@@ -7,7 +7,30 @@ export declare class AuthController {
     getProfile(req: any): Promise<{
         statusCode: HttpStatus;
         message: string;
-        data: any;
+        data: {
+            profile: {
+                id: string;
+                userId: string;
+                bio: string | null;
+                avatarUrl: string | null;
+                streak: number;
+                totalSessions: number;
+            };
+        } & {
+            level: string;
+            id: string;
+            clerkId: string;
+            fname: string;
+            lname: string;
+            gender: string | null;
+            hobbies: string[];
+            nativeLang: string;
+            overallLevel: string | null;
+            talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+            levelUpdatedAt: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        };
         error?: undefined;
     } | {
         statusCode: HttpStatus;
@@ -18,7 +41,30 @@ export declare class AuthController {
     getCurrentUser(req: any): Promise<{
         statusCode: HttpStatus;
         message: string;
-        data: any;
+        data: {
+            profile: {
+                id: string;
+                userId: string;
+                bio: string | null;
+                avatarUrl: string | null;
+                streak: number;
+                totalSessions: number;
+            };
+        } & {
+            level: string;
+            id: string;
+            clerkId: string;
+            fname: string;
+            lname: string;
+            gender: string | null;
+            hobbies: string[];
+            nativeLang: string;
+            overallLevel: string | null;
+            talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+            levelUpdatedAt: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        };
         error?: undefined;
     } | {
         statusCode: HttpStatus;
@@ -29,7 +75,30 @@ export declare class AuthController {
     registerUser(userData: any): Promise<{
         statusCode: HttpStatus;
         message: string;
-        data: any;
+        data: {
+            profile: {
+                id: string;
+                userId: string;
+                bio: string | null;
+                avatarUrl: string | null;
+                streak: number;
+                totalSessions: number;
+            };
+        } & {
+            level: string;
+            id: string;
+            clerkId: string;
+            fname: string;
+            lname: string;
+            gender: string | null;
+            hobbies: string[];
+            nativeLang: string;
+            overallLevel: string | null;
+            talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+            levelUpdatedAt: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        };
         error?: undefined;
     } | {
         statusCode: HttpStatus;

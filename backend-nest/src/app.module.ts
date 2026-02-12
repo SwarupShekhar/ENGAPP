@@ -41,7 +41,6 @@ import livekitConfig from './config/livekit.config';
       }),
       inject: [ConfigService],
     }),
-    DatabaseModule,
     RedisModule,
     AuthModule,
     MatchmakingModule,

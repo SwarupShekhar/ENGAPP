@@ -1,52 +1,60 @@
-import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../../database/postgres/database.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import { ClerkService } from '../../integrations/clerk.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
-    private database: DatabaseService,
+    private prisma: PrismaService,
     private clerkService: ClerkService,
   ) { }
 
   async validateUser(clerkId: string) {
     try {
       // First, try to find existing user in our database
-      const result = await this.database.query(
-        'SELECT * FROM "User" WHERE "clerkId" = $1',
-        [clerkId]
-      );
-
-      let user = result.rows[0];
+      let user = await this.prisma.user.findUnique({
+        where: { clerkId },
+        include: { profile: true }
+      });
 
       // If user doesn't exist, create them
       if (!user) {
+        this.logger.log(`DEBUG: User ${clerkId} NOT in Neon DB. Creating now...`);
         const clerkUser = await this.clerkService.getUser(clerkId);
         if (!clerkUser) {
           throw new Error('User not found in Clerk');
         }
 
-        const insertResult = await this.database.query(
-          'INSERT INTO "User" ("clerkId", "fname", "lname", "nativeLang", "level", "createdAt") VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
-          [clerkId, clerkUser.firstName || '', clerkUser.lastName || '', 'english', 'beginner']
-        );
-
-        user = insertResult.rows[0];
+        user = await this.prisma.user.create({
+          data: {
+            clerkId,
+            fname: clerkUser.firstName || '',
+            lname: clerkUser.lastName || '',
+            nativeLang: 'english',
+            level: 'beginner',
+            profile: {
+              create: {} // Create default empty profile
+            }
+          },
+          include: { profile: true }
+        });
+        this.logger.log(`DEBUG: User ${clerkId} successfully saved to PRISMA/NEON DATABASE.`);
       }
 
       return user;
     } catch (error) {
-      console.error('Error validating user:', error);
+      this.logger.error(`Error validating user ${clerkId}:`, error);
       throw error;
     }
   }
 
   async getUserProfile(userId: string) {
-    const result = await this.database.query(
-      'SELECT * FROM "User" WHERE "id" = $1',
-      [userId]
-    );
-    return result.rows[0];
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true }
+    });
   }
 
   async createUser(userData: {
@@ -59,48 +67,33 @@ export class AuthService {
     level: string;
   }) {
     try {
-      // Check if user already exists
-      const existing = await this.database.query(
-        'SELECT * FROM "User" WHERE "clerkId" = $1',
-        [userData.clerkId]
-      );
-      if (existing.rows.length > 0) {
-        return existing.rows[0]; // Already registered
-      }
-
-      // Format hobbies as PostgreSQL array literal: {item1,item2}
-      const hobbiesArr = userData.hobbies && userData.hobbies.length > 0
-        ? `{${userData.hobbies.map(h => `"${h.replace(/"/g, '\\"')}"`).join(',')}}`
-        : '{}';
-
-      const result = await this.database.query(
-        'INSERT INTO "User" ("clerkId", "fname", "lname", "gender", "hobbies", "nativeLang", "level", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5::text[], $6, $7, NOW(), NOW()) RETURNING *',
-        [
-          userData.clerkId,
-          userData.fname,
-          userData.lname,
-          userData.gender || null,
-          hobbiesArr,
-          userData.nativeLang,
-          userData.level
-        ]
-      );
-
-      const user = result.rows[0];
-
-      // Create default profile
-      try {
-        await this.database.query(
-          'INSERT INTO "Profile" ("id", "userId") VALUES (gen_random_uuid(), $1)',
-          [user.id]
-        );
-      } catch (profileErr) {
-        console.log('Profile creation skipped (may already exist):', profileErr);
-      }
+      // Create user and profile in a single transaction (Prisma handles this via connectOrCreate or nested create)
+      const user = await this.prisma.user.upsert({
+        where: { clerkId: userData.clerkId },
+        update: {
+          gender: userData.gender,
+          hobbies: userData.hobbies || [],
+          nativeLang: userData.nativeLang,
+          level: userData.level,
+        },
+        create: {
+          clerkId: userData.clerkId,
+          fname: userData.fname,
+          lname: userData.lname,
+          gender: userData.gender,
+          hobbies: userData.hobbies || [],
+          nativeLang: userData.nativeLang,
+          level: userData.level,
+          profile: {
+            create: {}
+          }
+        },
+        include: { profile: true }
+      });
 
       return user;
     } catch (error) {
-      console.error('Error creating user:', error);
+      this.logger.error('Error creating user:', error);
       throw error;
     }
   }
