@@ -1,0 +1,148 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { theme } from '../../theme/theme';
+import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
+
+const { width } = Dimensions.get('window');
+
+export default function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+    return (
+        <View style={styles.container}>
+            <View style={styles.tabBar}>
+                {state.routes.map((route, index) => {
+                    const { options } = descriptors[route.key];
+                    const isFocused = state.index === index;
+
+                    const onPress = () => {
+                        const event = navigation.emit({
+                            type: 'tabPress',
+                            target: route.key,
+                            canPreventDefault: true,
+                        });
+
+                        if (!isFocused && !event.defaultPrevented) {
+                            navigation.navigate(route.name);
+                        }
+                    };
+
+                    // Center Button (Call)
+                    if (index === 2) {
+                        return (
+                            <View key={index} style={styles.centerButtonContainer}>
+                                <TouchableOpacity
+                                    activeOpacity={0.9}
+                                    onPress={onPress}
+                                    style={styles.centerButton}
+                                >
+                                    <LinearGradient
+                                        colors={theme.colors.gradients.primary}
+                                        style={styles.gradientCircle}
+                                    >
+                                        <Ionicons name="call" size={32} color="white" />
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    }
+
+                    let iconName: any = 'home';
+                    if (route.name === 'Home') iconName = isFocused ? 'home' : 'home-outline';
+                    if (route.name === 'Feedback') iconName = isFocused ? 'document-text' : 'document-text-outline';
+                    if (route.name === 'Progress') iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
+                    if (route.name === 'Profile') iconName = isFocused ? 'person' : 'person-outline';
+
+                    return (
+                        <TouchableOpacity
+                            key={index}
+                            accessibilityRole="button"
+                            accessibilityState={isFocused ? { selected: true } : {}}
+                            accessibilityLabel={options.tabBarAccessibilityLabel}
+                            testID={(options as any).tabBarTestID}
+                            onPress={onPress}
+                            style={styles.tabItem}
+                        >
+                            <Ionicons
+                                name={iconName}
+                                size={24}
+                                color={isFocused ? theme.colors.primary : theme.colors.text.secondary}
+                            />
+                            <Text
+                                style={[
+                                    styles.label,
+                                    { color: isFocused ? theme.colors.primary : theme.colors.text.secondary },
+                                ]}
+                            >
+                                {route.name}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        marginBottom: Platform.OS === 'ios' ? 20 : 10,
+    },
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: 'white',
+        width: width * 0.92,
+        height: 70,
+        borderRadius: 35,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
+        justifyContent: 'space-between',
+        paddingHorizontal: 10,
+        alignItems: 'center',
+    },
+    tabItem: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+    },
+    label: {
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    centerButtonContainer: {
+        width: 70,
+        height: 70,
+        marginTop: -40, // Pulls it up
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    centerButton: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        shadowColor: theme.colors.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    gradientCircle: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+});
