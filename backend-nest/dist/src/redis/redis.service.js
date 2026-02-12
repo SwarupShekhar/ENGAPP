@@ -21,6 +21,7 @@ let RedisService = class RedisService {
         this.client = new ioredis_1.default({
             host: this.configService.get('REDIS_HOST', 'localhost'),
             port: this.configService.get('REDIS_PORT', 6379),
+            username: this.configService.get('REDIS_USERNAME', 'default'),
             password: this.configService.get('REDIS_PASSWORD'),
             db: 0,
             retryStrategy: (times) => {

@@ -6,12 +6,13 @@ import Redis from 'ioredis';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) { }
 
   async onModuleInit() {
     this.client = new Redis({
       host: this.configService.get('REDIS_HOST', 'localhost'),
       port: this.configService.get('REDIS_PORT', 6379),
+      username: this.configService.get('REDIS_USERNAME', 'default'),
       password: this.configService.get('REDIS_PASSWORD'),
       db: 0,
       retryStrategy: (times) => {
