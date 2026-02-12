@@ -14,7 +14,6 @@ const schedule_1 = require("@nestjs/schedule");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const auth_module_1 = require("./modules/auth/auth.module");
-const database_module_1 = require("./database/postgres/database.module");
 const redis_module_1 = require("./redis/redis.module");
 const matchmaking_module_1 = require("./modules/matchmaking/matchmaking.module");
 const livekit_module_1 = require("./modules/livekit/livekit.module");
@@ -52,7 +51,6 @@ exports.AppModule = AppModule = __decorate([
                 }),
                 inject: [config_1.ConfigService],
             }),
-            database_module_1.DatabaseModule,
             redis_module_1.RedisModule,
             auth_module_1.AuthModule,
             matchmaking_module_1.MatchmakingModule,

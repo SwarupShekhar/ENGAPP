@@ -1,11 +1,58 @@
-import { DatabaseService } from '../../database/postgres/database.service';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import { ClerkService } from '../../integrations/clerk.service';
 export declare class AuthService {
-    private database;
+    private prisma;
     private clerkService;
-    constructor(database: DatabaseService, clerkService: ClerkService);
-    validateUser(clerkId: string): Promise<any>;
-    getUserProfile(userId: string): Promise<any>;
+    private readonly logger;
+    constructor(prisma: PrismaService, clerkService: ClerkService);
+    validateUser(clerkId: string): Promise<{
+        profile: {
+            id: string;
+            userId: string;
+            bio: string | null;
+            avatarUrl: string | null;
+            streak: number;
+            totalSessions: number;
+        };
+    } & {
+        level: string;
+        id: string;
+        clerkId: string;
+        fname: string;
+        lname: string;
+        gender: string | null;
+        hobbies: string[];
+        nativeLang: string;
+        overallLevel: string | null;
+        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+        levelUpdatedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    getUserProfile(userId: string): Promise<{
+        profile: {
+            id: string;
+            userId: string;
+            bio: string | null;
+            avatarUrl: string | null;
+            streak: number;
+            totalSessions: number;
+        };
+    } & {
+        level: string;
+        id: string;
+        clerkId: string;
+        fname: string;
+        lname: string;
+        gender: string | null;
+        hobbies: string[];
+        nativeLang: string;
+        overallLevel: string | null;
+        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+        levelUpdatedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
     createUser(userData: {
         clerkId: string;
         fname: string;
@@ -14,5 +61,28 @@ export declare class AuthService {
         hobbies?: string[];
         nativeLang: string;
         level: string;
-    }): Promise<any>;
+    }): Promise<{
+        profile: {
+            id: string;
+            userId: string;
+            bio: string | null;
+            avatarUrl: string | null;
+            streak: number;
+            totalSessions: number;
+        };
+    } & {
+        level: string;
+        id: string;
+        clerkId: string;
+        fname: string;
+        lname: string;
+        gender: string | null;
+        hobbies: string[];
+        nativeLang: string;
+        overallLevel: string | null;
+        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+        levelUpdatedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
 }
