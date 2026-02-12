@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
-import { DatabaseModule } from './database/postgres/database.module';
 import { RedisModule } from './redis/redis.module';
 import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
 import { LivekitModule } from './modules/livekit/livekit.module';
