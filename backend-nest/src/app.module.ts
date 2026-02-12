@@ -33,9 +33,10 @@ import livekitConfig from './config/livekit.config';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         redis: {
-          host: configService.get('redis.host') || 'localhost',
-          port: configService.get('redis.port') || 6379,
-          password: configService.get('redis.password'),
+          host: configService.get('REDIS_HOST') || 'localhost',
+          port: configService.get('REDIS_PORT') || 6379,
+          username: configService.get('REDIS_USERNAME') || 'default',
+          password: configService.get('REDIS_PASSWORD'),
         },
       }),
       inject: [ConfigService],
