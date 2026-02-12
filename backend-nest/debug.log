@@ -1,0 +1,3 @@
+[ChatGateway] User user_a messaging user_b
+[FriendshipService] Checking friendship: user_a <-> user_b
+[FriendshipService] Result: {"id":"e61524a2-68fe-4868-81c5-c4147e8c7830","requesterId":"user_a","addresseeId":"user_b","status":"ACCEPTED","createdAt":"2026-02-11T12:22:10.436Z","updatedAt":"2026-02-11T12:22:10.436Z"}

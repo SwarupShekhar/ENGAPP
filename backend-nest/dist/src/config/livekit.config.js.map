@@ -1,0 +1,1 @@
+{"version":3,"file":"livekit.config.js","sourceRoot":"","sources":["../../../src/config/livekit.config.ts"],"names":[],"mappings":";;AAAA,2CAA4C;AAE5C,kBAAe,IAAA,mBAAU,EAAC,SAAS,EAAE,GAAG,EAAE,CAAC,CAAC;IACxC,GAAG,EAAE,OAAO,CAAC,GAAG,CAAC,WAAW;IAC5B,MAAM,EAAE,OAAO,CAAC,GAAG,CAAC,eAAe;IACnC,SAAS,EAAE,OAAO,CAAC,GAAG,CAAC,kBAAkB;CAC5C,CAAC,CAAC,CAAC"}

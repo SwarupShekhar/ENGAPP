@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User model
+model User {
+  id         String   @id @default(uuid())
+  clerkId    String   @unique
+  fname      String
+  lname      String
+  gender     String?
+  hobbies    String[]
+  nativeLang String
+  level      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  participants SessionParticipant[]
+  tasks        LearningTask[]
+  profile      Profile?
+
+  // Reviews given and received
+  reviewsGiven    PartnerReview[] @relation("ReviewsGiven")
+  reviewsReceived PartnerReview[] @relation("ReviewsReceived")
+
+  // Blocking relations
+  blockedUsers BlockedUser[] @relation("BlockingUser")
+  blockedBy    BlockedUser[] @relation("BlockedUser")
+
+  @@index([clerkId])
+}
+
+model Profile {
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  bio           String?
+  avatarUrl     String?
+  streak        Int     @default(0)
+  totalSessions Int     @default(0)
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConversationSession {
+  id        String    @id @default(uuid())
+  topic     String?
+  status    String    @default("CREATED") // CREATED, IN_PROGRESS, ENDED, PROCESSING, COMPLETED, ANALYSIS_FAILED
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  duration  Int? // in seconds
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  participants SessionParticipant[]
+  analyses     Analysis[]
+  tasks        LearningTask[]
+  feedback     Feedback?
+  reviews      PartnerReview[]
+}
+
+model SessionParticipant {
+  id            String   @id @default(uuid())
+  sessionId     String
+  userId        String
+  audioUrl      String?
+  speakingTime  Int      @default(0)
+  turnsTaken    Int      @default(0)
+  lastHeartbeat DateTime @default(now())
+
+  session  ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis Analysis?
+
+  @@unique([sessionId, userId])
+}
+
+model Analysis {
+  id            String   @id @default(uuid())
+  sessionId     String
+  participantId String   @unique // Refers to SessionParticipant.id
+  rawData       Json // Stores full FastAPI response
+  cefrLevel     String?
+  scores        Json // { grammar, pronunciation, fluency, vocabulary, overall }
+  createdAt     DateTime @default(now())
+
+  session             ConversationSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant         SessionParticipant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  mistakes            Mistake[]
+  pronunciationIssues PronunciationIssue[]
+
+  @@unique([sessionId, participantId])
+  @@index([sessionId])
+}
+
+model Mistake {
+  id           String   @id @default(uuid())
+  analysisId   String
+  type         String // verb_form, article, etc.
+  severity     String   @default("medium")
+  segmentId    String
+  original     String
+  corrected    String
+  rule         String?
+  explanation  String
+  cefrLevel    String?
+  timestamp    Float
+  reviewed     Boolean  @default(false)
+  masteryScore Float?
+  createdAt    DateTime @default(now())
+
+  analysis Analysis      @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  tasks    TaskMistake[]
+
+  @@index([analysisId])
+}
+
+model PronunciationIssue {
+  id               String   @id @default(uuid())
+  analysisId       String
+  word             String
+  segmentId        String?
+  phoneticExpected String?
+  phoneticActual   String?
+  issueType        String?
+  severity         String   @default("medium")
+  suggestion       String?
+  audioStart       Float?
+  audioEnd         Float?
+  confidence       Float?
+  createdAt        DateTime @default(now())
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model LearningTask {
+  id               String    @id @default(uuid())
+  userId           String
+  sessionId        String?
+  type             String // grammar_drill, flashcard, etc.
+  title            String
+  content          Json
+  status           String    @default("pending") // pending, completed
+  estimatedMinutes Int       @default(5)
+  dueDate          DateTime
+  completedAt      DateTime?
+  score            Float?
+  createdAt        DateTime  @default(now())
+
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session  ConversationSession? @relation(fields: [sessionId], references: [id])
+  mistakes TaskMistake[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TaskMistake {
+  taskId    String
+  mistakeId String
+
+  task    LearningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  mistake Mistake      @relation(fields: [mistakeId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, mistakeId])
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  sessionId  String   @unique
+  transcript String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model PartnerReview {
+  id         String   @id @default(uuid())
+  sessionId  String
+  reviewerId String
+  revieweeId String
+  rating     Int // 1-5
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  session  ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reviewer User                @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee User                @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, reviewerId])
+  @@index([revieweeId])
+}
+
+model BlockedUser {
+  id            String   @id @default(uuid())
+  blockerId     String
+  blockedUserId String
+  createdAt     DateTime @default(now())
+
+  blocker     User @relation("BlockingUser", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedUser User @relation("BlockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedUserId])
+  @@index([blockedUserId])
+}

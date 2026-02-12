@@ -1,0 +1,31 @@
+import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
+export declare class RedisService implements OnModuleInit, OnModuleDestroy {
+    private configService;
+    private client;
+    constructor(configService: ConfigService);
+    onModuleInit(): Promise<void>;
+    onModuleDestroy(): Promise<void>;
+    getClient(): Redis;
+    set(key: string, value: string, expireInSeconds?: number): Promise<void>;
+    get(key: string): Promise<string | null>;
+    del(key: string): Promise<number>;
+    exists(key: string): Promise<number>;
+    expire(key: string, seconds: number): Promise<number>;
+    hset(key: string, field: string, value: string): Promise<number>;
+    hget(key: string, field: string): Promise<string | null>;
+    hgetall(key: string): Promise<Record<string, string>>;
+    hdel(key: string, ...fields: string[]): Promise<number>;
+    lpush(key: string, ...values: string[]): Promise<number>;
+    rpush(key: string, ...values: string[]): Promise<number>;
+    lrange(key: string, start: number, stop: number): Promise<string[]>;
+    llen(key: string): Promise<number>;
+    sadd(key: string, ...members: string[]): Promise<number>;
+    smembers(key: string): Promise<string[]>;
+    sismember(key: string, member: string): Promise<number>;
+    zadd(key: string, score: number, member: string): Promise<number>;
+    zrange(key: string, start: number, stop: number): Promise<string[]>;
+    zrevrange(key: string, start: number, stop: number): Promise<string[]>;
+    zcard(key: string): Promise<number>;
+}

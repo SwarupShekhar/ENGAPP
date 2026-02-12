@@ -1,0 +1,30 @@
+[SessionsProcessor] Error processing session 1ccaf8a7-c043-46af-a8c3-b8299240db90: Request failed with status code 409
+Stack: AxiosError: Request failed with status code 409
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/azure/azure.service.ts:21:34)
+[SessionsProcessor] Error processing session 1ccaf8a7-c043-46af-a8c3-b8299240db90: Request failed with status code 409
+Stack: AxiosError: Request failed with status code 409
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/azure/azure.service.ts:21:34)
+[SessionsProcessor] Error processing session 1ccaf8a7-c043-46af-a8c3-b8299240db90: Request failed with status code 409
+Stack: AxiosError: Request failed with status code 409
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/azure/azure.service.ts:21:34)
