@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     )
     
     # Application
-    app_name: str = "englivo-ai-engine"
+    app_name: str = "engR-ai-engine"
     environment: str = "development"
-    debug: bool = False
+    debug: bool = True
     log_level: str = "INFO"
     
     # Server
