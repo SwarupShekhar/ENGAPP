@@ -62,29 +62,38 @@ export class AssessmentService {
     }
 
     async submitPhase(dto: SubmitPhaseDto) {
-        const session = await this.prisma.assessmentSession.findUnique({
-            where: { id: dto.assessmentId }
-        });
+        this.logger.log(`Submitting phase ${dto.phase} for assessment ${dto.assessmentId}`);
+        try {
+            const session = await this.prisma.assessmentSession.findUnique({
+                where: { id: dto.assessmentId }
+            });
 
-        if (!session || session.status !== 'IN_PROGRESS') {
-            throw new BadRequestException('Invalid or completed assessment session');
-        }
+            if (!session || session.status !== 'IN_PROGRESS') {
+                this.logger.warn(`Invalid session or status: ${session?.status}`);
+                throw new BadRequestException('Invalid or completed assessment session');
+            }
 
-        const audioBuffer = Buffer.from(dto.audioBase64, 'base64');
-        const audioKey = `assessments/${session.id}/${dto.phase.toLowerCase()}${dto.attempt ? `-at${dto.attempt}` : ''}.wav`;
-        const audioUrl = await this.storage.uploadFile(audioBuffer, audioKey, 'audio/wav');
+            this.logger.log(`Uploading audio for ${dto.phase}...`);
+            const audioBuffer = Buffer.from(dto.audioBase64, 'base64');
+            const audioKey = `assessments/${session.id}/${dto.phase.toLowerCase()}${dto.attempt ? `-at${dto.attempt}` : ''}.wav`;
+            const audioUrl = await this.storage.uploadFile(audioBuffer, audioKey, 'audio/wav');
+            this.logger.log(`Audio uploaded to ${audioUrl}`);
 
-        switch (dto.phase) {
-            case AssessmentPhase.PHASE_1:
-                return this.handlePhase1(session, audioUrl);
-            case AssessmentPhase.PHASE_2:
-                return this.handlePhase2(session, audioUrl, dto.attempt || 1);
-            case AssessmentPhase.PHASE_3:
-                return this.handlePhase3(session, audioUrl);
-            case AssessmentPhase.PHASE_4:
-                return this.handlePhase4(session, audioUrl);
-            default:
-                throw new BadRequestException('Invalid phase');
+            switch (dto.phase) {
+                case AssessmentPhase.PHASE_1:
+                    return await this.handlePhase1(session, audioUrl);
+                case AssessmentPhase.PHASE_2:
+                    return await this.handlePhase2(session, audioUrl, dto.attempt || 1);
+                case AssessmentPhase.PHASE_3:
+                    return await this.handlePhase3(session, audioUrl);
+                case AssessmentPhase.PHASE_4:
+                    return await this.handlePhase4(session, audioUrl);
+                default:
+                    throw new BadRequestException('Invalid phase');
+            }
+        } catch (error) {
+            this.logger.error(`Error in submitPhase: ${error.message}`, error.stack);
+            throw error;
         }
     }
 

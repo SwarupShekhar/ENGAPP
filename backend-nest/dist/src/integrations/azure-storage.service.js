@@ -31,6 +31,9 @@ let AzureStorageService = AzureStorageService_1 = class AzureStorageService {
         }
     }
     async uploadFile(file, key, contentType) {
+        if (!this.blobServiceClient) {
+            throw new Error('Azure Storage not initialized (missing connection string)');
+        }
         try {
             const containerClient = this.blobServiceClient.getContainerClient(this.containerName);
             await containerClient.createIfNotExists();

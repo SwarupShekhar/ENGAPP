@@ -15,7 +15,7 @@ export const client = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 30000, // 30s timeout for Render spin-up
+    timeout: 90000, // 90s timeout for Render cold start + AI processing
 });
 
 let getToken: (() => Promise<string | null>) | null = null;
