@@ -3,15 +3,19 @@ import { useAuth } from '@clerk/clerk-expo';
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
-const API_URL = IS_PROD
+const FORCE_PRODUCTION = true; // Use Render backend even in dev mode
+const API_URL = (IS_PROD || FORCE_PRODUCTION)
     ? 'https://engapp-3210.onrender.com'
-    : 'http://10.0.2.2:3000'; // Local dev (Android Emulator)
+    : 'http://10.0.2.2:3000';
+
+console.log(`[API] Initializing client with URL: ${API_URL}`);
 
 export const client = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30s timeout for Render spin-up
 });
 
 let getToken: (() => Promise<string | null>) | null = null;

@@ -177,11 +177,15 @@ export default function CreateProfileScreen({ navigation, onFinish }: any) {
 
             // 2. Register user in backend DB (non-blocking)
             console.log('2. Syncing with backend...');
+            const nameParts = name.trim().split(' ');
+            const firstName = nameParts[0];
+            const lastName = nameParts.slice(1).join(' ');
+
             try {
                 await client.post('/auth/register', {
                     clerkId: user.id,
-                    firstName: name.trim(),
-                    lastName: '',
+                    firstName: firstName,
+                    lastName: lastName,
                     gender: gender || 'prefer_not_to_say',
                     hobbies: interests,
                     nativeLang: nativeLanguage || 'english',

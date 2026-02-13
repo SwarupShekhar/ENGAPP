@@ -1,14 +1,26 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActionSheetIOS, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { theme } from '../../theme/theme';
+import { useAuth } from '@clerk/clerk-expo';
 
 export default function AssessmentIntroScreen({ navigation }: any) {
+    const { signOut } = useAuth();
+
+    const handleSignOut = () => {
+        signOut();
+    };
+
     return (
         <SafeAreaView style={styles.container}>
+            <View style={styles.debugHeader}>
+                <TouchableOpacity onPress={handleSignOut} style={styles.debugBtn}>
+                    <Text style={styles.debugBtnText}>Sign Out & Reset</Text>
+                </TouchableOpacity>
+            </View>
             <LinearGradient
                 colors={theme.colors.gradients.surface}
                 style={styles.background}
@@ -113,6 +125,25 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: '40%',
+    },
+    debugHeader: {
+        position: 'absolute',
+        top: 60,
+        right: 20,
+        zIndex: 100,
+    },
+    debugBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: theme.colors.error + '20',
+        borderWidth: 1,
+        borderColor: theme.colors.error,
+    },
+    debugBtnText: {
+        color: theme.colors.error,
+        fontSize: 12,
+        fontWeight: '600',
     },
     content: {
         flex: 1,
