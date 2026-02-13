@@ -27,7 +27,7 @@ export class BrainService {
                 })
             );
 
-            const data = response.data;
+            const data = response.data.data;
 
             // Map generic response to required format
             // If backend-ai doesn't return exactly what we need, we fallback or derive
@@ -68,7 +68,7 @@ export class BrainService {
                 })
             );
 
-            const data = response.data;
+            const data = response.data.data;
 
             // Map backend-ai errors to mistake format
             const mistakes = data.errors.map(e => ({

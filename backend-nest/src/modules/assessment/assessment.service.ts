@@ -115,10 +115,12 @@ export class AssessmentService {
             audioUrl
         };
 
+        this.logger.log(`Updating session ${session.id} with Phase 1 data...`);
         await this.prisma.assessmentSession.update({
             where: { id: session.id },
             data: { phase1Data }
         });
+        this.logger.log(`Phase 1 data stored for session ${session.id}`);
 
         return { nextPhase: AssessmentPhase.PHASE_2, nextSentence: { text: ELICITED_SENTENCES.B1, level: 'B1' } };
     }
@@ -140,10 +142,12 @@ export class AssessmentService {
             const nextLevel = result.accuracyScore >= 70 ? 'C1' : 'A2';
             phase2Data.adaptiveSentence = { text: ELICITED_SENTENCES[nextLevel], level: nextLevel };
 
+            this.logger.log(`Storing Phase 2 Attempt 1 data for session ${session.id}...`);
             await this.prisma.assessmentSession.update({
                 where: { id: session.id },
                 data: { phase2Data }
             });
+            this.logger.log(`Phase 2 Attempt 1 data stored for session ${session.id}`);
 
             return { nextPhase: AssessmentPhase.PHASE_2, nextSentence: phase2Data.adaptiveSentence };
         } else {
@@ -151,10 +155,12 @@ export class AssessmentService {
             phase2Data.finalPronunciationScore = ((phase2Data.attempt1.accuracyScore || 0) + (attemptData.accuracyScore || 0)) / 2;
             phase2Data.finalFluencyScore = ((phase2Data.attempt1.fluencyScore || 0) + (attemptData.fluencyScore || 0)) / 2;
 
+            this.logger.log(`Storing Phase 2 final data for session ${session.id}...`);
             await this.prisma.assessmentSession.update({
                 where: { id: session.id },
                 data: { phase2Data }
             });
+            this.logger.log(`Phase 2 final data stored for session ${session.id}`);
 
             // Select image for Phase 3
             let imgLevel = 'B1';
@@ -191,10 +197,12 @@ export class AssessmentService {
             audioUrl
         };
 
+        this.logger.log(`Storing Phase 3 data for session ${session.id}...`);
         await this.prisma.assessmentSession.update({
             where: { id: session.id },
             data: { phase3Data, talkStyle: geminiResult.talkStyle as any }
         });
+        this.logger.log(`Phase 3 data stored for session ${session.id}`);
 
         return { nextPhase: AssessmentPhase.PHASE_4, question: "What is your biggest challenge in learning English?" };
     }
@@ -210,10 +218,12 @@ export class AssessmentService {
             audioUrl
         };
 
+        this.logger.log(`Storing Phase 4 data for session ${session.id}...`);
         const updatedSession = await this.prisma.assessmentSession.update({
             where: { id: session.id },
             data: { phase4Data }
         });
+        this.logger.log(`Phase 4 data stored for session ${session.id}. Proceeding to final calculation.`);
 
         return this.calculateFinalLevel(updatedSession.id);
     }

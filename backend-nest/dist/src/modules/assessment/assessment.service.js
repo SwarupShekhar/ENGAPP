@@ -111,10 +111,12 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
             wordCount: result.wordCount,
             audioUrl
         };
+        this.logger.log(`Updating session ${session.id} with Phase 1 data...`);
         await this.prisma.assessmentSession.update({
             where: { id: session.id },
             data: { phase1Data }
         });
+        this.logger.log(`Phase 1 data stored for session ${session.id}`);
         return { nextPhase: assessment_dto_1.AssessmentPhase.PHASE_2, nextSentence: { text: ELICITED_SENTENCES.B1, level: 'B1' } };
     }
     async handlePhase2(session, audioUrl, attempt) {
@@ -131,20 +133,24 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
             phase2Data.attempt1 = attemptData;
             const nextLevel = result.accuracyScore >= 70 ? 'C1' : 'A2';
             phase2Data.adaptiveSentence = { text: ELICITED_SENTENCES[nextLevel], level: nextLevel };
+            this.logger.log(`Storing Phase 2 Attempt 1 data for session ${session.id}...`);
             await this.prisma.assessmentSession.update({
                 where: { id: session.id },
                 data: { phase2Data }
             });
+            this.logger.log(`Phase 2 Attempt 1 data stored for session ${session.id}`);
             return { nextPhase: assessment_dto_1.AssessmentPhase.PHASE_2, nextSentence: phase2Data.adaptiveSentence };
         }
         else {
             phase2Data.attempt2 = attemptData;
             phase2Data.finalPronunciationScore = ((phase2Data.attempt1.accuracyScore || 0) + (attemptData.accuracyScore || 0)) / 2;
             phase2Data.finalFluencyScore = ((phase2Data.attempt1.fluencyScore || 0) + (attemptData.fluencyScore || 0)) / 2;
+            this.logger.log(`Storing Phase 2 final data for session ${session.id}...`);
             await this.prisma.assessmentSession.update({
                 where: { id: session.id },
                 data: { phase2Data }
             });
+            this.logger.log(`Phase 2 final data stored for session ${session.id}`);
             let imgLevel = 'B1';
             const pron = phase2Data.finalPronunciationScore;
             if (pron < 50)
@@ -172,10 +178,12 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
             transcript: azureResult.transcript,
             audioUrl
         };
+        this.logger.log(`Storing Phase 3 data for session ${session.id}...`);
         await this.prisma.assessmentSession.update({
             where: { id: session.id },
             data: { phase3Data, talkStyle: geminiResult.talkStyle }
         });
+        this.logger.log(`Phase 3 data stored for session ${session.id}`);
         return { nextPhase: assessment_dto_1.AssessmentPhase.PHASE_4, question: "What is your biggest challenge in learning English?" };
     }
     async handlePhase4(session, audioUrl) {
@@ -187,10 +195,12 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
             transcript: result.transcript,
             audioUrl
         };
+        this.logger.log(`Storing Phase 4 data for session ${session.id}...`);
         const updatedSession = await this.prisma.assessmentSession.update({
             where: { id: session.id },
             data: { phase4Data }
         });
+        this.logger.log(`Phase 4 data stored for session ${session.id}. Proceeding to final calculation.`);
         return this.calculateFinalLevel(updatedSession.id);
     }
     async calculateFinalLevel(assessmentId) {

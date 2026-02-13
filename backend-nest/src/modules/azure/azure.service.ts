@@ -36,7 +36,7 @@ export class AzureService {
                         session_id: "system"
                     })
                 );
-                transcript = transResponse.data.text;
+                transcript = transResponse.data.data.text;
             }
 
             // 2. Perform Pronunciation Assessment (invokes Prosody + Azure)
@@ -48,7 +48,7 @@ export class AzureService {
                 })
             );
 
-            const data = pronResponse.data;
+            const data = pronResponse.data.data;
 
             return {
                 transcript: transcript,
@@ -63,7 +63,16 @@ export class AzureService {
 
         } catch (error) {
             this.logger.error(`AI Engine call failed: ${error.message}`);
-            // Fallback or rethrow? Rethrow for now to surface issues
+            if (error.response) {
+                // The request was made and the server responded with a status code
+                // that falls out of the range of 2xx
+                this.logger.error(`AI Engine Response Status: ${error.response.status}`);
+                this.logger.error(`AI Engine Response Data: ${JSON.stringify(error.response.data)}`);
+            } else if (error.request) {
+                // The request was made but no response was received
+                this.logger.error('AI Engine No Response received');
+            }
+            // Rethrow to be caught by AllExceptionsFilter or controller
             throw error;
         }
     }
