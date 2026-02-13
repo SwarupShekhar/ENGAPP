@@ -1,26 +1,26 @@
 export const theme = {
     colors: {
-        primary: '#4F46E5', // Indigo-600
-        primaryLight: '#818CF8', // Indigo-400
+        primary: '#6366F1', // Indigo-500 (Vibrant)
+        primaryLight: '#A5B4FC',
         secondary: '#10B981', // Emerald-500
-        secondaryLight: '#34D399', // Emerald-400
-        background: '#F9FAFB', // Gray-50
-        surface: '#FFFFFF',
+        secondaryLight: '#6EE7B7',
+        background: '#0F172A', // Slate-900 (Dark Mode Base)
+        surface: '#1E293B',    // Slate-800 (Card Base)
         text: {
-            primary: '#111827', // Gray-900
-            secondary: '#6B7280', // Gray-500
-            light: '#F3F4F6', // Gray-100
-            accent: '#4F46E5',
+            primary: '#F8FAFC',
+            secondary: '#94A3B8',
+            light: '#E2E8F0',
+            accent: '#818CF8',
         },
-        error: '#EF4444',
+        error: '#F43F5E',
         success: '#10B981',
         warning: '#F59E0B',
-        border: '#E5E7EB',
+        border: '#334155',
         gradients: {
-            primary: ['#4F46E5', '#818CF8'] as const,
+            primary: ['#6366F1', '#A855F7'] as const, // Indigo to Purple
             secondary: ['#10B981', '#34D399'] as const,
-            surface: ['#FFFFFF', '#F9FAFB'] as const,
-            darkParams: ['#1F2937', '#111827'] as const, // For dark mode look
+            surface: ['#1E293B', '#334155'] as const, // Glassmorphism-style depth
+            premium: ['#8B5CF6', '#D946EF'] as const, // Violet to Fuchsia
         }
     },
     spacing: {
