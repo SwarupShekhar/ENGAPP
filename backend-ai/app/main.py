@@ -45,7 +45,8 @@ app = FastAPI(
     version="1.1.0",
     lifespan=lifespan,
     docs_url="/docs" if settings.environment != "production" else None,
-    redoc_url=None
+    redoc_url=None,
+    debug=True
 )
 
 # 2. Middleware Stack (Order matters: Bottom-up execution)

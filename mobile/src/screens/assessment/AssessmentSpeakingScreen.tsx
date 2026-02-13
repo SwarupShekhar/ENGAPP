@@ -123,9 +123,10 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
                 navigation.replace('AssessmentResult', { result: res });
             }
 
-        } catch (err) {
-            console.error(err);
-            Alert.alert("Error", "Submission failed. Please try again.");
+        } catch (err: any) {
+            console.error('Assessment submit error:', JSON.stringify(err?.response?.data || err?.message));
+            const serverMsg = err?.response?.data?.message || err?.message || "Unknown error";
+            Alert.alert("Error", `Submission failed: ${serverMsg}`);
         } finally {
             setIsSubmitting(false);
         }

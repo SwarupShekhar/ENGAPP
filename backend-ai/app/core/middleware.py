@@ -42,6 +42,18 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             
         except Exception as e:
             process_time = time.time() - start_time
+            
+            # DEBUG: Write to file
+            try:
+                import traceback
+                with open("middleware_error.log", "a") as f:
+                    f.write(f"\n--- MIDDLEWARE ERROR at {time.time()} ---\n")
+                    f.write(f"Path: {request.url.path}\n")
+                    f.write(f"Error: {str(e)}\n")
+                    f.write(traceback.format_exc())
+            except:
+                pass
+
             structlog_logger.error(
                 "request_failed",
                 method=request.method,
@@ -49,4 +61,6 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
                 error=str(e),
                 duration=process_time,
             )
+            # Do NOT raise, verify if we can return JSON response here?
+            # Re-raising should trigger global handler.
             raise e

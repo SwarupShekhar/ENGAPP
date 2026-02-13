@@ -14,18 +14,26 @@ async def transcribe_audio(
     service: TranscriptionService = Depends(lambda: transcription_service)
 ):
     log = get_logger(request)
-    log.info("endpoint_transcribe_started", user_id=body.user_id)
-    
-    start_time = time.time()
-    result = await service.transcribe(body)
-    
-    processing_time_ms = int((time.time() - start_time) * 1000)
-    
-    return StandardResponse(
-        success=True,
-        data=result,
-        meta=Meta(
-            processing_time_ms=processing_time_ms,
-            request_id=getattr(request.state, "request_id", None)
+    try:
+        log.info("endpoint_transcribe_started", user_id=body.user_id)
+        
+        start_time = time.time()
+        print(f"DEBUG: Calling service.transcribe for user {body.user_id}")
+        result = await service.transcribe(body)
+        print("DEBUG: Service returned result")
+        
+        processing_time_ms = int((time.time() - start_time) * 1000)
+        
+        return StandardResponse(
+            success=True,
+            data=result,
+            meta=Meta(
+                processing_time_ms=processing_time_ms,
+                request_id=getattr(request.state, "request_id", None)
+            )
         )
-    )
+    except Exception as e:
+        print(f"DEBUG: Error in transcribe endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise e

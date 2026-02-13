@@ -138,5 +138,5 @@ class GeminiResponseParser:
         
         return result
 
-def parse_gemini_analysis(text: str) -> Dict[str, Any]:
+def robust_json_parser(text: str) -> Dict[str, Any]:
     return GeminiResponseParser.parse_analysis_response(text)
