@@ -55,82 +55,50 @@ class TranscriptionService:
             logger.warning("word_extraction_failed", error=str(e))
         return words
 
-    @retry(
-        retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        reraise=True
-    )
     @cached(prefix="transcript", ttl=settings.cache_ttl_transcription)
     async def transcribe(self, request: TranscriptionRequest) -> TranscriptionResponse:
         start_time = time.time()
-        temp_path = None
         
         try:
-            if not self.speech_config:
-                raise ValueError("Azure Speech is not configured")
-
-            # 1. Validate and download streamed
+            from app.utils.async_azure_speech import azure_speech
+            
+            # 1. Validate and download bytes
             is_valid, error = await validate_audio_url(str(request.audio_url))
             if not is_valid:
                 raise ValueError(error)
 
-            temp_path = tempfile.mktemp(suffix=".wav")
-            await download_audio_streamed(str(request.audio_url), temp_path)
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(str(request.audio_url))
+                response.raise_for_status()
+                audio_bytes = response.content
 
-            # 2. Configure SDK
-            audio_config = speechsdk.audio.AudioConfig(filename=temp_path)
-            self.speech_config.speech_recognition_language = request.language
-            recognizer = speechsdk.SpeechRecognizer(
-                speech_config=self.speech_config, 
-                audio_config=audio_config
+            # 2. Call Enhanced Async SDK
+            result = await azure_speech.transcribe_from_bytes(
+                audio_bytes,
+                language=request.language
             )
 
-            # 3. Async Wrapper for Continuous Recognition
-            loop = asyncio.get_event_loop()
-            future = loop.create_future()
-            results = []
+            # 3. Map to TranscriptionResponse
+            all_words = [
+                Word(
+                    text=w["text"],
+                    start_time=w["start_time"],
+                    end_time=w["end_time"],
+                    confidence=w["confidence"]
+                ) for w in result["words"]
+            ]
 
-            def handle_recognized(evt):
-                if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
-                    results.append(evt.result)
-
-            def handle_stop(evt):
-                if not future.done():
-                    loop.call_soon_threadsafe(future.set_result, True)
-
-            recognizer.recognized.connect(handle_recognized)
-            recognizer.session_stopped.connect(handle_stop)
-            recognizer.canceled.connect(handle_stop)
-
-            recognizer.start_continuous_recognition()
-            try:
-                # Max 5 minute timeout for processing
-                await asyncio.wait_for(future, timeout=300)
-            finally:
-                recognizer.stop_continuous_recognition()
-
-            # 4. Compile Response
-            full_text = " ".join([r.text for r in results])
-            all_words = []
-            for r in results:
-                all_words.extend(self._extract_words(r))
-
-            duration = all_words[-1].end_time if all_words else 0
-            
             return TranscriptionResponse(
-                text=full_text,
-                confidence=sum(w.confidence for w in all_words)/len(all_words) if all_words else 0.0,
+                text=result["text"],
+                confidence=result["confidence"],
                 words=all_words,
-                duration=duration,
+                duration=result["duration"],
                 processing_time=time.time() - start_time
             )
 
         except Exception as e:
             logger.error("transcription_failed", error=str(e), user_id=request.user_id)
             raise
-        finally:
-            if temp_path and os.path.exists(temp_path):
-                os.remove(temp_path)
 
 transcription_service = TranscriptionService()

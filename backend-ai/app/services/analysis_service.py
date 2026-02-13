@@ -69,86 +69,16 @@ class AnalysisService:
             # 3. Call AI
             raw_response = await self._call_gemini(prompt)
             
-            # 4. Parse & Normalize
-            data = self._parse_json_response(raw_response)
+            # 4. Enhanced Robust Parsing
+            from app.utils.robust_json_parser import parse_gemini_analysis
+            data = parse_gemini_analysis(raw_response)
             
-            # 5. Enrich with business logic (e.g. shadowing - simplified for now)
-            # In a full DI setup, these would be calls to injected services
-            shadowing_url = None
-            
-            return self._build_response(data, start_time, shadowing_url)
+            # 5. Build Response
+            return self._build_response(data, start_time, None)
 
         except Exception as e:
             logger.error("analysis_failed", error=str(e), user_id=request.user_id)
             raise
-
-    def _get_general_analysis_prompt(self, text: str, context: str, native_lang: str) -> str:
-        return f"""
-        Strictly analyze the following English text from a learner:
-        TEXT: "{text}"
-        CONTEXT: {context or 'General'}
-        NATIVE_LANG: {native_lang or 'Unknown'}
-        
-        Return exactly this JSON structure:
-        {{
-            "cefr_assessment": {{
-                "level": "A1|A2|B1|B2|C1|C2",
-                "score": float(0-100),
-                "confidence": float(0-1),
-                "strengths": [str],
-                "weaknesses": [str],
-                "next_level_requirements": [str]
-            }},
-            "errors": [
-                {{
-                    "type": "grammar|vocabulary|punctuation|tense|article",
-                    "severity": "critical|major|minor|suggestion",
-                    "original_text": "...",
-                    "corrected_text": "...",
-                    "explanation": "...",
-                    "suggestion": "..."
-                }}
-            ],
-            "metrics": {{
-                "wpm": float,
-                "unique_words": int,
-                "grammar_score": float,
-                "vocabulary_score": float
-            }},
-            "feedback": "...",
-            "strengths": [str],
-            "improvement_areas": [str],
-            "recommended_tasks": []
-        }}
-        """
-
-    def _get_image_description_prompt(self, text: str, context: str) -> str:
-        return f"""
-        Analyze this image description speaking sample:
-        TEXT: "{text}"
-        IMAGE_CONTEXT: {context or 'None'}
-        
-        Return JSON structure:
-        {{
-            "cefr_level": "...",
-            "grammar_score": float,
-            "vocabulary_score": float,
-            "relevance_score": float,
-            "talk_style": "DRIVER|PASSENGER",
-            "errors": [...],
-            "feedback": "..."
-        }}
-        """
-
-    def _parse_json_response(self, text: str) -> Dict[str, Any]:
-        """Robustly parse JSON from LLM response."""
-        try:
-            # Strip markdown blocks
-            clean_text = text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-        except Exception as e:
-            logger.error("json_parse_failed", raw_text=text, error=str(e))
-            raise ValueError("Failed to parse AI response as JSON")
 
     def _build_response(self, data: Dict[str, Any], start_time: float, shadowing_url: Optional[str]) -> AnalysisResponse:
         # Normalization if it was an image description

@@ -13,6 +13,7 @@ from app.core.logging import configure_logging, logger
 from app.core.middleware import RequestIDMiddleware
 from app.cache.manager import cache
 from app.api.routes import health, transcribe, analyze, pronunciation
+from app.utils.async_azure_speech import shutdown_executor
 from app.models.response import StandardResponse, ErrorResponse
 
 # 1. Initialize Sentry
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("application_shutdown")
     await cache.close()
+    await shutdown_executor()
 
 app = FastAPI(
     title="EngR AI Backend", 
