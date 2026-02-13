@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { useAuth } from '@clerk/clerk-expo';
 
-// Access localhost from emulator/device
-// Android Emulator: 10.0.2.2
-// iOS Simulator: localhost
-// Physical Device: Your Machine's LAN IP
-const API_URL = 'http://10.0.2.2:3000'; // Change to your LAN IP if using a physical device.
+// Access localhost from emulator/device or use production URL
+const IS_PROD = !__DEV__;
+const API_URL = IS_PROD
+    ? 'https://engapp-3210.onrender.com'
+    : 'http://10.0.2.2:3000'; // Local dev (Android Emulator)
 
 export const client = axios.create({
     baseURL: API_URL,
