@@ -30,7 +30,7 @@ let BrainService = BrainService_1 = class BrainService {
                 session_id: "system",
                 context: `Assessment Phase 3. Image Level: ${imageLevel}. Image Description: ${imageDescription}. Require relevance score and talk style.`
             }));
-            const data = response.data;
+            const data = response.data.data;
             return {
                 grammarScore: data.metrics.grammar_score * 10,
                 vocabularyCEFR: data.cefr_assessment.level,
@@ -60,7 +60,7 @@ let BrainService = BrainService_1 = class BrainService {
                 session_id: "system",
                 context: `Interpret Azure Evidence: ${JSON.stringify(evidence)}`
             }));
-            const data = response.data;
+            const data = response.data.data;
             const mistakes = data.errors.map(e => ({
                 original: e.original_text,
                 corrected: e.corrected_text,

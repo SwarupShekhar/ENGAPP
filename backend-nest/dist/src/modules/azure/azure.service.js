@@ -31,14 +31,14 @@ let AzureService = AzureService_1 = class AzureService {
                     user_id: "system",
                     session_id: "system"
                 }));
-                transcript = transResponse.data.text;
+                transcript = transResponse.data.data.text;
             }
             const pronResponse = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/pronunciation`, {
                 audio_url: audioUrl,
                 reference_text: transcript,
                 user_id: "system"
             }));
-            const data = pronResponse.data;
+            const data = pronResponse.data.data;
             return {
                 transcript: transcript,
                 pronunciationEvidence: data.words,
@@ -52,6 +52,13 @@ let AzureService = AzureService_1 = class AzureService {
         }
         catch (error) {
             this.logger.error(`AI Engine call failed: ${error.message}`);
+            if (error.response) {
+                this.logger.error(`AI Engine Response Status: ${error.response.status}`);
+                this.logger.error(`AI Engine Response Data: ${JSON.stringify(error.response.data)}`);
+            }
+            else if (error.request) {
+                this.logger.error('AI Engine No Response received');
+            }
             throw error;
         }
     }

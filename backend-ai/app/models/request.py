@@ -18,7 +18,7 @@ class AnalysisRequest(BaseModel):
     task_type: AnalysisTaskType = AnalysisTaskType.GENERAL
 
 class PronunciationRequest(BaseModel):
-    audio_url: HttpUrl
+    audio_url: str
     reference_text: str
     user_id: str
     language: str = "en-US"
