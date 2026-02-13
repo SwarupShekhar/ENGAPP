@@ -8,58 +8,38 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var BrainService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BrainService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const generative_ai_1 = require("@google/generative-ai");
-let BrainService = class BrainService {
-    constructor(configService) {
+const axios_1 = require("@nestjs/axios");
+const rxjs_1 = require("rxjs");
+let BrainService = BrainService_1 = class BrainService {
+    constructor(configService, httpService) {
         this.configService = configService;
-        const apiKey = this.configService.get('GEMINI_API_KEY') || this.configService.get('GOOGLE_LANGUAGE_API_KEY');
-        if (!apiKey) {
-            throw new Error('GEMINI_API_KEY is not defined');
-        }
-        this.genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
-        this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        this.httpService = httpService;
+        this.logger = new common_1.Logger(BrainService_1.name);
+        this.aiEngineUrl = this.configService.get('AI_ENGINE_URL') || 'http://localhost:8001';
     }
     async analyzeImageDescription(transcript, imageLevel, imageDescription) {
-        const prompt = `
-        Analyze this English speaking sample.
-        Image description level: ${imageLevel}
-        Shown image description: "${imageDescription}"
-        User transcript: "${transcript}"
-
-        Return EXACT JSON:
-        {
-            "grammarScore": number (0-100),
-            "vocabularyCEFR": "A1|A2|B1|B2|C1|C2",
-            "relevanceScore": number (0-100),
-            "talkStyle": "DRIVER|PASSENGER"
-        }
-
-        Rules:
-        - grammarScore: penalize tense/article/preposition errors
-        - vocabularyCEFR: classify sophistication
-        - relevanceScore: how well image described
-        - DRIVER if >30 words + detailed
-        - PASSENGER otherwise
-        `;
-        const generationConfig = {
-            temperature: 0.2,
-            responseMimeType: "application/json",
-        };
         try {
-            const result = await this.model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                generationConfig,
-            });
-            const response = await result.response;
-            const text = response.text();
-            return JSON.parse(text);
+            const response = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
+                text: transcript,
+                user_id: "system",
+                session_id: "system",
+                context: `Assessment Phase 3. Image Level: ${imageLevel}. Image Description: ${imageDescription}. Require relevance score and talk style.`
+            }));
+            const data = response.data;
+            return {
+                grammarScore: data.metrics.grammar_score * 10,
+                vocabularyCEFR: data.cefr_assessment.level,
+                relevanceScore: 80,
+                talkStyle: "PASSENGER"
+            };
         }
         catch (error) {
-            console.error("Gemini Phase 3 Error:", error);
+            this.logger.error("BrainService Phase 3 Error:", error);
             return this.ruleBasedFallback(transcript);
         }
     }
@@ -73,31 +53,30 @@ let BrainService = class BrainService {
         };
     }
     async interpretAzureEvidence(transcript, evidence) {
-        const prompt = `
-        Analyze the following English speech transcript and pronunciation scores.
-        Provide feedback in JSON format:
-        {
-            "corrected": "Corrected sentence",
-            "explanation": "Grammar rule explanation",
-            "severity": "low|medium|high",
-            "pronunciationTip": "Tip for improvement",
-            "mistakes": [
-                { "original": "word", "corrected": "word", "type": "grammar|vocab|pronunciation" }
-            ]
-        }
-
-        Transcript: "${transcript}"
-        Evidence/Scores: ${JSON.stringify(evidence)}
-        `;
         try {
-            const result = await this.model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
-            const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            return JSON.parse(cleanText);
+            const response = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
+                text: transcript,
+                user_id: "system",
+                session_id: "system",
+                context: `Interpret Azure Evidence: ${JSON.stringify(evidence)}`
+            }));
+            const data = response.data;
+            const mistakes = data.errors.map(e => ({
+                original: e.original_text,
+                corrected: e.corrected_text,
+                type: e.type,
+                explanation: e.explanation
+            }));
+            return {
+                corrected: mistakes.length > 0 ? mistakes[0].corrected : transcript,
+                explanation: data.feedback,
+                severity: "medium",
+                pronunciationTip: data.improvement_areas[0] || "Keep practicing!",
+                mistakes: mistakes
+            };
         }
         catch (error) {
-            console.error("Gemini Error:", error);
+            this.logger.error("BrainService Interpret Error:", error);
             return {
                 original: transcript,
                 corrected: transcript,
@@ -110,8 +89,9 @@ let BrainService = class BrainService {
     }
 };
 exports.BrainService = BrainService;
-exports.BrainService = BrainService = __decorate([
+exports.BrainService = BrainService = BrainService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [config_1.ConfigService])
+    __metadata("design:paramtypes", [config_1.ConfigService,
+        axios_1.HttpService])
 ], BrainService);
 //# sourceMappingURL=brain.service.js.map

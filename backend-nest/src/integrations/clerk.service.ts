@@ -1,14 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { clerkClient } from '@clerk/clerk-sdk-node';
 
 @Injectable()
 export class ClerkService {
+  private readonly logger = new Logger(ClerkService.name);
+
   constructor(private configService: ConfigService) { }
 
   async verifyToken(token: string): Promise<any | null> {
     try {
-      // Simple token verification - in production, use proper Clerk SDK
-      // This is a placeholder implementation
       if (!token) return null;
 
       // For E2E Testing: Accept "TEST_TOKEN_X" to simulate different users
@@ -24,32 +25,38 @@ export class ClerkService {
         };
       }
 
-      // For now, return a mock response for any other token
-      return {
-        id: 'mock_user_id',
-        userId: 'mock_user_id',
-        sessionId: 'mock_session_id',
-        email: 'mock@test.com',
-        firstName: 'Mock',
-        lastName: 'User',
-      };
+      // Real Token Verification
+      try {
+        const decoded = await clerkClient.verifyToken(token);
+
+        return {
+          userId: decoded.sub,
+          sessionId: decoded.sid,
+          // Note: Standard JWT doesn't check claims for email/name unless configured.
+          // We rely on getUser to fetch details when creating the user.
+        };
+      } catch (e) {
+        this.logger.error(`Token verification failed: ${e.message}`);
+        return null;
+      }
+
     } catch (error) {
-      console.error('Clerk token verification failed:', error);
+      this.logger.error('Clerk token verification failed:', error);
       return null;
     }
   }
 
   async getUser(userId: string) {
     try {
-      // Mock implementation - replace with actual Clerk API call
+      const user = await clerkClient.users.getUser(userId);
       return {
-        id: userId,
-        emailAddresses: [{ emailAddress: 'user@example.com' }],
-        firstName: 'John',
-        lastName: 'Doe',
+        id: user.id,
+        emailAddresses: user.emailAddresses,
+        firstName: user.firstName,
+        lastName: user.lastName,
       };
     } catch (error) {
-      console.error('Failed to get user from Clerk:', error);
+      this.logger.error(`Failed to get user from Clerk: ${error.message}`);
       return null;
     }
   }
@@ -60,14 +67,17 @@ export class ClerkService {
     firstName?: string;
     lastName?: string;
   }) {
+    // This method is primarily for testing or admin creation, assume mock for now or implement if needed.
+    // Since we are syncing FROM Clerk (signup happens on frontend), we might not need this.
+    // Leaving as is or simple mock to satisfy interface if used.
     try {
-      // Mock implementation - replace with actual Clerk API call
+      // Mock implementation for now as we don't create Clerk users from backend usually
       return {
         id: 'new_user_id',
         ...userData,
       };
     } catch (error) {
-      console.error('Failed to create user in Clerk:', error);
+      this.logger.error('Failed to create user in Clerk:', error);
       throw error;
     }
   }

@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AzureModule = void 0;
 const common_1 = require("@nestjs/common");
+const axios_1 = require("@nestjs/axios");
 const config_1 = require("@nestjs/config");
 const azure_service_1 = require("./azure.service");
 let AzureModule = class AzureModule {
@@ -15,9 +16,9 @@ let AzureModule = class AzureModule {
 exports.AzureModule = AzureModule;
 exports.AzureModule = AzureModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule],
+        imports: [config_1.ConfigModule, axios_1.HttpModule],
         providers: [azure_service_1.AzureService],
-        exports: [azure_service_1.AzureService],
+        exports: [azure_service_1.AzureService]
     })
 ], AzureModule);
 //# sourceMappingURL=azure.module.js.map

@@ -11,15 +11,15 @@ const common_1 = require("@nestjs/common");
 const auth_service_1 = require("./auth.service");
 const auth_controller_1 = require("./auth.controller");
 const clerk_guard_1 = require("./clerk.guard");
-const clerk_service_1 = require("../../integrations/clerk.service");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
+    (0, common_1.Global)(),
     (0, common_1.Module)({
         imports: [],
         controllers: [auth_controller_1.AuthController],
-        providers: [auth_service_1.AuthService, clerk_service_1.ClerkService, clerk_guard_1.ClerkGuard],
+        providers: [auth_service_1.AuthService, clerk_guard_1.ClerkGuard],
         exports: [auth_service_1.AuthService, clerk_guard_1.ClerkGuard],
     })
 ], AuthModule);

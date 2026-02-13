@@ -7,12 +7,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ClerkService } from '../../integrations/clerk.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { AuthService } from './auth.service';
 
 @Injectable()
 export class ClerkGuard implements CanActivate {
   constructor(
     private clerkService: ClerkService,
     private prisma: PrismaService,
+    private authService: AuthService,
     private reflector: Reflector,
   ) { }
 
@@ -36,23 +38,23 @@ export class ClerkGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    // Check if user exists in database
-    const user = await this.prisma.user.findFirst({
-      where: { clerkId: session.userId } // session.userId is the clerk ID (e.g. user_a)
-    });
+    // Check if user exists in database (and create if not)
+    // We use AuthService.validateUser to handle the sync logic
+    try {
+      const user = await this.authService.validateUser(session.userId);
 
-    if (!user) {
-      // Option: throw error, or allow but without internal ID?
-      // For E2E/APP, we expect user to exist if they have valid token?
-      // Or just attach clerkId.
-      // But FeedbackController needs internal ID.
-      // Let's assume user must exist.
-      throw new UnauthorizedException('User not found in database');
+      if (!user) {
+        throw new UnauthorizedException('User could not be validated or created');
+      }
+
+      // Attach user information to request (Internal User)
+      request.user = user;
+      return true;
+
+    } catch (e) {
+      if (e instanceof UnauthorizedException) throw e;
+      // If validation fails (e.g. Clerk API error), we deny access
+      throw new UnauthorizedException(`User validation failed: ${e.message}`);
     }
-
-    // Attach user information to request (Internal User)
-    request.user = user;
-
-    return true;
   }
 }

@@ -8,89 +8,58 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var AzureService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AzureService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const axios_1 = require("axios");
-const sdk = require("microsoft-cognitiveservices-speech-sdk");
-let AzureService = class AzureService {
-    constructor(configService) {
+const axios_1 = require("@nestjs/axios");
+const rxjs_1 = require("rxjs");
+let AzureService = AzureService_1 = class AzureService {
+    constructor(configService, httpService) {
         this.configService = configService;
+        this.httpService = httpService;
+        this.logger = new common_1.Logger(AzureService_1.name);
+        this.aiEngineUrl = this.configService.get('AI_ENGINE_URL') || 'http://localhost:8001';
     }
     async analyzeSpeech(audioUrl, referenceText = '') {
-        const speechKey = this.configService.get('AZURE_SPEECH_KEY');
-        const speechRegion = this.configService.get('AZURE_SPEECH_REGION');
-        if (!speechKey || !speechRegion) {
-            throw new Error('Azure Speech credentials not configured');
+        try {
+            let transcript = referenceText;
+            if (!transcript) {
+                const transResponse = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/transcribe`, {
+                    audio_url: audioUrl,
+                    user_id: "system",
+                    session_id: "system"
+                }));
+                transcript = transResponse.data.text;
+            }
+            const pronResponse = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/pronunciation`, {
+                audio_url: audioUrl,
+                reference_text: transcript,
+                user_id: "system"
+            }));
+            const data = pronResponse.data;
+            return {
+                transcript: transcript,
+                pronunciationEvidence: data.words,
+                accuracyScore: data.accuracy_score,
+                fluencyScore: data.fluency_score,
+                prosodyScore: data.prosody_score,
+                completenessScore: data.completeness_score,
+                wordCount: transcript.split(/\s+/).filter(w => w.length > 0).length,
+                snr: 20
+            };
         }
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await axios_1.default.get(audioUrl, { responseType: 'arraybuffer' });
-                const audioBuffer = Buffer.from(response.data);
-                const speechConfig = sdk.SpeechConfig.fromSubscription(speechKey, speechRegion);
-                speechConfig.speechRecognitionLanguage = "en-US";
-                const pushStream = sdk.AudioInputStream.createPushStream();
-                pushStream.write(audioBuffer.buffer.slice(audioBuffer.byteOffset, audioBuffer.byteOffset + audioBuffer.byteLength));
-                pushStream.close();
-                const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
-                const pronunciationConfig = new sdk.PronunciationAssessmentConfig(referenceText, sdk.PronunciationAssessmentGradingSystem.HundredMark, sdk.PronunciationAssessmentGranularity.Phoneme, true);
-                const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
-                pronunciationConfig.applyTo(recognizer);
-                let transcript = '';
-                let pronResults = [];
-                recognizer.recognized = (s, e) => {
-                    if (e.result.reason === sdk.ResultReason.RecognizedSpeech) {
-                        transcript += e.result.text + " ";
-                        const pronResult = sdk.PronunciationAssessmentResult.fromResult(e.result);
-                        if (pronResult) {
-                            pronResults.push(pronResult);
-                        }
-                    }
-                };
-                recognizer.canceled = (s, e) => {
-                    if (e.reason === sdk.CancellationReason.Error) {
-                        console.error(`CANCELED: ErrorCode=${e.errorCode}`);
-                        console.error(`CANCELED: ErrorDetails=${e.errorDetails}`);
-                        reject(new Error(`Azure Speech Canceled: ${e.errorDetails}`));
-                    }
-                    recognizer.stopContinuousRecognitionAsync();
-                };
-                recognizer.sessionStopped = (s, e) => {
-                    recognizer.stopContinuousRecognitionAsync();
-                    if (pronResults.length > 0) {
-                        const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-                        const finalTranscript = transcript.trim();
-                        resolve({
-                            transcript: finalTranscript,
-                            pronunciationEvidence: pronResults,
-                            accuracyScore: avg(pronResults.map(r => r.accuracyScore)),
-                            fluencyScore: avg(pronResults.map(r => r.fluencyScore)),
-                            prosodyScore: avg(pronResults.map(r => r.prosodyScore)),
-                            completenessScore: avg(pronResults.map(r => r.completenessScore)),
-                            wordCount: finalTranscript.split(/\s+/).filter(w => w.length > 0).length,
-                            snr: 20
-                        });
-                    }
-                    else {
-                        resolve({
-                            transcript: transcript.trim(),
-                            pronunciationEvidence: null,
-                            wordCount: transcript.trim().split(/\s+/).filter(w => w.length > 0).length
-                        });
-                    }
-                };
-                recognizer.startContinuousRecognitionAsync();
-            }
-            catch (error) {
-                reject(error);
-            }
-        });
+        catch (error) {
+            this.logger.error(`AI Engine call failed: ${error.message}`);
+            throw error;
+        }
     }
 };
 exports.AzureService = AzureService;
-exports.AzureService = AzureService = __decorate([
+exports.AzureService = AzureService = AzureService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [config_1.ConfigService])
+    __metadata("design:paramtypes", [config_1.ConfigService,
+        axios_1.HttpService])
 ], AzureService);
 //# sourceMappingURL=azure.service.js.map

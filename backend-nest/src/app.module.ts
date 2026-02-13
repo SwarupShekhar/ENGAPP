@@ -20,6 +20,7 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
 import livekitConfig from './config/livekit.config';
+import { PrismaModule } from './database/prisma/prisma.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import livekitConfig from './config/livekit.config';
     AssessmentModule,
     FriendshipModule,
     ChatModule,
+    PrismaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
