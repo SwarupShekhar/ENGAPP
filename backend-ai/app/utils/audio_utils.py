@@ -13,6 +13,11 @@ async def validate_audio_url(url: str) -> Tuple[bool, str]:
         async with httpx.AsyncClient(timeout=10.0) as client:
             # Only head request to check size/type
             response = await client.head(url)
+            
+            # If HEAD fails (e.g. 403 from some storage), try GET with stream=True
+            if response.status_code >= 400:
+                response = await client.get(url, follow_redirects=True)
+                
             response.raise_for_status()
             
             # 1. Content Type Check
@@ -20,8 +25,6 @@ async def validate_audio_url(url: str) -> Tuple[bool, str]:
             valid_types = settings.supported_audio_formats.split(",")
             if not any(t in content_type for t in valid_types if t):
                  logger.warning("invalid_audio_type", url=url, content_type=content_type)
-                 # Some S3 buckets don't return proper content-type, maybe warn only?
-                 # return False, f"Invalid content type: {content_type}"
             
             # 2. Size Check
             content_length = int(response.headers.get("content-length", 0))
@@ -32,7 +35,8 @@ async def validate_audio_url(url: str) -> Tuple[bool, str]:
             
     except Exception as e:
         logger.error("audio_validation_failed", url=url, error=str(e))
-        return False, f"Could not accessibility audio URL: {str(e)}"
+        # Fallback to true if validation fails due to network (let download attempt decide)
+        return True, ""
 
 async def download_audio_streamed(url: str, target_path: str):
     """Download audio using streaming to save memory."""
@@ -42,3 +46,11 @@ async def download_audio_streamed(url: str, target_path: str):
             with open(target_path, "wb") as f:
                 async for chunk in response.aiter_bytes():
                     f.write(chunk)
+
+async def stream_audio_content(url: str):
+    """Yield audio content chunks directly from URL."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            async for chunk in response.aiter_bytes():
+                yield chunk

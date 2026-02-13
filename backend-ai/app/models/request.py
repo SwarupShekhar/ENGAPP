@@ -3,7 +3,7 @@ from typing import Optional
 from app.models.base import AnalysisTaskType
 
 class TranscriptionRequest(BaseModel):
-    audio_url: HttpUrl
+    audio_url: str
     language: str = "en-US"
     user_id: str
     session_id: str

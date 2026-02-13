@@ -5,11 +5,13 @@ export declare class AssessmentController {
     constructor(assessmentService: AssessmentService);
     start(req: any): Promise<{
         id: string;
-        status: import(".prisma/client").$Enums.AssessmentStatus;
         overallLevel: string | null;
+        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+        createdAt: Date;
+        userId: string;
+        status: import(".prisma/client").$Enums.AssessmentStatus;
         overallScore: number | null;
         confidence: number | null;
-        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
         skillBreakdown: import("@prisma/client/runtime/client").JsonValue | null;
         weaknessMap: import("@prisma/client/runtime/client").JsonValue | null;
         improvementDelta: import("@prisma/client/runtime/client").JsonValue | null;
@@ -18,9 +20,7 @@ export declare class AssessmentController {
         phase2Data: import("@prisma/client/runtime/client").JsonValue | null;
         phase3Data: import("@prisma/client/runtime/client").JsonValue | null;
         phase4Data: import("@prisma/client/runtime/client").JsonValue | null;
-        createdAt: Date;
         completedAt: Date | null;
-        userId: string;
     }>;
     submit(dto: SubmitPhaseDto): Promise<{
         hint: string;
@@ -110,11 +110,13 @@ export declare class AssessmentController {
     }>;
     getResults(id: string): Promise<{
         id: string;
-        status: import(".prisma/client").$Enums.AssessmentStatus;
         overallLevel: string | null;
+        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
+        createdAt: Date;
+        userId: string;
+        status: import(".prisma/client").$Enums.AssessmentStatus;
         overallScore: number | null;
         confidence: number | null;
-        talkStyle: import(".prisma/client").$Enums.TalkStyle | null;
         skillBreakdown: import("@prisma/client/runtime/client").JsonValue | null;
         weaknessMap: import("@prisma/client/runtime/client").JsonValue | null;
         improvementDelta: import("@prisma/client/runtime/client").JsonValue | null;
@@ -123,8 +125,6 @@ export declare class AssessmentController {
         phase2Data: import("@prisma/client/runtime/client").JsonValue | null;
         phase3Data: import("@prisma/client/runtime/client").JsonValue | null;
         phase4Data: import("@prisma/client/runtime/client").JsonValue | null;
-        createdAt: Date;
         completedAt: Date | null;
-        userId: string;
     }>;
 }

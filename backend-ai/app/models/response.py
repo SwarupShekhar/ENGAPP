@@ -8,7 +8,7 @@ from app.models.base import (
 T = TypeVar("T")
 
 class Meta(BaseModel):
-    processing_time_ms: int
+    processing_time_ms: int = 0
     cache_hit: bool = False
     request_id: Optional[str] = None
 
