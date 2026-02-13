@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     cache_ttl_analysis: int = 3600
     cache_ttl_pronunciation: int = 7200
     disk_cache_dir: str = "/tmp/englivo-cache"
+    disk_cache_size_limit: int = 10 * 1024 * 1024 * 1024  # 10GB
     
     # Model Configuration
     transcription_model: str = "azure"

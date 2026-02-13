@@ -65,57 +65,49 @@ class PronunciationService:
             logger.warning("prosody_analysis_failed", error=str(e))
             return {"prosody_score": 0.0, "speech_rate_wpm": 0.0, "pitch_variance": 0.0}
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     @cached(prefix="pronunciation", ttl=settings.cache_ttl_pronunciation)
     async def assess(self, request: PronunciationRequest) -> PronunciationResponse:
         start_time = time.time()
         temp_path = None
         
         try:
-            if not self.speech_config:
-                raise ValueError("Azure Speech is not configured")
-
-            # 1. Download & Validate
+            from app.utils.async_azure_speech import azure_speech
+            
+            # 1. Download & Validate (Need file for librosa)
             temp_path = tempfile.mktemp(suffix=".wav")
             await download_audio_streamed(str(request.audio_url), temp_path)
+            
+            with open(temp_path, "rb") as f:
+                audio_bytes = f.read()
 
-            # 2. Parallel Prosody Analysis
+            # 2. Parallel Prosody Analysis (Keep using the file for librosa)
             prosody_metrics = await self._analyze_prosody(temp_path)
 
-            # 3. Azure Assessment
-            pronunciation_config = speechsdk.PronunciationAssessmentConfig(
-                reference_text=request.reference_text,
-                grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
-                granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
-                enable_miscue=True
+            # 3. Enhanced Azure Assessment
+            result = await azure_speech.assess_pronunciation(
+                audio_bytes,
+                request.reference_text,
+                language=request.language
             )
-            
-            audio_config = speechsdk.audio.AudioConfig(filename=temp_path)
-            self.speech_config.speech_recognition_language = request.language
-            recognizer = speechsdk.SpeechRecognizer(
-                speech_config=self.speech_config, 
-                audio_config=audio_config
-            )
-            pronunciation_config.apply_to(recognizer)
 
-            # Run in thread pool to avoid blocking async loop
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, recognizer.recognize_once)
-
-            if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-                raise ValueError(f"Azure assessment failed: {result.reason}")
-
-            # 4. Parse Results
-            azure_res = speechsdk.PronunciationAssessmentResult(result)
-            detailed = json.loads(result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult))
-            
-            words = self._extract_words(detailed)
+            # 4. Map Results
+            words = [
+                WordPronunciation(
+                    word=w["word"],
+                    accuracy_score=w["accuracy_score"],
+                    error_type=w["error_type"],
+                    phonemes=[
+                        PhonemeScore(phoneme=p["phoneme"], accuracy_score=p["accuracy_score"])
+                        for p in w["phonemes"]
+                    ]
+                ) for w in result["words"]
+            ]
             
             return PronunciationResponse(
-                accuracy_score=azure_res.accuracy_score,
-                fluency_score=azure_res.fluency_score,
-                completeness_score=azure_res.completeness_score,
-                pronunciation_score=azure_res.pronunciation_score,
+                accuracy_score=result["accuracy_score"],
+                fluency_score=result["fluency_score"],
+                completeness_score=result["completeness_score"],
+                pronunciation_score=result["pronunciation_score"],
                 words=words,
                 common_issues=self._get_issues(words),
                 improvement_tips=self._get_tips(words),

@@ -3,19 +3,19 @@ Async-friendly Azure Speech SDK wrapper.
 Handles both transcription and pronunciation assessment.
 """
 import asyncio
+import io
+import json
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 import azure.cognitiveservices.speech as speechsdk
 from app.core.config import settings
-from app.core.logging import get_logger
+from app.core.logging import logger
 from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type
 )
-
-logger = get_logger(__name__)
 
 # Thread pool for CPU-bound Azure SDK operations
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="azure_speech")
@@ -59,13 +59,6 @@ class AsyncAzureSpeech:
     ) -> dict:
         """
         Transcribe audio from bytes asynchronously.
-        
-        Args:
-            audio_bytes: Audio file content
-            language: Language code (e.g., "en-US")
-        
-        Returns:
-            dict with: text, confidence, words, duration
         """
         if not self.speech_config:
             raise RuntimeError("Azure Speech not configured")
@@ -88,7 +81,6 @@ class AsyncAzureSpeech:
         """Synchronous transcription (runs in executor)."""
         
         # Create audio config from bytes
-        import io
         audio_stream = speechsdk.audio.PushAudioInputStream()
         audio_stream.write(audio_bytes)
         audio_stream.close()
@@ -126,8 +118,6 @@ class AsyncAzureSpeech:
     
     def _parse_transcription_result(self, result) -> dict:
         """Parse Azure result into structured format."""
-        import json
-        
         words = []
         duration = 0.0
         
@@ -188,14 +178,6 @@ class AsyncAzureSpeech:
     ) -> dict:
         """
         Assess pronunciation asynchronously.
-        
-        Args:
-            audio_bytes: Audio file content
-            reference_text: Expected text
-            language: Language code
-        
-        Returns:
-            dict with: accuracy_score, fluency_score, completeness_score, words
         """
         if not self.speech_config:
             raise RuntimeError("Azure Speech not configured")
@@ -212,7 +194,7 @@ class AsyncAzureSpeech:
             language
         )
         
-        logger.info(f"Pronunciation assessment completed: {result['pronunciation_score']:.1f}")
+        logger.info(f"Pronunciation assessment completed")
         return result
     
     def _assess_pronunciation_sync(
@@ -269,8 +251,6 @@ class AsyncAzureSpeech:
     
     def _parse_pronunciation_result(self, result) -> dict:
         """Parse pronunciation assessment result."""
-        import json
-        
         try:
             # Get pronunciation result
             pronunciation_result = speechsdk.PronunciationAssessmentResult(result)
