@@ -17,14 +17,12 @@ async def health_check():
     if settings.enable_cache:
         try:
             # Simple check
-            if cache.redis_client:
-                 await cache.redis_client.setex("health_check", 10, "ok")
+            if cache.redis:
+                 await cache.redis.set("health_check", "ok", ttl=10)
                  checks["redis"] = "online"
             else:
                  checks["redis"] = "disabled/unavailable"
-        except Exception as e:
-            from app.core.logging import logger
-            logger.error("redis_health_check_failed", error=str(e))
+        except Exception:
             checks["redis"] = "offline"
             
     return checks
