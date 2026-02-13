@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging, logger
 from app.core.middleware import RequestIDMiddleware
 from app.cache.manager import cache
-from app.api.routes import health, transcribe, analyze, pronunciation, batch, sessions
+from app.api.routes import health, transcribe, analyze, pronunciation
 from app.utils.async_azure_speech import shutdown_executor
 from app.models.response import StandardResponse, ErrorResponse
 
@@ -50,8 +50,6 @@ app = FastAPI(
 )
 
 # 2. Middleware Stack (Order matters: Bottom-up execution)
-from app.core.middleware import APIKeyMiddleware
-app.add_middleware(APIKeyMiddleware)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
@@ -102,8 +100,6 @@ app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(transcribe.router, prefix="/api", tags=["Transcribe"])
 app.include_router(analyze.router, prefix="/api", tags=["Analyze"])
 app.include_router(pronunciation.router, prefix="/api", tags=["Pronunciation"])
-app.include_router(batch.router, prefix="/api", tags=["Batch"])
-app.include_router(sessions.router, prefix="/api", tags=["Sessions"])
 
 # 5. Monitoring
 metrics_app = make_asgi_app()
