@@ -184,6 +184,20 @@ export declare class AssessmentService {
     analyzeAndStore(sessionId: string, participantId: string, audioUrl: string): Promise<{
         analysisId: string;
         transcript: string;
-        feedback: any;
+        feedback: {
+            corrected: any;
+            explanation: any;
+            severity: string;
+            pronunciationTip: any;
+            mistakes: any;
+            original?: undefined;
+        } | {
+            original: string;
+            corrected: string;
+            explanation: string;
+            severity: string;
+            pronunciationTip: string;
+            mistakes: any[];
+        };
     }>;
 }

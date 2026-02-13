@@ -8,13 +8,16 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var ClerkService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClerkService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-let ClerkService = class ClerkService {
+const clerk_sdk_node_1 = require("@clerk/clerk-sdk-node");
+let ClerkService = ClerkService_1 = class ClerkService {
     constructor(configService) {
         this.configService = configService;
+        this.logger = new common_1.Logger(ClerkService_1.name);
     }
     async verifyToken(token) {
         try {
@@ -31,31 +34,35 @@ let ClerkService = class ClerkService {
                     lastName: userId.toUpperCase(),
                 };
             }
-            return {
-                id: 'mock_user_id',
-                userId: 'mock_user_id',
-                sessionId: 'mock_session_id',
-                email: 'mock@test.com',
-                firstName: 'Mock',
-                lastName: 'User',
-            };
+            try {
+                const decoded = await clerk_sdk_node_1.clerkClient.verifyToken(token);
+                return {
+                    userId: decoded.sub,
+                    sessionId: decoded.sid,
+                };
+            }
+            catch (e) {
+                this.logger.error(`Token verification failed: ${e.message}`);
+                return null;
+            }
         }
         catch (error) {
-            console.error('Clerk token verification failed:', error);
+            this.logger.error('Clerk token verification failed:', error);
             return null;
         }
     }
     async getUser(userId) {
         try {
+            const user = await clerk_sdk_node_1.clerkClient.users.getUser(userId);
             return {
-                id: userId,
-                emailAddresses: [{ emailAddress: 'user@example.com' }],
-                firstName: 'John',
-                lastName: 'Doe',
+                id: user.id,
+                emailAddresses: user.emailAddresses,
+                firstName: user.firstName,
+                lastName: user.lastName,
             };
         }
         catch (error) {
-            console.error('Failed to get user from Clerk:', error);
+            this.logger.error(`Failed to get user from Clerk: ${error.message}`);
             return null;
         }
     }
@@ -67,13 +74,13 @@ let ClerkService = class ClerkService {
             };
         }
         catch (error) {
-            console.error('Failed to create user in Clerk:', error);
+            this.logger.error('Failed to create user in Clerk:', error);
             throw error;
         }
     }
 };
 exports.ClerkService = ClerkService;
-exports.ClerkService = ClerkService = __decorate([
+exports.ClerkService = ClerkService = ClerkService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [config_1.ConfigService])
 ], ClerkService);

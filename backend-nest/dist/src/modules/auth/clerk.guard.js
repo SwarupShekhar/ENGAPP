@@ -14,10 +14,12 @@ const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const clerk_service_1 = require("../../integrations/clerk.service");
 const prisma_service_1 = require("../../database/prisma/prisma.service");
+const auth_service_1 = require("./auth.service");
 let ClerkGuard = class ClerkGuard {
-    constructor(clerkService, prisma, reflector) {
+    constructor(clerkService, prisma, authService, reflector) {
         this.clerkService = clerkService;
         this.prisma = prisma;
+        this.authService = authService;
         this.reflector = reflector;
     }
     async canActivate(context) {
@@ -34,14 +36,19 @@ let ClerkGuard = class ClerkGuard {
         if (!session) {
             throw new common_1.UnauthorizedException('Invalid or expired token');
         }
-        const user = await this.prisma.user.findFirst({
-            where: { clerkId: session.userId }
-        });
-        if (!user) {
-            throw new common_1.UnauthorizedException('User not found in database');
+        try {
+            const user = await this.authService.validateUser(session.userId);
+            if (!user) {
+                throw new common_1.UnauthorizedException('User could not be validated or created');
+            }
+            request.user = user;
+            return true;
         }
-        request.user = user;
-        return true;
+        catch (e) {
+            if (e instanceof common_1.UnauthorizedException)
+                throw e;
+            throw new common_1.UnauthorizedException(`User validation failed: ${e.message}`);
+        }
     }
 };
 exports.ClerkGuard = ClerkGuard;
@@ -49,6 +56,7 @@ exports.ClerkGuard = ClerkGuard = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [clerk_service_1.ClerkService,
         prisma_service_1.PrismaService,
+        auth_service_1.AuthService,
         core_1.Reflector])
 ], ClerkGuard);
 //# sourceMappingURL=clerk.guard.js.map

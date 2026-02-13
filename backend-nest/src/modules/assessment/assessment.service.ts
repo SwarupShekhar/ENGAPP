@@ -184,7 +184,7 @@ export class AssessmentService {
 
         await this.prisma.assessmentSession.update({
             where: { id: session.id },
-            data: { phase3Data, talkStyle: geminiResult.talkStyle }
+            data: { phase3Data, talkStyle: geminiResult.talkStyle as any }
         });
 
         return { nextPhase: AssessmentPhase.PHASE_4, question: "What is your biggest challenge in learning English?" };

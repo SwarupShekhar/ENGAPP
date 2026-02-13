@@ -12,10 +12,10 @@ export declare class TasksService {
                 id: string;
                 createdAt: Date;
                 type: string;
+                original: string;
                 cefrLevel: string | null;
                 severity: string;
                 segmentId: string;
-                original: string;
                 corrected: string;
                 rule: string | null;
                 explanation: string;

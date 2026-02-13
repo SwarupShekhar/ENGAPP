@@ -1,7 +1,11 @@
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
 export declare class AzureService {
     private configService;
-    constructor(configService: ConfigService);
+    private httpService;
+    private readonly logger;
+    private aiEngineUrl;
+    constructor(configService: ConfigService, httpService: HttpService);
     analyzeSpeech(audioUrl: string, referenceText?: string): Promise<{
         transcript: string;
         pronunciationEvidence: any;

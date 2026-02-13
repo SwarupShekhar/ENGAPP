@@ -28,6 +28,7 @@ const app_config_1 = require("./config/app.config");
 const database_config_1 = require("./config/database.config");
 const redis_config_1 = require("./config/redis.config");
 const livekit_config_1 = require("./config/livekit.config");
+const prisma_module_1 = require("./database/prisma/prisma.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -63,6 +64,7 @@ exports.AppModule = AppModule = __decorate([
             assessment_module_1.AssessmentModule,
             friendship_module_1.FriendshipModule,
             chat_module_1.ChatModule,
+            prisma_module_1.PrismaModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

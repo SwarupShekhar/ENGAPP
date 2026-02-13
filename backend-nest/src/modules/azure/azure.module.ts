@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { AzureService } from './azure.service';
 
 @Module({
-    imports: [ConfigModule],
+    imports: [ConfigModule, HttpModule],
     providers: [AzureService],
-    exports: [AzureService],
+    exports: [AzureService]
 })
 export class AzureModule { }

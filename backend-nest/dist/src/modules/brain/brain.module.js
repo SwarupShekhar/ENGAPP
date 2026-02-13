@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BrainModule = void 0;
 const common_1 = require("@nestjs/common");
+const axios_1 = require("@nestjs/axios");
 const config_1 = require("@nestjs/config");
 const brain_service_1 = require("./brain.service");
 let BrainModule = class BrainModule {
@@ -15,7 +16,7 @@ let BrainModule = class BrainModule {
 exports.BrainModule = BrainModule;
 exports.BrainModule = BrainModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule],
+        imports: [config_1.ConfigModule, axios_1.HttpModule],
         providers: [brain_service_1.BrainService],
         exports: [brain_service_1.BrainService],
     })

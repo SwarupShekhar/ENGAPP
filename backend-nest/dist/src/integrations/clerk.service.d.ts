@@ -1,13 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 export declare class ClerkService {
     private configService;
+    private readonly logger;
     constructor(configService: ConfigService);
     verifyToken(token: string): Promise<any | null>;
     getUser(userId: string): Promise<{
         id: string;
-        emailAddresses: {
-            emailAddress: string;
-        }[];
+        emailAddresses: import("@clerk/clerk-sdk-node").EmailAddress[];
         firstName: string;
         lastName: string;
     }>;
