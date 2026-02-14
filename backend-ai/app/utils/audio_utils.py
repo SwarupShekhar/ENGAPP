@@ -10,19 +10,22 @@ async def validate_audio_url(url: str) -> Tuple[bool, str]:
     Checks for size, content type, etc.
     """
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             # Only head request to check size/type
             response = await client.head(url)
             
             # If HEAD fails (e.g. 403 from some storage), try GET with stream=True
             if response.status_code >= 400:
-                response = await client.get(url, follow_redirects=True)
+                logger.warning("head_request_failed", url=url, status=response.status_code)
+                response = await client.get(url)
                 
             response.raise_for_status()
             
             # 1. Content Type Check
             content_type = response.headers.get("content-type", "")
-            valid_types = settings.supported_audio_formats.split(",")
+            valid_types = settings.supported_audio_formats
+            if isinstance(valid_types, str):
+                valid_types = [t.strip() for t in valid_types.split(",") if t.strip()]
             if not any(t in content_type for t in valid_types if t):
                  logger.warning("invalid_audio_type", url=url, content_type=content_type)
             
@@ -34,7 +37,7 @@ async def validate_audio_url(url: str) -> Tuple[bool, str]:
             return True, ""
             
     except Exception as e:
-        logger.error("audio_validation_failed", url=url, error=str(e))
+        logger.error("audio_validation_failed", url=url[:100], error=str(e))
         # Fallback to true if validation fails due to network (let download attempt decide)
         return True, ""
 
@@ -49,8 +52,12 @@ async def download_audio_streamed(url: str, target_path: str):
 
 async def stream_audio_content(url: str):
     """Yield audio content chunks directly from URL."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    logger.info("streaming_audio", url=url[:100])
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
         async with client.stream("GET", url) as response:
+            if response.status_code >= 400:
+                body = await response.aread()
+                logger.error("stream_audio_failed", status=response.status_code, body=body.decode('utf-8', errors='replace')[:500])
             response.raise_for_status()
             async for chunk in response.aiter_bytes():
                 yield chunk

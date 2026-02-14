@@ -1,62 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Dimensions
+    Dimensions, StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { theme } from '../theme/theme';
+import { sessionsApi, ConversationSession } from '../api/sessions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ─── Mock Data ─────────────────────────────────────────────
-const MOCK_FEEDBACK = {
-    overallScore: 78,
-    cefrLevel: 'B1',
-    scores: {
-        grammar: 72,
-        pronunciation: 85,
-        fluency: 68,
-        vocabulary: 80,
-    },
-    mistakes: [
-        {
-            id: '1',
-            type: 'verb_form',
-            severity: 'high',
-            original: 'I goed to Goa last month.',
-            corrected: 'I went to Goa last month.',
-            explanation: 'The past tense of "go" is "went", not "goed". This is an irregular verb.',
-            rule: 'Irregular past tense',
-        },
-        {
-            id: '2',
-            type: 'verb_form',
-            severity: 'high',
-            original: 'I eated fish curry.',
-            corrected: 'I ate fish curry.',
-            explanation: 'The past tense of "eat" is "ate", not "eated". This is an irregular verb.',
-            rule: 'Irregular past tense',
-        },
-        {
-            id: '3',
-            type: 'word_choice',
-            severity: 'medium',
-            original: 'The water was very beautiful and clean.',
-            corrected: 'The water was crystal clear and beautiful.',
-            explanation: 'Using more descriptive vocabulary like "crystal clear" sounds more natural and vivid.',
-            rule: 'Vocabulary enrichment',
-        },
-    ],
-    pronunciationIssues: [
-        { id: '1', word: 'restaurants', expected: '/ˈres.tə.rɒnts/', actual: '/res.tau.rants/', severity: 'medium', suggestion: 'Stress the first syllable: RES-tuh-ronts' },
-        { id: '2', word: 'beautiful', expected: '/ˈbjuː.tɪ.fəl/', actual: '/byu.ti.ful/', severity: 'low', suggestion: 'The middle syllable is reduced: BYOO-tih-ful' },
-        { id: '3', word: 'delicious', expected: '/dɪˈlɪʃ.əs/', actual: '/de.li.si.ous/', severity: 'medium', suggestion: 'Stress second syllable: deh-LISH-us' },
-    ],
-    aiSummary: "Great effort in today's conversation! You showed confidence in expressing your ideas about travel and food. Your main area for improvement is irregular past tenses — you used regular patterns for irregular verbs like 'go' and 'eat'. Your pronunciation is generally clear but work on reducing syllables in longer words. Your fluency improved as the conversation went on, and your vocabulary is growing. Focus on irregular verbs this week for the biggest improvement!",
-};
 
 // ─── Skill Bar Component ──────────────────────────────────
 function SkillBar({ label, score, icon, color, delay }: {
@@ -96,7 +50,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 }
 
 // ─── Mistake Card ─────────────────────────────────────────
-function MistakeCard({ item, index }: { item: typeof MOCK_FEEDBACK.mistakes[0]; index: number }) {
+function MistakeCard({ item, index }: { item: any; index: number }) {
     const [expanded, setExpanded] = useState(false);
     return (
         <Animated.View entering={FadeInDown.delay(600 + index * 100).springify()}>
@@ -142,12 +96,12 @@ function MistakeCard({ item, index }: { item: typeof MOCK_FEEDBACK.mistakes[0]; 
 }
 
 // ─── Pronunciation Card ───────────────────────────────────
-function PronunciationCard({ item }: { item: typeof MOCK_FEEDBACK.pronunciationIssues[0] }) {
+function PronunciationCard({ item }: { item: any }) {
     return (
         <View style={styles.pronCard}>
             <Text style={styles.pronWord}>{item.word}</Text>
             <View style={styles.pronPhonetics}>
-                <Text style={styles.pronExpected}>{item.expected}</Text>
+                <Text style={styles.pronExpected}>{item.phoneticExpected || item.expected}</Text>
             </View>
             <Text style={styles.pronSuggestion}>{item.suggestion}</Text>
             <TouchableOpacity style={styles.pronPlayButton}>
@@ -159,17 +113,85 @@ function PronunciationCard({ item }: { item: typeof MOCK_FEEDBACK.pronunciationI
 
 // ─── Main Component ───────────────────────────────────────
 export default function CallFeedbackScreen({ navigation, route }: any) {
+    const [loading, setLoading] = useState(true);
+    const [sessionData, setSessionData] = useState<ConversationSession | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+
     const params = route?.params || {};
-    const partnerName = params.partnerName || 'Sarah M.';
-    const topic = params.topic || 'Travel';
+    const sessionId = params.sessionId;
+    const partnerName = params.partnerName || 'Co-learner';
+    const topic = params.topic || 'General Practice';
     const callDuration = params.duration || 0;
 
-    const data = MOCK_FEEDBACK;
+    useEffect(() => {
+        let isMounted = true;
+        const fetchAnalysis = async () => {
+            if (!sessionId) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const data = await sessionsApi.getSessionAnalysis(sessionId);
+                if (data.analyses && data.analyses.length > 0) {
+                    if (isMounted) {
+                        setSessionData(data);
+                        setLoading(false);
+                    }
+                } else if (retryCount < 10) {
+                    // Poll if not ready yet (AI processing takes time)
+                    setTimeout(() => {
+                        if (isMounted) setRetryCount(prev => prev + 1);
+                    }, 5000);
+                } else {
+                    if (isMounted) setLoading(false);
+                }
+            } catch (error) {
+                console.error('Failed to fetch session analysis:', error);
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchAnalysis();
+        return () => { isMounted = false; };
+    }, [sessionId, retryCount]);
 
     const formatDuration = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m}m ${s}s`;
+    };
+
+    if (loading) {
+        return (
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <StatusBar barStyle="dark-content" />
+                <View style={{ alignItems: 'center', gap: 20 }}>
+                    <Ionicons name="sparkles" size={48} color={theme.colors.primary} />
+                    <Text style={{ fontSize: 18, fontWeight: '600', color: theme.colors.text.primary }}>
+                        AI is analyzing your call...
+                    </Text>
+                    <Text style={{ color: theme.colors.text.secondary, textAlign: 'center', paddingHorizontal: 40 }}>
+                        We're preparing your personalized feedback and corrections.
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    const currentAnalysis = sessionData?.analyses?.[0];
+    const data = {
+        overallScore: currentAnalysis?.scores?.overall || 0,
+        cefrLevel: currentAnalysis?.cefrLevel || 'B1',
+        scores: {
+            grammar: currentAnalysis?.scores?.grammar || 0,
+            pronunciation: currentAnalysis?.scores?.pronunciation || 0,
+            fluency: currentAnalysis?.scores?.fluency || 0,
+            vocabulary: currentAnalysis?.scores?.vocabulary || 0,
+        },
+        mistakes: currentAnalysis?.mistakes || [],
+        pronunciationIssues: currentAnalysis?.pronunciationIssues || [],
+        aiSummary: "The AI analysis focused on your grammar accuracy, pronunciation clarity, and vocabulary choice during the call.",
     };
 
     return (
@@ -238,23 +260,31 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
                 {/* Key Mistakes */}
                 <Text style={styles.sectionTitle}>Key Mistakes</Text>
-                {data.mistakes.map((item, index) => (
-                    <MistakeCard key={item.id} item={item} index={index} />
-                ))}
+                {data.mistakes.length > 0 ? (
+                    data.mistakes.map((item, index) => (
+                        <MistakeCard key={item.id} item={item} index={index} />
+                    ))
+                ) : (
+                    <Text style={{ paddingHorizontal: 30, color: theme.colors.text.secondary, fontSize: 14 }}>
+                        No significant mistakes found in this session. Well done!
+                    </Text>
+                )}
 
                 {/* Pronunciation Issues */}
-                <Animated.View entering={FadeInDown.delay(900).springify()}>
-                    <Text style={styles.sectionTitle}>Pronunciation Issues</Text>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.pronList}
-                    >
-                        {data.pronunciationIssues.map((item) => (
-                            <PronunciationCard key={item.id} item={item} />
-                        ))}
-                    </ScrollView>
-                </Animated.View>
+                {data.pronunciationIssues.length > 0 && (
+                    <Animated.View entering={FadeInDown.delay(900).springify()}>
+                        <Text style={styles.sectionTitle}>Pronunciation Issues</Text>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.pronList}
+                        >
+                            {data.pronunciationIssues.map((item: any) => (
+                                <PronunciationCard key={item.id} item={item} />
+                            ))}
+                        </ScrollView>
+                    </Animated.View>
+                )}
 
                 {/* AI Summary */}
                 <Animated.View entering={FadeInDown.delay(1000).springify()}>
@@ -275,15 +305,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
                 {/* Action Buttons */}
                 <Animated.View entering={FadeInDown.delay(1100).springify()} style={styles.actions}>
-                    <TouchableOpacity style={styles.primaryAction} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.primaryAction} activeOpacity={0.8} onPress={() => navigation.navigate('Home')}>
                         <LinearGradient
                             colors={theme.colors.gradients.primary}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.actionGradient}
                         >
-                            <Ionicons name="fitness" size={20} color="white" />
-                            <Text style={styles.primaryActionText}>Practice Mistakes</Text>
+                            <Ionicons name="home" size={20} color="white" />
+                            <Text style={styles.primaryActionText}>Back to Home</Text>
                         </LinearGradient>
                     </TouchableOpacity>
 
@@ -299,7 +329,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     );
 }
 
-// ─── Styles ────────────────────────────────────────────────
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -308,8 +337,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: theme.spacing.xl,
     },
-
-    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -328,8 +355,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: theme.colors.text.primary,
     },
-
-    // Meta
     metaRow: {
         flexDirection: 'row',
         paddingHorizontal: theme.spacing.l,
@@ -352,8 +377,6 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         fontWeight: '500',
     },
-
-    // Score Card
     scoreCard: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,
@@ -398,8 +421,6 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.sizes.m,
         fontWeight: '700',
     },
-
-    // Section
     sectionTitle: {
         fontSize: theme.typography.sizes.l,
         fontWeight: 'bold',
@@ -408,8 +429,6 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.m,
         marginTop: theme.spacing.m,
     },
-
-    // Skills
     skillsCard: {
         backgroundColor: theme.colors.surface,
         marginHorizontal: theme.spacing.l,
@@ -458,8 +477,6 @@ const styles = StyleSheet.create({
         width: 40,
         textAlign: 'right',
     },
-
-    // Mistakes
     mistakeCard: {
         backgroundColor: theme.colors.surface,
         marginHorizontal: theme.spacing.l,
@@ -542,8 +559,6 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         lineHeight: 18,
     },
-
-    // Pronunciation
     pronList: {
         paddingHorizontal: theme.spacing.l,
         gap: theme.spacing.s,
@@ -585,8 +600,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-
-    // AI Summary
     summaryCard: {
         backgroundColor: theme.colors.surface,
         marginHorizontal: theme.spacing.l,
@@ -617,8 +630,6 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         lineHeight: 22,
     },
-
-    // Actions
     actions: {
         paddingHorizontal: theme.spacing.l,
         marginTop: theme.spacing.l,

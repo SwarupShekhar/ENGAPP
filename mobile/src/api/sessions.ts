@@ -81,4 +81,9 @@ export const sessionsApi = {
         const response = await client.post('/sessions/start', { topic });
         return response.data;
     },
+
+    /** End a practice session */
+    endSession: async (sessionId: string): Promise<void> => {
+        await client.post(`/sessions/${sessionId}/end`);
+    },
 };

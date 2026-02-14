@@ -4,9 +4,9 @@ import { useAuth } from '@clerk/clerk-expo';
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
 const FORCE_PRODUCTION = false; // Switch to LOCAL backend for testing
-const API_URL = (IS_PROD || FORCE_PRODUCTION)
+export const API_URL = (IS_PROD || FORCE_PRODUCTION)
     ? 'https://engapp-3210.onrender.com'
-    : 'http://192.168.1.16:3000'; // Mac's local IP for iOS device testing
+    : 'http://172.20.10.13:3000'; // Mac's local IP for iOS device testing
 
 console.log(`[API] Initializing client with URL: ${API_URL}`);
 

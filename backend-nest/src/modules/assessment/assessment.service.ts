@@ -73,21 +73,20 @@ export class AssessmentService {
                 throw new BadRequestException('Invalid or completed assessment session');
             }
 
-            this.logger.log(`Uploading audio for ${dto.phase}...`);
-            const audioBuffer = Buffer.from(dto.audioBase64, 'base64');
-            const audioKey = `assessments/${session.id}/${dto.phase.toLowerCase()}${dto.attempt ? `-at${dto.attempt}` : ''}.wav`;
-            const audioUrl = await this.storage.uploadFile(audioBuffer, audioKey, 'audio/wav');
-            this.logger.log(`Audio uploaded to ${audioUrl}`);
+            // NEW: Skip Azure Blob Storage upload. Process in-memory only.
+            this.logger.log(`Processing assessment audio in-memory for ${dto.phase}...`);
+            // We use empty string as URL since we're providing base64
+            const audioUrl = "";
 
             switch (dto.phase) {
                 case AssessmentPhase.PHASE_1:
-                    return await this.handlePhase1(session, audioUrl);
+                    return await this.handlePhase1(session, audioUrl, dto.audioBase64);
                 case AssessmentPhase.PHASE_2:
-                    return await this.handlePhase2(session, audioUrl, dto.attempt || 1);
+                    return await this.handlePhase2(session, audioUrl, dto.attempt || 1, dto.audioBase64);
                 case AssessmentPhase.PHASE_3:
-                    return await this.handlePhase3(session, audioUrl);
+                    return await this.handlePhase3(session, audioUrl, dto.audioBase64);
                 case AssessmentPhase.PHASE_4:
-                    return await this.handlePhase4(session, audioUrl);
+                    return await this.handlePhase4(session, audioUrl, dto.audioBase64);
                 default:
                     throw new BadRequestException('Invalid phase');
             }
@@ -97,8 +96,8 @@ export class AssessmentService {
         }
     }
 
-    private async handlePhase1(session: any, audioUrl: string) {
-        const result = await this.azure.analyzeSpeech(audioUrl); // Warm-up: no reference text
+    private async handlePhase1(session: any, audioUrl: string, audioBase64: string) {
+        const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
 
         if (result.wordCount === 0) {
             return { hint: "We couldn't hear you clearly. Please try again.", nextPhase: AssessmentPhase.PHASE_1 };
@@ -125,9 +124,9 @@ export class AssessmentService {
         return { nextPhase: AssessmentPhase.PHASE_2, nextSentence: { text: ELICITED_SENTENCES.B1, level: 'B1' } };
     }
 
-    private async handlePhase2(session: any, audioUrl: string, attempt: number) {
+    private async handlePhase2(session: any, audioUrl: string, attempt: number, audioBase64: string) {
         const referenceText = attempt === 1 ? ELICITED_SENTENCES.B1 : (session.phase2Data?.adaptiveSentence?.text || ELICITED_SENTENCES.B1);
-        const result = await this.azure.analyzeSpeech(audioUrl, referenceText);
+        const result = await this.azure.analyzeSpeech(audioUrl, referenceText, audioBase64);
 
         const attemptData = {
             accuracyScore: result.accuracyScore,
@@ -176,8 +175,8 @@ export class AssessmentService {
         }
     }
 
-    private async handlePhase3(session: any, audioUrl: string) {
-        const azureResult = await this.azure.analyzeSpeech(audioUrl);
+    private async handlePhase3(session: any, audioUrl: string, audioBase64: string) {
+        const azureResult = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
 
         // Determine image level from Phase 2
         const phase2Data = session.phase2Data as any;
@@ -207,8 +206,8 @@ export class AssessmentService {
         return { nextPhase: AssessmentPhase.PHASE_4, question: "What is your biggest challenge in learning English?" };
     }
 
-    private async handlePhase4(session: any, audioUrl: string) {
-        const result = await this.azure.analyzeSpeech(audioUrl);
+    private async handlePhase4(session: any, audioUrl: string, audioBase64: string) {
+        const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
         const compScore = result.wordCount > 15 ? 80 : (result.wordCount > 8 ? 65 : 50);
 
         const phase4Data = {

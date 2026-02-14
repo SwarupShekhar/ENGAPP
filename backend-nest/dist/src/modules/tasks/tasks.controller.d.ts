@@ -9,8 +9,8 @@ export declare class TasksController {
                     id: string;
                     createdAt: Date;
                     type: string;
-                    original: string;
                     cefrLevel: string | null;
+                    original: string;
                     severity: string;
                     segmentId: string;
                     corrected: string;
@@ -28,10 +28,10 @@ export declare class TasksController {
         } & {
             id: string;
             createdAt: Date;
-            userId: string;
             status: string;
-            completedAt: Date | null;
             type: string;
+            userId: string;
+            completedAt: Date | null;
             sessionId: string | null;
             score: number | null;
             title: string;

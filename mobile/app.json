@@ -36,6 +36,15 @@
       "eas": {
         "projectId": "2286e998-c3a9-4582-bf36-0cfde9a7dc57"
       }
-    }
+    },
+    "plugins": [
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "cameraPermission": "Allow EngR to access your camera",
+          "microphonePermission": "Allow EngR to access your microphone"
+        }
+      ]
+    ]
   }
 }

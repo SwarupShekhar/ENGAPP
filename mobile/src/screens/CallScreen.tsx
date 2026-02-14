@@ -8,7 +8,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AnimatedRN, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useUser } from '@clerk/clerk-expo';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from '../theme/theme';
+import { matchmakingApi } from '../api/matchmaking';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -156,13 +158,47 @@ export default function CallScreen() {
     const meta = (user?.unsafeMetadata || {}) as any;
     const userLevel = meta.assessmentLevel || 'B1';
 
-    const handleFindPartner = () => {
+    const navigation: any = useNavigation();
+
+    const handleFindPartner = async () => {
+        if (!user) return;
+
         setIsSearching(true);
-        // Simulate matching — in real app this would hit matchmaking API
-        setTimeout(() => {
+        try {
+            await matchmakingApi.join({
+                userId: user.id,
+                englishLevel: userLevel,
+                topic: selectedTopic || 'general'
+            });
+
+            // Start Polling
+            const pollInterval = setInterval(async () => {
+                try {
+                    const status = await matchmakingApi.checkStatus(user.id, userLevel);
+                    if (status.matched && status.sessionId) {
+                        clearInterval(pollInterval);
+                        setIsSearching(false);
+                        navigation.replace('InCall', {
+                            sessionId: status.sessionId,
+                            roomName: status.roomName,
+                            partnerId: status.partnerId,
+                            partnerName: status.partnerName,
+                            topic: selectedTopic || 'general'
+                        });
+                    } else if (status.message) {
+                        // Timeout or other message
+                        clearInterval(pollInterval);
+                        setIsSearching(false);
+                        alert(status.message);
+                    }
+                } catch (error) {
+                    console.error('Matchmaking poll error:', error);
+                }
+            }, 3000);
+        } catch (error) {
+            console.error('Failed to join queue:', error);
             setIsSearching(false);
-            // TODO: Navigate to InCallScreen when matchmaking is live
-        }, 3000);
+        }
     };
 
     return (

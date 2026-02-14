@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
 } from 'react-native';
@@ -6,62 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme/theme';
-
-// ─── Mock Data ─────────────────────────────────────────────
-const MOCK_SESSIONS = [
-    {
-        id: '1',
-        topic: 'Travel Plans',
-        partnerName: 'Sarah M.',
-        date: 'Today, 2:30 PM',
-        duration: 720,
-        overallScore: 82,
-        cefrLevel: 'B1',
-        status: 'COMPLETED',
-    },
-    {
-        id: '2',
-        topic: 'Daily Routine',
-        partnerName: 'David L.',
-        date: 'Yesterday, 5:15 PM',
-        duration: 480,
-        overallScore: 75,
-        cefrLevel: 'B1',
-        status: 'COMPLETED',
-    },
-    {
-        id: '3',
-        topic: 'Movies & TV',
-        partnerName: 'Priya K.',
-        date: 'Feb 10, 11:00 AM',
-        duration: 600,
-        overallScore: 88,
-        cefrLevel: 'B1',
-        status: 'COMPLETED',
-    },
-    {
-        id: '4',
-        topic: 'Technology',
-        partnerName: 'Raj P.',
-        date: 'Feb 9, 3:45 PM',
-        duration: 540,
-        overallScore: 70,
-        cefrLevel: 'A2',
-        status: 'COMPLETED',
-    },
-    {
-        id: '5',
-        topic: 'Food & Cooking',
-        partnerName: 'Ananya S.',
-        date: 'Feb 8, 6:20 PM',
-        duration: 660,
-        overallScore: 85,
-        cefrLevel: 'B1',
-        status: 'COMPLETED',
-    },
-];
+import { userApi, AssessmentHistoryItem } from '../api/user';
 
 type FilterType = 'all' | 'week' | 'month';
 
@@ -80,9 +27,15 @@ function FilterChip({ label, active, onPress }: {
     );
 }
 
+// ─── Formatting Helper ────────────────────────────────────
+function formatDate(dateStr: string) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 // ─── Session Card ─────────────────────────────────────────
 function SessionCard({ item, index, onPress }: {
-    item: typeof MOCK_SESSIONS[0]; index: number; onPress: () => void;
+    item: AssessmentHistoryItem; index: number; onPress: () => void;
 }) {
     const minutes = Math.floor(item.duration / 60);
     const scoreColor = item.overallScore >= 80
@@ -111,7 +64,7 @@ function SessionCard({ item, index, onPress }: {
                         <Ionicons name="time-outline" size={12} color={theme.colors.text.secondary} />
                         <Text style={styles.sessionMetaText}>{minutes} min</Text>
                         <Text style={styles.sessionDot}>·</Text>
-                        <Text style={styles.sessionMetaText}>{item.date}</Text>
+                        <Text style={styles.sessionMetaText}>{formatDate(item.date)}</Text>
                     </View>
                 </View>
                 <View style={styles.sessionRight}>
@@ -157,9 +110,24 @@ function EmptyState({ navigation }: { navigation: any }) {
 export default function FeedbackScreen() {
     const navigation: any = useNavigation();
     const [filter, setFilter] = useState<FilterType>('all');
+    const [sessions, setSessions] = useState<AssessmentHistoryItem[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // In a real app, filter would query the API
-    const sessions = MOCK_SESSIONS;
+    useFocusEffect(
+        useCallback(() => {
+            const fetchHistory = async () => {
+                try {
+                    const data = await userApi.getHistory();
+                    setSessions(data);
+                } catch (error) {
+                    console.error('Failed to fetch history:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchHistory();
+        }, [])
+    );
 
     const averageScore = sessions.length > 0
         ? Math.round(sessions.reduce((sum, s) => sum + s.overallScore, 0) / sessions.length)
@@ -242,8 +210,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: theme.spacing.xl,
     },
-
-    // Header
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -271,8 +237,6 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: theme.colors.primary,
     },
-
-    // Filters
     filters: {
         flexDirection: 'row',
         paddingHorizontal: theme.spacing.l,
@@ -300,8 +264,6 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '600',
     },
-
-    // Stats
     statsRow: {
         flexDirection: 'row',
         paddingHorizontal: theme.spacing.l,
@@ -326,8 +288,6 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         marginTop: 2,
     },
-
-    // Session Card
     sessionCard: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -398,8 +358,6 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         fontWeight: '500',
     },
-
-    // Empty State
     emptyState: {
         alignItems: 'center',
         paddingVertical: theme.spacing.xxl * 2,

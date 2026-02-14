@@ -86,17 +86,34 @@ export class MatchmakingService {
                     if (removedU1 > 0 && removedU2 > 0) {
                         this.logger.log(`Match found between ${userId} and ${partnerId} for level ${level}`);
 
+                        // Resolve IDs to internal UUIDs for DB creation
+                        const dbUserId = await this.resolveToUuid(userId);
+                        const dbPartnerId = await this.resolveToUuid(partnerId);
+
+                        if (!dbUserId || !dbPartnerId) {
+                            this.logger.error(`Failed to resolve users to UUIDs: ${userId} -> ${dbUserId}, ${partnerId} -> ${dbPartnerId}`);
+                            // Rollback queue changes
+                            await this.redisService.getClient().rpush(queueKey, userId);
+                            await this.redisService.getClient().rpush(queueKey, partnerId);
+                            return { matched: false };
+                        }
+
                         const session = await this.prisma.conversationSession.create({
                             data: {
                                 topic: userMeta.topic || 'general',
                                 status: 'CREATED',
                                 participants: {
                                     create: [
-                                        { userId: userId },
-                                        { userId: partnerId },
+                                        { userId: dbUserId },
+                                        { userId: dbPartnerId },
                                     ],
                                 },
                             },
+                        });
+
+                        const partner = await this.prisma.user.findUnique({
+                            where: { id: partnerId },
+                            select: { fname: true, lname: true }
                         });
 
                         await this.redisService.getClient().del(`user:${userId}:meta`);
@@ -107,6 +124,7 @@ export class MatchmakingService {
                             sessionId: session.id,
                             roomName: `room_${session.id}`,
                             partnerId: partnerId,
+                            partnerName: partner ? `${partner.fname} ${partner.lname}` : 'Co-learner',
                         };
                     } else {
                         // If one failed to remove, put the other back (unlikely but safe)
@@ -119,5 +137,17 @@ export class MatchmakingService {
         }
 
         return { matched: false };
+    }
+
+    private async resolveToUuid(id: string): Promise<string | null> {
+        // 1. Check if it's already a valid UUID and exists
+        const byId = await this.prisma.user.findUnique({ where: { id } });
+        if (byId) return byId.id;
+
+        // 2. Check if it's a Clerk ID
+        const byClerkId = await this.prisma.user.findUnique({ where: { clerkId: id } });
+        if (byClerkId) return byClerkId.id;
+
+        return null;
     }
 }

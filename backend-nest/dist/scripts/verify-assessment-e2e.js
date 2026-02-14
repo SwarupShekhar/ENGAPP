@@ -7,7 +7,7 @@ const fs = require("fs");
 const child_process_1 = require("child_process");
 dotenv.config();
 const prisma = new client_1.PrismaClient();
-const API_URL = "http://localhost:3002";
+const API_URL = "http://localhost:3000";
 async function generateAudio(text, filename) {
     const path = `${filename}.wav`;
     try {

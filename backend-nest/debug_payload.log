@@ -1,0 +1,3 @@
+[2026-02-14T08:27:52.713Z] Sending payload: audio_base64=true, len=150752, keys=audio_base64,user_id,session_id, audio_url=undefined
+[2026-02-14T08:29:05.222Z] Sending payload: audio_base64=true, len=227320, keys=audio_base64,user_id,session_id, audio_url=undefined
+[2026-02-14T08:29:33.426Z] Sending payload: audio_base64=true, len=187440, keys=audio_base64,user_id,session_id, audio_url=undefined

@@ -7,28 +7,82 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp, SlideInRight } from 'react-native-reanimated';
+import { useUser } from '@clerk/clerk-expo';
+import {
+    LiveKitRoom,
+    useTracks,
+    useRoomContext,
+    TrackReferenceOrPlaceholder,
+    isTrackReference,
+} from '@livekit/react-native';
+import { Track, RoomEvent, DataPacket_Kind } from 'livekit-client';
+import { io, Socket } from 'socket.io-client';
 import { theme } from '../theme/theme';
+import { livekitApi } from '../api/livekit';
+import { sessionsApi } from '../api/sessions';
+import { API_URL } from '../api/client';
+import { Buffer } from 'buffer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// In a real app, these would come from environment variables
+const LIVEKIT_URL = 'wss://engrapp-8lz8v8ia.livekit.cloud';
+const SOCKET_URL = 'http://172.20.10.13:3000/audio'; // Same as API_URL but with namespace
+
+// ─── Data Listener Component ───────────────────────────────
+function DataListener({ onTranscription }: { onTranscription: (data: any) => void }) {
+    const room = useRoomContext();
+
+    useEffect(() => {
+        const handleData = (payload: Uint8Array, participant?: any) => {
+            try {
+                const str = Buffer.from(payload).toString('utf-8');
+                const data = JSON.parse(str);
+                if (data.type === 'transcription') {
+                    onTranscription(data);
+                }
+            } catch (e) {
+                console.error('Failed to parse data packet:', e);
+            }
+        };
+
+        room.on(RoomEvent.DataReceived, handleData);
+        return () => {
+            room.off(RoomEvent.DataReceived, handleData);
+        };
+    }, [room, onTranscription]);
+
+    return null;
+}
+
+// ─── Audio Conference Component ────────────────────────────
+function AudioConference() {
+    const tracks = useTracks([Track.Source.Microphone]);
+    return (
+        <View style={{ display: 'none' }}>
+            {tracks.map((track) => (
+                <AudioTrack key={track.publication.trackSid} trackRef={track} />
+            ))}
+        </View>
+    );
+}
+
+function AudioTrack({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) {
+    // This is a placeholder as @livekit/react-native handles audio playback automatically
+    // when connected to a room. We just need to ensure tracks are subscribed.
+    return null;
+}
 
 // ─── Mock Transcript Data ──────────────────────────────────
 const MOCK_TRANSCRIPT = [
-    { id: '1', speaker: 'partner', text: "Hi! So today let's talk about travel. Have you been anywhere recently?", time: '0:05' },
-    { id: '2', speaker: 'user', text: "Yes, I goed to Goa last month with my family.", time: '0:12' },
-    { id: '3', speaker: 'partner', text: "Oh nice! What did you like most about Goa?", time: '0:18' },
-    { id: '4', speaker: 'user', text: "I liked the beaches very much. The water was very beautiful and clean.", time: '0:28' },
-    { id: '5', speaker: 'partner', text: "That sounds amazing! Did you try any local food there?", time: '0:35' },
-    { id: '6', speaker: 'user', text: "Yes, I eated fish curry and it was very delicious. The restaurants near the beach are very good.", time: '0:48' },
-    { id: '7', speaker: 'partner', text: "I love seafood! How long did you stay?", time: '0:55' },
-    { id: '8', speaker: 'user', text: "We stayed for five days. It was not enough time to see everything.", time: '1:05' },
+    { id: '1', speaker: 'partner', text: "Hi! I'm your co-learner. Ready to practice?", time: '0:01' },
 ];
 
 // ─── Transcript Bubble ────────────────────────────────────
-function TranscriptBubble({ item, index }: { item: typeof MOCK_TRANSCRIPT[0]; index: number }) {
+function TranscriptBubble({ item, index }: { item: any; index: number }) {
     const isUser = item.speaker === 'user';
     return (
         <Animated.View
-            entering={SlideInRight.delay(index * 300 + 1000).springify()}
+            entering={SlideInRight.delay(index * 300).springify()}
             style={[
                 styles.bubbleRow,
                 isUser ? styles.bubbleRowRight : styles.bubbleRowLeft,
@@ -64,14 +118,94 @@ function ControlButton({ icon, label, onPress, danger, active }: {
 
 // ─── Main Component ───────────────────────────────────────
 export default function InCallScreen({ navigation, route }: any) {
+    const { user } = useUser();
+    const [token, setToken] = useState<string | null>(null);
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeaker, setIsSpeaker] = useState(false);
     const [visibleMessages, setVisibleMessages] = useState(0);
+    const [transcript, setTranscript] = useState<any[]>(MOCK_TRANSCRIPT);
     const scrollRef = useRef<ScrollView>(null);
 
-    const partnerName = route?.params?.partnerName || 'Sarah M.';
-    const topic = route?.params?.topic || 'Travel';
+    const socketRef = useRef<Socket | null>(null);
+
+    const sessionId = route?.params?.sessionId;
+    const partnerName = route?.params?.partnerName || 'Co-learner';
+    const topic = route?.params?.topic || 'General Practice';
+
+    // Fetch Token on Mount
+    useEffect(() => {
+        const fetchToken = async () => {
+            if (!user || !sessionId) return;
+            try {
+                const res = await livekitApi.getToken(user.id, sessionId);
+                setToken(res.token);
+            } catch (error) {
+                console.error('Failed to get LiveKit token:', error);
+            }
+        };
+        fetchToken();
+    }, [user, sessionId]);
+
+    // Socket.io for transcription
+    useEffect(() => {
+        if (!user || !sessionId || !token) return;
+
+        // Connect to the audio namespace
+        const socketUrl = `${API_URL}/audio`;
+
+        socketRef.current = io(socketUrl, {
+            auth: { token },
+            transports: ['websocket'],
+        });
+
+        const socket = socketRef.current;
+
+        socket.on('connect', () => {
+            console.log('[Socket] Connected to audio namespace');
+            socket.emit('startStream', {
+                userId: user.id,
+                sessionId,
+                language: 'en-US'
+            });
+        });
+
+        socket.on('transcription', (data: { text: string; isFinal: boolean; timestamp: string }) => {
+            console.log('[Socket] Transcription received:', data.text);
+            if (data.isFinal) {
+                setTranscript(prev => [
+                    ...prev,
+                    {
+                        id: Date.now().toString(),
+                        speaker: 'user',
+                        text: data.text,
+                        time: formatTime(data.timestamp)
+                    }
+                ]);
+            }
+        });
+
+        socket.on('error', (err) => {
+            console.error('[Socket] Error:', err);
+        });
+
+        // NOTE: To send REAL audio data, we need a native bridge like react-native-live-audio-stream
+        // or to use a server-side LiveKit egress. Since LiveKit is already using the Mic,
+        // we can't easily record simultaneously with standard Expo APIs.
+        // socket.emit('audioData', pcmBuffer);
+
+        return () => {
+            if (socket.connected) {
+                socket.emit('stopStream');
+                socket.disconnect();
+            }
+        };
+    }, [user, sessionId, token]);
+
+    const formatTime = (isoString?: string) => {
+        const date = isoString ? new Date(isoString) : new Date();
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
 
     // Timer
     useEffect(() => {
@@ -81,22 +215,12 @@ export default function InCallScreen({ navigation, route }: any) {
         return () => clearInterval(interval);
     }, []);
 
-    // Simulate transcript messages appearing
-    useEffect(() => {
-        if (visibleMessages < MOCK_TRANSCRIPT.length) {
-            const timeout = setTimeout(() => {
-                setVisibleMessages(prev => prev + 1);
-            }, 3000);
-            return () => clearTimeout(timeout);
-        }
-    }, [visibleMessages]);
-
     // Auto-scroll transcript
     useEffect(() => {
         setTimeout(() => {
             scrollRef.current?.scrollToEnd({ animated: true });
         }, 100);
-    }, [visibleMessages]);
+    }, [transcript.length]);
 
     const formatDuration = (seconds: number) => {
         const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -104,103 +228,139 @@ export default function InCallScreen({ navigation, route }: any) {
         return `${m}:${s}`;
     };
 
-    const handleEndCall = () => {
+    const handleEndCall = async () => {
+        try {
+            if (sessionId) {
+                await sessionsApi.endSession(sessionId);
+            }
+        } catch (error) {
+            console.error('Failed to end session:', error);
+        }
         navigation.replace('CallFeedback', {
-            sessionId: 'mock-session-1',
+            sessionId: sessionId || 'session-id',
             partnerName,
             topic,
             duration,
         });
     };
 
+    if (!token) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <StatusBar barStyle="light-content" />
+                <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.background} />
+                <Animated.View entering={FadeIn}>
+                    <Ionicons name="call" size={48} color={theme.colors.primaryLight} style={{ marginBottom: 20 }} />
+                    <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>Connecting...</Text>
+                </Animated.View>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-            <LinearGradient
-                colors={['#1a1a2e', '#16213e', '#0f3460']}
-                style={styles.background}
-            />
+            <LiveKitRoom
+                serverUrl={LIVEKIT_URL}
+                token={token}
+                connect={true}
+                audio={true}
+                video={false}
+                onDisconnected={() => handleEndCall()}
+            >
+                <StatusBar barStyle="light-content" />
+                <DataListener onTranscription={(data) => {
+                    setTranscript(prev => [
+                        ...prev,
+                        {
+                            id: Date.now().toString(),
+                            speaker: data.userId === user?.id ? 'user' : 'partner',
+                            text: data.text,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }
+                    ]);
+                }} />
+                <LinearGradient
+                    colors={['#1a1a2e', '#16213e', '#0f3460']}
+                    style={styles.background}
+                />
 
-            <SafeAreaView style={styles.safeArea}>
-                {/* Header */}
-                <Animated.View entering={FadeIn.delay(200)} style={styles.header}>
-                    <View style={styles.topicPill}>
-                        <Ionicons name="chatbubbles" size={12} color={theme.colors.primaryLight} />
-                        <Text style={styles.topicText}>{topic}</Text>
+                <SafeAreaView style={styles.safeArea}>
+                    {/* AudioConference handles the actual audio streaming/playback */}
+                    <AudioConference />
+
+                    {/* Header */}
+                    <Animated.View entering={FadeIn.delay(200)} style={styles.header}>
+                        <View style={styles.topicPill}>
+                            <Ionicons name="chatbubbles" size={12} color={theme.colors.primaryLight} />
+                            <Text style={styles.topicText}>{topic}</Text>
+                        </View>
+                    </Animated.View>
+
+                    {/* Partner Info */}
+                    <Animated.View entering={FadeInUp.delay(300).springify()} style={styles.partnerSection}>
+                        <LinearGradient
+                            colors={theme.colors.gradients.primary}
+                            style={styles.partnerAvatar}
+                        >
+                            <Text style={styles.partnerInitial}>{partnerName.charAt(0)}</Text>
+                        </LinearGradient>
+                        <Text style={styles.partnerName}>{partnerName}</Text>
+                        <View style={styles.timerContainer}>
+                            <View style={styles.liveDot} />
+                            <Text style={styles.timerText}>{formatDuration(duration)}</Text>
+                        </View>
+                    </Animated.View>
+
+                    {/* Live Transcript placeholder */}
+                    <View style={styles.transcriptContainer}>
+                        <View style={styles.transcriptHeader}>
+                            <Ionicons name="text" size={16} color={theme.colors.primaryLight} />
+                            <Text style={styles.transcriptLabel}>Live Transcript</Text>
+                        </View>
+                        <ScrollView
+                            ref={scrollRef}
+                            style={styles.transcriptScroll}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.transcriptContent}
+                        >
+                            {transcript.map((item, index) => (
+                                <TranscriptBubble key={item.id} item={item} index={index} />
+                            ))}
+                        </ScrollView>
                     </View>
-                </Animated.View>
 
-                {/* Partner Info */}
-                <Animated.View entering={FadeInUp.delay(300).springify()} style={styles.partnerSection}>
-                    <LinearGradient
-                        colors={theme.colors.gradients.primary}
-                        style={styles.partnerAvatar}
-                    >
-                        <Text style={styles.partnerInitial}>{partnerName.charAt(0)}</Text>
-                    </LinearGradient>
-                    <Text style={styles.partnerName}>{partnerName}</Text>
-                    <View style={styles.timerContainer}>
-                        <View style={styles.liveDot} />
-                        <Text style={styles.timerText}>{formatDuration(duration)}</Text>
-                    </View>
-                </Animated.View>
-
-                {/* Live Transcript */}
-                <View style={styles.transcriptContainer}>
-                    <View style={styles.transcriptHeader}>
-                        <Ionicons name="text" size={16} color={theme.colors.primaryLight} />
-                        <Text style={styles.transcriptLabel}>Live Transcript</Text>
-                    </View>
-                    <ScrollView
-                        ref={scrollRef}
-                        style={styles.transcriptScroll}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.transcriptContent}
-                    >
-                        {MOCK_TRANSCRIPT.slice(0, visibleMessages).map((item, index) => (
-                            <TranscriptBubble key={item.id} item={item} index={index} />
-                        ))}
-                        {visibleMessages === 0 && (
-                            <Animated.View entering={FadeIn.delay(500)} style={styles.waitingContainer}>
-                                <Ionicons name="mic-outline" size={32} color="rgba(255,255,255,0.3)" />
-                                <Text style={styles.waitingText}>Listening...</Text>
-                            </Animated.View>
-                        )}
-                    </ScrollView>
-                </View>
-
-                {/* Controls */}
-                <Animated.View entering={FadeInUp.delay(600).springify()} style={styles.controls}>
-                    <ControlButton
-                        icon={isMuted ? 'mic-off' : 'mic'}
-                        label={isMuted ? 'Unmute' : 'Mute'}
-                        active={isMuted}
-                        onPress={() => setIsMuted(!isMuted)}
-                    />
-                    <ControlButton
-                        icon={isSpeaker ? 'volume-high' : 'volume-medium'}
-                        label="Speaker"
-                        active={isSpeaker}
-                        onPress={() => setIsSpeaker(!isSpeaker)}
-                    />
-                    <ControlButton
-                        icon="close"
-                        label="End"
-                        danger
-                        onPress={handleEndCall}
-                    />
-                    <ControlButton
-                        icon="create-outline"
-                        label="Notes"
-                        onPress={() => { }}
-                    />
-                </Animated.View>
-            </SafeAreaView>
+                    {/* Controls */}
+                    <Animated.View entering={FadeInUp.delay(600).springify()} style={styles.controls}>
+                        <ControlButton
+                            icon={isMuted ? 'mic-off' : 'mic'}
+                            label={isMuted ? 'Unmute' : 'Mute'}
+                            active={isMuted}
+                            onPress={() => setIsMuted(!isMuted)}
+                        />
+                        <ControlButton
+                            icon={isSpeaker ? 'volume-high' : 'volume-medium'}
+                            label="Speaker"
+                            active={isSpeaker}
+                            onPress={() => setIsSpeaker(!isSpeaker)}
+                        />
+                        <ControlButton
+                            icon="close"
+                            label="End"
+                            danger
+                            onPress={handleEndCall}
+                        />
+                        <ControlButton
+                            icon="create-outline"
+                            label="Notes"
+                            onPress={() => { }}
+                        />
+                    </Animated.View>
+                </SafeAreaView>
+            </LiveKitRoom>
         </View>
     );
 }
 
-// ─── Styles ────────────────────────────────────────────────
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -215,8 +375,6 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
     },
-
-    // Header
     header: {
         alignItems: 'center',
         paddingVertical: theme.spacing.s,
@@ -235,8 +393,6 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.sizes.xs,
         fontWeight: '600',
     },
-
-    // Partner
     partnerSection: {
         alignItems: 'center',
         paddingVertical: theme.spacing.m,
@@ -277,8 +433,6 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         fontVariant: ['tabular-nums'],
     },
-
-    // Transcript
     transcriptContainer: {
         flex: 1,
         marginHorizontal: theme.spacing.m,
@@ -308,8 +462,6 @@ const styles = StyleSheet.create({
         padding: theme.spacing.m,
         gap: theme.spacing.s,
     },
-
-    // Bubbles
     bubbleRow: {
         flexDirection: 'row',
         marginBottom: 4,
@@ -350,20 +502,6 @@ const styles = StyleSheet.create({
         textAlign: 'right',
         marginTop: 4,
     },
-
-    // Waiting
-    waitingContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: theme.spacing.xxl,
-        gap: theme.spacing.s,
-    },
-    waitingText: {
-        color: 'rgba(255,255,255,0.3)',
-        fontSize: theme.typography.sizes.m,
-    },
-
-    // Controls
     controls: {
         flexDirection: 'row',
         justifyContent: 'space-evenly',

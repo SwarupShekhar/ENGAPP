@@ -1,19 +1,23 @@
 import { useUser } from '@clerk/clerk-expo';
-import { useNavigation } from '@react-navigation/native';
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 import { theme } from '../theme/theme';
-import { StatsOverview } from '../components/home/StatsOverview';
-import { StickyPrompt } from '../components/home/StickyPrompt';
-import { HomeCarousel } from '../components/home/HomeCarousel';
+import { ConnectPracticeCard } from '../components/home/ConnectPracticeCard';
+import { FeedbackReadyCard } from '../components/home/FeedbackReadyCard';
+import { WeekProgressRow } from '../components/home/WeekProgressRow';
+import { userApi, UserStats } from '../api/user';
 
 export default function HomeScreen() {
     const { user, isLoaded } = useUser();
     const navigation: any = useNavigation();
+
+    const [stats, setStats] = useState<UserStats | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (isLoaded && user && !user.firstName) {
@@ -21,56 +25,73 @@ export default function HomeScreen() {
         }
     }, [isLoaded, user]);
 
-    // Mock data for now, but use real name if available
-    const userData = {
+    useFocusEffect(
+        useCallback(() => {
+            if (!user) return;
+            const fetchStats = async () => {
+                try {
+                    const data = await userApi.getStats();
+                    setStats(data);
+                } catch (error) {
+                    console.error('Failed to fetch user stats:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchStats();
+        }, [user])
+    );
+
+    const displayData = {
         name: user?.firstName || "User",
-        feedbackScore: 85,
-        fluencyScore: 78,
-        vocabScore: 92,
-        recentMistakes: 3,
+        mistakesLines: stats?.mistakeCount || 34,
+        words: stats?.vocabScore ? Math.round(stats.vocabScore * 10) : 28, // Mock word count
+        level: stats?.level || 'B2',
     };
 
-    if (!isLoaded) return null; // Or a loading spinner
+    if (!isLoaded) return null;
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" />
-            <LinearGradient
-                colors={theme.colors.gradients.surface}
-                style={styles.background}
-            />
+            <StatusBar barStyle="dark-content" backgroundColor="white" />
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Animated.View
-                        entering={FadeInDown.delay(100).springify()}
-                        style={styles.header}
-                    >
-                        <View>
-                            <Text style={styles.greeting}>Hello,</Text>
-                            <Text style={styles.username}>{userData.name}</Text>
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <View style={styles.headerLeft}>
+                            <View style={styles.avatarPlaceholder}>
+                                <Image source={{ uri: user?.imageUrl }} style={styles.avatarImage} />
+                                {/* Fallback if no image */}
+                                {(!user?.imageUrl) && <Text style={styles.avatarText}>{displayData.name.charAt(0)}</Text>}
+                            </View>
+                            <Text style={styles.greeting}>Hi {displayData.name} 👋</Text>
                         </View>
-                        <View style={styles.avatarPlaceholder} />
+                        <TouchableOpacity style={styles.iconBtn}>
+                            <Ionicons name="notifications-outline" size={24} color="#7C3AED" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Connect & Practice Card */}
+                    <Animated.View entering={FadeInDown.delay(100).springify()}>
+                        <ConnectPracticeCard onPress={() => navigation.navigate('CallPreference')} />
                     </Animated.View>
 
+                    {/* Feedback Ready Card */}
                     <Animated.View entering={FadeInDown.delay(200).springify()}>
-                        <StatsOverview
-                            feedbackScore={userData.feedbackScore}
-                            fluencyScore={userData.fluencyScore}
-                            vocabScore={userData.vocabScore}
-                        />
+                        <FeedbackReadyCard onPress={() => navigation.navigate('Feedback')} />
                     </Animated.View>
 
-                    <StickyPrompt
-                        mistakeCount={userData.recentMistakes}
-                        onPress={() => navigation.navigate('AssessmentIntro')}
-                    />
-
-                    <Animated.View entering={FadeInDown.delay(400).springify()}>
-                        <Text style={styles.sectionTitle}>Your Activity</Text>
-                        <HomeCarousel />
+                    {/* Weekly Progress */}
+                    <Animated.View entering={FadeInDown.delay(300).springify()}>
+                        <Text style={styles.sectionTitle}>This Week's Progress</Text>
+                        <WeekProgressRow
+                            mistakes={displayData.mistakesLines}
+                            words={displayData.words}
+                            level={displayData.level}
+                        />
                     </Animated.View>
 
                     <View style={styles.footerSpacer} />
@@ -83,14 +104,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.background,
-    },
-    background: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        height: 300,
+        backgroundColor: 'white', // Changed to white as per mock
     },
     safeArea: {
         flex: 1,
@@ -102,34 +116,50 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: theme.spacing.m,
-        paddingTop: theme.spacing.m,
+        paddingHorizontal: theme.spacing.l,
+        paddingVertical: theme.spacing.m,
         marginBottom: theme.spacing.s,
     },
-    greeting: {
-        fontSize: theme.typography.sizes.l,
-        color: theme.colors.text.secondary,
-    },
-    username: {
-        fontSize: theme.typography.sizes.xxl,
-        fontWeight: theme.typography.weights.black as any,
-        color: theme.colors.text.primary,
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     avatarPlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: theme.borderRadius.circle,
-        backgroundColor: theme.colors.primaryLight,
-        opacity: 0.2,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#E2E8F0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    avatarText: {
+        color: '#64748B',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    greeting: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: theme.colors.text.primary,
+    },
+    iconBtn: {
+        padding: 8,
     },
     sectionTitle: {
-        fontSize: theme.typography.sizes.l,
-        fontWeight: theme.typography.weights.bold as any,
+        fontSize: 18,
+        fontWeight: 'bold',
         color: theme.colors.text.primary,
-        marginLeft: theme.spacing.m,
-        marginBottom: theme.spacing.s,
+        marginLeft: theme.spacing.l,
+        marginBottom: theme.spacing.m,
+        marginTop: theme.spacing.s,
     },
     footerSpacer: {
-        height: 100,
+        height: 120, // Increased to clear the floating tab bar and button
     },
 });

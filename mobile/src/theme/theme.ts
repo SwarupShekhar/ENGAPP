@@ -4,13 +4,13 @@ export const theme = {
         primaryLight: '#A5B4FC',
         secondary: '#10B981', // Emerald-500
         secondaryLight: '#6EE7B7',
-        background: '#0F172A', // Slate-900 (Dark Mode Base)
-        surface: '#1E293B',    // Slate-800 (Card Base)
+        background: '#FFFFFF', // White
+        surface: '#F8FAFC',    // Slate-50
         text: {
-            primary: '#F8FAFC',
-            secondary: '#94A3B8',
-            light: '#E2E8F0',
-            accent: '#818CF8',
+            primary: '#0F172A', // Slate-900
+            secondary: '#64748B', // Slate-500
+            light: '#94A3B8',
+            accent: '#6366F1',
         },
         error: '#F43F5E',
         success: '#10B981',

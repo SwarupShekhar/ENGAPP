@@ -7,7 +7,7 @@ import { execSync } from "child_process";
 dotenv.config();
 
 const prisma = new PrismaClient();
-const API_URL = "http://localhost:3002";
+const API_URL = "http://localhost:3000";
 
 async function generateAudio(text: string, filename: string): Promise<string> {
     const path = `${filename}.wav`;

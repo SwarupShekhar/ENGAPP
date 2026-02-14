@@ -16,6 +16,7 @@ async def transcribe_audio(
     log = get_logger(request)
     try:
         log.info("endpoint_transcribe_started", user_id=body.user_id)
+        print(f"DEBUG TRANSCRIBE REQUEST: audio_url={body.audio_url}, has_base64={bool(body.audio_base64)}, base64_len={len(body.audio_base64) if body.audio_base64 else 0}, user_id={body.user_id}")
         
         start_time = time.time()
         print(f"DEBUG: Calling service.transcribe for user {body.user_id}")

@@ -1,5 +1,6 @@
-import { Controller, Post, Body, Put, Param, Get } from '@nestjs/common';
+import { Controller, Post, Body, Put, Param, Get, UseGuards, Request } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
+import { ClerkGuard } from '../auth/clerk.guard';
 
 @Controller('sessions')
 export class SessionsController {
@@ -13,6 +14,13 @@ export class SessionsController {
     @Put(':id/heartbeat')
     async heartbeat(@Param('id') sessionId: string, @Body() data: { userId: string }) {
         return this.sessionsService.heartbeat(sessionId, data.userId);
+    }
+
+    @Get(':id/analysis')
+    @UseGuards(ClerkGuard)
+    async getAnalysis(@Param('id') sessionId: string, @Request() req) {
+        // Use the authenticated user's ID to filter the analysis
+        return this.sessionsService.getSessionAnalysis(sessionId, req.user.id);
     }
 
     @Post(':id/end')

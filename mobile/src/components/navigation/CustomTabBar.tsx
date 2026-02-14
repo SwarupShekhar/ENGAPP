@@ -28,13 +28,13 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                         }
                     };
 
-                    // Center Button (Call)
-                    if (index === 2) {
+                    // Special handling for Call button
+                    if (route.name === 'Call') {
                         return (
                             <View key={index} style={styles.centerButtonContainer}>
                                 <TouchableOpacity
                                     activeOpacity={0.9}
-                                    onPress={onPress}
+                                    onPress={() => navigation.navigate('CallPreference')}
                                     style={styles.centerButton}
                                 >
                                     <LinearGradient
@@ -52,7 +52,6 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                     if (route.name === 'Home') iconName = isFocused ? 'home' : 'home-outline';
                     if (route.name === 'Feedback') iconName = isFocused ? 'document-text' : 'document-text-outline';
                     if (route.name === 'Progress') iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
-                    if (route.name === 'Profile') iconName = isFocused ? 'person' : 'person-outline';
 
                     return (
                         <TouchableOpacity
@@ -123,7 +122,7 @@ const styles = StyleSheet.create({
     centerButtonContainer: {
         width: 70,
         height: 70,
-        marginTop: -40, // Pulls it up
+        marginTop: -30, // Adjusted pull up
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 10,
@@ -132,11 +131,13 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 32,
-        shadowColor: theme.colors.primary,
+        shadowColor: '#7C3AED', // Violet shadow
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
+        shadowOpacity: 0.5,
+        shadowRadius: 16,
         elevation: 10,
+        backgroundColor: 'white', // Ensure button has bg behind gradient if needed
+        marginBottom: 10,
     },
     gradientCircle: {
         width: '100%',

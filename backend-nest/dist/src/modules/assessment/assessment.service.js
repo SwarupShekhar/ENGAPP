@@ -73,20 +73,17 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
                 this.logger.warn(`Invalid session or status: ${session?.status}`);
                 throw new common_1.BadRequestException('Invalid or completed assessment session');
             }
-            this.logger.log(`Uploading audio for ${dto.phase}...`);
-            const audioBuffer = Buffer.from(dto.audioBase64, 'base64');
-            const audioKey = `assessments/${session.id}/${dto.phase.toLowerCase()}${dto.attempt ? `-at${dto.attempt}` : ''}.wav`;
-            const audioUrl = await this.storage.uploadFile(audioBuffer, audioKey, 'audio/wav');
-            this.logger.log(`Audio uploaded to ${audioUrl}`);
+            this.logger.log(`Processing assessment audio in-memory for ${dto.phase}...`);
+            const audioUrl = "";
             switch (dto.phase) {
                 case assessment_dto_1.AssessmentPhase.PHASE_1:
-                    return await this.handlePhase1(session, audioUrl);
+                    return await this.handlePhase1(session, audioUrl, dto.audioBase64);
                 case assessment_dto_1.AssessmentPhase.PHASE_2:
-                    return await this.handlePhase2(session, audioUrl, dto.attempt || 1);
+                    return await this.handlePhase2(session, audioUrl, dto.attempt || 1, dto.audioBase64);
                 case assessment_dto_1.AssessmentPhase.PHASE_3:
-                    return await this.handlePhase3(session, audioUrl);
+                    return await this.handlePhase3(session, audioUrl, dto.audioBase64);
                 case assessment_dto_1.AssessmentPhase.PHASE_4:
-                    return await this.handlePhase4(session, audioUrl);
+                    return await this.handlePhase4(session, audioUrl, dto.audioBase64);
                 default:
                     throw new common_1.BadRequestException('Invalid phase');
             }
@@ -96,8 +93,8 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
             throw error;
         }
     }
-    async handlePhase1(session, audioUrl) {
-        const result = await this.azure.analyzeSpeech(audioUrl);
+    async handlePhase1(session, audioUrl, audioBase64) {
+        const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
         if (result.wordCount === 0) {
             return { hint: "We couldn't hear you clearly. Please try again.", nextPhase: assessment_dto_1.AssessmentPhase.PHASE_1 };
         }
@@ -119,9 +116,9 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
         this.logger.log(`Phase 1 data stored for session ${session.id}`);
         return { nextPhase: assessment_dto_1.AssessmentPhase.PHASE_2, nextSentence: { text: ELICITED_SENTENCES.B1, level: 'B1' } };
     }
-    async handlePhase2(session, audioUrl, attempt) {
+    async handlePhase2(session, audioUrl, attempt, audioBase64) {
         const referenceText = attempt === 1 ? ELICITED_SENTENCES.B1 : (session.phase2Data?.adaptiveSentence?.text || ELICITED_SENTENCES.B1);
-        const result = await this.azure.analyzeSpeech(audioUrl, referenceText);
+        const result = await this.azure.analyzeSpeech(audioUrl, referenceText, audioBase64);
         const attemptData = {
             accuracyScore: result.accuracyScore,
             fluencyScore: result.fluencyScore,
@@ -164,8 +161,8 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
             };
         }
     }
-    async handlePhase3(session, audioUrl) {
-        const azureResult = await this.azure.analyzeSpeech(audioUrl);
+    async handlePhase3(session, audioUrl, audioBase64) {
+        const azureResult = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
         const phase2Data = session.phase2Data;
         let imgLevel = 'B1';
         if (phase2Data.finalPronunciationScore < 50)
@@ -186,8 +183,8 @@ let AssessmentService = AssessmentService_1 = class AssessmentService {
         this.logger.log(`Phase 3 data stored for session ${session.id}`);
         return { nextPhase: assessment_dto_1.AssessmentPhase.PHASE_4, question: "What is your biggest challenge in learning English?" };
     }
-    async handlePhase4(session, audioUrl) {
-        const result = await this.azure.analyzeSpeech(audioUrl);
+    async handlePhase4(session, audioUrl, audioBase64) {
+        const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
         const compScore = result.wordCount > 15 ? 80 : (result.wordCount > 8 ? 65 : 50);
         const phase4Data = {
             wordCount: result.wordCount,

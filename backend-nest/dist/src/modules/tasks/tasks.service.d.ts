@@ -12,8 +12,8 @@ export declare class TasksService {
                 id: string;
                 createdAt: Date;
                 type: string;
-                original: string;
                 cefrLevel: string | null;
+                original: string;
                 severity: string;
                 segmentId: string;
                 corrected: string;
@@ -31,10 +31,10 @@ export declare class TasksService {
     } & {
         id: string;
         createdAt: Date;
-        userId: string;
         status: string;
-        completedAt: Date | null;
         type: string;
+        userId: string;
+        completedAt: Date | null;
         sessionId: string | null;
         score: number | null;
         title: string;
@@ -45,10 +45,10 @@ export declare class TasksService {
     completeTask(taskId: string, score: number): Promise<{
         id: string;
         createdAt: Date;
-        userId: string;
         status: string;
-        completedAt: Date | null;
         type: string;
+        userId: string;
+        completedAt: Date | null;
         sessionId: string | null;
         score: number | null;
         title: string;

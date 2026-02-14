@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
@@ -12,6 +12,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function AssessmentSpeakingScreen({ navigation, route }: any) {
     const { user } = useUser();
+    const insets = useSafeAreaInsets();
     const [phase, setPhase] = useState('PHASE_1');
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
     const [isRecording, setIsRecording] = useState(false);
@@ -170,54 +171,66 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
             <LinearGradient
                 colors={theme.colors.gradients.surface}
                 style={styles.background}
             />
 
-            <View style={styles.header}>
-                <Text style={styles.headerText}>
-                    {phase === 'PHASE_1' && "Reading"}
-                    {phase === 'PHASE_2' && "Adaptive Speaking"}
-                    {phase === 'PHASE_3' && "Image Description"}
-                    {phase === 'PHASE_4' && "Open Response"}
-                </Text>
-            </View>
-
-            <View style={styles.contentContainer}>
-                {renderContent()}
-            </View>
-
-            <View style={styles.footer}>
-                <View style={styles.timerContainer}>
-                    <Text style={styles.timerText}>{isRecording ? `00:0${timer}` : "Ready"}</Text>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: insets.top + theme.spacing.m,
+                        paddingBottom: Math.max(insets.bottom, 20) + 20
+                    }
+                ]}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.header}>
+                    <Text style={styles.headerText}>
+                        {phase === 'PHASE_1' && "Reading"}
+                        {phase === 'PHASE_2' && "Adaptive Speaking"}
+                        {phase === 'PHASE_3' && "Image Description"}
+                        {phase === 'PHASE_4' && "Open Response"}
+                    </Text>
                 </View>
 
-                <TouchableOpacity
-                    onPress={isRecording ? stopRecording : startRecording}
-                    disabled={isSubmitting}
-                    style={[
-                        styles.recordButton,
-                        isRecording && styles.recordingActive,
-                        isSubmitting && styles.buttonDisabled
-                    ]}
-                >
-                    {isSubmitting ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <Ionicons
-                            name={isRecording ? "stop" : "mic"}
-                            size={32}
-                            color="#FFF"
-                        />
-                    )}
-                </TouchableOpacity>
-                <Text style={styles.hintText}>
-                    {isRecording ? "Tap to Stop" : "Tap to Record"}
-                </Text>
-            </View>
-        </SafeAreaView>
+                <View style={styles.contentContainer}>
+                    {renderContent()}
+                </View>
+
+                <View style={styles.footer}>
+                    <View style={styles.timerContainer}>
+                        <Text style={styles.timerText}>{isRecording ? `00:0${timer}` : "Ready"}</Text>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={isRecording ? stopRecording : startRecording}
+                        disabled={isSubmitting}
+                        style={[
+                            styles.recordButton,
+                            isRecording && styles.recordingActive,
+                            isSubmitting && styles.buttonDisabled
+                        ]}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <Ionicons
+                                name={isRecording ? "stop" : "mic"}
+                                size={32}
+                                color="#FFF"
+                            />
+                        )}
+                    </TouchableOpacity>
+                    <Text style={styles.hintText}>
+                        {isRecording ? "Tap to Stop" : "Tap to Record"}
+                    </Text>
+                </View>
+            </ScrollView>
+        </View>
     );
 }
 
@@ -233,9 +246,16 @@ const styles = StyleSheet.create({
         right: 0,
         height: 200,
     },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingHorizontal: theme.spacing.l,
+    },
     header: {
         alignItems: 'center',
-        paddingVertical: theme.spacing.m,
+        paddingBottom: theme.spacing.m,
     },
     headerText: {
         fontSize: theme.typography.sizes.l,
@@ -245,7 +265,8 @@ const styles = StyleSheet.create({
     contentContainer: {
         flex: 1,
         justifyContent: 'center',
-        padding: theme.spacing.l,
+        paddingVertical: theme.spacing.l,
+        minHeight: 350,
     },
     phaseContent: {
         alignItems: 'center',
@@ -279,7 +300,7 @@ const styles = StyleSheet.create({
     },
     footer: {
         alignItems: 'center',
-        paddingBottom: 40,
+        paddingBottom: theme.spacing.l,
         gap: theme.spacing.m,
     },
     timerContainer: {
