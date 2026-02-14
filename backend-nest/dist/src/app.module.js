@@ -24,6 +24,7 @@ const integrations_module_1 = require("./integrations/integrations.module");
 const assessment_module_1 = require("./modules/assessment/assessment.module");
 const friendship_module_1 = require("./modules/friendship/friendship.module");
 const chat_module_1 = require("./modules/chat/chat.module");
+const users_module_1 = require("./modules/users/users.module");
 const app_config_1 = require("./config/app.config");
 const database_config_1 = require("./config/database.config");
 const redis_config_1 = require("./config/redis.config");
@@ -65,6 +66,7 @@ exports.AppModule = AppModule = __decorate([
             friendship_module_1.FriendshipModule,
             chat_module_1.ChatModule,
             prisma_module_1.PrismaModule,
+            users_module_1.UsersModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

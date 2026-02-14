@@ -14,7 +14,7 @@ from app.core.middleware import RequestIDMiddleware
 from app.cache.manager import cache
 from app.api.routes import health, transcribe, analyze, pronunciation
 from app.utils.async_azure_speech import shutdown_executor
-from app.models.response import StandardResponse, ErrorResponse
+from app.models.response import StandardResponse, ErrorResponse, Meta
 
 # 1. Initialize Sentry
 if settings.sentry_dsn:
@@ -46,7 +46,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url=None,
-    debug=True
+    debug=False  # MUST be False so custom exception handlers work correctly
 )
 
 # 2. Middleware Stack (Order matters: Bottom-up execution)
@@ -63,7 +63,15 @@ app.add_middleware(
 # 3. Global Exception Handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("unhandled_exception", error=str(exc), path=request.url.path)
+    error_msg = str(exc)
+    logger.error("unhandled_exception", error=error_msg, error_type=type(exc).__name__, path=request.url.path)
+    
+    # Provide a more specific message for HTTP errors (e.g., audio download failures)
+    message = "An unexpected error occurred"
+    if "HTTPStatusError" in type(exc).__name__:
+        message = f"Failed to fetch remote resource: {error_msg[:200]}"
+    elif "ConnectError" in type(exc).__name__:
+        message = f"Could not connect to remote service: {error_msg[:200]}"
     
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -71,11 +79,11 @@ async def global_exception_handler(request: Request, exc: Exception):
             success=False,
             error=ErrorResponse(
                 code="INTERNAL_SERVER_ERROR",
-                message="An unexpected error occurred"
+                message=message
             ),
-            meta={
-                "request_id": getattr(request.state, "request_id", None)
-            }
+            meta=Meta(
+                request_id=getattr(request.state, "request_id", None)
+            )
         ).model_dump()
     )
 
@@ -89,9 +97,9 @@ async def value_error_handler(request: Request, exc: ValueError):
                 code="VALIDATION_ERROR",
                 message=str(exc)
             ),
-            meta={
-                "request_id": getattr(request.state, "request_id", None)
-            }
+            meta=Meta(
+                request_id=getattr(request.state, "request_id", None)
+            )
         ).model_dump()
     )
 

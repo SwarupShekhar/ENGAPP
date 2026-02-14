@@ -1,4 +1,5 @@
 import React from "react";
+import { View } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "../screens/HomeScreen";
@@ -7,6 +8,8 @@ import ProgressScreen from "../screens/ProgressScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import FeedbackScreen from "../screens/FeedbackScreen";
 import CallScreen from "../screens/CallScreen";
+import CallPreferenceScreen from "../screens/CallPreferenceScreen";
+import PracticeScreen from "../screens/PracticeScreen";
 import InCallScreen from "../screens/InCallScreen";
 import CallFeedbackScreen from "../screens/CallFeedbackScreen";
 import CreateProfileScreen from "../screens/auth/CreateProfileScreen";
@@ -26,9 +29,17 @@ function MainTabs() {
         >
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Feedback" component={FeedbackScreen} />
-            <Tab.Screen name="Call" component={CallScreen} />
+            <Tab.Screen
+                name="Call"
+                component={View} // Placeholder, handled by CustomTabBar
+                listeners={({ navigation }) => ({
+                    tabPress: (e) => {
+                        e.preventDefault();
+                        navigation.navigate('CallPreference');
+                    },
+                })}
+            />
             <Tab.Screen name="Progress" component={ProgressScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }
@@ -50,6 +61,19 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
             <Stack.Screen name="AssessmentIntro" component={AssessmentIntroScreen} />
             <Stack.Screen name="AssessmentSpeaking" component={AssessmentSpeakingScreen} />
             <Stack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
+
+            {/* screens accessible from logic/header */}
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Call" component={CallScreen} />
+
+            <Stack.Screen
+                name="CallPreference"
+                component={CallPreferenceScreen}
+                options={{
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom'
+                }}
+            />
 
             {/* Call Flow */}
             <Stack.Screen name="InCall" component={InCallScreen} options={{ gestureEnabled: false }} />

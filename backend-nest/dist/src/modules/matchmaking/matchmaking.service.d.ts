@@ -15,17 +15,21 @@ export declare class MatchmakingService {
         sessionId?: undefined;
         roomName?: undefined;
         partnerId?: undefined;
-    } | {
-        matched: boolean;
-        sessionId: string;
-        roomName: string;
-        partnerId: string;
-        message?: undefined;
+        partnerName?: undefined;
     } | {
         matched: boolean;
         message?: undefined;
         sessionId?: undefined;
         roomName?: undefined;
         partnerId?: undefined;
+        partnerName?: undefined;
+    } | {
+        matched: boolean;
+        sessionId: string;
+        roomName: string;
+        partnerId: string;
+        partnerName: string;
+        message?: undefined;
     }>;
+    private resolveToUuid;
 }

@@ -46,3 +46,7 @@ tenacity>=8.2.3
 # Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.4
+
+# LiveKit Agents
+livekit-agents>=0.8.0
+livekit-plugins-azure>=0.5.0

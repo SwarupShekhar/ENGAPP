@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -10,6 +10,7 @@ import { useUser } from '@clerk/clerk-expo';
 export default function AssessmentResultScreen({ navigation, route }: any) {
     const { result } = route.params || {};
     const { user } = useUser();
+    const insets = useSafeAreaInsets();
 
     const handleContinueToHome = async () => {
         try {
@@ -42,8 +43,14 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                    paddingTop: insets.top,
+                    paddingBottom: Math.max(insets.bottom, 20) + 20 // Extra padding for safety
+                }}
+            >
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Assessment Complete!</Text>
                 </View>
@@ -89,7 +96,7 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
                     <Text style={styles.buttonText}>Continue to Home</Text>
                 </TouchableOpacity>
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 

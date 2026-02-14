@@ -16,7 +16,11 @@ let AzureModule = class AzureModule {
 exports.AzureModule = AzureModule;
 exports.AzureModule = AzureModule = __decorate([
     (0, common_1.Module)({
-        imports: [config_1.ConfigModule, axios_1.HttpModule],
+        imports: [config_1.ConfigModule, axios_1.HttpModule.register({
+                timeout: 120000,
+                maxContentLength: 100 * 1024 * 1024,
+                maxBodyLength: 100 * 1024 * 1024,
+            })],
         providers: [azure_service_1.AzureService],
         exports: [azure_service_1.AzureService]
     })

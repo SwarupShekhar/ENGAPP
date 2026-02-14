@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActionSheetIOS, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActionSheetIOS, Platform, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -9,24 +9,36 @@ import { useAuth } from '@clerk/clerk-expo';
 
 export default function AssessmentIntroScreen({ navigation }: any) {
     const { signOut } = useAuth();
+    const insets = useSafeAreaInsets();
 
     const handleSignOut = () => {
         signOut();
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.debugHeader}>
-                <TouchableOpacity onPress={handleSignOut} style={styles.debugBtn}>
-                    <Text style={styles.debugBtnText}>Sign Out & Reset</Text>
-                </TouchableOpacity>
-            </View>
+        <View style={styles.container}>
             <LinearGradient
                 colors={theme.colors.gradients.surface}
                 style={styles.background}
             />
 
-            <View style={styles.content}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingTop: Math.max(insets.top, 20),
+                        paddingBottom: Math.max(insets.bottom, 20) + 40
+                    }
+                ]}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={handleSignOut} style={styles.debugBtn}>
+                        <Text style={styles.debugBtnText}>Sign Out & Reset</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.iconContainer}>
                     <LinearGradient
                         colors={theme.colors.gradients.primary}
@@ -36,7 +48,7 @@ export default function AssessmentIntroScreen({ navigation }: any) {
                     </LinearGradient>
                 </Animated.View>
 
-                <Animated.View entering={FadeInDown.delay(200).springify()}>
+                <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.textCenter}>
                     <Text style={styles.title}>English Level Assessment</Text>
                     <Text style={styles.subtitle}>
                         Take a quick 3-minute test to personalize your learning plan.
@@ -70,9 +82,7 @@ export default function AssessmentIntroScreen({ navigation }: any) {
                     />
                 </Animated.View>
 
-                <View style={styles.spacer} />
-
-                <Animated.View entering={FadeInDown.delay(800).springify()} style={styles.footer}>
+                <View style={styles.footer}>
                     <TouchableOpacity
                         style={styles.buttonContainer}
                         onPress={() => navigation.navigate('AssessmentSpeaking')}
@@ -88,15 +98,16 @@ export default function AssessmentIntroScreen({ navigation }: any) {
                             <Ionicons name="arrow-forward" size={20} color={theme.colors.surface} />
                         </LinearGradient>
                     </TouchableOpacity>
+
                     <TouchableOpacity
                         style={styles.skipButton}
                         onPress={() => navigation.goBack()}
                     >
                         <Text style={styles.skipText}>Skip for now</Text>
                     </TouchableOpacity>
-                </Animated.View>
-            </View>
-        </SafeAreaView>
+                </View>
+            </ScrollView>
+        </View>
     );
 }
 
@@ -126,11 +137,18 @@ const styles = StyleSheet.create({
         right: 0,
         height: '40%',
     },
-    debugHeader: {
-        position: 'absolute',
-        top: 60,
-        right: 20,
-        zIndex: 100,
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: theme.spacing.l,
+        alignItems: 'center',
+    },
+    headerRow: {
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginBottom: theme.spacing.m,
     },
     debugBtn: {
         paddingHorizontal: 12,
@@ -145,14 +163,9 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
     },
-    content: {
-        flex: 1,
-        padding: theme.spacing.l,
-        alignItems: 'center',
-    },
     iconContainer: {
-        marginTop: theme.spacing.xl,
-        marginBottom: theme.spacing.l,
+        marginTop: theme.spacing.m,
+        marginBottom: theme.spacing.m,
         ...theme.shadows.medium,
     },
     iconGradient: {
@@ -160,6 +173,9 @@ const styles = StyleSheet.create({
         height: 100,
         borderRadius: 50,
         justifyContent: 'center',
+        alignItems: 'center',
+    },
+    textCenter: {
         alignItems: 'center',
     },
     title: {
@@ -206,12 +222,10 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.sizes.s,
         color: theme.colors.text.secondary,
     },
-    spacer: {
-        flex: 1,
-    },
     footer: {
         width: '100%',
         gap: theme.spacing.m,
+        marginTop: theme.spacing.xl,
         marginBottom: theme.spacing.m,
     },
     buttonContainer: {

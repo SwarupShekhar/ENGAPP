@@ -22,19 +22,28 @@ let AzureService = AzureService_1 = class AzureService {
         this.logger = new common_1.Logger(AzureService_1.name);
         this.aiEngineUrl = this.configService.get('AI_ENGINE_URL') || 'http://localhost:8001';
     }
-    async analyzeSpeech(audioUrl, referenceText = '') {
+    async analyzeSpeech(audioUrl, referenceText = '', audioBase64) {
         try {
+            const audioPayload = audioBase64
+                ? { audio_base64: audioBase64 }
+                : { audio_url: audioUrl };
             let transcript = referenceText;
             if (!transcript) {
-                const transResponse = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/transcribe`, {
-                    audio_url: audioUrl,
+                const transcribePayload = {
+                    ...audioPayload,
                     user_id: "system",
                     session_id: "system"
-                }));
+                };
+                this.logger.log(`Transcribing audio (base64: ${!!audioBase64}, payload keys: ${Object.keys(transcribePayload).join(',')})`);
+                this.logger.log(`Payload audio_base64 length: ${transcribePayload.audio_base64?.length || 'N/A'}`);
+                this.logger.log(`Payload audio_url: ${transcribePayload.audio_url || 'N/A'}`);
+                const transResponse = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/transcribe`, transcribePayload));
                 transcript = transResponse.data.data.text;
+                this.logger.log(`Transcription result: "${transcript}"`);
             }
+            this.logger.log(`Running pronunciation assessment (base64: ${!!audioBase64})...`);
             const pronResponse = await (0, rxjs_1.lastValueFrom)(this.httpService.post(`${this.aiEngineUrl}/api/pronunciation`, {
-                audio_url: audioUrl,
+                ...audioPayload,
                 reference_text: transcript,
                 user_id: "system"
             }));
@@ -54,10 +63,14 @@ let AzureService = AzureService_1 = class AzureService {
             this.logger.error(`AI Engine call failed: ${error.message}`);
             if (error.response) {
                 this.logger.error(`AI Engine Response Status: ${error.response.status}`);
-                this.logger.error(`AI Engine Response Data: ${JSON.stringify(error.response.data)}`);
+                this.logger.error(`AI Engine Response Data: ${JSON.stringify(error.response.data).substring(0, 2000)}`);
             }
             else if (error.request) {
                 this.logger.error('AI Engine No Response received');
+                this.logger.error(`Request URL: ${error.config?.url}`);
+            }
+            else {
+                this.logger.error(`Error setting up AI Engine request: ${error.message}`);
             }
             throw error;
         }

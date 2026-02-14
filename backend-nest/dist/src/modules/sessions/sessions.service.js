@@ -23,6 +23,48 @@ let SessionsService = SessionsService_1 = class SessionsService {
         this.sessionsQueue = sessionsQueue;
         this.logger = new common_1.Logger(SessionsService_1.name);
     }
+    async getSessionAnalysis(sessionId, userId) {
+        this.logger.log(`DEBUG: Fetching analysis for session ${sessionId}, user ${userId}`);
+        const sessionCount = await this.prisma.conversationSession.count();
+        this.logger.log(`DEBUG: Total sessions in DB: ${sessionCount}`);
+        const session = await this.prisma.conversationSession.findUnique({
+            where: { id: sessionId },
+            include: {
+                analyses: {
+                    where: {
+                        participant: {
+                            userId: userId
+                        }
+                    },
+                    include: {
+                        mistakes: true,
+                        pronunciationIssues: true
+                    }
+                },
+                participants: {
+                    include: {
+                        user: true
+                    }
+                }
+            }
+        });
+        if (!session) {
+            const latestSession = await this.prisma.conversationSession.findFirst({
+                orderBy: { createdAt: 'desc' }
+            });
+            throw new common_1.BadRequestException({
+                message: 'Session not found in database',
+                debug: {
+                    requestedSessionId: sessionId,
+                    requestedUserId: userId,
+                    totalSessionsInDb: sessionCount,
+                    latestSessionId: latestSession?.id || 'none'
+                }
+            });
+        }
+        return session;
+        return session;
+    }
     async startSession(data) {
         try {
             const session = await this.prisma.conversationSession.create({
@@ -84,26 +126,20 @@ let SessionsService = SessionsService_1 = class SessionsService {
                 this.logger.warn(`Session ${sessionId} is already ${session.status}.`);
                 return { status: session.status, sessionId };
             }
+            const endedAt = new Date();
+            const duration = data?.actualDuration ?? Math.floor((endedAt.getTime() - session.createdAt.getTime()) / 1000);
             await this.prisma.conversationSession.update({
                 where: { id: sessionId },
                 data: {
                     status: 'PROCESSING',
-                    endedAt: new Date(),
-                    duration: data.actualDuration,
+                    endedAt: endedAt,
+                    duration: duration,
                 },
             });
-            const participantIds = [];
-            for (const participant of session.participants) {
-                const audioUrl = data.audioUrls[participant.userId];
-                const updatedParticipant = await this.prisma.sessionParticipant.update({
-                    where: { id: participant.id },
-                    data: { audioUrl },
-                });
-                participantIds.push(updatedParticipant.id);
-            }
+            const participantIds = session.participants.map(p => p.userId);
             await this.sessionsQueue.add('process-session', {
                 sessionId,
-                audioUrls: data.audioUrls,
+                audioUrls: data?.audioUrls || {},
                 participantIds,
             }, {
                 attempts: 3,

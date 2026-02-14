@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -11,6 +11,53 @@ export class SessionsService {
         private prisma: PrismaService,
         @InjectQueue('sessions') private sessionsQueue: Queue,
     ) { }
+
+    async getSessionAnalysis(sessionId: string, userId: string) {
+        this.logger.log(`DEBUG: Fetching analysis for session ${sessionId}, user ${userId}`);
+        const sessionCount = await this.prisma.conversationSession.count();
+        this.logger.log(`DEBUG: Total sessions in DB: ${sessionCount}`);
+
+        const session = await this.prisma.conversationSession.findUnique({
+            where: { id: sessionId },
+            include: {
+                analyses: {
+                    where: {
+                        participant: {
+                            userId: userId
+                        }
+                    },
+                    include: {
+                        mistakes: true,
+                        pronunciationIssues: true
+                    }
+                },
+                participants: {
+                    include: {
+                        user: true
+                    }
+                }
+            }
+        });
+
+        if (!session) {
+            const latestSession = await this.prisma.conversationSession.findFirst({
+                orderBy: { createdAt: 'desc' }
+            });
+            throw new BadRequestException({
+                message: 'Session not found in database',
+                debug: {
+                    requestedSessionId: sessionId,
+                    requestedUserId: userId,
+                    totalSessionsInDb: sessionCount,
+                    latestSessionId: latestSession?.id || 'none'
+                }
+            });
+        }
+
+        return session;
+
+        return session;
+    }
 
     async startSession(data: { matchId: string; participants: string[]; topic: string; estimatedDuration: number }) {
         try {
@@ -64,7 +111,7 @@ export class SessionsService {
         }
     }
 
-    async endSession(sessionId: string, data: { actualDuration: number; userEndedEarly: boolean; audioUrls: Record<string, string> }) {
+    async endSession(sessionId: string, data?: { actualDuration?: number; userEndedEarly?: boolean; audioUrls?: Record<string, string> }) {
         try {
             // 1) Check status – idempotency
             const session = await this.prisma.conversationSession.findUnique({
@@ -78,30 +125,27 @@ export class SessionsService {
                 return { status: session.status, sessionId };
             }
 
-            // 2) Update session and participants with final data
+            // 2) Update session with final data
+            const endedAt = new Date();
+            // Fallback to server-calculated duration if not provided
+            const duration = data?.actualDuration ?? Math.floor((endedAt.getTime() - session.createdAt.getTime()) / 1000);
+
             await this.prisma.conversationSession.update({
                 where: { id: sessionId },
                 data: {
                     status: 'PROCESSING',
-                    endedAt: new Date(),
-                    duration: data.actualDuration,
+                    endedAt: endedAt,
+                    duration: duration,
                 },
             });
 
-            const participantIds = [];
-            for (const participant of session.participants) {
-                const audioUrl = data.audioUrls[participant.userId];
-                const updatedParticipant = await this.prisma.sessionParticipant.update({
-                    where: { id: participant.id },
-                    data: { audioUrl },
-                });
-                participantIds.push(updatedParticipant.id);
-            }
+            // 3) Trigger Analysis via Queue
+            // We use participant IDs from the fetched session
+            const participantIds = session.participants.map(p => p.userId);
 
-            // 3) Push to Bull Queue with Retries
             await this.sessionsQueue.add('process-session', {
                 sessionId,
-                audioUrls: data.audioUrls,
+                audioUrls: data?.audioUrls || {},
                 participantIds,
             }, {
                 attempts: 3,

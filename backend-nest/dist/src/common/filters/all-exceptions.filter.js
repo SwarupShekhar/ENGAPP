@@ -34,6 +34,7 @@ let AllExceptionsFilter = AllExceptionsFilter_1 = class AllExceptionsFilter {
             path: request.url,
             method: request.method,
             message: exception.message || (typeof message === 'object' ? message.message : message),
+            responseBody: message,
             stack: exception.stack,
         };
         this.logger.error(`${request.method} ${request.url} ${status} - ${exception.message}`, exception.stack);

@@ -6,7 +6,7 @@ export declare class AzureService {
     private readonly logger;
     private aiEngineUrl;
     constructor(configService: ConfigService, httpService: HttpService);
-    analyzeSpeech(audioUrl: string, referenceText?: string): Promise<{
+    analyzeSpeech(audioUrl: string, referenceText?: string, audioBase64?: string): Promise<{
         transcript: string;
         pronunciationEvidence: any;
         accuracyScore?: number;

@@ -39,6 +39,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
             path: request.url,
             method: request.method,
             message: exception.message || (typeof message === 'object' ? (message as any).message : message),
+            responseBody: message, // Capture full response body including debug info
             stack: exception.stack,
         };
 

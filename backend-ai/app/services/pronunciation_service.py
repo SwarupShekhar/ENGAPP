@@ -8,6 +8,7 @@ import azure.cognitiveservices.speech as speechsdk
 import librosa
 import numpy as np
 from tenacity import retry, stop_after_attempt, wait_exponential
+import base64
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -73,9 +74,40 @@ class PronunciationService:
         try:
             from app.utils.async_azure_speech import azure_speech
             
-            # 1. Download & Validate (Need file for librosa)
+            # 1. Get audio data: from base64 or download from URL
             temp_path = tempfile.mktemp(suffix=".wav")
-            await download_audio_streamed(str(request.audio_url), temp_path)
+            if request.audio_base64:
+                try:
+                    # Robust handling: Convert whatever format to WAV 16kHz via pydub/ffmpeg
+                    import io
+                    from pydub import AudioSegment
+                    
+                    audio_bytes = base64.b64decode(request.audio_base64)
+                    
+                    # Log snippet for debugging
+                    logger.debug(f"Decoding base64 audio ({len(audio_bytes)} bytes)")
+                    
+                    # Convert to AudioSegment (pydub handles M4A, MP3, etc. via ffmpeg)
+                    audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+                    
+                    # Normalize to 16kHz mono (Azure requirement)
+                    audio_segment = audio_segment.set_frame_rate(16000).set_channels(1)
+                    
+                    # Export as valid WAV
+                    audio_segment.export(temp_path, format="wav")
+                    logger.info(f"Converted audio to WAV: {temp_path}")
+                    
+                except Exception as e:
+                    # Fallback or re-raise with better message
+                    logger.error(f"Audio conversion failed: {e}. Is ffmpeg installed?")
+                    # Try writing raw bytes as fallback if conversion fails (e.g. absent ffmpeg)
+                    # But warn that it might fail later
+                    with open(temp_path, "wb") as f:
+                        f.write(audio_bytes)
+            elif request.audio_url:
+                await download_audio_streamed(str(request.audio_url), temp_path)
+            else:
+                raise ValueError("Either audio_url or audio_base64 must be provided")
             
             with open(temp_path, "rb") as f:
                 audio_bytes = f.read()

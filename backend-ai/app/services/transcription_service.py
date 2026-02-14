@@ -1,6 +1,7 @@
 import time
 import json
 import asyncio
+import base64
 import azure.cognitiveservices.speech as speechsdk
 from typing import List, Optional, Any
 
@@ -63,9 +64,17 @@ class TranscriptionService:
 
         start_time = time.time()
         
-        is_valid, error = await validate_audio_url(str(request.audio_url))
-        if not is_valid:
-            raise ValueError(error)
+        # Determine audio source: base64 or URL
+        has_base64 = bool(request.audio_base64)
+        has_url = bool(request.audio_url)
+        
+        if not has_base64 and not has_url:
+            raise ValueError("Either audio_url or audio_base64 must be provided")
+        
+        if has_url and not has_base64:
+            is_valid, error = await validate_audio_url(str(request.audio_url))
+            if not is_valid:
+                raise ValueError(error)
 
         push_stream = speechsdk.audio.PushAudioInputStream()
         audio_config = speechsdk.audio.AudioConfig(stream=push_stream)
@@ -109,12 +118,43 @@ class TranscriptionService:
         recognizer.start_continuous_recognition()
 
         try:
-            from app.utils.audio_utils import stream_audio_content
-            async for chunk in stream_audio_content(str(request.audio_url)):
-                if chunk:
-                    push_stream.write(chunk)
-                else:
-                    break
+            if has_base64:
+                try:
+                    # Robust handling: Convert to PCM 16kHz via pydub
+                    import io
+                    from pydub import AudioSegment
+                    
+                    audio_bytes = base64.b64decode(request.audio_base64)
+                    
+                    # Convert to AudioSegment
+                    audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+                    
+                    # Normalize to 16kHz mono (Azure Default)
+                    audio_segment = audio_segment.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+                    
+                    # Get raw PCM data (no WAV header)
+                    chunk_size = 4096
+                    raw_data = audio_segment.raw_data
+                    
+                    # Write in chunks
+                    for i in range(0, len(raw_data), chunk_size):
+                        push_stream.write(raw_data[i:i+chunk_size])
+                        
+                    logger.info(f"Streamed {len(raw_data)} bytes of PCM audio for transcription")
+                    
+                except Exception as e:
+                    logger.error(f"Audio conversion failed in transcription: {e}")
+                    # Fallback to raw bytes (might be M4A/WAV) - Azure might reject
+                    audio_bytes = base64.b64decode(request.audio_base64)
+                    push_stream.write(audio_bytes)
+            else:
+                # Stream from URL
+                from app.utils.audio_utils import stream_audio_content
+                async for chunk in stream_audio_content(str(request.audio_url)):
+                    if chunk:
+                        push_stream.write(chunk)
+                    else:
+                        break
         finally:
             push_stream.close()
 

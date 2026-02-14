@@ -323,3 +323,690 @@ pydantic_core._pydantic_core.ValidationError: 1 validation error for StandardRes
 meta.processing_time_ms
   Field required [type=missing, input_value={'request_id': '9233410c-...4600-a7cd-889a38270ed8'}, input_type=dict]
     For further information visit https://errors.pydantic.dev/2.12/v/missing
+
+--- MIDDLEWARE ERROR at 1771050513.2977412 ---
+Path: /api/transcribe
+Error: name 'Meta' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 39, in transcribe_audio
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 22, in transcribe_audio
+    result = await service.transcribe(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/transcription_service.py", line 66, in transcribe
+    is_valid, error = await validate_audio_url(str(request.audio_url))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py", line 2321, in _execute_mock_call
+    raise effect
+ValueError: Invalid URL
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 59, in wrapped_app
+    response = await handler(conn, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/main.py", line 92, in value_error_handler
+    meta=Meta(
+         ^^^^
+NameError: name 'Meta' is not defined
+
+--- MIDDLEWARE ERROR at 1771052576.9771461 ---
+Path: /api/transcribe
+Error: [Errno 8] nodename nor servname provided, or not known
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 67, in map_httpcore_exceptions
+    yield
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 371, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_async/connection.py", line 101, in handle_async_request
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_async/connection.py", line 78, in handle_async_request
+    stream = await self._connect(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_async/connection.py", line 124, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_backends/auto.py", line 31, in connect_tcp
+    return await self._backend.connect_tcp(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py", line 113, in connect_tcp
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: [Errno 8] nodename nor servname provided, or not known
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 39, in transcribe_audio
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 22, in transcribe_audio
+    result = await service.transcribe(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/transcription_service.py", line 113, in transcribe
+    async for chunk in stream_audio_content(str(request.audio_url)):
+    ...<3 lines>...
+            break
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/utils/audio_utils.py", line 53, in stream_audio_content
+    async with client.stream("GET", url) as response:
+               ~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1602, in stream
+    response = await self.send(
+               ^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1646, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1674, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1711, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_client.py", line 1748, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 370, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 84, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [Errno 8] nodename nor servname provided, or not known
+
+--- MIDDLEWARE ERROR at 1771052698.585142 ---
+Path: /api/transcribe
+Error: Client error '403 Forbidden' for url 'https://storage.googleapis.com/codeskulptor-assets/fallback_low.mp3'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 39, in transcribe_audio
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 22, in transcribe_audio
+    result = await service.transcribe(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/transcription_service.py", line 113, in transcribe
+    async for chunk in stream_audio_content(str(request.audio_url)):
+    ...<3 lines>...
+            break
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/utils/audio_utils.py", line 54, in stream_audio_content
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_models.py", line 759, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '403 Forbidden' for url 'https://storage.googleapis.com/codeskulptor-assets/fallback_low.mp3'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+--- MIDDLEWARE ERROR at 1771052722.7543628 ---
+Path: /api/transcribe
+Error: Client error '403 Forbidden' for url 'https://storage.googleapis.com/codeskulptor-assets/fallback_low.mp3'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 39, in transcribe_audio
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 22, in transcribe_audio
+    result = await service.transcribe(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/transcription_service.py", line 113, in transcribe
+    async for chunk in stream_audio_content(str(request.audio_url)):
+    ...<3 lines>...
+            break
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/utils/audio_utils.py", line 54, in stream_audio_content
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_models.py", line 759, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '403 Forbidden' for url 'https://storage.googleapis.com/codeskulptor-assets/fallback_low.mp3'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+--- MIDDLEWARE ERROR at 1771054176.259826 ---
+Path: /api/transcribe
+Error: Client error '403 Server failed to authenticate the request. Make sure the value of Authorization header is formed correctly including the signature.' for url 'https://audiodata1.blob.core.windows.net/audio-files/assessments/test/phase_1.wav?sv=2024-11-04&st=2025-02-14&se=2025-02-14&sr=b&sp=r&sig=test'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 39, in transcribe_audio
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 22, in transcribe_audio
+    result = await service.transcribe(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/transcription_service.py", line 113, in transcribe
+    async for chunk in stream_audio_content(str(request.audio_url)):
+    ...<3 lines>...
+            break
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/utils/audio_utils.py", line 61, in stream_audio_content
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_models.py", line 759, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '403 Server failed to authenticate the request. Make sure the value of Authorization header is formed correctly including the signature.' for url 'https://audiodata1.blob.core.windows.net/audio-files/assessments/test/phase_1.wav?sv=2024-11-04&st=2025-02-14&se=2025-02-14&sr=b&sp=r&sig=test'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+--- MIDDLEWARE ERROR at 1771054268.928172 ---
+Path: /api/transcribe
+Error: Client error '403 Server failed to authenticate the request. Make sure the value of Authorization header is formed correctly including the signature.' for url 'https://audiodata1.blob.core.windows.net/audio-files/assessments/test/phase_1.wav?sv=2024-11-04&st=2025-02-14&se=2025-02-14&sr=b&sp=r&sig=test'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 39, in transcribe_audio
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/transcribe.py", line 22, in transcribe_audio
+    result = await service.transcribe(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/transcription_service.py", line 113, in transcribe
+    async for chunk in stream_audio_content(str(request.audio_url)):
+    ...<3 lines>...
+            break
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/utils/audio_utils.py", line 61, in stream_audio_content
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/httpx/_models.py", line 759, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '403 Server failed to authenticate the request. Make sure the value of Authorization header is formed correctly including the signature.' for url 'https://audiodata1.blob.core.windows.net/audio-files/assessments/test/phase_1.wav?sv=2024-11-04&st=2025-02-14&se=2025-02-14&sr=b&sp=r&sig=test'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+--- MIDDLEWARE ERROR at 1771057755.491053 ---
+Path: /api/analyze
+Error: 
+**********************************************************************
+  Resource [93mpunkt_tab[0m not found.
+  Please use the NLTK Downloader to obtain the resource:
+
+  [31m>>> import nltk
+  >>> nltk.download('punkt_tab')
+  [0m
+  For more information see: https://www.nltk.org/data.html
+
+  Attempted to load [93mtokenizers/punkt_tab/english/[0m
+
+  Searched in:
+    - '/Users/swarupshekhar/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/share/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/nltk_data'
+    - '/usr/share/nltk_data'
+    - '/usr/local/share/nltk_data'
+    - '/usr/lib/nltk_data'
+    - '/usr/local/lib/nltk_data'
+**********************************************************************
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/analyze.py", line 20, in analyze_text
+    result = await service.analyze(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 77, in analyze
+    cefr_assessment = cefr_classifier.classify(request.text)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/cefr_classifier.py", line 48, in classify
+    tokens = [word.lower() for word in word_tokenize(text) if word.isalpha()]
+                                       ~~~~~~~~~~~~~^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/__init__.py", line 142, in word_tokenize
+    sentences = [text] if preserve_line else sent_tokenize(text, language)
+                                             ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/__init__.py", line 119, in sent_tokenize
+    tokenizer = _get_punkt_tokenizer(language)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/__init__.py", line 105, in _get_punkt_tokenizer
+    return PunktTokenizer(language)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/punkt.py", line 1744, in __init__
+    self.load_lang(lang)
+    ~~~~~~~~~~~~~~^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/punkt.py", line 1749, in load_lang
+    lang_dir = find(f"tokenizers/punkt_tab/{lang}/")
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/data.py", line 579, in find
+    raise LookupError(resource_not_found)
+LookupError: 
+**********************************************************************
+  Resource [93mpunkt_tab[0m not found.
+  Please use the NLTK Downloader to obtain the resource:
+
+  [31m>>> import nltk
+  >>> nltk.download('punkt_tab')
+  [0m
+  For more information see: https://www.nltk.org/data.html
+
+  Attempted to load [93mtokenizers/punkt_tab/english/[0m
+
+  Searched in:
+    - '/Users/swarupshekhar/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/share/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/nltk_data'
+    - '/usr/share/nltk_data'
+    - '/usr/local/share/nltk_data'
+    - '/usr/lib/nltk_data'
+    - '/usr/local/lib/nltk_data'
+**********************************************************************
+
+
+--- MIDDLEWARE ERROR at 1771060748.580585 ---
+Path: /api/analyze
+Error: 
+**********************************************************************
+  Resource [93mpunkt_tab[0m not found.
+  Please use the NLTK Downloader to obtain the resource:
+
+  [31m>>> import nltk
+  >>> nltk.download('punkt_tab')
+  [0m
+  For more information see: https://www.nltk.org/data.html
+
+  Attempted to load [93mtokenizers/punkt_tab/english/[0m
+
+  Searched in:
+    - '/Users/swarupshekhar/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/share/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/nltk_data'
+    - '/usr/share/nltk_data'
+    - '/usr/local/share/nltk_data'
+    - '/usr/lib/nltk_data'
+    - '/usr/local/lib/nltk_data'
+**********************************************************************
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/analyze.py", line 20, in analyze_text
+    result = await service.analyze(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 77, in analyze
+    cefr_assessment = cefr_classifier.classify(request.text)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/cefr_classifier.py", line 48, in classify
+    tokens = [word.lower() for word in word_tokenize(text) if word.isalpha()]
+                                       ~~~~~~~~~~~~~^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/__init__.py", line 142, in word_tokenize
+    sentences = [text] if preserve_line else sent_tokenize(text, language)
+                                             ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/__init__.py", line 119, in sent_tokenize
+    tokenizer = _get_punkt_tokenizer(language)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/__init__.py", line 105, in _get_punkt_tokenizer
+    return PunktTokenizer(language)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/punkt.py", line 1744, in __init__
+    self.load_lang(lang)
+    ~~~~~~~~~~~~~~^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/tokenize/punkt.py", line 1749, in load_lang
+    lang_dir = find(f"tokenizers/punkt_tab/{lang}/")
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/nltk/data.py", line 579, in find
+    raise LookupError(resource_not_found)
+LookupError: 
+**********************************************************************
+  Resource [93mpunkt_tab[0m not found.
+  Please use the NLTK Downloader to obtain the resource:
+
+  [31m>>> import nltk
+  >>> nltk.download('punkt_tab')
+  [0m
+  For more information see: https://www.nltk.org/data.html
+
+  Attempted to load [93mtokenizers/punkt_tab/english/[0m
+
+  Searched in:
+    - '/Users/swarupshekhar/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/share/nltk_data'
+    - '/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/nltk_data'
+    - '/usr/share/nltk_data'
+    - '/usr/local/share/nltk_data'
+    - '/usr/lib/nltk_data'
+    - '/usr/local/lib/nltk_data'
+**********************************************************************
+

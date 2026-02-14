@@ -78,17 +78,29 @@ let MatchmakingService = MatchmakingService_1 = class MatchmakingService {
                     const removedU2 = await this.redisService.getClient().lrem(queueKey, 1, partnerId);
                     if (removedU1 > 0 && removedU2 > 0) {
                         this.logger.log(`Match found between ${userId} and ${partnerId} for level ${level}`);
+                        const dbUserId = await this.resolveToUuid(userId);
+                        const dbPartnerId = await this.resolveToUuid(partnerId);
+                        if (!dbUserId || !dbPartnerId) {
+                            this.logger.error(`Failed to resolve users to UUIDs: ${userId} -> ${dbUserId}, ${partnerId} -> ${dbPartnerId}`);
+                            await this.redisService.getClient().rpush(queueKey, userId);
+                            await this.redisService.getClient().rpush(queueKey, partnerId);
+                            return { matched: false };
+                        }
                         const session = await this.prisma.conversationSession.create({
                             data: {
                                 topic: userMeta.topic || 'general',
                                 status: 'CREATED',
                                 participants: {
                                     create: [
-                                        { userId: userId },
-                                        { userId: partnerId },
+                                        { userId: dbUserId },
+                                        { userId: dbPartnerId },
                                     ],
                                 },
                             },
+                        });
+                        const partner = await this.prisma.user.findUnique({
+                            where: { id: partnerId },
+                            select: { fname: true, lname: true }
                         });
                         await this.redisService.getClient().del(`user:${userId}:meta`);
                         await this.redisService.getClient().del(`user:${partnerId}:meta`);
@@ -97,6 +109,7 @@ let MatchmakingService = MatchmakingService_1 = class MatchmakingService {
                             sessionId: session.id,
                             roomName: `room_${session.id}`,
                             partnerId: partnerId,
+                            partnerName: partner ? `${partner.fname} ${partner.lname}` : 'Co-learner',
                         };
                     }
                     else {
@@ -110,6 +123,15 @@ let MatchmakingService = MatchmakingService_1 = class MatchmakingService {
             }
         }
         return { matched: false };
+    }
+    async resolveToUuid(id) {
+        const byId = await this.prisma.user.findUnique({ where: { id } });
+        if (byId)
+            return byId.id;
+        const byClerkId = await this.prisma.user.findUnique({ where: { clerkId: id } });
+        if (byClerkId)
+            return byClerkId.id;
+        return null;
     }
 };
 exports.MatchmakingService = MatchmakingService;
