@@ -52,10 +52,12 @@ const styles = StyleSheet.create({
     },
     card: {
         flex: 1,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.m,
-        padding: theme.spacing.m,
-        ...theme.shadows.small,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderRadius: theme.borderRadius.xl,
+        padding: theme.spacing.l,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     streakContainer: {
         flexDirection: 'row',

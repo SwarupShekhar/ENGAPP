@@ -24,6 +24,14 @@ export interface SessionAnalysis {
     };
     mistakes: SessionMistake[];
     pronunciationIssues: SessionPronunciationIssue[];
+    rawData?: {
+        aiFeedback?: string;
+        strengths?: string[];
+        improvementAreas?: string[];
+        accentNotes?: string;
+        pronunciationTip?: string;
+        azureEvidence?: any;
+    };
 }
 
 export interface SessionMistake {
@@ -83,7 +91,7 @@ export const sessionsApi = {
     },
 
     /** End a practice session */
-    endSession: async (sessionId: string): Promise<void> => {
-        await client.post(`/sessions/${sessionId}/end`);
+    endSession: async (sessionId: string, data?: { transcript?: string; actualDuration?: number; userEndedEarly?: boolean }): Promise<void> => {
+        await client.post(`/sessions/${sessionId}/end`, data);
     },
 };

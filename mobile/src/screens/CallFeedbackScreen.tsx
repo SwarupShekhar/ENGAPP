@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Dimensions, StatusBar
+    Dimensions, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,12 +10,19 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { theme } from '../theme/theme';
 import { sessionsApi, ConversationSession } from '../api/sessions';
 
+// Feedback Components
+import { WordLevelBreakdown } from '../components/feedback/WordLevelBreakdown';
+import { PracticeTips } from '../components/feedback/PracticeTips';
+import { GrammarVocabBreakdown } from '../components/feedback/GrammarVocabBreakdown';
+import { ScoreBreakdownCard } from '../components/feedback/ScoreBreakdownCard';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Skill Bar Component ──────────────────────────────────
 function SkillBar({ label, score, icon, color, delay }: {
     label: string; score: number; icon: string; color: string; delay: number;
 }) {
+    const clampedScore = Math.min(100, Math.max(0, score));
     return (
         <Animated.View entering={FadeInRight.delay(delay).springify()} style={styles.skillRow}>
             <View style={styles.skillInfo}>
@@ -25,9 +32,9 @@ function SkillBar({ label, score, icon, color, delay }: {
                 <Text style={styles.skillLabel}>{label}</Text>
             </View>
             <View style={styles.barContainer}>
-                <View style={[styles.barFill, { width: `${score}%`, backgroundColor: color }]} />
+                <View style={[styles.barFill, { width: `${clampedScore}%`, backgroundColor: color }]} />
             </View>
-            <Text style={[styles.skillScore, { color }]}>{score}%</Text>
+            <Text style={[styles.skillScore, { color }]}>{clampedScore}%</Text>
         </Animated.View>
     );
 }
@@ -35,15 +42,19 @@ function SkillBar({ label, score, icon, color, delay }: {
 // ─── Severity Badge ───────────────────────────────────────
 function SeverityBadge({ severity }: { severity: string }) {
     const colors: Record<string, { bg: string; text: string }> = {
+        critical: { bg: theme.colors.error + '15', text: theme.colors.error },
+        major: { bg: theme.colors.warning + '15', text: theme.colors.warning },
         high: { bg: theme.colors.error + '15', text: theme.colors.error },
         medium: { bg: theme.colors.warning + '15', text: theme.colors.warning },
+        minor: { bg: '#10B98115', text: '#10B981' },
         low: { bg: theme.colors.success + '15', text: theme.colors.success },
+        suggestion: { bg: theme.colors.primary + '15', text: theme.colors.primary },
     };
-    const c = colors[severity] || colors.medium;
+    const c = colors[severity?.toLowerCase()] || colors.medium;
     return (
         <View style={[styles.severityBadge, { backgroundColor: c.bg }]}>
             <Text style={[styles.severityText, { color: c.text }]}>
-                {severity.charAt(0).toUpperCase() + severity.slice(1)}
+                {severity?.charAt(0).toUpperCase() + severity?.slice(1) || 'Medium'}
             </Text>
         </View>
     );
@@ -95,20 +106,12 @@ function MistakeCard({ item, index }: { item: any; index: number }) {
     );
 }
 
-// ─── Pronunciation Card ───────────────────────────────────
-function PronunciationCard({ item }: { item: any }) {
-    return (
-        <View style={styles.pronCard}>
-            <Text style={styles.pronWord}>{item.word}</Text>
-            <View style={styles.pronPhonetics}>
-                <Text style={styles.pronExpected}>{item.phoneticExpected || item.expected}</Text>
-            </View>
-            <Text style={styles.pronSuggestion}>{item.suggestion}</Text>
-            <TouchableOpacity style={styles.pronPlayButton}>
-                <Ionicons name="play" size={14} color={theme.colors.primary} />
-            </TouchableOpacity>
-        </View>
-    );
+// ─── Score Color Helper ───────────────────────────────────
+function getScoreColor(score: number) {
+    if (score >= 80) return theme.colors.success;
+    if (score >= 60) return theme.colors.warning;
+    if (score >= 40) return '#F59E0B';
+    return theme.colors.error;
 }
 
 // ─── Main Component ───────────────────────────────────────
@@ -116,6 +119,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     const [loading, setLoading] = useState(true);
     const [sessionData, setSessionData] = useState<ConversationSession | null>(null);
     const [retryCount, setRetryCount] = useState(0);
+    const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(true);
 
     const params = route?.params || {};
     const sessionId = params.sessionId;
@@ -126,7 +130,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     useEffect(() => {
         let isMounted = true;
         const fetchAnalysis = async () => {
-            if (!sessionId) {
+            if (!sessionId || sessionId === 'session-id') {
+                console.warn('[CallFeedback] Invalid or placeholder sessionId provided');
                 setLoading(false);
                 return;
             }
@@ -139,7 +144,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                         setLoading(false);
                     }
                 } else if (retryCount < 10) {
-                    // Poll if not ready yet (AI processing takes time)
                     setTimeout(() => {
                         if (isMounted) setRetryCount(prev => prev + 1);
                     }, 5000);
@@ -167,32 +171,46 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                 <StatusBar barStyle="dark-content" />
                 <View style={{ alignItems: 'center', gap: 20 }}>
-                    <Ionicons name="sparkles" size={48} color={theme.colors.primary} />
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                     <Text style={{ fontSize: 18, fontWeight: '600', color: theme.colors.text.primary }}>
                         AI is analyzing your call...
                     </Text>
                     <Text style={{ color: theme.colors.text.secondary, textAlign: 'center', paddingHorizontal: 40 }}>
                         We're preparing your personalized feedback and corrections.
                     </Text>
+                    {retryCount > 0 && (
+                        <Text style={{ color: theme.colors.text.secondary, fontSize: 12 }}>
+                            Attempt {retryCount + 1}/10
+                        </Text>
+                    )}
                 </View>
             </SafeAreaView>
         );
     }
 
     const currentAnalysis = sessionData?.analyses?.[0];
+    const rawData = currentAnalysis?.rawData;
     const data = {
-        overallScore: currentAnalysis?.scores?.overall || 0,
+        overallScore: Math.min(100, currentAnalysis?.scores?.overall || 0),
         cefrLevel: currentAnalysis?.cefrLevel || 'B1',
         scores: {
-            grammar: currentAnalysis?.scores?.grammar || 0,
-            pronunciation: currentAnalysis?.scores?.pronunciation || 0,
-            fluency: currentAnalysis?.scores?.fluency || 0,
-            vocabulary: currentAnalysis?.scores?.vocabulary || 0,
+            grammar: Math.min(100, currentAnalysis?.scores?.grammar || 0),
+            pronunciation: Math.min(100, currentAnalysis?.scores?.pronunciation || 0),
+            fluency: Math.min(100, currentAnalysis?.scores?.fluency || 0),
+            vocabulary: Math.min(100, currentAnalysis?.scores?.vocabulary || 0),
         },
         mistakes: currentAnalysis?.mistakes || [],
         pronunciationIssues: currentAnalysis?.pronunciationIssues || [],
-        aiSummary: "The AI analysis focused on your grammar accuracy, pronunciation clarity, and vocabulary choice during the call.",
+        aiFeedback: (rawData as any)?.ai_detailed_feedback || null,
+        actionableFeedback: (rawData as any)?.actionable_feedback || null,
+        wordLevelData: (rawData as any)?.detailed_errors?.word_level_scores || [],
+        strengths: rawData?.strengths || [],
+        improvementAreas: rawData?.improvementAreas || [],
+        accentNotes: rawData?.accentNotes || null,
+        pronunciationTip: rawData?.pronunciationTip || null,
     };
+
+    const overallColor = getScoreColor(data.overallScore);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -247,79 +265,184 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                     </LinearGradient>
                 </Animated.View>
 
-                {/* Skill Breakdown */}
+                {/* New Score Breakdown */}
                 <Animated.View entering={FadeInDown.delay(300).springify()}>
-                    <Text style={styles.sectionTitle}>Skill Breakdown</Text>
-                    <View style={styles.skillsCard}>
-                        <SkillBar label="Grammar" score={data.scores.grammar} icon="text" color="#6366F1" delay={400} />
-                        <SkillBar label="Pronunciation" score={data.scores.pronunciation} icon="mic" color="#10B981" delay={500} />
-                        <SkillBar label="Fluency" score={data.scores.fluency} icon="water" color="#F59E0B" delay={600} />
-                        <SkillBar label="Vocabulary" score={data.scores.vocabulary} icon="book" color="#8B5CF6" delay={700} />
-                    </View>
+                    <ScoreBreakdownCard
+                        scores={data.scores}
+                        justifications={{
+                            pronunciation: data.aiFeedback?.pronunciation?.justification,
+                            grammar: data.aiFeedback?.grammar?.justification,
+                            vocabulary: data.aiFeedback?.vocabulary?.justification,
+                            fluency: data.aiFeedback?.fluency?.justification,
+                        }}
+                    />
                 </Animated.View>
 
-                {/* Key Mistakes */}
-                <Text style={styles.sectionTitle}>Key Mistakes</Text>
-                {data.mistakes.length > 0 ? (
-                    data.mistakes.map((item, index) => (
-                        <MistakeCard key={item.id} item={item} index={index} />
-                    ))
-                ) : (
-                    <Text style={{ paddingHorizontal: 30, color: theme.colors.text.secondary, fontSize: 14 }}>
-                        No significant mistakes found in this session. Well done!
+                {/* Detail Toggle */}
+                <TouchableOpacity
+                    style={styles.detailToggle}
+                    onPress={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
+                >
+                    <Text style={styles.detailToggleText}>
+                        {showDetailedAnalysis ? '📊 Hide' : '📊 Show'} Detailed Analysis
                     </Text>
-                )}
+                </TouchableOpacity>
 
-                {/* Pronunciation Issues */}
-                {data.pronunciationIssues.length > 0 && (
-                    <Animated.View entering={FadeInDown.delay(900).springify()}>
-                        <Text style={styles.sectionTitle}>Pronunciation Issues</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.pronList}
-                        >
-                            {data.pronunciationIssues.map((item: any) => (
-                                <PronunciationCard key={item.id} item={item} />
-                            ))}
-                        </ScrollView>
+                {showDetailedAnalysis && (
+                    <Animated.View entering={FadeInDown.delay(350).springify()}>
+                        {/* Word Level Breakdown */}
+                        {data.wordLevelData && data.wordLevelData.length > 0 && (
+                            <WordLevelBreakdown wordScores={data.wordLevelData} />
+                        )}
+
+                        {/* Grammar & Vocabulary Breakdown */}
+                        {(data.aiFeedback?.grammar || data.aiFeedback?.vocabulary) && (
+                            <GrammarVocabBreakdown
+                                grammar={data.aiFeedback?.grammar || {
+                                    score: 0,
+                                    errors: [],
+                                    strengths: [],
+                                    cefr_level: 'A1',
+                                    justification: 'No grammar analysis available.'
+                                }}
+                                vocabulary={data.aiFeedback?.vocabulary || {
+                                    score: 0,
+                                    word_count: 0,
+                                    unique_words: 0,
+                                    advanced_words: [],
+                                    repetitions: {},
+                                    inappropriate_words: {},
+                                    cefr_level: 'A1',
+                                    justification: 'No vocabulary analysis available.'
+                                }}
+                            />
+                        )}
+
+                        {/* Actionable Practice Tips */}
+                        {data.actionableFeedback && (
+                            <PracticeTips actionableFeedback={data.actionableFeedback} />
+                        )}
                     </Animated.View>
                 )}
 
-                {/* AI Summary */}
-                <Animated.View entering={FadeInDown.delay(1000).springify()}>
-                    <Text style={styles.sectionTitle}>AI Summary</Text>
-                    <View style={styles.summaryCard}>
-                        <View style={styles.summaryHeader}>
-                            <LinearGradient
-                                colors={theme.colors.gradients.primary}
-                                style={styles.aiIcon}
-                            >
-                                <Ionicons name="sparkles" size={14} color="white" />
-                            </LinearGradient>
-                            <Text style={styles.aiLabel}>EngR AI Analysis</Text>
+                {/* Accent & Pronunciation Analysis */}
+                {(data.accentNotes || data.pronunciationTip) && (
+                    <Animated.View entering={FadeInDown.delay(750).springify()}>
+                        <Text style={styles.sectionTitle}>Accent & Pronunciation</Text>
+                        <View style={styles.glassCard}>
+                            <View style={styles.accentHeader}>
+                                <View style={styles.accentIconContainer}>
+                                    <Ionicons name="globe-outline" size={20} color="#6366F1" />
+                                </View>
+                                <Text style={styles.accentTitle}>Accent Analysis</Text>
+                            </View>
+                            {data.accentNotes && (
+                                <Text style={styles.accentText}>{data.accentNotes}</Text>
+                            )}
+                            {data.pronunciationTip && (
+                                <View style={styles.tipRow}>
+                                    <Ionicons name="bulb-outline" size={14} color={theme.colors.warning} />
+                                    <Text style={styles.tipText}>{data.pronunciationTip}</Text>
+                                </View>
+                            )}
                         </View>
-                        <Text style={styles.summaryText}>{data.aiSummary}</Text>
+                    </Animated.View>
+                )}
+
+                {/* Strengths & Areas to Improve */}
+                {(data.strengths.length > 0 || data.improvementAreas.length > 0) && (
+                    <Animated.View entering={FadeInDown.delay(800).springify()}>
+                        <Text style={styles.sectionTitle}>Performance Breakdown</Text>
+                        <View style={styles.strengthsRow}>
+                            {data.strengths.length > 0 && (
+                                <View style={[styles.strengthCard, { borderLeftColor: theme.colors.success }]}>
+                                    <View style={styles.strengthHeader}>
+                                        <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                                        <Text style={[styles.strengthTitle, { color: theme.colors.success }]}>Strengths</Text>
+                                    </View>
+                                    {data.strengths.map((s, i) => (
+                                        <Text key={i} style={styles.strengthItem}>• {s}</Text>
+                                    ))}
+                                </View>
+                            )}
+                            {data.improvementAreas.length > 0 && (
+                                <View style={[styles.strengthCard, { borderLeftColor: theme.colors.warning }]}>
+                                    <View style={styles.strengthHeader}>
+                                        <Ionicons name="trending-up" size={16} color={theme.colors.warning} />
+                                        <Text style={[styles.strengthTitle, { color: theme.colors.warning }]}>Improve</Text>
+                                    </View>
+                                    {data.improvementAreas.map((a, i) => (
+                                        <Text key={i} style={styles.strengthItem}>• {a}</Text>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    </Animated.View>
+                )}
+
+                {/* Key Mistakes */}
+                <Text style={styles.sectionTitle}>
+                    Key Mistakes {data.mistakes.length > 0 && `(${data.mistakes.length})`}
+                </Text>
+                {data.mistakes.length > 0 ? (
+                    data.mistakes.map((item, index) => (
+                        <MistakeCard key={item.id || index} item={item} index={index} />
+                    ))
+                ) : (
+                    <View style={styles.glassCard}>
+                        <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                            <Ionicons name="checkmark-circle" size={32} color={theme.colors.success} />
+                            <Text style={{ color: theme.colors.text.secondary, fontSize: 14, marginTop: 8 }}>
+                                No significant mistakes found. Keep it up!
+                            </Text>
+                        </View>
                     </View>
-                </Animated.View>
+                )}
+
+                {/* AI Summary */}
+                {data.aiFeedback && (
+                    <Animated.View entering={FadeInDown.delay(1000).springify()}>
+                        <Text style={styles.sectionTitle}>AI Summary</Text>
+                        <View style={styles.glassCard}>
+                            <View style={styles.summaryHeader}>
+                                <LinearGradient
+                                    colors={theme.colors.gradients.primary}
+                                    style={styles.aiIcon}
+                                >
+                                    <Ionicons name="sparkles" size={14} color="white" />
+                                </LinearGradient>
+                                <Text style={styles.aiLabel}>EngR AI Analysis</Text>
+                            </View>
+                            <Text style={styles.summaryText}>{data.aiFeedback}</Text>
+                        </View>
+                    </Animated.View>
+                )}
 
                 {/* Action Buttons */}
                 <Animated.View entering={FadeInDown.delay(1100).springify()} style={styles.actions}>
-                    <TouchableOpacity style={styles.primaryAction} activeOpacity={0.8} onPress={() => navigation.navigate('Home')}>
+                    <TouchableOpacity
+                        style={styles.primaryAction}
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate('Call')}
+                    >
                         <LinearGradient
                             colors={theme.colors.gradients.primary}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.actionGradient}
                         >
-                            <Ionicons name="home" size={20} color="white" />
-                            <Text style={styles.primaryActionText}>Back to Home</Text>
+                            <Ionicons name="call" size={20} color="white" />
+                            <Text style={styles.primaryActionText}>Practice Again</Text>
                         </LinearGradient>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.secondaryAction} activeOpacity={0.7}>
-                        <Ionicons name="share-outline" size={20} color={theme.colors.primary} />
-                        <Text style={styles.secondaryActionText}>Share Results</Text>
+                    <TouchableOpacity
+                        style={styles.secondaryAction}
+                        activeOpacity={0.7}
+                        onPress={() => navigation.navigate('Home')}
+                    >
+                        <Ionicons name="home-outline" size={20} color={theme.colors.primary} />
+                        <Text style={styles.secondaryActionText}>Back to Home</Text>
                     </TouchableOpacity>
                 </Animated.View>
 
@@ -332,7 +455,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.background,
+        backgroundColor: '#F0F2F8',
     },
     scrollContent: {
         paddingBottom: theme.spacing.xl,
@@ -369,8 +492,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: theme.borderRadius.circle,
-        backgroundColor: theme.colors.surface,
-        ...theme.shadows.small,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
     },
     metaText: {
         fontSize: theme.typography.sizes.xs,
@@ -429,13 +553,16 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.m,
         marginTop: theme.spacing.m,
     },
-    skillsCard: {
-        backgroundColor: theme.colors.surface,
+    // Glassmorphism card used for all sections
+    glassCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
         marginHorizontal: theme.spacing.l,
-        borderRadius: theme.borderRadius.l,
+        borderRadius: 16,
         padding: theme.spacing.m,
         gap: theme.spacing.m,
-        ...theme.shadows.small,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     skillRow: {
         flexDirection: 'row',
@@ -477,13 +604,84 @@ const styles = StyleSheet.create({
         width: 40,
         textAlign: 'right',
     },
+    // Accent section
+    accentHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    accentIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#6366F115',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    accentTitle: {
+        fontSize: theme.typography.sizes.m,
+        fontWeight: '700',
+        color: theme.colors.text.primary,
+    },
+    accentText: {
+        fontSize: theme.typography.sizes.s,
+        color: theme.colors.text.secondary,
+        lineHeight: 22,
+    },
+    tipRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        backgroundColor: theme.colors.warning + '08',
+        padding: theme.spacing.s,
+        borderRadius: 10,
+    },
+    tipText: {
+        flex: 1,
+        fontSize: theme.typography.sizes.xs,
+        color: theme.colors.text.secondary,
+        lineHeight: 18,
+    },
+    // Strengths & Improvements
+    strengthsRow: {
+        paddingHorizontal: theme.spacing.l,
+        gap: theme.spacing.s,
+    },
+    strengthCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderRadius: 16,
+        padding: theme.spacing.m,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        borderLeftWidth: 3,
+        ...theme.shadows.medium,
+    },
+    strengthHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    strengthTitle: {
+        fontSize: theme.typography.sizes.s,
+        fontWeight: '700',
+    },
+    strengthItem: {
+        fontSize: theme.typography.sizes.s,
+        color: theme.colors.text.secondary,
+        lineHeight: 22,
+        paddingLeft: 4,
+    },
+    // Mistake cards
     mistakeCard: {
-        backgroundColor: theme.colors.surface,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.s,
-        borderRadius: theme.borderRadius.l,
+        borderRadius: 16,
         padding: theme.spacing.m,
-        ...theme.shadows.small,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     mistakeHeader: {
         flexDirection: 'row',
@@ -559,59 +757,11 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         lineHeight: 18,
     },
-    pronList: {
-        paddingHorizontal: theme.spacing.l,
-        gap: theme.spacing.s,
-    },
-    pronCard: {
-        width: 160,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.l,
-        padding: theme.spacing.m,
-        ...theme.shadows.small,
-    },
-    pronWord: {
-        fontSize: theme.typography.sizes.m,
-        fontWeight: '700',
-        color: theme.colors.text.primary,
-        marginBottom: 4,
-    },
-    pronPhonetics: {
-        marginBottom: theme.spacing.s,
-    },
-    pronExpected: {
-        fontSize: theme.typography.sizes.xs,
-        color: theme.colors.primary,
-        fontStyle: 'italic',
-    },
-    pronSuggestion: {
-        fontSize: 11,
-        color: theme.colors.text.secondary,
-        lineHeight: 16,
-    },
-    pronPlayButton: {
-        position: 'absolute',
-        top: theme.spacing.s,
-        right: theme.spacing.s,
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: theme.colors.primary + '15',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    summaryCard: {
-        backgroundColor: theme.colors.surface,
-        marginHorizontal: theme.spacing.l,
-        borderRadius: theme.borderRadius.l,
-        padding: theme.spacing.m,
-        ...theme.shadows.small,
-    },
+    // AI Summary
     summaryHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        marginBottom: theme.spacing.m,
     },
     aiIcon: {
         width: 28,
@@ -630,6 +780,7 @@ const styles = StyleSheet.create({
         color: theme.colors.text.secondary,
         lineHeight: 22,
     },
+    // Actions
     actions: {
         paddingHorizontal: theme.spacing.l,
         marginTop: theme.spacing.l,
@@ -665,6 +816,17 @@ const styles = StyleSheet.create({
     secondaryActionText: {
         color: theme.colors.primary,
         fontSize: theme.typography.sizes.m,
+        fontWeight: '600',
+    },
+    detailToggle: {
+        alignSelf: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        marginBottom: 8,
+    },
+    detailToggleText: {
+        color: theme.colors.primary,
+        fontSize: theme.typography.sizes.s,
         fontWeight: '600',
     },
 });

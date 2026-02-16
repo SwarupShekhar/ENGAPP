@@ -119,6 +119,10 @@ class TranscriptionService:
 
         try:
             if has_base64:
+                if not request.audio_base64 or len(request.audio_base64) < 100:
+                    logger.info("Empty or too small audio base64, returning empty transcript")
+                    return TranscriptionResponse(text="", confidence=0.0, words=[], duration=0.0, processing_time=time.time() - start_time)
+                
                 try:
                     # Robust handling: Convert to PCM 16kHz via pydub
                     import io

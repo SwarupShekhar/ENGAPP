@@ -38,10 +38,12 @@ const styles = StyleSheet.create({
     container: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.l,
-        padding: theme.spacing.m,
-        ...theme.shadows.small,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderRadius: theme.borderRadius.xl,
+        padding: theme.spacing.l,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     title: {
         fontSize: theme.typography.sizes.l,

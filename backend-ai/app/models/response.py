@@ -39,12 +39,40 @@ class AnalysisResponse(BaseModel):
     improvement_areas: List[str]
     recommended_tasks: List[Dict[str, Any]]
     processing_time: float
+    accent_notes: Optional[str] = None
     # Deep Intelligence Additions
     linguistic_fingerprint_updates: Optional[Dict[str, Any]] = None
     shadowing_audio_url: Optional[str] = None
     # Image Description Specifics
     relevance_score: Optional[float] = None
     talk_style: Optional[str] = None
+
+
+class MispronuncedWord(BaseModel):
+    word: str
+    accuracy: float
+    error_type: str
+    position_in_text: int
+
+class WeakPhoneme(BaseModel):
+    word: str
+    phoneme: str
+    score: float
+    ipa_symbol: str
+
+class DetailedPronunciationFeedback(BaseModel):
+    mispronounced_words: List[MispronuncedWord] = []
+    weak_phonemes: List[WeakPhoneme] = []
+    problem_sounds: Dict[str, int] = {}
+    omitted_words: List[str] = []
+    inserted_words: List[str] = []
+    word_level_scores: List[Dict[str, Any]] = []
+
+class ActionableFeedback(BaseModel):
+    practice_words: List[str] = []
+    phoneme_tips: List[str] = []
+    accent_specific_tips: List[str] = []
+    strengths: List[str] = []
 
 class PronunciationResponse(BaseModel):
     accuracy_score: float
@@ -59,3 +87,9 @@ class PronunciationResponse(BaseModel):
     prosody_score: Optional[float] = None
     speech_rate_wpm: Optional[float] = None
     pitch_variance: Optional[float] = None
+    # Detailed Feedback
+    detailed_errors: Optional[DetailedPronunciationFeedback] = None
+    actionable_feedback: Optional[ActionableFeedback] = None
+    word_level_data: Optional[List[Dict[str, Any]]] = None
+    # Emotion & Confidence
+    emotion_data: Optional[Dict[str, Any]] = None

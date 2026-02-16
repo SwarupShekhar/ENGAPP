@@ -27,6 +27,33 @@ export class SessionsProcessor {
                 data: { status: 'PROCESSING' },
             });
 
+            // Short-circuit if transcript is empty (silent call)
+            const transcript = job.data.transcript || '';
+            if (!transcript.trim()) {
+                this.logger.log(`Short-circuiting session ${sessionId}: No speech detected.`);
+
+                // Create dummy zero analyses for participants so the UI shows something
+                await Promise.all(participantIds.map(async (participantId) => {
+                    await this.prisma.analysis.upsert({
+                        where: { sessionId_participantId: { sessionId, participantId } },
+                        create: {
+                            sessionId,
+                            participantId,
+                            rawData: { message: "No speech detected" },
+                            scores: { grammar: 0, pronunciation: 0, fluency: 0, vocabulary: 0, overall: 0 },
+                            cefrLevel: 'N/A'
+                        },
+                        update: {}
+                    });
+                }));
+
+                await this.prisma.conversationSession.update({
+                    where: { id: sessionId },
+                    data: { status: 'COMPLETED' },
+                });
+                return;
+            }
+
             // 2) AI Pipeline - Process all participants in parallel
             await Promise.all(participantIds.map(async (participantId) => {
                 const participant = await this.prisma.sessionParticipant.findUnique({
@@ -44,7 +71,8 @@ export class SessionsProcessor {
                 const result = await this.assessmentService.analyzeAndStore(
                     sessionId,
                     participantId,
-                    participant.audioUrl
+                    participant.audioUrl,
+                    job.data.transcript
                 );
 
                 // B) Generate Tasks based on mistakes

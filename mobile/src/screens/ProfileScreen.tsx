@@ -241,7 +241,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.background,
+        backgroundColor: '#F0F2F8',
     },
     scrollContent: {
         padding: theme.spacing.l,
@@ -258,11 +258,13 @@ const styles = StyleSheet.create({
     userCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: theme.colors.surface,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
         borderRadius: theme.borderRadius.xl,
         padding: theme.spacing.l,
         marginBottom: theme.spacing.l,
         gap: theme.spacing.m,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
         ...theme.shadows.medium,
     },
     avatarCircle: {
@@ -321,10 +323,12 @@ const styles = StyleSheet.create({
 
     // Setting Card
     settingCard: {
-        backgroundColor: theme.colors.surface,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
         borderRadius: theme.borderRadius.l,
         overflow: 'hidden',
-        ...theme.shadows.small,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     separator: {
         height: 1,

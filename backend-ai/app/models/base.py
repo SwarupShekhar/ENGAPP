@@ -56,7 +56,10 @@ class AnalysisMetrics(BaseModel):
     wpm: float
     unique_words: int
     grammar_score: float
+    pronunciation_score: float = 50.0
+    fluency_score: float = 50.0
     vocabulary_score: float
+    overall_score: float = 50.0
 
 class PhonemeScore(BaseModel):
     phoneme: str

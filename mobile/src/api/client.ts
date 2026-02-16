@@ -1,12 +1,17 @@
 import axios from 'axios';
 import { useAuth } from '@clerk/clerk-expo';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
 const FORCE_PRODUCTION = false; // Switch to LOCAL backend for testing
+
+// Using localhost for iOS Simulator and the detected local IP for everything else
+const LOCAL_IP = '192.168.1.16';
 export const API_URL = (IS_PROD || FORCE_PRODUCTION)
     ? 'https://engapp-3210.onrender.com'
-    : 'http://172.20.10.13:3000'; // Mac's local IP for iOS device testing
+    : (Platform.OS === 'ios' && !Constants.appOwnership ? 'http://localhost:3000' : `http://${LOCAL_IP}:3000`);
 
 console.log(`[API] Initializing client with URL: ${API_URL}`);
 

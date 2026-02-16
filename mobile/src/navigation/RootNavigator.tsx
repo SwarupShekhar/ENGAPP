@@ -40,6 +40,7 @@ function MainTabs() {
                 })}
             />
             <Tab.Screen name="Progress" component={ProgressScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }

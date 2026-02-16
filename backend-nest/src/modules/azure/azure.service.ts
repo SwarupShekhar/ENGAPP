@@ -24,6 +24,11 @@ export class AzureService {
         completenessScore?: number;
         wordCount?: number;
         snr?: number;
+        detailedFeedback?: {
+            detailed_errors: any;
+            actionable_feedback: any;
+            word_level_data: any;
+        };
     }> {
         try {
             // Build payload: prefer base64 if available, fallback to URL
@@ -70,7 +75,12 @@ export class AzureService {
                 prosodyScore: data.prosody_score,
                 completenessScore: data.completeness_score,
                 wordCount: transcript.split(/\s+/).filter(w => w.length > 0).length,
-                snr: 20 // Placeholder
+                snr: 20, // Placeholder
+                detailedFeedback: {
+                    detailed_errors: data.detailed_errors,
+                    actionable_feedback: data.actionable_feedback,
+                    word_level_data: data.word_level_data
+                }
             };
 
         } catch (error) {

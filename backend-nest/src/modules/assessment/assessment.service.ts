@@ -3,24 +3,32 @@ import { AzureService } from '../azure/azure.service';
 import { BrainService } from '../brain/brain.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
+import { AdaptiveQuestionSelector, UserLevel } from './adaptive-question.service';
 import { SubmitPhaseDto, AssessmentPhase } from './dto/assessment.dto';
 
-const ELICITED_SENTENCES = {
-    A2: "I like to eat breakfast at home.",
-    B1: "Although I was tired, I finished my work before going to bed.",
-    C1: "The unprecedented technological advancements have fundamentally transformed our daily communication patterns."
+const ELICITED_SENTENCES: Record<string, string> = {
+    'A1': "I like to eat apples.",
+    'A2': "I often go to the park on weekends.",
+    'B1': "Although I was tired, I finished my work before going to bed.",
+    'B2': "The economy has been improving steadily over the last decade.",
+    'C1': "The unprecedented technological advancements have fundamentally transformed our daily communication patterns.",
+    'C2': "Albeit controversial, the decision to implement austere fiscal policies was deemed necessary to curb inflation."
 };
 
-const IMAGE_DESCRIPTIONS = {
-    A2: "A simple kitchen with a white refrigerator, wooden table, two chairs, and a window.",
-    B1: "A busy park with people jogging, walking a dog, and sitting on a bench reading.",
-    B2: "A professional business meeting with people in an office, one person presenting at a whiteboard."
+const CLOUDINARY_IMAGES: Record<string, string> = {
+    'A2': 'https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/kitchen_pqrrxf.png',
+    'B1': 'https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/Busypark_rx3ebg.png',
+    'B2': 'https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/Office_meeting_kgdysg.png',
+    'C1': 'https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/Office_meeting_kgdysg.png', // Fallback
+    'C2': 'https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/Office_meeting_kgdysg.png'  // Fallback
 };
 
-const CLOUDINARY_IMAGES = {
-    A2: "https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/kitchen_pqrrxf.png",
-    B1: "https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/Busypark_rx3ebg.png",
-    B2: "https://res.cloudinary.com/de8vvmpip/image/upload/v1770879569/Office_meeting_kgdysg.png"
+const IMAGE_DESCRIPTIONS: Record<string, string> = {
+    'A2': 'A kitchen with white cabinets, a wooden table, and a window.',
+    'B1': 'A busy park with people walking, children playing, and trees.',
+    'B2': 'A formal business meeting in a modern office with people sitting around a table.',
+    'C1': 'A formal business meeting in a modern office with people sitting around a table.', // Fallback
+    'C2': 'A formal business meeting in a modern office with people sitting around a table.'  // Fallback
 };
 
 @Injectable()
@@ -31,7 +39,8 @@ export class AssessmentService {
         private readonly azure: AzureService,
         private readonly brain: BrainService,
         private readonly prisma: PrismaService,
-        private readonly storage: AzureStorageService
+        private readonly storage: AzureStorageService,
+        private readonly questionSelector: AdaptiveQuestionSelector
     ) { }
 
     async startAssessment(userId: string) {
@@ -90,7 +99,7 @@ export class AssessmentService {
                 default:
                     throw new BadRequestException('Invalid phase');
             }
-        } catch (error) {
+        } catch (error: any) {
             this.logger.error(`Error in submitPhase: ${error.message}`, error.stack);
             throw error;
         }
@@ -111,7 +120,8 @@ export class AssessmentService {
             fluencyScore: result.fluencyScore,
             prosodyScore: result.prosodyScore,
             wordCount: result.wordCount,
-            audioUrl
+            audioUrl,
+            detailedFeedback: result.detailedFeedback
         };
 
         this.logger.log(`Updating session ${session.id} with Phase 1 data...`);
@@ -132,14 +142,23 @@ export class AssessmentService {
             accuracyScore: result.accuracyScore,
             fluencyScore: result.fluencyScore,
             audioUrl,
-            referenceText
+            referenceText,
+            detailedFeedback: result.detailedFeedback,
+            emotionData: (result as any).emotionData // Capture emotion data
         };
 
         let phase2Data = (session.phase2Data as any) || {};
         if (attempt === 1) {
             phase2Data.attempt1 = attemptData;
-            const nextLevel = result.accuracyScore >= 70 ? 'C1' : 'A2';
-            phase2Data.adaptiveSentence = { text: ELICITED_SENTENCES[nextLevel], level: nextLevel };
+
+            // Adaptive Selection for Attempt 2
+            const currentLevel = result.accuracyScore >= 70 ? 'C1' : 'A2';
+            const nextQuestion = this.questionSelector.selectNextQuestion(
+                currentLevel as UserLevel,
+                { accuracy: result.accuracyScore, fluency: result.fluencyScore || 0 },
+                'phase2'
+            );
+            phase2Data.adaptiveSentence = { text: nextQuestion.text, level: nextQuestion.level };
 
             this.logger.log(`Storing Phase 2 Attempt 1 data for session ${session.id}...`);
             await this.prisma.assessmentSession.update({
@@ -161,16 +180,28 @@ export class AssessmentService {
             });
             this.logger.log(`Phase 2 final data stored for session ${session.id}`);
 
-            // Select image for Phase 3
+            // Adaptive Selection for Phase 3
             let imgLevel = 'B1';
             const pron = phase2Data.finalPronunciationScore;
             if (pron < 50) imgLevel = 'A2';
             else if (pron > 75) imgLevel = 'B2';
 
+            const nextImageQuestion = this.questionSelector.selectNextQuestion(
+                imgLevel as UserLevel,
+                { accuracy: pron, fluency: phase2Data.finalFluencyScore },
+                'phase3'
+            );
+
+            // Store selected image for Phase 3 reference
+            await this.prisma.assessmentSession.update({
+                where: { id: session.id },
+                data: { phase3Data: { ...session.phase3Data, targetedImage: nextImageQuestion } }
+            });
+
             return {
                 nextPhase: AssessmentPhase.PHASE_3,
-                imageUrl: CLOUDINARY_IMAGES[imgLevel],
-                imageLevel: imgLevel
+                imageUrl: nextImageQuestion.imageUrl || CLOUDINARY_IMAGES[imgLevel],
+                imageLevel: nextImageQuestion.level
             };
         }
     }
@@ -184,16 +215,22 @@ export class AssessmentService {
         if (phase2Data.finalPronunciationScore < 50) imgLevel = 'A2';
         else if (phase2Data.finalPronunciationScore > 75) imgLevel = 'B2';
 
+        // Use adaptive image description if available, else fallback
+        const targetedImage = (session.phase3Data as any)?.targetedImage;
+        const imageDescription = targetedImage?.text || IMAGE_DESCRIPTIONS[imgLevel];
+
         const geminiResult = await this.brain.analyzeImageDescription(
             azureResult.transcript,
             imgLevel,
-            IMAGE_DESCRIPTIONS[imgLevel]
+            imageDescription
         );
 
         const phase3Data = {
             ...geminiResult,
             transcript: azureResult.transcript,
-            audioUrl
+            audioUrl,
+            detailedFeedback: azureResult.detailedFeedback,
+            emotionData: (azureResult as any).emotionData // Capture emotion data
         };
 
         this.logger.log(`Storing Phase 3 data for session ${session.id}...`);
@@ -214,7 +251,8 @@ export class AssessmentService {
             wordCount: result.wordCount,
             comprehensionScore: compScore,
             transcript: result.transcript,
-            audioUrl
+            audioUrl,
+            detailedFeedback: result.detailedFeedback
         };
 
         this.logger.log(`Storing Phase 4 data for session ${session.id}...`);
@@ -333,6 +371,17 @@ export class AssessmentService {
             })
         ]);
 
+        // Aggregate Detailed Feedback
+        const detailedReport = {
+            phase1: (session.phase1Data as any)?.detailedFeedback,
+            phase2: {
+                attempt1: (p2.attempt1 as any)?.detailedFeedback,
+                attempt2: (p2.attempt2 as any)?.detailedFeedback,
+            },
+            phase3: (session.phase3Data as any)?.detailedFeedback,
+            phase4: (session.phase4Data as any)?.detailedFeedback,
+        };
+
         return {
             assessmentId: session.id,
             status: 'COMPLETED',
@@ -344,6 +393,7 @@ export class AssessmentService {
             weaknessMap,
             improvementDelta,
             personalizedPlan,
+            detailedReport,
             nextAssessmentAvailableAt: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000)
         };
     }
@@ -421,6 +471,9 @@ export class AssessmentService {
 
         const nextAvailableAt = new Date(new Date(latestAssessment.completedAt!).getTime() + 7 * 24 * 60 * 60 * 1000);
 
+        // Benchmarking
+        const benchmark = await this.getBenchmarkData(latestAssessment.overallScore || 0, user?.overallLevel || 'B1');
+
         return {
             state: 'DASHBOARD',
             currentLevel: user?.overallLevel,
@@ -429,34 +482,97 @@ export class AssessmentService {
             skillBreakdown: latestAssessment.skillBreakdown,
             weaknessMap: latestAssessment.weaknessMap,
             personalizedPlan: latestAssessment.personalizedPlan,
+            assessmentId: latestAssessment.id,
+            detailedReport: {
+                phase1: (latestAssessment.phase1Data as any)?.detailedFeedback,
+                phase2: {
+                    attempt1: ((latestAssessment.phase2Data as any)?.attempt1 as any)?.detailedFeedback,
+                    attempt2: ((latestAssessment.phase2Data as any)?.attempt2 as any)?.detailedFeedback,
+                },
+                phase3: (latestAssessment.phase3Data as any)?.detailedFeedback,
+                phase4: (latestAssessment.phase4Data as any)?.detailedFeedback,
+            },
+            benchmark, // New field
             nextAssessmentAvailableAt: nextAvailableAt
         };
     }
 
+    private async getBenchmarkData(userScore: number, userLevel: string) {
+        // 1. Calculate Average for Level
+        const avgResult = await this.prisma.assessmentSession.aggregate({
+            _avg: { overallScore: true },
+            where: {
+                status: 'COMPLETED',
+                overallLevel: userLevel
+            }
+        });
+        const averageScore = Math.round(avgResult._avg.overallScore || 0);
+
+        // 2. Calculate Percentile
+        const totalUsers = await this.prisma.assessmentSession.count({
+            where: { status: 'COMPLETED' }
+        });
+
+        const usersBelow = await this.prisma.assessmentSession.count({
+            where: {
+                status: 'COMPLETED',
+                overallScore: { lt: userScore }
+            }
+        });
+
+        const percentile = totalUsers > 0 ? Math.round((usersBelow / totalUsers) * 100) : 0;
+
+        return {
+            averageScore,
+            percentile,
+            comparisonText: `You scored higher than ${percentile}% of users.`
+        };
+    }
+
     // Restore for regular session analysis (backward compatibility)
-    async analyzeAndStore(sessionId: string, participantId: string, audioUrl: string) {
-        const evidence = await this.azure.analyzeSpeech(audioUrl);
+    async analyzeAndStore(sessionId: string, participantId: string, audioUrl: string, transcript?: string) {
+        const evidence = await this.azure.analyzeSpeech(audioUrl, transcript || '');
         const feedback = await this.brain.interpretAzureEvidence(
             evidence.transcript,
             evidence.pronunciationEvidence
         );
 
+        // Use AI-generated scores, falling back to Azure raw scores
+        const aiScores: any = feedback.scores || {};
+        const scores = {
+            grammar: aiScores.grammar ?? 0,
+            pronunciation: aiScores.pronunciation ?? evidence.accuracyScore ?? 0,
+            fluency: aiScores.fluency ?? evidence.fluencyScore ?? 0,
+            vocabulary: aiScores.vocabulary ?? 0,
+            overall: aiScores.overall ?? Math.round(
+                ((aiScores.grammar ?? 0) * 0.3) +
+                ((aiScores.pronunciation ?? evidence.accuracyScore ?? 0) * 0.25) +
+                ((aiScores.fluency ?? evidence.fluencyScore ?? 0) * 0.25) +
+                ((aiScores.vocabulary ?? 0) * 0.2)
+            ),
+        };
+
         const analysis = await this.prisma.analysis.create({
             data: {
                 sessionId,
                 participantId,
-                rawData: evidence as any,
-                scores: {
-                    accuracy: evidence.accuracyScore || 0,
-                    fluency: evidence.fluencyScore || 0,
-                    prosody: evidence.prosodyScore || 0
-                },
+                rawData: {
+                    azureEvidence: evidence,
+                    aiFeedback: feedback.feedback || feedback.explanation || '',
+                    strengths: feedback.strengths || [],
+                    improvementAreas: feedback.improvementAreas || [],
+                    accentNotes: feedback.accentNotes || null,
+                    pronunciationTip: feedback.pronunciationTip || null,
+                } as any,
+                cefrLevel: feedback.cefrLevel || null,
+                scores: scores,
                 mistakes: {
                     create: feedback.mistakes?.map(m => ({
                         type: m.type || 'general',
+                        severity: m.severity || 'medium',
                         original: m.original,
                         corrected: m.corrected,
-                        explanation: feedback.explanation || '',
+                        explanation: m.explanation || feedback.explanation || '',
                         timestamp: 0,
                         segmentId: '0'
                     })) || []

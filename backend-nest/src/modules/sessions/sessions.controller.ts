@@ -16,6 +16,13 @@ export class SessionsController {
         return this.sessionsService.heartbeat(sessionId, data.userId);
     }
 
+    @Get()
+    @UseGuards(ClerkGuard)
+    async getAll(@Request() req) {
+        console.log('GET /sessions hit for user:', req.user.id);
+        return this.sessionsService.getUserSessions(req.user.id);
+    }
+
     @Get(':id/analysis')
     @UseGuards(ClerkGuard)
     async getAnalysis(@Param('id') sessionId: string, @Request() req) {
@@ -24,7 +31,7 @@ export class SessionsController {
     }
 
     @Post(':id/end')
-    async end(@Param('id') sessionId: string, @Body() data: { actualDuration: number; userEndedEarly: boolean; audioUrls: Record<string, string> }) {
+    async end(@Param('id') sessionId: string, @Body() data: { actualDuration: number; userEndedEarly: boolean; audioUrls: Record<string, string>; transcript?: string }) {
         return this.sessionsService.endSession(sessionId, data);
     }
 }

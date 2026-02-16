@@ -59,31 +59,50 @@ export class BrainService {
 
     async interpretAzureEvidence(transcript: string, evidence: any) {
         try {
+            // Build structured context with labeled Azure pronunciation data
+            const azureContext = this.formatAzureEvidence(evidence);
+
             const response = await lastValueFrom(
                 this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
                     text: transcript,
                     user_id: "system",
                     session_id: "system",
-                    context: `Interpret Azure Evidence: ${JSON.stringify(evidence)}`
+                    context: azureContext
                 })
             );
 
             const data = response.data.data;
 
             // Map backend-ai errors to mistake format
-            const mistakes = data.errors.map(e => ({
+            const mistakes = (data.errors || []).map(e => ({
                 original: e.original_text,
                 corrected: e.corrected_text,
                 type: e.type,
-                explanation: e.explanation
+                explanation: e.explanation,
+                severity: e.severity?.toLowerCase() || 'medium',
             }));
 
+            // Extract AI-generated scores — use correct field names from Gemini response
+            const aiScores = data.metrics || {};
+
             return {
-                corrected: mistakes.length > 0 ? mistakes[0].corrected : transcript, // Simplified
-                explanation: data.feedback,
-                severity: "medium",
-                pronunciationTip: data.improvement_areas[0] || "Keep practicing!",
-                mistakes: mistakes
+                corrected: mistakes.length > 0 ? mistakes[0].corrected : transcript,
+                explanation: data.feedback || "No feedback available.",
+                severity: mistakes.length > 3 ? "high" : mistakes.length > 0 ? "medium" : "low",
+                pronunciationTip: (data.improvement_areas || [])[0] || "Keep practicing!",
+                mistakes: mistakes,
+                scores: {
+                    grammar: aiScores.grammar_score ?? 50,
+                    pronunciation: aiScores.pronunciation_score ?? 50,
+                    fluency: aiScores.fluency_score ?? 50,
+                    vocabulary: aiScores.vocabulary_score ?? 50,
+                    overall: aiScores.overall_score ?? 50,
+                },
+                feedback: data.feedback || '',
+                strengths: data.strengths || [],
+                improvementAreas: data.improvement_areas || [],
+                cefrLevel: data.cefr_assessment?.level || 'B1',
+                accentNotes: data.improvement_areas?.find((a: string) => a.toLowerCase().includes('accent') || a.toLowerCase().includes('pronunciation')) || null,
             };
 
         } catch (error) {
@@ -94,8 +113,44 @@ export class BrainService {
                 explanation: "AI service temporarily unavailable.",
                 severity: "low",
                 pronunciationTip: "Keep practicing!",
-                mistakes: []
+                mistakes: [],
+                scores: { grammar: 0, pronunciation: 0, fluency: 0, vocabulary: 0, overall: 0 },
+                strengths: [],
+                improvementAreas: [],
+                cefrLevel: 'N/A',
             };
         }
+    }
+
+    /**
+     * Format raw Azure pronunciation evidence into a structured, labeled string
+     * that Gemini can understand and use for scoring.
+     */
+    private formatAzureEvidence(evidence: any): string {
+        if (!evidence) return '';
+
+        // If evidence is an array of word-level pronunciation data
+        if (Array.isArray(evidence)) {
+            const wordSummaries = evidence.slice(0, 20).map((w: any) =>
+                `"${w.word || w.Word}" (accuracy: ${w.accuracyScore ?? w.AccuracyScore ?? 'N/A'}%, error: ${w.errorType || w.ErrorType || 'None'})`
+            ).join(', ');
+
+            return `Azure Speech Pronunciation Assessment Results:
+- Words analyzed: ${evidence.length}
+- Per-word accuracy: [${wordSummaries}]
+Use these accuracy scores to inform your pronunciation_score. Words with low accuracy or error types like "Mispronunciation" should lower the score.`;
+        }
+
+        // If evidence is an object with aggregate scores
+        if (typeof evidence === 'object') {
+            return `Azure Speech Pronunciation Assessment Results:
+- Accuracy Score: ${evidence.accuracyScore ?? 'N/A'}/100
+- Fluency Score: ${evidence.fluencyScore ?? 'N/A'}/100
+- Prosody Score: ${evidence.prosodyScore ?? 'N/A'}/100
+- Completeness Score: ${evidence.completenessScore ?? 'N/A'}/100
+Use these scores to calibrate your pronunciation_score and fluency_score.`;
+        }
+
+        return `Azure Evidence: ${JSON.stringify(evidence).substring(0, 500)}`;
     }
 }

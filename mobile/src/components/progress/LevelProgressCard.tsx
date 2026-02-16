@@ -45,8 +45,10 @@ const styles = StyleSheet.create({
     card: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.l,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderRadius: theme.borderRadius.xl,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
         ...theme.shadows.medium,
         overflow: 'hidden',
     },

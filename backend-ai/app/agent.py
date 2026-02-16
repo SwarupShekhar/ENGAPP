@@ -6,8 +6,13 @@ from dotenv import load_dotenv
 from livekit import agents, rtc
 from livekit.plugins import azure
 
+import certifi
+
 # Load environment variables
 load_dotenv()
+
+# SSL certificate fix for macOS
+os.environ['SSL_CERT_FILE'] = certifi.where()
 
 logger = logging.getLogger("transcription-agent")
 logger.setLevel(logging.INFO)
@@ -74,8 +79,4 @@ if __name__ == "__main__":
     import json
     
     # Run the worker
-    agents.Worker(
-        request_handler=entrypoint,
-        # In a real setup, we'd use environment variables for these
-        # But Worker() automatically reads LIVEKIT_URL, LIVEKIT_API_KEY, etc.
-    ).run()
+    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))

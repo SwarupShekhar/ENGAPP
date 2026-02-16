@@ -60,7 +60,9 @@ class PronunciationService:
             return {
                 "prosody_score": min(100.0, float(prosody_score)),
                 "speech_rate_wpm": float(tempo),
-                "pitch_variance": float(pitch_std)
+                "pitch_variance": float(pitch_std),
+                "energy_level": float(np.mean(librosa.feature.rms(y=y)) * 100), # Simple energy metric
+                "speaking_confidence": float(min(100.0, max(0.0, 100 - (pause_ratio * 100) - (pitch_std / 2)))) # Heuristic confidence
             }
         except Exception as e:
             logger.warning("prosody_analysis_failed", error=str(e))
@@ -122,15 +124,55 @@ class PronunciationService:
                 language=request.language
             )
 
-            # 4. Map Results
+            # 4. Extract Detailed Feedback using Analyzer
+            from app.utils.pronunciation_analyzer import extract_detailed_errors, generate_actionable_feedback
+            from app.models.response import DetailedPronunciationFeedback, ActionableFeedback, MispronuncedWord, WeakPhoneme
+
+            # Parse full Azure JSON for detailed analysis containing NBest/Phonemes
+            azure_json_str = result.get("azure_json", "{}")
+            if isinstance(azure_json_str, str):
+                azure_json = json.loads(azure_json_str)
+            else:
+                azure_json = azure_json_str
+
+            if not azure_json and "words" in result and result["words"]:
+                 # Fallback if azure_json not returned: reconstruct minimal structure from simplified result
+                 azure_json = {"NBest": [{"Words": result["words"]}]}
+
+            detailed_errors_dict = extract_detailed_errors(azure_json)
+            
+            # Generate actionable tips (accent_notes will be passed in a separate flow or null for now)
+            actionable_feedback_dict = generate_actionable_feedback(detailed_errors_dict, accent_notes=None)
+
+            # Convert to Pydantic models
+            detailed_errors = DetailedPronunciationFeedback(
+                mispronounced_words=[MispronuncedWord(**w) for w in detailed_errors_dict["mispronounced_words"]],
+                weak_phonemes=[WeakPhoneme(**p) for p in detailed_errors_dict["weak_phonemes"]],
+                problem_sounds=detailed_errors_dict["problem_sounds"],
+                omitted_words=detailed_errors_dict["omitted_words"],
+                inserted_words=detailed_errors_dict["inserted_words"],
+                word_level_scores=detailed_errors_dict["word_level_scores"]
+            )
+
+            actionable_feedback = ActionableFeedback(
+                practice_words=actionable_feedback_dict["practice_words"],
+                phoneme_tips=actionable_feedback_dict["phoneme_tips"],
+                accent_specific_tips=actionable_feedback_dict["accent_specific_tips"],
+                strengths=actionable_feedback_dict["strengths"]
+            )
+
+            # 5. Map Results
             words = [
                 WordPronunciation(
                     word=w["word"],
-                    accuracy_score=w["accuracy_score"],
-                    error_type=w["error_type"],
+                    accuracy_score=w.get("accuracy_score") or w.get("AccuracyScore", 0.0),
+                    error_type=w.get("error_type") or w.get("ErrorType", "None"),
                     phonemes=[
-                        PhonemeScore(phoneme=p["phoneme"], accuracy_score=p["accuracy_score"])
-                        for p in w["phonemes"]
+                        PhonemeScore(
+                            phoneme=p.get("phoneme") or p.get("Phoneme", ""), 
+                            accuracy_score=p.get("accuracy_score") or p.get("Score", 0.0)
+                        )
+                        for p in w.get("phonemes") or w.get("Phonemes", [])
                     ]
                 ) for w in result["words"]
             ]
@@ -144,7 +186,18 @@ class PronunciationService:
                 common_issues=self._get_issues(words),
                 improvement_tips=self._get_tips(words),
                 processing_time=time.time() - start_time,
-                **prosody_metrics
+                # Deep Intelligence
+                **prosody_metrics,
+                # Detailed Feedback
+                detailed_errors=detailed_errors,
+                actionable_feedback=actionable_feedback,
+                word_level_data=detailed_errors_dict["word_level_scores"],
+                emotion_data={
+                    "energy_level": prosody_metrics.get("energy_level", 0.0),
+                    "speaking_confidence": prosody_metrics.get("speaking_confidence", 0.0),
+                    "emotional_tone": "Neutral", # Placeholder for future ML model
+                    "confidence_level": "High" if prosody_metrics.get("speaking_confidence", 0) > 70 else "Medium"
+                }
             )
 
         except Exception as e:

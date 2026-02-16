@@ -57,10 +57,12 @@ const styles = StyleSheet.create({
     },
     statItem: {
         width: '47%',
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.m,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderRadius: 16,
         padding: theme.spacing.m,
-        ...theme.shadows.small,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     iconContainer: {
         width: 32,

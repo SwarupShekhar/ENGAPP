@@ -13,9 +13,9 @@ export class SessionsService {
     ) { }
 
     async getSessionAnalysis(sessionId: string, userId: string) {
-        this.logger.log(`DEBUG: Fetching analysis for session ${sessionId}, user ${userId}`);
+        this.logger.log(`[SessionsService] Requesting analysis for session: ${sessionId}, user: ${userId}`);
         const sessionCount = await this.prisma.conversationSession.count();
-        this.logger.log(`DEBUG: Total sessions in DB: ${sessionCount}`);
+        this.logger.log(`[SessionsService] DB check: Total sessions = ${sessionCount}`);
 
         const session = await this.prisma.conversationSession.findUnique({
             where: { id: sessionId },
@@ -57,6 +57,45 @@ export class SessionsService {
         return session;
 
         return session;
+    }
+
+    async getUserSessions(userId: string) {
+        return this.prisma.conversationSession.findMany({
+            where: {
+                participants: {
+                    some: {
+                        userId: userId
+                    }
+                }
+            },
+            include: {
+                participants: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                fname: true,
+                                lname: true
+                            }
+                        }
+                    }
+                },
+                analyses: {
+                    where: {
+                        participant: {
+                            userId: userId
+                        }
+                    },
+                    select: {
+                        scores: true,
+                        cefrLevel: true
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
     }
 
     async startSession(data: { matchId: string; participants: string[]; topic: string; estimatedDuration: number }) {
@@ -111,7 +150,7 @@ export class SessionsService {
         }
     }
 
-    async endSession(sessionId: string, data?: { actualDuration?: number; userEndedEarly?: boolean; audioUrls?: Record<string, string> }) {
+    async endSession(sessionId: string, data?: { actualDuration?: number; userEndedEarly?: boolean; audioUrls?: Record<string, string>; transcript?: string }) {
         try {
             // 1) Check status – idempotency
             const session = await this.prisma.conversationSession.findUnique({
@@ -136,6 +175,12 @@ export class SessionsService {
                     status: 'PROCESSING',
                     endedAt: endedAt,
                     duration: duration,
+                    feedback: data?.transcript ? {
+                        upsert: {
+                            create: { transcript: data.transcript },
+                            update: { transcript: data.transcript }
+                        }
+                    } : undefined,
                 },
             });
 
@@ -147,6 +192,7 @@ export class SessionsService {
                 sessionId,
                 audioUrls: data?.audioUrls || {},
                 participantIds,
+                transcript: data?.transcript || '',
             }, {
                 attempts: 3,
                 backoff: {

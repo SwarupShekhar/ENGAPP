@@ -89,6 +89,58 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
                     </View>
                 </View>
 
+                {/* Detailed Feedback Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Detailed Feedback</Text>
+                    <View style={styles.planCard}>
+                        {/* 1. Practice Words */}
+                        <View style={styles.planRow}>
+                            <Ionicons name="mic-outline" size={24} color={theme.colors.secondary} />
+                            <View style={styles.planTextContainer}>
+                                <Text style={styles.planLabel}>Words to Practice</Text>
+                                <Text style={styles.planValue}>
+                                    {(() => {
+                                        const uniqueWords = new Set<string>();
+                                        const report = result?.detailedReport;
+                                        if (report) {
+                                            [report.phase1, report.phase2?.attempt1, report.phase2?.attempt2, report.phase3, report.phase4].forEach(phase => {
+                                                phase?.actionable_feedback?.practice_words?.forEach((w: string) => uniqueWords.add(w));
+                                            });
+                                        }
+                                        const words = Array.from(uniqueWords).slice(0, 5); // Limit to 5
+                                        return words.length > 0 ? words.join(", ") : "Great pronunciation!";
+                                    })()}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        {/* 2. Phoneme Tips */}
+                        <View style={styles.planRow}>
+                            <Ionicons name="school-outline" size={24} color={theme.colors.secondary} />
+                            <View style={styles.planTextContainer}>
+                                <Text style={styles.planLabel}>Pro Tips</Text>
+                                <View style={{ marginTop: 4 }}>
+                                    {(() => {
+                                        const uniqueTips = new Set<string>();
+                                        const report = result?.detailedReport;
+                                        if (report) {
+                                            [report.phase1, report.phase2?.attempt1, report.phase2?.attempt2, report.phase3, report.phase4].forEach(phase => {
+                                                phase?.actionable_feedback?.phoneme_tips?.forEach((t: string) => uniqueTips.add(t));
+                                            });
+                                        }
+                                        const tips = Array.from(uniqueTips).slice(0, 3);
+                                        return tips.length > 0 ? tips.map((tip, i) => (
+                                            <Text key={i} style={styles.tipText}>• {tip}</Text>
+                                        )) : <Text style={styles.planValue}>Keep up the good prosody!</Text>;
+                                    })()}
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
                 <TouchableOpacity
                     style={styles.button}
                     onPress={handleContinueToHome}
@@ -178,6 +230,12 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.sizes.m,
         fontWeight: '600',
         color: theme.colors.text.primary,
+    },
+    tipText: {
+        fontSize: theme.typography.sizes.s,
+        color: theme.colors.text.primary,
+        marginBottom: 4,
+        lineHeight: 20,
     },
     divider: {
         height: 1,

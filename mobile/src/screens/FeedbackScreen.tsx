@@ -9,6 +9,7 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme/theme';
 import { userApi, AssessmentHistoryItem } from '../api/user';
+import { sessionsApi } from '../api/sessions';
 
 type FilterType = 'all' | 'week' | 'month';
 
@@ -117,8 +118,21 @@ export default function FeedbackScreen() {
         useCallback(() => {
             const fetchHistory = async () => {
                 try {
-                    const data = await userApi.getHistory();
-                    setSessions(data);
+                    const data = await sessionsApi.listSessions();
+                    const mappedData: AssessmentHistoryItem[] = data.map((s: any) => {
+                        const analysis = s.analyses?.[0];
+                        return {
+                            id: s.id,
+                            date: s.startedAt || s.createdAt,
+                            duration: s.duration || 0,
+                            overallScore: analysis?.scores?.overall || 0,
+                            cefrLevel: analysis?.cefrLevel || 'B1',
+                            partnerName: s.participants?.length > 1 ? 'Practice Partner' : 'AI Tutor',
+                            topic: s.topic || 'General Conversation',
+                            status: s.status
+                        };
+                    });
+                    setSessions(mappedData);
                 } catch (error) {
                     console.error('Failed to fetch history:', error);
                 } finally {
@@ -129,14 +143,32 @@ export default function FeedbackScreen() {
         }, [])
     );
 
-    const averageScore = sessions.length > 0
-        ? Math.round(sessions.reduce((sum, s) => sum + s.overallScore, 0) / sessions.length)
+    // Apply filter logic
+    const filteredSessions = sessions.filter(s => {
+        if (filter === 'all') return true;
+        const sessionDate = new Date(s.date);
+        const now = new Date();
+        if (filter === 'week') {
+            const oneWeekAgo = new Date(now);
+            oneWeekAgo.setDate(now.getDate() - 7);
+            return sessionDate >= oneWeekAgo;
+        }
+        if (filter === 'month') {
+            const oneMonthAgo = new Date(now);
+            oneMonthAgo.setMonth(now.getMonth() - 1);
+            return sessionDate >= oneMonthAgo;
+        }
+        return true;
+    });
+
+    const averageScore = filteredSessions.length > 0
+        ? Math.min(100, Math.round(filteredSessions.reduce((sum, s) => sum + Math.min(100, s.overallScore), 0) / filteredSessions.length))
         : 0;
 
     return (
         <SafeAreaView style={styles.container}>
             <FlatList
-                data={sessions}
+                data={filteredSessions}
                 keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
@@ -145,7 +177,7 @@ export default function FeedbackScreen() {
                         {/* Header */}
                         <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
                             <Text style={styles.title}>Sessions</Text>
-                            {sessions.length > 0 && (
+                            {filteredSessions.length > 0 && (
                                 <View style={styles.avgBadge}>
                                     <Ionicons name="analytics" size={14} color={theme.colors.primary} />
                                     <Text style={styles.avgText}>Avg: {averageScore}</Text>
@@ -161,21 +193,21 @@ export default function FeedbackScreen() {
                         </Animated.View>
 
                         {/* Stats Summary */}
-                        {sessions.length > 0 && (
+                        {filteredSessions.length > 0 && (
                             <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.statsRow}>
                                 <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{sessions.length}</Text>
+                                    <Text style={styles.statValue}>{filteredSessions.length}</Text>
                                     <Text style={styles.statLabel}>Total Sessions</Text>
                                 </View>
                                 <View style={styles.statCard}>
                                     <Text style={styles.statValue}>
-                                        {Math.round(sessions.reduce((sum, s) => sum + s.duration, 0) / 60)}m
+                                        {Math.round(filteredSessions.reduce((sum, s) => sum + s.duration, 0) / 60)}m
                                     </Text>
                                     <Text style={styles.statLabel}>Total Time</Text>
                                 </View>
                                 <View style={styles.statCard}>
                                     <Text style={[styles.statValue, { color: theme.colors.success }]}>
-                                        {Math.max(...sessions.map(s => s.overallScore))}
+                                        {Math.min(100, Math.max(...filteredSessions.map(s => s.overallScore)))}
                                     </Text>
                                     <Text style={styles.statLabel}>Best Score</Text>
                                 </View>
@@ -205,7 +237,7 @@ export default function FeedbackScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: theme.colors.background,
+        backgroundColor: '#F0F2F8',
     },
     scrollContent: {
         paddingBottom: theme.spacing.xl,
@@ -272,11 +304,13 @@ const styles = StyleSheet.create({
     },
     statCard: {
         flex: 1,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.m,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        borderRadius: 16,
         padding: theme.spacing.m,
         alignItems: 'center',
-        ...theme.shadows.small,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     statValue: {
         fontSize: theme.typography.sizes.xl,
@@ -291,12 +325,14 @@ const styles = StyleSheet.create({
     sessionCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: theme.colors.surface,
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.s,
         padding: theme.spacing.m,
-        borderRadius: theme.borderRadius.l,
-        ...theme.shadows.small,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.6)',
+        ...theme.shadows.medium,
     },
     sessionLeft: {
         marginRight: theme.spacing.m,

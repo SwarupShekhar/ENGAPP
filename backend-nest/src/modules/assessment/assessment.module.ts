@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { AdaptiveQuestionSelector } from './adaptive-question.service';
 import { AssessmentController } from './assessment.controller';
 import { AssessmentService } from './assessment.service';
 import { AssessmentCleanupService } from './assessment-cleanup.service';
@@ -13,7 +14,7 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
     imports: [ConfigModule, IntegrationsModule, forwardRef(() => SessionsModule), AzureModule, BrainModule, PrismaModule, AuthModule],
     controllers: [AssessmentController],
-    providers: [AssessmentService, AssessmentCleanupService],
+    providers: [AssessmentService, AssessmentCleanupService, AdaptiveQuestionSelector],
     exports: [AssessmentService],
 })
 export class AssessmentModule { }

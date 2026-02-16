@@ -52,6 +52,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                     if (route.name === 'Home') iconName = isFocused ? 'home' : 'home-outline';
                     if (route.name === 'Feedback') iconName = isFocused ? 'document-text' : 'document-text-outline';
                     if (route.name === 'Progress') iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
+                    if (route.name === 'Profile') iconName = isFocused ? 'person' : 'person-outline';
 
                     return (
                         <TouchableOpacity
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 10,
         justifyContent: 'space-between',
-        paddingHorizontal: 10,
+        paddingHorizontal: 5,
         alignItems: 'center',
     },
     tabItem: {
