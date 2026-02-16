@@ -34,4 +34,14 @@ export class SessionsController {
     async end(@Param('id') sessionId: string, @Body() data: { actualDuration: number; userEndedEarly: boolean; audioUrls: Record<string, string>; transcript?: string }) {
         return this.sessionsService.endSession(sessionId, data);
     }
+
+    @Post(':id/participant/:userId/audio')
+    async updateAudio(@Param('id') sessionId: string, @Param('userId') userId: string, @Body() data: { audioUrl: string }) {
+        return this.sessionsService.updateParticipantAudio(sessionId, userId, data.audioUrl);
+    }
+
+    @Post('upload-audio')
+    async uploadAudio(@Body() data: { audioBase64: string; userId: string; sessionId: string }) {
+        return this.sessionsService.uploadAudio(data.userId, data.sessionId, data.audioBase64);
+    }
 }

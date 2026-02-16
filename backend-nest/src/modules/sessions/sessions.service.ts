@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { AzureStorageService } from '../../integrations/azure-storage.service';
 
 @Injectable()
 export class SessionsService {
@@ -9,6 +10,7 @@ export class SessionsService {
 
     constructor(
         private prisma: PrismaService,
+        private azureStorage: AzureStorageService,
         @InjectQueue('sessions') private sessionsQueue: Queue,
     ) { }
 
@@ -204,6 +206,35 @@ export class SessionsService {
             return { status: 'PROCESSING', sessionId };
         } catch (error) {
             this.logger.error(`Failed to end session ${sessionId}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async updateParticipantAudio(sessionId: string, userId: string, audioUrl: string) {
+        try {
+            await this.prisma.sessionParticipant.update({
+                where: {
+                    sessionId_userId: { sessionId, userId },
+                },
+                data: {
+                    audioUrl,
+                },
+            });
+            return { status: 'ok' };
+        } catch (error) {
+            this.logger.error(`Failed to update audio for session ${sessionId}, user ${userId}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async uploadAudio(userId: string, sessionId: string, audioBase64: string) {
+        try {
+            const buffer = Buffer.from(audioBase64, 'base64');
+            const key = `sessions/${sessionId}/${userId}_${Date.now()}.wav`;
+            const audioUrl = await this.azureStorage.uploadFile(buffer, key, 'audio/wav');
+            return { audioUrl };
+        } catch (error) {
+            this.logger.error(`Audio upload failed for session ${sessionId}: ${error.message}`);
             throw error;
         }
     }
