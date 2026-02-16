@@ -7,30 +7,44 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { AssessmentSession } from '@/types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@clerk/nextjs';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
     const { isLoaded, userId, getToken } = useAuth();
     const [data, setData] = useState<AssessmentSession | any>(null);
+    const [sessions, setSessions] = useState<any[]>([]);
     const [loadingMessage, setLoadingMessage] = useState<string>("Initializing...");
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchDashboard = async () => {
+        const fetchData = async () => {
             if (!isLoaded || !userId) return;
 
             setLoadingMessage("Authenticating...");
             try {
                 const token = await getToken();
+                setLoadingMessage("Fetching Data...");
 
-                setLoadingMessage("Fetching Dashboard Data...");
-                const res = await api.get('/assessment/dashboard', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-                setData(res.data);
+                // Parallel fetch
+                const [dashboardRes, sessionsRes] = await Promise.allSettled([
+                    api.get('/assessment/dashboard', { headers: { Authorization: `Bearer ${token}` } }),
+                    api.get('/sessions', { headers: { Authorization: `Bearer ${token}` } })
+                ]);
+
+                if (dashboardRes.status === 'fulfilled') {
+                    setData(dashboardRes.value.data);
+                } else {
+                    throw dashboardRes.reason;
+                }
+
+                if (sessionsRes.status === 'fulfilled') {
+                    setSessions(sessionsRes.value.data);
+                } else {
+                    console.warn("Failed to fetch sessions", sessionsRes.reason);
+                }
+
             } catch (err: any) {
                 console.error("Dashboard fetch error:", err);
                 const msg = err.response?.data?.message || err.message || "Failed to load dashboard.";
@@ -45,7 +59,7 @@ export default function DashboardPage() {
         };
 
         if (isLoaded && userId) {
-            fetchDashboard();
+            fetchData();
         }
     }, [isLoaded, userId, getToken]);
 
@@ -54,7 +68,7 @@ export default function DashboardPage() {
 
     if (loadingMessage) return (
         <div className="flex h-screen flex-col items-center justify-center gap-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">{loadingMessage}</p>
         </div>
     );
@@ -148,8 +162,8 @@ export default function DashboardPage() {
                     </Card>
                 </div>
 
-                {/* Detailed Feedback & Plan */}
                 <div className="grid gap-6 md:grid-cols-2 mt-6">
+                    {/* Personalized Plan */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Personalized Plan</CardTitle>
@@ -161,6 +175,32 @@ export default function DashboardPage() {
                                 ))}
                             </ul>
                             <p className="mt-4 font-semibold text-sm">Weekly Goal: {data?.personalizedPlan?.weeklyGoal}</p>
+                        </CardContent>
+                    </Card>
+
+                    {/* Recent Sessions */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Recent Sessions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {sessions.length > 0 ? (
+                                <ul className="space-y-4">
+                                    {sessions.map((session: any) => (
+                                        <li key={session.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                                            <div>
+                                                <div className="font-medium">{session.topic || 'Assessment'}</div>
+                                                <div className="text-sm text-muted-foreground">{new Date(session.createdAt).toLocaleDateString()}</div>
+                                            </div>
+                                            <Button variant="outline" size="sm" asChild>
+                                                <Link href={`/feedback/${session.id}`}>View Feedback</Link>
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-muted-foreground text-sm">No recent sessions found.</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

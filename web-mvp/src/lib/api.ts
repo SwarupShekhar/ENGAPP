@@ -23,4 +23,23 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+export const getLiveKitToken = async (sessionId: string) => {
+    // We don't need to pass userId explicitly if the backend extracts it from the token
+    // But the controller expects it in the body: { userId, sessionId }
+    // Let's rely on the backend to use the authenticated user's ID if possible, 
+    // OR we need to decode the token/store userId in context.
+    // For now, let's assume the backend endpoint might need adjustment or we send a dummy if it uses req.user
+
+    // Wait, the controller code I saw:
+    // @Post('token')
+    // async getToken(@Body() body: { userId: string; sessionId: string }) ...
+    // It doesn't seem to use @Request() req.user
+    // So we must pass userId. 
+
+    // We need to access userId from the auth context. 
+    // Since this is a standalone function, we can't use hooks.
+    // We will accept userId as an argument.
+    return Promise.reject("Use the component directly");
+};
+
 export default api;
