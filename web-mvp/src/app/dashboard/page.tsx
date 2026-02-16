@@ -8,53 +8,48 @@ import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { AssessmentSession } from '@/types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { useAuth } from '@clerk/nextjs';
 
 export default function DashboardPage() {
+    const { isLoaded, userId, getToken } = useAuth();
     const [data, setData] = useState<AssessmentSession | any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchDashboard = async () => {
-            const userId = localStorage.getItem('userId');
-            if (!userId) return; // Handle redirect if needed
+            if (!isLoaded || !userId) return;
 
             try {
-                // In a real app we'd use a comprehensive hook or state manager
-                // For MVP, we pass userId via header or query if auth middleware isn't set up for "dev-token"
-                // But our backend expects Clerk. 
-                // We might need to bypass auth or assume the user has a valid Clerk token.
-                // Since the user asked for a Web MVP to test functionalities, I assume we will mock the auth 
-                // or the user will put a real token.
-                // For now, let's assume we can hit the endpoint.
-                // If backend requires Clerk, we might need a "mock-user-id" header if I modified the guard, 
-                // but checking the code, it uses ClerkGuard.
-                // If this is blocked, I'll need to disable ClerkGuard for testing or add a simpler Guard.
-                // I will add a 'x-user-id' header support in backend later if needed.
-                // For now, I'll try to use the dashboard endpoint.
-
-                // Correction: The backend expects `req.user.id`.
-                // I'll assume we can't easily get a Clerk token without the full Clerk flow.
-                // I should probably edit the backend to allow a "Dev Bypass" guard.
+                const token = await getToken();
+                // We send the token in the Authorization header.
+                // The backend ClerkGuard will validate it.
+                // We also send x-user-id just in case, but usually token is enough if backend extracts from it.
+                // Our backend currently needs to match the sub in token with the user ID in DB?
+                // Actually, backend uses `req.user.id` from the decoded token.
 
                 const res = await api.get('/assessment/dashboard', {
-                    headers: { 'x-user-id': userId } // I will add this support to backend
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
                 });
                 setData(res.data);
             } catch (err) {
-                console.error(err);
+                console.error("Dashboard fetch error:", err);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchDashboard();
-    }, []);
+    }, [isLoaded, userId, getToken]);
 
-    if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+    if (!isLoaded || loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+
+    if (!userId) return <div>Please sign in</div>;
 
     const skillData = data?.skillBreakdown ? [
         { subject: 'Pronunciation', A: data.skillBreakdown.pronunciation.phonemeAccuracy, fullMark: 100 },
-        { subject: 'Fluency', A: data.skillBreakdown.fluency.speechRate, fullMark: 100 }, // Scaling might be needed
+        { subject: 'Fluency', A: data.skillBreakdown.fluency.speechRate, fullMark: 100 },
         { subject: 'Grammar', A: data.skillBreakdown.grammar.tenseControl, fullMark: 100 },
         { subject: 'Vocab', A: data.skillBreakdown.vocabulary.lexicalRange, fullMark: 100 },
     ] : [];

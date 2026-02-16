@@ -8,8 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import api from '@/lib/api';
 import { Mic, Square, Loader2, Play, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Keep this import, we'll use it
-import { AssessmentSession } from '@/types'; // Import this if needed for types
+import { useAuth } from '@clerk/nextjs';
 
 // Phases
 enum AssessmentPhase {
@@ -31,6 +30,7 @@ interface AssessmentState {
 
 export default function AssessmentPage() {
     const router = useRouter();
+    const { isLoaded, userId, getToken } = useAuth();
     const { isRecording, startRecording, stopRecording, audioBlob, audioUrl, resetRecording } = useAudioRecorder();
 
     const [state, setState] = useState<AssessmentState>({
@@ -44,38 +44,31 @@ export default function AssessmentPage() {
     });
 
     const [attempt, setAttempt] = useState(1);
+    const hasStarted = useRef(false);
 
     // Initial Start
     useEffect(() => {
         const startAssessment = async () => {
-            const userId = localStorage.getItem('userId');
-            if (!userId) {
-                router.push('/');
-                return;
-            }
+            if (!isLoaded || !userId || hasStarted.current) return;
+            hasStarted.current = true;
 
             try {
-                // Modified backend to accept POST /assessment/start with userId in body or header
-                // We'll try just calling it. If it fails due to Auth, we'll need to fix backend.
-                // Assuming backend expects Clerk ID in Token.
-                // WORKAROUND: For MVP, I'll use a hardcoded user ID if the backend allows, 
-                // or just skip the "create" step if we can reuse an existing session manually?
-                // No, we need a session ID.
+                const token = await getToken();
 
-                // Let's assume the previous dashboard call worked or failed.
-                // I will try to hit the endpoint. If 403, I'll enable a dev mode on backend later.
+                // Start a new assessment session
                 const res = await api.post('/assessment/start', {}, {
-                    headers: { 'x-user-id': userId }
+                    headers: { Authorization: `Bearer ${token}` }
                 });
                 setState(prev => ({ ...prev, sessionId: res.data.id }));
             } catch (err: any) {
                 console.error("Failed to start assessment:", err);
-                setState(prev => ({ ...prev, error: "Could not start assessment. Ensure backend is running and you are logged in." }));
+                const msg = err.response?.data?.message || "Could not start assessment. Ensure you are eligible (e.g., 7 days cooling off).";
+                setState(prev => ({ ...prev, error: msg }));
             }
         };
 
         startAssessment();
-    }, [router]);
+    }, [isLoaded, userId, getToken]);
 
     const submitAudio = async () => {
         if (!audioBlob || !state.sessionId) return;
@@ -89,6 +82,7 @@ export default function AssessmentPage() {
             const base64Audio = (reader.result as string).split(',')[1];
 
             try {
+                const token = await getToken();
                 const payload = {
                     assessmentId: state.sessionId,
                     phase: state.phase,
@@ -96,7 +90,9 @@ export default function AssessmentPage() {
                     attempt: state.phase === AssessmentPhase.PHASE_2 ? attempt : undefined
                 };
 
-                const res = await api.post('/assessment/submit', payload);
+                const res = await api.post('/assessment/submit', payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 const data = res.data;
 
                 // Handle Response
@@ -182,6 +178,9 @@ export default function AssessmentPage() {
                 return <div>Loading...</div>;
         }
     };
+
+    if (!isLoaded) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+    if (!userId) return <div>Please sign in</div>;
 
     return (
         <div className="min-h-screen bg-background flex flex-col">

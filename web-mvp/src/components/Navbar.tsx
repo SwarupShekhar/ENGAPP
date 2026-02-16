@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { UserButton } from "@clerk/nextjs";
 
 export function Navbar() {
     return (
@@ -22,9 +23,7 @@ export function Navbar() {
                     <div className="w-full flex-1 md:w-auto md:flex-none">
                         {/* Search or other items could go here */}
                     </div>
-                    <Button variant="ghost" asChild>
-                        <Link href="/">Logout</Link>
-                    </Button>
+                    <UserButton afterSignOutUrl="/" />
                 </div>
             </div>
         </nav>
