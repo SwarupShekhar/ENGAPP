@@ -12,4 +12,10 @@ export class TasksController {
         const tasks = await this.tasksService.getDailyTasks(req.user.id);
         return { tasks };
     }
+
+    @UseGuards(ClerkGuard)
+    @Post(':id/complete')
+    async completeTask(@Param('id') id: string, @Body() body: { score: number }) {
+        return this.tasksService.completeTask(id, body.score);
+    }
 }

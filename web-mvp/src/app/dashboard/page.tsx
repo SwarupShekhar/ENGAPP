@@ -9,12 +9,13 @@ import api from '@/lib/api';
 import { AssessmentSession } from '@/types';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@clerk/nextjs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle } from 'lucide-react';
 
 export default function DashboardPage() {
     const { isLoaded, userId, getToken } = useAuth();
     const [data, setData] = useState<AssessmentSession | any>(null);
     const [sessions, setSessions] = useState<any[]>([]);
+    const [tasks, setTasks] = useState<any[]>([]);
     const [loadingMessage, setLoadingMessage] = useState<string>("Initializing...");
     const [error, setError] = useState<string | null>(null);
 
@@ -28,31 +29,30 @@ export default function DashboardPage() {
                 setLoadingMessage("Fetching Data...");
 
                 // Parallel fetch
-                const [dashboardRes, sessionsRes] = await Promise.allSettled([
+                const [dashboardRes, sessionsRes, tasksRes] = await Promise.allSettled([
                     api.get('/assessment/dashboard', { headers: { Authorization: `Bearer ${token}` } }),
-                    api.get('/sessions', { headers: { Authorization: `Bearer ${token}` } })
+                    api.get('/sessions', { headers: { Authorization: `Bearer ${token}` } }),
+                    api.get('/tasks/daily', { headers: { Authorization: `Bearer ${token}` } })
                 ]);
 
                 if (dashboardRes.status === 'fulfilled') {
                     setData(dashboardRes.value.data);
                 } else {
-                    throw dashboardRes.reason;
+                    console.error("Dashboard error:", dashboardRes.reason);
                 }
 
                 if (sessionsRes.status === 'fulfilled') {
                     setSessions(sessionsRes.value.data);
-                } else {
-                    console.warn("Failed to fetch sessions", sessionsRes.reason);
+                }
+
+                if (tasksRes.status === 'fulfilled') {
+                    setTasks(tasksRes.value.data.tasks || []);
                 }
 
             } catch (err: any) {
                 console.error("Dashboard fetch error:", err);
                 const msg = err.response?.data?.message || err.message || "Failed to load dashboard.";
-                if (err.code === 'ECONNABORTED') {
-                    setError("Connection timed out. Is the backend running?");
-                } else {
-                    setError(msg);
-                }
+                setError(msg);
             } finally {
                 setLoadingMessage("");
             }
@@ -62,6 +62,19 @@ export default function DashboardPage() {
             fetchData();
         }
     }, [isLoaded, userId, getToken]);
+
+    const completeTask = async (taskId: string) => {
+        try {
+            const token = await getToken();
+            await api.post(`/tasks/${taskId}/complete`, { score: 100 }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            // Update local state
+            setTasks(prev => prev.filter(t => t.id !== taskId));
+        } catch (error) {
+            console.error("Failed to complete task:", error);
+        }
+    };
 
     if (!isLoaded) return <div className="flex h-screen items-center justify-center">Loading Auth...</div>;
     if (!userId) return <div className="flex h-screen items-center justify-center">Please sign in</div>;
@@ -89,7 +102,7 @@ export default function DashboardPage() {
     ] : [];
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background text-foreground">
             <Navbar />
             <main className="container py-8">
                 <div className="mb-8 flex items-center justify-between">
@@ -144,7 +157,7 @@ export default function DashboardPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Weakness Map */}
+                    {/* Skill Breakdown */}
                     <Card className="col-span-1 md:col-span-2 lg:col-span-1">
                         <CardHeader>
                             <CardTitle>Skill Breakdown</CardTitle>
@@ -162,19 +175,62 @@ export default function DashboardPage() {
                     </Card>
                 </div>
 
-                <div className="grid gap-6 md:grid-cols-2 mt-6">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
+                    {/* Daily Tasks */}
+                    <Card className="md:col-span-2 lg:col-span-1">
+                        <CardHeader>
+                            <CardTitle className="flex justify-between items-center">
+                                Daily Tasks
+                                <span className="text-xs font-normal text-muted-foreground">{tasks.length} pending</span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {tasks.length > 0 ? (
+                                <ul className="space-y-3">
+                                    {tasks.map((task: any) => (
+                                        <li key={task.id} className="flex items-start gap-3 p-3 rounded-lg border bg-secondary/30">
+                                            <button
+                                                onClick={() => completeTask(task.id)}
+                                                className="mt-1 text-muted-foreground hover:text-primary transition-colors"
+                                            >
+                                                <Circle className="h-5 w-5" />
+                                            </button>
+                                            <div className="flex-1">
+                                                <div className="font-medium text-sm">{task.title}</div>
+                                                <div className="text-xs text-muted-foreground">{task.content?.instructions || 'Review your mistakes'}</div>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded">{task.type.replace('_', ' ')}</span>
+                                                    <span className="text-[10px] text-muted-foreground">{task.estimatedMinutes} mins</span>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <CheckCircle2 className="h-10 w-10 text-green-500 mb-2" />
+                                    <p className="text-sm font-medium">All caught up!</p>
+                                    <p className="text-xs text-muted-foreground">Check back after your next practice call.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                     {/* Personalized Plan */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Personalized Plan</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ul className="list-disc pl-5 space-y-2">
+                            <ul className="list-disc pl-5 space-y-2 text-sm">
                                 {data?.personalizedPlan?.dailyFocus?.map((item: string, i: number) => (
                                     <li key={i}>{item}</li>
                                 ))}
                             </ul>
-                            <p className="mt-4 font-semibold text-sm">Weekly Goal: {data?.personalizedPlan?.weeklyGoal}</p>
+                            <div className="mt-4 p-3 rounded bg-primary/5 border border-primary/10">
+                                <p className="text-[10px] uppercase font-bold text-primary mb-1">Weekly Goal</p>
+                                <p className="text-sm">{data?.personalizedPlan?.weeklyGoal || "Complete 3 practice calls"}</p>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -186,14 +242,14 @@ export default function DashboardPage() {
                         <CardContent>
                             {sessions.length > 0 ? (
                                 <ul className="space-y-4">
-                                    {sessions.map((session: any) => (
-                                        <li key={session.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                                    {sessions.slice(0, 5).map((session: any) => (
+                                        <li key={session.id} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
                                             <div>
-                                                <div className="font-medium">{session.topic || 'Assessment'}</div>
-                                                <div className="text-sm text-muted-foreground">{new Date(session.createdAt).toLocaleDateString()}</div>
+                                                <div className="font-medium text-sm">{session.topic || 'Assessment'}</div>
+                                                <div className="text-xs text-muted-foreground">{new Date(session.createdAt).toLocaleDateString()}</div>
                                             </div>
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link href={`/feedback/${session.id}`}>View Feedback</Link>
+                                            <Button variant="outline" size="sm" asChild className="h-8 text-xs">
+                                                <Link href={`/feedback/${session.id}`}>Feedback</Link>
                                             </Button>
                                         </li>
                                     ))}

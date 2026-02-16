@@ -14,11 +14,17 @@ export function Navbar() {
                         <Link href="/dashboard" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             Dashboard
                         </Link>
+                        <Link href="/social" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                            Social
+                        </Link>
                         <Link href="/assessment" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             Assessment
                         </Link>
                         <Link href="/call" className="transition-colors hover:text-foreground/80 text-foreground/60">
                             Practice Call
+                        </Link>
+                        <Link href="/settings" className="transition-colors hover:text-foreground/80 text-foreground/60">
+                            Settings
                         </Link>
                     </nav>
                 </div>

@@ -12,6 +12,7 @@
     "@clerk/nextjs": "^6.37.4",
     "@livekit/components-react": "^2.9.19",
     "@livekit/components-styles": "^1.2.0",
+    "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@types/uuid": "^10.0.0",
     "axios": "^1.13.5",
