@@ -13,39 +13,59 @@ import { useAuth } from '@clerk/nextjs';
 export default function DashboardPage() {
     const { isLoaded, userId, getToken } = useAuth();
     const [data, setData] = useState<AssessmentSession | any>(null);
-    const [loading, setLoading] = useState(true);
+    const [loadingMessage, setLoadingMessage] = useState<string>("Initializing...");
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchDashboard = async () => {
             if (!isLoaded || !userId) return;
 
+            setLoadingMessage("Authenticating...");
             try {
                 const token = await getToken();
-                // We send the token in the Authorization header.
-                // The backend ClerkGuard will validate it.
-                // We also send x-user-id just in case, but usually token is enough if backend extracts from it.
-                // Our backend currently needs to match the sub in token with the user ID in DB?
-                // Actually, backend uses `req.user.id` from the decoded token.
 
+                setLoadingMessage("Fetching Dashboard Data...");
                 const res = await api.get('/assessment/dashboard', {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
                 });
                 setData(res.data);
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Dashboard fetch error:", err);
+                const msg = err.response?.data?.message || err.message || "Failed to load dashboard.";
+                if (err.code === 'ECONNABORTED') {
+                    setError("Connection timed out. Is the backend running?");
+                } else {
+                    setError(msg);
+                }
             } finally {
-                setLoading(false);
+                setLoadingMessage("");
             }
         };
 
-        fetchDashboard();
+        if (isLoaded && userId) {
+            fetchDashboard();
+        }
     }, [isLoaded, userId, getToken]);
 
-    if (!isLoaded || loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+    if (!isLoaded) return <div className="flex h-screen items-center justify-center">Loading Auth...</div>;
+    if (!userId) return <div className="flex h-screen items-center justify-center">Please sign in</div>;
 
-    if (!userId) return <div>Please sign in</div>;
+    if (loadingMessage) return (
+        <div className="flex h-screen flex-col items-center justify-center gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">{loadingMessage}</p>
+        </div>
+    );
+
+    if (error) return (
+        <div className="flex h-screen flex-col items-center justify-center gap-4">
+            <div className="text-destructive font-bold">Error Loading Dashboard</div>
+            <p className="text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+    );
 
     const skillData = data?.skillBreakdown ? [
         { subject: 'Pronunciation', A: data.skillBreakdown.pronunciation.phonemeAccuracy, fullMark: 100 },
