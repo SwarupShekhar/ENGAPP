@@ -10,9 +10,10 @@ import { AzureModule } from '../azure/azure.module';
 import { BrainModule } from '../brain/brain.module';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
-    imports: [ConfigModule, IntegrationsModule, forwardRef(() => SessionsModule), AzureModule, BrainModule, PrismaModule, AuthModule],
+    imports: [ConfigModule, IntegrationsModule, forwardRef(() => SessionsModule), AzureModule, BrainModule, PrismaModule, AuthModule, TasksModule],
     controllers: [AssessmentController],
     providers: [AssessmentService, AssessmentCleanupService, AdaptiveQuestionSelector],
     exports: [AssessmentService],
