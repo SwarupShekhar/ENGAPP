@@ -22,6 +22,7 @@ import { theme } from '../theme/theme';
 import { tutorApi } from '../api/tutor';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MAX_REPETITION_ATTEMPTS = 3;
 
 // ─── Typing Dots ──────────────────────────────────────────
 function TypingDots() {
@@ -70,6 +71,29 @@ function TranscriptBubble({ item, index }: { item: any; index: number }) {
                 <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextPartner]}>
                     {item.text}
                 </Text>
+
+                {/* Pronunciation score badge on user messages */}
+                {item.isPronunciationAttempt && item.pronunciationScore != null && (
+                    <View style={[
+                        styles.scoreBadge,
+                        { backgroundColor: item.pronunciationScore >= 70 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)' }
+                    ]}>
+                        <Text style={[styles.scoreBadgeText, {
+                            color: item.pronunciationScore >= 70 ? '#10b981' : '#ef4444'
+                        }]}>
+                            🎯 {item.pronunciationScore?.toFixed(0)}/100
+                        </Text>
+                    </View>
+                )}
+
+                {/* Command badge */}
+                {item.isCommand && item.detectedIntent && (
+                    <View style={styles.commandBadge}>
+                        <Text style={styles.commandBadgeText}>🎙️ {item.detectedIntent.replace(/_/g, ' ')}</Text>
+                    </View>
+                )}
+
+                {/* Correction tip box */}
                 {item.correction && (
                     <View style={styles.correctionBox}>
                         <View style={styles.correctionHeader}>
@@ -81,6 +105,26 @@ function TranscriptBubble({ item, index }: { item: any; index: number }) {
                         </Text>
                         {item.correction.explanation_hinglish && (
                             <Text style={styles.explanation}>{item.correction.explanation_hinglish}</Text>
+                        )}
+                    </View>
+                )}
+
+                {/* Pronunciation assessment detail */}
+                {item.pronunciationAssessment && (
+                    <View style={styles.inlinePronContainer}>
+                        {item.pronunciationAssessment.words?.length > 0 && (
+                            <View style={styles.wordBreakdownList}>
+                                {item.pronunciationAssessment.words.map((w: any, idx: number) => (
+                                    <View key={idx} style={styles.wordBreakdownItem}>
+                                        <Text style={styles.wordBreakdownWord}>{w.word}</Text>
+                                        <Text style={[styles.wordBreakdownScore, {
+                                            color: w.accuracy_score >= 70 ? '#10b981' : '#ef4444'
+                                        }]}>
+                                            {w.accuracy_score?.toFixed(0)}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
                         )}
                     </View>
                 )}
@@ -105,6 +149,13 @@ export default function AITutorScreen({ navigation }: any) {
     const [transcript, setTranscript] = useState<any[]>([
         { id: 'welcome', speaker: 'ai', text: "Namaste! 🙏 I'm Priya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!" }
     ]);
+
+    // Pronunciation assessment state
+    const [awaitingRepetition, setAwaitingRepetition] = useState(false);
+    const [currentReferenceText, setCurrentReferenceText] = useState<string>('');
+    const [pronunciationResult, setPronunciationResult] = useState<any>(null);
+    const [repetitionAttempts, setRepetitionAttempts] = useState(0);
+
     const scrollRef = useRef<ScrollView>(null);
     const recordingRef = useRef<Audio.Recording | null>(null);
     const soundRef = useRef<Audio.Sound | null>(null);
@@ -134,7 +185,6 @@ export default function AITutorScreen({ navigation }: any) {
         init();
 
         return () => {
-            // Cleanup: end session and unload audio
             if (sessionIdRef.current) {
                 tutorApi.endSession(sessionIdRef.current).catch(() => {});
             }
@@ -149,6 +199,102 @@ export default function AITutorScreen({ navigation }: any) {
         opacity: pulseOpacity.value,
     }));
 
+    // ─── Audio Playback ─────────────────────────────────────
+    const playAudioBase64 = async (base64: string) => {
+        try {
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+            const sound = new Audio.Sound();
+            await sound.loadAsync({ uri: `data:audio/mp3;base64,${base64}` });
+            if (soundRef.current) await soundRef.current.unloadAsync().catch(() => {});
+            soundRef.current = sound;
+            await sound.playAsync();
+        } catch (e) {
+            console.error('Audio playback error:', e);
+        }
+    };
+
+    // ─── Intent Handling ────────────────────────────────────
+    const handleIntent = useCallback(async (intent: string) => {
+        switch (intent) {
+            case 'end_session':
+                handleEndSession();
+                break;
+
+            case 'repeat_please': {
+                const lastAi = [...transcript].reverse().find(t => t.speaker === 'ai' && !t.isCommand);
+                if (lastAi) {
+                    const newTurn = turnCount + 1;
+                    setTurnCount(newTurn);
+                    setTranscript(prev => [...prev, {
+                        id: `ai-repeat-${newTurn}`,
+                        speaker: 'ai',
+                        text: lastAi.text,
+                        isRepeat: true,
+                    }]);
+                }
+                break;
+            }
+
+            case 'dont_understand': {
+                const explanation = "Koi baat nahi! Let me explain differently. What specifically was confusing?";
+                const newTurn = turnCount + 1;
+                setTurnCount(newTurn);
+                setTranscript(prev => [...prev, {
+                    id: `ai-explain-${newTurn}`,
+                    speaker: 'ai',
+                    text: explanation,
+                }]);
+                break;
+            }
+
+            case 'speak_slower': {
+                const slowerResponse = "Bilkul! I will speak more slowly. Just tell me when you are ready.";
+                const newTurn = turnCount + 1;
+                setTurnCount(newTurn);
+                setTranscript(prev => [...prev, {
+                    id: `ai-slower-${newTurn}`,
+                    speaker: 'ai',
+                    text: slowerResponse,
+                }]);
+                break;
+            }
+
+            case 'skip_topic': {
+                const skipResponse = "Theek hai! Chalo kuch aur baat karte hain. Tell me, what did you have for breakfast today?";
+                const newTurn = turnCount + 1;
+                setTurnCount(newTurn);
+                setTranscript(prev => [...prev, {
+                    id: `ai-skip-${newTurn}`,
+                    speaker: 'ai',
+                    text: skipResponse,
+                }]);
+                break;
+            }
+
+            case 'help': {
+                const helpText =
+                    `Aap yeh commands use kar sakte hain:\n` +
+                    `• "Repeat that" - main dobara bolugi\n` +
+                    `• "Slow down" - main dhire bolungi\n` +
+                    `• "I don't understand" - main explain karungi\n` +
+                    `• "Change topic" - naya topic start karenge\n` +
+                    `• "End session" - session band kar denge`;
+                const newTurn = turnCount + 1;
+                setTurnCount(newTurn);
+                setTranscript(prev => [...prev, {
+                    id: `ai-help-${newTurn}`,
+                    speaker: 'ai',
+                    text: helpText,
+                }]);
+                break;
+            }
+
+            default:
+                break;
+        }
+    }, [transcript, turnCount]);
+
+    // ─── Recording ──────────────────────────────────────────
     const startRecording = async () => {
         if (isProcessing) return;
         setError(null);
@@ -176,39 +322,126 @@ export default function AITutorScreen({ navigation }: any) {
             await recordingRef.current.stopAndUnloadAsync();
             const uri = recordingRef.current.getURI();
 
-            const formData = new FormData();
-            formData.append('audio', { uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
-            formData.append('sessionId', sessionId || '');
-            formData.append('userId', user?.id || '');
+            if (!uri) {
+                console.error('No audio URI');
+                return;
+            }
 
-            const res = await tutorApi.processSpeech(formData);
+            // ─── Branch: Pronunciation Assessment or Normal ──
+            if (awaitingRepetition && currentReferenceText) {
+                // ── PRONUNCIATION ASSESSMENT MODE ────────────
+                const formData = new FormData();
+                formData.append('audio', { uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
+                formData.append('sessionId', sessionId || '');
+                formData.append('referenceText', currentReferenceText);
 
-            const newTurn = turnCount + 1;
-            setTurnCount(newTurn);
+                const result = await tutorApi.assessPronunciation(formData);
+                setPronunciationResult(result);
 
-            setTranscript(prev => [
-                ...prev,
-                { id: `user-${newTurn}`, speaker: 'user', text: res.transcription },
-                {
-                    id: `ai-${newTurn}`,
-                    speaker: 'ai',
-                    text: res.aiResponse,
-                    correction: res.correction,
-                },
-            ]);
+                const newTurn = turnCount + 1;
+                setTurnCount(newTurn);
 
-            // Play AI response audio
-            if (res.audioBase64) {
-                await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-                const sound = new Audio.Sound();
-                await sound.loadAsync({ uri: `data:audio/mp3;base64,${res.audioBase64}` });
-                if (soundRef.current) await soundRef.current.unloadAsync().catch(() => {});
-                soundRef.current = sound;
-                await sound.playAsync();
+                setTranscript(prev => [
+                    ...prev,
+                    {
+                        id: `user-pron-${newTurn}`,
+                        speaker: 'user',
+                        text: result.recognized_text || currentReferenceText,
+                        isPronunciationAttempt: true,
+                        pronunciationScore: result.accuracy_score,
+                    },
+                    {
+                        id: `ai-pron-${newTurn}`,
+                        speaker: 'ai',
+                        text: result.priya_feedback,
+                        pronunciationAssessment: result,
+                    },
+                ]);
+
+                if (result.passed) {
+                    // User passed → exit repetition mode
+                    setAwaitingRepetition(false);
+                    setCurrentReferenceText('');
+                    setRepetitionAttempts(0);
+                    setPronunciationResult(null);
+                } else {
+                    const newAttempts = repetitionAttempts + 1;
+                    setRepetitionAttempts(newAttempts);
+
+                    if (newAttempts >= MAX_REPETITION_ATTEMPTS) {
+                        // Max attempts → move on gracefully
+                        setAwaitingRepetition(false);
+                        setCurrentReferenceText('');
+                        setRepetitionAttempts(0);
+                        setPronunciationResult(null);
+
+                        setTranscript(prev => [
+                            ...prev,
+                            {
+                                id: `ai-maxattempt-${newTurn}`,
+                                speaker: 'ai',
+                                text: "Koi baat nahi! हम आगे बढ़ते हैं। You can practice this later. Ab batao, aur kya chal raha hai?",
+                            },
+                        ]);
+                    }
+                }
+            } else {
+                // ── NORMAL CONVERSATION MODE ─────────────────
+                const formData = new FormData();
+                formData.append('audio', { uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
+                formData.append('sessionId', sessionId || '');
+                formData.append('userId', user?.id || '');
+
+                const res = await tutorApi.processSpeech(formData);
+
+                // ── Check for voice command intent ───────────
+                if (res.isCommand && res.intent !== 'none') {
+                    const newTurn = turnCount + 1;
+                    setTurnCount(newTurn);
+
+                    setTranscript(prev => [...prev, {
+                        id: `user-cmd-${newTurn}`,
+                        speaker: 'user',
+                        text: res.transcription,
+                        isCommand: true,
+                        detectedIntent: res.intent,
+                    }]);
+
+                    await handleIntent(res.intent);
+                    return;
+                }
+
+                // ── Normal conversation turn ─────────────────
+                const newTurn = turnCount + 1;
+                setTurnCount(newTurn);
+
+                setTranscript(prev => [
+                    ...prev,
+                    { id: `user-${newTurn}`, speaker: 'user', text: res.transcription },
+                    {
+                        id: `ai-${newTurn}`,
+                        speaker: 'ai',
+                        text: res.aiResponse,
+                        correction: res.correction,
+                    },
+                ]);
+
+                // If there's a correction, enter pronunciation repetition mode
+                if (res.correction && res.correction.right) {
+                    setAwaitingRepetition(true);
+                    setCurrentReferenceText(res.correction.right);
+                    setRepetitionAttempts(0);
+                    setPronunciationResult(null);
+                }
+
+                // Play AI audio
+                if (res.audioBase64) {
+                    await playAudioBase64(res.audioBase64);
+                }
             }
         } catch (e: any) {
             console.error('Failed to process speech', e);
-            setError(e?.message?.includes('timeout') 
+            setError(e?.message?.includes('timeout')
                 ? 'Response took too long. Please try again.'
                 : 'Something went wrong. Please try again.');
         } finally {
@@ -291,6 +524,77 @@ export default function AITutorScreen({ navigation }: any) {
                     {isProcessing && <TypingDots />}
                 </ScrollView>
 
+                {/* Pronunciation Assessment UI */}
+                {awaitingRepetition && currentReferenceText && (
+                    <Animated.View entering={FadeInUp.springify()} style={styles.repetitionContainer}>
+                        {/* Header */}
+                        <View style={styles.repetitionHeader}>
+                            <Text style={styles.repetitionIcon}>🎯</Text>
+                            <Text style={styles.repetitionTitle}>Try saying this:</Text>
+                        </View>
+
+                        {/* Reference phrase */}
+                        <View style={styles.referenceBox}>
+                            <Text style={styles.referenceText}>"{currentReferenceText}"</Text>
+                        </View>
+
+                        {/* Score display (only if failed) */}
+                        {pronunciationResult && !pronunciationResult.passed && (
+                            <View style={styles.scoreContainer}>
+                                <View style={styles.scoreRow}>
+                                    <Text style={styles.scoreLabel}>Your accuracy:</Text>
+                                    <Text style={[styles.scoreValue, {
+                                        color: pronunciationResult.accuracy_score >= 70 ? '#10b981' : '#ef4444'
+                                    }]}>
+                                        {pronunciationResult.accuracy_score?.toFixed(0)}/100
+                                    </Text>
+                                </View>
+
+                                {/* Progress bar */}
+                                <View style={styles.progressBarContainer}>
+                                    <View style={[styles.progressBarFill, {
+                                        width: `${Math.min(pronunciationResult.accuracy_score, 100)}%`,
+                                        backgroundColor: pronunciationResult.accuracy_score >= 70 ? '#10b981'
+                                            : pronunciationResult.accuracy_score >= 50 ? '#f59e0b' : '#ef4444'
+                                    }]} />
+                                </View>
+
+                                {/* Problem words */}
+                                {pronunciationResult.problem_words?.length > 0 && (
+                                    <View style={styles.problemWordsContainer}>
+                                        <Text style={styles.problemWordsLabel}>Focus on:</Text>
+                                        <View style={styles.problemWordsList}>
+                                            {pronunciationResult.problem_words.map((word: string, idx: number) => (
+                                                <View key={idx} style={styles.problemWordChip}>
+                                                    <Text style={styles.problemWordText}>{word}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                )}
+
+                                {/* Attempts remaining */}
+                                <Text style={styles.attemptsText}>
+                                    {MAX_REPETITION_ATTEMPTS - repetitionAttempts} attempt(s) remaining
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Skip button */}
+                        <TouchableOpacity
+                            style={styles.skipButton}
+                            onPress={() => {
+                                setAwaitingRepetition(false);
+                                setCurrentReferenceText('');
+                                setRepetitionAttempts(0);
+                                setPronunciationResult(null);
+                            }}
+                        >
+                            <Text style={styles.skipButtonText}>Skip for now →</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                )}
+
                 {/* Footer */}
                 <View style={styles.footer}>
                     <TouchableOpacity
@@ -307,7 +611,9 @@ export default function AITutorScreen({ navigation }: any) {
                                         ? [theme.colors.error, '#EF4444'] as const
                                         : isProcessing
                                             ? ['#475569', '#64748B'] as const
-                                            : theme.colors.gradients.primary
+                                            : awaitingRepetition
+                                                ? ['#7C3AED', '#A855F7'] as const
+                                                : theme.colors.gradients.primary
                                 }
                                 style={styles.micButton}
                             >
@@ -324,7 +630,9 @@ export default function AITutorScreen({ navigation }: any) {
                             ? 'Processing...'
                             : isRecording
                                 ? '🔴 Release to send'
-                                : 'Hold to speak'}
+                                : awaitingRepetition
+                                    ? '🎯 Hold to repeat the phrase'
+                                    : 'Hold to speak'}
                     </Text>
                 </View>
             </SafeAreaView>
@@ -459,6 +767,34 @@ const styles = StyleSheet.create({
     bubbleTextUser: { color: 'white' },
     bubbleTextPartner: { color: '#E2E8F0' },
 
+    // Score badge on user messages
+    scoreBadge: {
+        marginTop: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        alignSelf: 'flex-start',
+    },
+    scoreBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+
+    // Command badge
+    commandBadge: {
+        marginTop: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        backgroundColor: 'rgba(59,130,246,0.2)',
+        alignSelf: 'flex-start',
+    },
+    commandBadgeText: {
+        fontSize: 11,
+        color: '#93c5fd',
+        fontWeight: '500',
+    },
+
     // Correction box
     correctionBox: {
         marginTop: 8,
@@ -491,6 +827,31 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
+    // Inline pronunciation detail in bubbles
+    inlinePronContainer: { marginTop: 6 },
+    wordBreakdownList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    wordBreakdownItem: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 8,
+        padding: 6,
+        alignItems: 'center',
+        minWidth: 50,
+    },
+    wordBreakdownWord: {
+        fontSize: 12,
+        color: '#fff',
+        fontWeight: '600',
+    },
+    wordBreakdownScore: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginTop: 2,
+    },
+
     // Typing dots
     typingRow: {
         flexDirection: 'row',
@@ -511,6 +872,113 @@ const styles = StyleSheet.create({
         height: 7,
         borderRadius: 3.5,
         backgroundColor: 'rgba(255,255,255,0.4)',
+    },
+
+    // ─── Pronunciation Assessment Panel ──────────────────────
+    repetitionContainer: {
+        backgroundColor: 'rgba(139, 92, 246, 0.15)',
+        borderRadius: 16,
+        padding: 16,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(139, 92, 246, 0.4)',
+    },
+    repetitionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    repetitionIcon: {
+        fontSize: 20,
+        marginRight: 8,
+    },
+    repetitionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.8)',
+    },
+    referenceBox: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 12,
+        alignItems: 'center',
+    },
+    referenceText: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#fff',
+        textAlign: 'center',
+        letterSpacing: 0.5,
+    },
+    scoreContainer: {
+        marginBottom: 12,
+    },
+    scoreRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    scoreLabel: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.7)',
+    },
+    scoreValue: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    progressBarContainer: {
+        height: 8,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 4,
+        marginBottom: 10,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    problemWordsContainer: {
+        marginBottom: 10,
+    },
+    problemWordsLabel: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.6)',
+        marginBottom: 6,
+    },
+    problemWordsList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    problemWordChip: {
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.4)',
+    },
+    problemWordText: {
+        fontSize: 13,
+        color: '#fca5a5',
+        fontWeight: '600',
+    },
+    attemptsText: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.4)',
+        textAlign: 'right',
+    },
+    skipButton: {
+        alignSelf: 'flex-end',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+    },
+    skipButtonText: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.5)',
     },
 
     // Footer

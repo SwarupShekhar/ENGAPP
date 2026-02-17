@@ -1,34 +1,77 @@
-import { Controller, Post, Body, Get, Param, Patch, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Patch, Delete, UseGuards, Request } from '@nestjs/common';
+import { ClerkGuard } from '../auth/clerk.guard';
 import { FriendshipService } from './friendship.service';
 
 @Controller('friendship')
+@UseGuards(ClerkGuard)
 export class FriendshipController {
-    constructor(private readonly friendshipService: FriendshipService) { }
+    constructor(private readonly friendshipService: FriendshipService) {}
 
+    /**
+     * Send a friend request to another user by their internal userId.
+     * POST /friendship/request
+     * Body: { targetUserId: string }
+     */
     @Post('request')
-    async sendRequest(@Body() body: { requesterId: string; addresseeClerkIdOrEmail: string }) {
-        // We will use sendRequest logic which looks up user by Clerk ID (or email if we change implementation)
-        // For now the service implements sendRequest taking (requesterId, addresseeClerkIdOrEmail)
-        return this.friendshipService.sendRequest(body.requesterId, body.addresseeClerkIdOrEmail);
+    async sendRequest(
+        @Request() req,
+        @Body('targetUserId') targetUserId: string,
+    ) {
+        return this.friendshipService.sendRequestById(req.user.id, targetUserId);
     }
 
+    /**
+     * Accept a pending friend request.
+     * PATCH /friendship/:id/accept
+     */
     @Patch(':id/accept')
-    async acceptRequest(@Param('id') id: string, @Body() body: { userId: string }) {
-        return this.friendshipService.acceptRequest(body.userId, id);
+    async acceptRequest(
+        @Request() req,
+        @Param('id') id: string,
+    ) {
+        return this.friendshipService.acceptRequest(req.user.id, id);
     }
 
+    /**
+     * Reject a pending friend request.
+     * PATCH /friendship/:id/reject
+     */
     @Patch(':id/reject')
-    async rejectRequest(@Param('id') id: string, @Body() body: { userId: string }) {
-        return this.friendshipService.rejectRequest(body.userId, id);
+    async rejectRequest(
+        @Request() req,
+        @Param('id') id: string,
+    ) {
+        return this.friendshipService.rejectRequest(req.user.id, id);
     }
 
-    @Get(':userId/friends')
-    async getFriends(@Param('userId') userId: string) {
-        return this.friendshipService.getFriends(userId);
+    /**
+     * Get connection status with a specific user.
+     * GET /friendship/status/:targetUserId
+     * Returns: { status, requestId?, conversationId? }
+     */
+    @Get('status/:targetUserId')
+    async getStatus(
+        @Request() req,
+        @Param('targetUserId') targetUserId: string,
+    ) {
+        return this.friendshipService.getConnectionStatus(req.user.id, targetUserId);
     }
 
-    @Get(':userId/pending')
-    async getPendingRequests(@Param('userId') userId: string) {
-        return this.friendshipService.getPendingRequests(userId);
+    /**
+     * Get all current friends.
+     * GET /friendship/friends
+     */
+    @Get('friends')
+    async getFriends(@Request() req) {
+        return this.friendshipService.getFriends(req.user.id);
+    }
+
+    /**
+     * Get pending incoming friend requests.
+     * GET /friendship/pending
+     */
+    @Get('pending')
+    async getPendingRequests(@Request() req) {
+        return this.friendshipService.getPendingRequests(req.user.id);
     }
 }

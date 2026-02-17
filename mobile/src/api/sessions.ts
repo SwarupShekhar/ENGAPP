@@ -7,6 +7,8 @@ export interface SessionParticipant {
     speakingTime: number;
     turnsTaken: number;
     user?: {
+        id: string; // internal UUID
+        clerkId?: string;
         fname: string;
         lname: string;
     };

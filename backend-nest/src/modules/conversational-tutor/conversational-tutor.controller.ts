@@ -1,7 +1,14 @@
-import { Controller, Post, Body, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConversationalTutorService } from './conversational-tutor.service';
-import { StartSessionDto, ProcessSpeechDto, EndSessionDto } from './dto/tutor.dto';
+import { StartSessionDto, EndSessionDto } from './dto/tutor.dto';
 import { v4 as uuidv4 } from 'uuid';
 
 @Controller('conversational-tutor')
@@ -11,30 +18,47 @@ export class ConversationalTutorController {
   @Post('start-session')
   async startSession(@Body() dto: StartSessionDto) {
     const sessionId = uuidv4();
-    return { sessionId, message: "Welcome! I'm Priya, your AI Tutor. Let's start speaking." };
+    return {
+      sessionId,
+      message:
+        "Namaste! 🙏 I'm Priya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!",
+    };
   }
 
   @Post('process-speech')
   @UseInterceptors(FileInterceptor('audio'))
   async processSpeech(
     @UploadedFile() audio: Express.Multer.File,
-    @Body() dto: ProcessSpeechDto
+    @Body('sessionId') sessionId: string,
+    @Body('userId') userId: string,
   ) {
-    // 1. Transcribe
-    const sttResult = await this.tutorService.transcribeHinglish(audio.buffer, dto.userId);
-    
-    // 2. Multi-turn Logic with Gemini
-    const aiResult = await this.tutorService.processUserUtterance(dto.sessionId, sttResult.text, dto.userId);
-    
-    // 3. Synthesize
-    const audioBase64 = await this.tutorService.synthesizeHinglish(aiResult.response);
-    
-    return {
-      transcription: sttResult.text,
-      aiResponse: aiResult.response,
-      correction: aiResult.correction,
-      audioBase64: audioBase64
-    };
+    if (!audio) throw new BadRequestException('Audio file is required');
+    if (!sessionId) throw new BadRequestException('sessionId is required');
+    if (!userId) throw new BadRequestException('userId is required');
+
+    return this.tutorService.processSpeechWithIntent(
+      audio.buffer,
+      userId,
+      sessionId,
+    );
+  }
+
+  @Post('assess-pronunciation')
+  @UseInterceptors(FileInterceptor('audio'))
+  async assessPronunciation(
+    @UploadedFile() audio: Express.Multer.File,
+    @Body('sessionId') sessionId: string,
+    @Body('referenceText') referenceText: string,
+  ) {
+    if (!audio) throw new BadRequestException('Audio file is required');
+    if (!referenceText) throw new BadRequestException('referenceText is required');
+    if (!sessionId) throw new BadRequestException('sessionId is required');
+
+    return this.tutorService.assessPronunciation(
+      audio.buffer,
+      referenceText,
+      sessionId,
+    );
   }
 
   @Post('end-session')

@@ -72,6 +72,7 @@ export class SessionsService {
                         user: {
                             select: {
                                 id: true,
+                                clerkId: true,
                                 fname: true,
                                 lname: true
                             }

@@ -4,150 +4,240 @@ import {
     SubscribeMessage,
     OnGatewayConnection,
     OnGatewayDisconnect,
-    MessageBody,
     ConnectedSocket,
+    MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
-import { FriendshipService } from '../friendship/friendship.service';
+import { Logger } from '@nestjs/common';
 import { ClerkService } from '../../integrations/clerk.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { ChatService } from './chat.service';
+
+interface AuthenticatedSocket extends Socket {
+    userId?: string;
+    userName?: string;
+}
 
 @WebSocketGateway({
     cors: {
         origin: '*',
+        credentials: true,
     },
+    namespace: '/chat',
+    transports: ['websocket', 'polling'],
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
     private readonly logger = new Logger(ChatGateway.name);
-    private connectedUsers = new Map<string, string>(); // userId -> socketId
+
+    // userId → Set of socketIds (supports multi-device)
+    private onlineUsers = new Map<string, Set<string>>();
 
     constructor(
-        private friendshipService: FriendshipService,
         private clerkService: ClerkService,
         private prisma: PrismaService,
-    ) { }
+        private chatService: ChatService,
+    ) {}
 
-    async handleConnection(client: Socket) {
+    // ── Connection ──────────────────────────────────────
+    async handleConnection(client: AuthenticatedSocket) {
         try {
-            // 1) Verify Auth
-            const token = client.handshake.auth.token as string;
+            const token = client.handshake.auth?.token as string;
             if (!token) {
                 throw new Error('No token provided');
             }
 
-            // Verify JWT using Clerk
-            const user = await this.clerkService.verifyToken(token);
-            if (!user) {
+            // Verify using Clerk (same as existing auth pattern)
+            const session = await this.clerkService.verifyToken(token);
+            if (!session) {
                 throw new Error('Invalid token');
             }
 
-            // 2) Store Connection
-            this.connectedUsers.set(user.id, client.id);
-            client.data.user = user;
+            // Resolve internal user from clerkId
+            const user = await this.prisma.user.findUnique({
+                where: { clerkId: session.userId },
+                select: { id: true, fname: true, lname: true },
+            });
 
-            this.logger.log(`User connected: ${user.id}`);
+            if (!user) {
+                throw new Error('User not found in database');
+            }
 
-            // 3) Join User Room
+            client.userId = user.id;
+            client.userName = `${user.fname} ${user.lname}`.trim();
+
+            // Track online users (multi-device)
+            if (!this.onlineUsers.has(user.id)) {
+                this.onlineUsers.set(user.id, new Set());
+            }
+            this.onlineUsers.get(user.id)!.add(client.id);
+
+            // Join personal room for direct notifications
             client.join(`user:${user.id}`);
 
-            // 4) Deliver Offline Messages
-            const offlineMessages = await this.prisma.chatMessage.findMany({
-                where: {
-                    receiverId: user.id,
-                    read: false,
-                },
-                orderBy: { createdAt: 'asc' },
-            });
+            // Broadcast presence
+            this.broadcastPresence(user.id, 'online');
 
-            if (offlineMessages.length > 0) {
-                offlineMessages.forEach(msg => {
-                    client.emit('chat:receive', {
-                        from: msg.senderId,
-                        message: msg.content,
-                        timestamp: msg.createdAt,
-                        id: msg.id
-                    });
-                });
-            }
+            this.logger.log(`User ${user.id} (${client.userName}) connected — socket: ${client.id}`);
         } catch (error) {
-            this.logger.error(`Connection failed: ${error.message}`);
-            client.disconnect();
+            this.logger.warn(`Connection failed: ${error.message}`);
+            client.disconnect(true);
         }
     }
 
-    handleDisconnect(client: Socket) {
-        if (client.data.user) {
-            this.connectedUsers.delete(client.data.user.id);
-            this.logger.log(`User disconnected: ${client.data.user.id}`);
-        }
-    }
+    handleDisconnect(client: AuthenticatedSocket) {
+        if (!client.userId) return;
 
-    @SubscribeMessage('chat:send')
-    async handleMessage(
-        @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { toUserId: string; message: string },
-    ) {
-        const senderId = client.data.user.id;
-        const { toUserId, message } = payload;
-
-        // 1) Check Friendship
-        const areFriends = await this.friendshipService.areFriends(senderId, toUserId);
-        if (!areFriends) {
-            this.logger.warn(`User ${senderId} tried to message ${toUserId} without friendship`);
-            client.emit('chat:error', { message: 'Not in network' });
-            return;
-        }
-
-        // 2) Store in DB
-        const savedMessage = await this.prisma.chatMessage.create({
-            data: {
-                senderId,
-                receiverId: toUserId,
-                content: message,
-                read: false,
+        const userSockets = this.onlineUsers.get(client.userId);
+        if (userSockets) {
+            userSockets.delete(client.id);
+            if (userSockets.size === 0) {
+                this.onlineUsers.delete(client.userId);
+                this.broadcastPresence(client.userId, 'offline');
             }
-        });
+        }
 
-        // 3) Send to Recipient (via room)
-        this.server.to(`user:${toUserId}`).emit('chat:receive', {
-            from: senderId,
-            message,
-            timestamp: savedMessage.createdAt,
-            id: savedMessage.id
-        });
+        this.logger.log(`User ${client.userId} disconnected`);
     }
 
-    @SubscribeMessage('chat:typing')
-    async handleTyping(
-        @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { toUserId: string },
+    // ── Join conversation room ──────────────────────────
+    @SubscribeMessage('join_conversation')
+    handleJoinConversation(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { conversationId: string },
     ) {
-        const senderId = client.data.user.id;
-        this.server.to(`user:${payload.toUserId}`).emit('chat:typing', { from: senderId });
+        client.join(`conversation:${data.conversationId}`);
+        this.logger.log(`User ${client.userId} joined conversation ${data.conversationId}`);
+        return { success: true };
     }
 
-    @SubscribeMessage('chat:read')
-    async handleReadReceipt(
-        @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { messageId: string },
+    // ── Send message ────────────────────────────────────
+    @SubscribeMessage('send_message')
+    async handleSendMessage(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: {
+            conversationId: string;
+            content: string;
+            type?: string;
+            metadata?: any;
+        },
     ) {
-        // Update DB
         try {
-            const msg = await this.prisma.chatMessage.update({
-                where: { id: payload.messageId },
-                data: { read: true }
+            const message = await this.chatService.saveMessage(
+                data.conversationId,
+                client.userId!,
+                data.content,
+                data.type || 'text',
+                data.metadata,
+            );
+
+            // Broadcast to everyone in this conversation room
+            this.server.to(`conversation:${data.conversationId}`).emit('new_message', {
+                conversationId: data.conversationId,
+                message,
             });
 
-            // Notify Sender
-            if (msg) {
-                this.server.to(`user:${msg.senderId}`).emit('chat:read', { messageId: payload.messageId });
-            }
-        } catch (e) {
-            // Handle error (e.g. message not found)
+            return { success: true, messageId: message.id };
+        } catch (err) {
+            this.logger.error(`send_message error: ${err.message}`);
+            return { success: false, error: err.message };
         }
+    }
+
+    // ── Typing indicators ───────────────────────────────
+    @SubscribeMessage('typing_start')
+    handleTypingStart(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { conversationId: string },
+    ) {
+        client.to(`conversation:${data.conversationId}`).emit('user_typing', {
+            conversationId: data.conversationId,
+            userId: client.userId,
+            userName: client.userName,
+            isTyping: true,
+        });
+    }
+
+    @SubscribeMessage('typing_stop')
+    handleTypingStop(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { conversationId: string },
+    ) {
+        client.to(`conversation:${data.conversationId}`).emit('user_typing', {
+            conversationId: data.conversationId,
+            userId: client.userId,
+            isTyping: false,
+        });
+    }
+
+    // ── Mark as read ────────────────────────────────────
+    @SubscribeMessage('mark_read')
+    async handleMarkRead(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { conversationId: string },
+    ) {
+        await this.chatService.markAsRead(data.conversationId, client.userId!);
+
+        // Notify conversation members
+        client.to(`conversation:${data.conversationId}`).emit('messages_read', {
+            conversationId: data.conversationId,
+            readByUserId: client.userId,
+            readAt: new Date().toISOString(),
+        });
+
+        return { success: true };
+    }
+
+    // ── Call invite ─────────────────────────────────────
+    @SubscribeMessage('send_call_invite')
+    async handleCallInvite(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: {
+            conversationId: string;
+            callId: string;
+            callType: 'voice' | 'video';
+        },
+    ) {
+        // Save call invite as a message
+        const message = await this.chatService.saveMessage(
+            data.conversationId,
+            client.userId!,
+            `📞 ${client.userName} started a ${data.callType} call`,
+            'call_invite',
+            {
+                callId: data.callId,
+                callType: data.callType,
+                status: 'pending',
+                initiatorId: client.userId,
+                initiatorName: client.userName,
+            },
+        );
+
+        // Broadcast to conversation
+        this.server.to(`conversation:${data.conversationId}`).emit('new_message', {
+            conversationId: data.conversationId,
+            message,
+        });
+
+        return { success: true, messageId: message.id };
+    }
+
+    // ── Helpers ─────────────────────────────────────────
+    private broadcastPresence(userId: string, status: 'online' | 'offline') {
+        this.server.emit('presence_update', {
+            userId,
+            status,
+            lastSeen: new Date().toISOString(),
+        });
+    }
+
+    isUserOnline(userId: string): boolean {
+        return this.onlineUsers.has(userId) && this.onlineUsers.get(userId)!.size > 0;
+    }
+
+    notifyUser(userId: string, event: string, data: any) {
+        this.server.to(`user:${userId}`).emit(event, data);
     }
 }

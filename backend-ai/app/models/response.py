@@ -113,3 +113,41 @@ class HinglishSTTResponse(BaseModel):
 
 class HinglishTTSResponse(BaseModel):
     audio_base64: str
+
+
+# ─── AI Tutor Pronunciation Assessment Models ──────────────────
+
+class PhonemeDetail(BaseModel):
+    phoneme: str
+    accuracy_score: float
+
+class WordAssessment(BaseModel):
+    word: str
+    accuracy_score: float
+    error_type: str  # "None", "Omission", "Insertion", "Mispronunciation"
+    phonemes: List[PhonemeDetail] = []
+
+class TutorPronunciationAssessmentResult(BaseModel):
+    accuracy_score: float
+    fluency_score: float
+    completeness_score: float
+    prosody_score: float
+    recognized_text: str
+    reference_text: str
+    words: List[WordAssessment] = []
+    passed: bool
+    priya_feedback: str
+    problem_words: List[str] = []
+
+
+# ─── AI Tutor STT with Intent Models ──────────────────────────
+
+class HinglishSTTWithIntentResponse(BaseModel):
+    text: str
+    language: Optional[str] = None
+    success: bool = True
+    error: Optional[str] = None
+    intent: str = "none"
+    intent_confidence: float = 0.0
+    is_command: bool = False
+    matched_keyword: Optional[str] = None

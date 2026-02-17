@@ -77,7 +77,7 @@ export class FriendshipService {
             throw new BadRequestException('Request is already ' + request.status);
         }
 
-        // Transaction to update request and create friendship
+        // Transaction to update request, create friendship, and create conversation
         const [updatedRequest, friendship] = await this.prisma.$transaction([
             this.prisma.friendRequest.update({
                 where: { id: requestId },
@@ -92,7 +92,19 @@ export class FriendshipService {
             }),
         ]);
 
-        return friendship;
+        // Auto-create a conversation between these two users
+        const conversation = await this.prisma.conversation.create({
+            data: {
+                participants: {
+                    create: [
+                        { userId: request.senderId },
+                        { userId: userId },
+                    ],
+                },
+            },
+        });
+
+        return { friendship, conversationId: conversation.id };
     }
 
     async rejectRequest(userId: string, requestId: string) {
@@ -148,5 +160,63 @@ export class FriendshipService {
             }
         });
         return !!friendship;
+    }
+
+    /**
+     * Get the connection status between two users.
+     * Returns status + optional requestId and conversationId.
+     */
+    async getConnectionStatus(
+        userId: string,
+        targetUserId: string,
+    ): Promise<{
+        status: 'none' | 'pending_sent' | 'pending_received' | 'connected';
+        requestId?: string;
+        conversationId?: string;
+    }> {
+        // Check for accepted friendship
+        const friendship = await this.prisma.friendship.findFirst({
+            where: {
+                OR: [
+                    { requesterId: userId, addresseeId: targetUserId, status: 'ACCEPTED' },
+                    { requesterId: targetUserId, addresseeId: userId, status: 'ACCEPTED' },
+                ],
+            },
+        });
+
+        if (friendship) {
+            // Find their conversation
+            const participant = await this.prisma.conversationParticipant.findFirst({
+                where: {
+                    userId,
+                    conversation: {
+                        participants: { some: { userId: targetUserId } },
+                    },
+                },
+            });
+
+            return {
+                status: 'connected',
+                conversationId: participant?.conversationId,
+            };
+        }
+
+        // Check for pending friend request
+        const request = await this.prisma.friendRequest.findFirst({
+            where: {
+                OR: [
+                    { senderId: userId, receiverId: targetUserId, status: 'PENDING' },
+                    { senderId: targetUserId, receiverId: userId, status: 'PENDING' },
+                ],
+            },
+        });
+
+        if (!request) return { status: 'none' };
+
+        if (request.senderId === userId) {
+            return { status: 'pending_sent', requestId: request.id };
+        }
+
+        return { status: 'pending_received', requestId: request.id };
     }
 }
