@@ -148,13 +148,13 @@ export class UsersService {
             return 0;
         }
 
-        let streak = 0;
+        const streak = 0;
 
 
         // Re-do specific consecutive check logic
         let currentStreak = 0;
         let checkDate = new Date(); // Start with today
-        let checkDateStr = checkDate.toISOString().split('T')[0];
+        const checkDateStr = checkDate.toISOString().split('T')[0];
 
         // If user didn't practice today, check if they practiced yesterday. 
         // If they practiced today, count starts from today.

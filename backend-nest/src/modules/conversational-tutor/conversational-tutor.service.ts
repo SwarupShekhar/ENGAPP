@@ -216,9 +216,9 @@ export class ConversationalTutorService {
 
       return result;
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message;
+      const errorMessage = (error as any).response?.data?.detail || (error as any).message;
       this.logger.error(`Pronunciation assessment failed: ${errorMessage}`);
-      throw new Error(`Pronunciation assessment failed: ${errorMessage}`);
+      throw new Error(`Pronunciation assessment failed: ${errorMessage}`, { cause: error });
     }
   }
 

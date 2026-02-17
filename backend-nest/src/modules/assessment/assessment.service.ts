@@ -155,7 +155,7 @@ export class AssessmentService {
             emotionData: (result as any).emotionData // Capture emotion data
         };
 
-        let phase2Data = currentPhase2Data;
+        const phase2Data = currentPhase2Data;
         if (attempt === 1) {
             phase2Data.attempt1 = attemptData;
 
