@@ -113,6 +113,8 @@ model ConversationSession {
   startedAt   DateTime  @default(now())
   endedAt     DateTime?
   duration    Int?      // in seconds
+  interactionMetrics Json? // interaction-specific scores (turn-taking, active listening)
+  peerComparison      Json? // comparative analysis between participants
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -146,6 +148,9 @@ model Analysis {
   rawData       Json     // Stores full FastAPI response
   cefrLevel     String?
   scores        Json     // { grammar, pronunciation, fluency, vocabulary, overall }
+  confidenceTimeline Json? // timeline of confidence scores
+  hesitationMarkers  Json? // filler words, self-corrections, false starts
+  topicVocabulary    Json? // domain-specific vocabulary audit
   createdAt     DateTime @default(now())
 
   session      ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)

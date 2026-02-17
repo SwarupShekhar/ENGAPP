@@ -6,8 +6,8 @@ import google.generativeai as genai
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.models.request import AnalysisRequest
-from app.models.response import AnalysisResponse, AnalysisMetrics
+from app.models.request import AnalysisRequest, JointAnalysisRequest, SpeakerSegment
+from app.models.response import AnalysisResponse, AnalysisMetrics, JointAnalysisResponse, ParticipantAnalysis
 from app.models.base import CEFRAssessment, ErrorDetail, ErrorType, ErrorSeverity, CEFRLevel
 from app.cache.manager import cached
 from app.services.cefr_classifier import cefr_classifier
@@ -116,6 +116,84 @@ Respond with ONLY this JSON. No commentary outside the JSON structure.
     ]
 }}"""
 
+    def _create_joint_analysis_prompt(self, request: JointAnalysisRequest) -> str:
+        """Create a prompt for analyzing a joint conversation between two or more participants."""
+        segments_data = []
+        for s in request.segments:
+            segments_data.append(f"[{s.speaker_id} at {s.timestamp}s]: {s.text}")
+        
+        transcript_block = "\n".join(segments_data)
+        
+        return f"""You are a professional ESL Conversational Coach and Linguist.
+Analyze the following multi-speaker transcript of an English practice session.
+
+**Transcript:**
+---
+{transcript_block}
+---
+
+**ANALYSIS OBJECTIVES:**
+1. **Conversational Metrics**: Analyze interaction quality (turn-taking, backchanneling like 'uh-huh', building on partner's ideas).
+2. **Peer Comparison**: Compare participant strengths and weaknesses relatively.
+3. **Individual Feedback**: Provide granular feedback for EACH participant (scores, errors, confidence, vocabulary).
+4. **Learning Synergy**: Identify what participants can learn from each other.
+
+**Respond with ONLY this JSON structure:**
+{{
+    "interaction_metrics": {{
+        "turn_taking_score": <int 0-100>,
+        "backchanneling_detected": [<str>],
+        "conversation_flow_feedback": "<string>",
+        "active_listening_score": <int 0-100>
+    }},
+    "peer_comparison": {{
+        "speaking_time_distribution": {{ "<speaker_id>": "<percentage>%" }},
+        "relative_strengths": {{ "<speaker_id>": ["Strength 1", "..."] }},
+        "synergy_feedback": "<string describing how they helped each other>"
+    }},
+    "participant_analyses": [
+        {{
+            "participant_id": "<speaker_id>",
+            "analysis_data": {{
+                "scores": {{
+                    "grammar_score": <int 0-100>,
+                    "pronunciation_score": <int 0-100>,
+                    "fluency_score": <int 0-100>,
+                    "vocabulary_score": <int 0-100>,
+                    "overall_score": <int 0-100>
+                }},
+                "cefr_level": "<A1-C2>",
+                "errors": [
+                    {{
+                        "type": "GRAMMAR" | "VOCABULARY" | "TENSE" | "ARTICLE" | "FLUENCY",
+                        "severity": "CRITICAL" | "MAJOR" | "MINOR" | "SUGGESTION",
+                        "original_text": "<text>",
+                        "corrected_text": "<text>",
+                        "explanation": "<text>",
+                        "suggestion": "<text>"
+                    }}
+                ],
+                "feedback": "<2-3 sentences>",
+                "strengths": [<str>],
+                "improvement_areas": [<str>]
+            }},
+            "confidence_timeline": [
+                {{ "timestamp": <float>, "confidence_score": <int 0-100> }}
+            ],
+            "hesitation_markers": {{
+                "filler_usage": {{ "um": <int>, "uh": <int>, "...": <int> }},
+                "self_corrections": <int>,
+                "false_starts": <int>
+            }},
+            "topic_vocabulary": {{
+                "detected_domains": ["<domain1>", "..."],
+                "appropriate_terms": ["<term1>", "..."],
+                "suggested_alternatives": {{ "<generic_word>": ["<vivid_word1>", "..."] }}
+            }}
+        }}
+    ]
+}}"""
+
     @cached(prefix="analysis", ttl=settings.cache_ttl_analysis)
     async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
         """
@@ -184,4 +262,72 @@ Respond with ONLY this JSON. No commentary outside the JSON structure.
             processing_time=time.time() - start_time
         )
 
+    async def analyze_joint(self, request: JointAnalysisRequest) -> JointAnalysisResponse:
+        """
+        Analyzes a multi-speaker conversation for interaction quality and individual performance.
+        """
+        if not self.model:
+            raise RuntimeError("Analysis service is not configured.")
+
+        start_time = time.time()
+        prompt = self._create_joint_analysis_prompt(request)
+        
+        try:
+            response = await asyncio.wait_for(
+                self.model.generate_content_async(prompt),
+                timeout=60.0
+            )
+            analysis_data = robust_json_parser(response.text)
+        except Exception as e:
+            logger.error(f"Gemini joint analysis failed: {e}", exc_info=True)
+            # Fallback / Error handling
+            raise e
+
+        # Construct JointAnalysisResponse
+        participant_analyses = []
+        for pa in analysis_data.get("participant_analyses", []):
+            ad = pa.get("analysis_data", {})
+            ai_scores = ad.get("scores", {})
+            
+            # Map to ParticipantAnalysis model
+            participant_analyses.append(ParticipantAnalysis(
+                participant_id=pa["participant_id"],
+                analysis=AnalysisResponse(
+                    cefr_assessment=CEFRAssessment(
+                        level=CEFRLevel(ad.get("cefr_level", "B1")),
+                        score=ai_scores.get("overall_score", 50),
+                        confidence=0.9,
+                        strengths=ad.get("strengths", []),
+                        weaknesses=ad.get("improvement_areas", []),
+                        next_level_requirements=[]
+                    ),
+                    errors=[ErrorDetail(**e) for e in ad.get("errors", [])],
+                    metrics=AnalysisMetrics(
+                        wpm=0, # Placeholder
+                        unique_words=0, # Placeholder
+                        grammar_score=ai_scores.get("grammar_score", 50),
+                        pronunciation_score=ai_scores.get("pronunciation_score", 50),
+                        fluency_score=ai_scores.get("fluency_score", 50),
+                        vocabulary_score=ai_scores.get("vocabulary_score", 50),
+                        overall_score=ai_scores.get("overall_score", 50),
+                    ),
+                    feedback=ad.get("feedback", ""),
+                    strengths=ad.get("strengths", []),
+                    improvement_areas=ad.get("improvement_areas", []),
+                    recommended_tasks=[],
+                    processing_time=0
+                ),
+                confidence_timeline=pa.get("confidence_timeline"),
+                hesitation_markers=pa.get("hesitation_markers"),
+                topic_vocabulary=pa.get("topic_vocabulary")
+            ))
+
+        return JointAnalysisResponse(
+            session_id=request.session_id,
+            interaction_metrics=analysis_data.get("interaction_metrics", {}),
+            peer_comparison=analysis_data.get("peer_comparison", {}),
+            participant_analyses=participant_analyses
+        )
+
 analysis_service = AnalysisService()
+

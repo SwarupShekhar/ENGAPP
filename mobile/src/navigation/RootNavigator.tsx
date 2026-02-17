@@ -16,6 +16,7 @@ import CreateProfileScreen from "../screens/auth/CreateProfileScreen";
 import AssessmentIntroScreen from "../screens/assessment/AssessmentIntroScreen";
 import AssessmentSpeakingScreen from "../screens/assessment/AssessmentSpeakingScreen";
 import AssessmentResultScreen from "../screens/assessment/AssessmentResultScreen";
+import AITutorScreen from "../screens/AITutorScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
 
 const Tab = createBottomTabNavigator();
@@ -78,6 +79,7 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
 
             {/* Call Flow */}
             <Stack.Screen name="InCall" component={InCallScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="AITutor" component={AITutorScreen} />
             <Stack.Screen name="CallFeedback" component={CallFeedbackScreen} />
         </Stack.Navigator>
     );

@@ -153,4 +153,20 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
 
         return `Azure Evidence: ${JSON.stringify(evidence).substring(0, 500)}`;
     }
+
+    async analyzeJoint(sessionId: string, segments: any[]) {
+        try {
+            const response = await lastValueFrom(
+                this.httpService.post(`${this.aiEngineUrl}/api/analyze-joint`, {
+                    session_id: sessionId,
+                    segments: segments
+                })
+            );
+
+            return response.data;
+        } catch (error) {
+            this.logger.error("BrainService Joint Analysis Error:", error);
+            throw error;
+        }
+    }
 }

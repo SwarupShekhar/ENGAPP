@@ -93,3 +93,23 @@ class PronunciationResponse(BaseModel):
     word_level_data: Optional[List[Dict[str, Any]]] = None
     # Emotion & Confidence
     emotion_data: Optional[Dict[str, Any]] = None
+
+class ParticipantAnalysis(BaseModel):
+    participant_id: str
+    analysis: AnalysisResponse
+    confidence_timeline: Optional[List[Dict[str, Any]]] = None
+    hesitation_markers: Optional[Dict[str, Any]] = None
+    topic_vocabulary: Optional[Dict[str, Any]] = None
+
+class JointAnalysisResponse(BaseModel):
+    session_id: str
+    interaction_metrics: Dict[str, Any]
+    peer_comparison: Dict[str, Any]
+    participant_analyses: List[ParticipantAnalysis]
+
+class HinglishSTTResponse(BaseModel):
+    text: str
+    language: Optional[str] = None
+
+class HinglishTTSResponse(BaseModel):
+    audio_base64: str

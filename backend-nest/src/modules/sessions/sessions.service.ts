@@ -23,11 +23,6 @@ export class SessionsService {
             where: { id: sessionId },
             include: {
                 analyses: {
-                    where: {
-                        participant: {
-                            userId: userId
-                        }
-                    },
                     include: {
                         mistakes: true,
                         pronunciationIssues: true
@@ -40,6 +35,7 @@ export class SessionsService {
                 }
             }
         });
+
 
         if (!session) {
             const latestSession = await this.prisma.conversationSession.findFirst({

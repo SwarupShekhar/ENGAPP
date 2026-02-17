@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { AdaptiveQuestionSelector, UserLevel } from './adaptive-question.service';
 import { SubmitPhaseDto, AssessmentPhase } from './dto/assessment.dto';
+import { TasksService } from '../tasks/tasks.service';
 
 const ELICITED_SENTENCES: Record<string, string> = {
     'A1': "I like to eat apples.",
@@ -40,7 +41,8 @@ export class AssessmentService {
         private readonly brain: BrainService,
         private readonly prisma: PrismaService,
         private readonly storage: AzureStorageService,
-        private readonly questionSelector: AdaptiveQuestionSelector
+        private readonly questionSelector: AdaptiveQuestionSelector,
+        private readonly tasksService: TasksService
     ) { }
 
     async startAssessment(userId: string) {
@@ -498,29 +500,29 @@ export class AssessmentService {
     }
 
     private async getBenchmarkData(userScore: number, userLevel: string) {
-        // 1. Calculate Average for Level
-        const avgResult = await this.prisma.assessmentSession.aggregate({
-            _avg: { overallScore: true },
-            where: {
-                status: 'COMPLETED',
-                overallLevel: userLevel
-            }
-        });
+        // Run queries in parallel for performance
+        const [avgResult, totalUsers, usersBelow] = await Promise.all([
+            this.prisma.assessmentSession.aggregate({
+                _avg: { overallScore: true },
+                where: {
+                    status: 'COMPLETED',
+                    overallLevel: userLevel
+                }
+            }),
+            this.prisma.assessmentSession.count({
+                where: { status: 'COMPLETED' }
+            }),
+            this.prisma.assessmentSession.count({
+                where: {
+                    status: 'COMPLETED',
+                    overallScore: { lt: userScore }
+                }
+            })
+        ]);
+
         const averageScore = Math.round(avgResult._avg.overallScore || 0);
-
-        // 2. Calculate Percentile
-        const totalUsers = await this.prisma.assessmentSession.count({
-            where: { status: 'COMPLETED' }
-        });
-
-        const usersBelow = await this.prisma.assessmentSession.count({
-            where: {
-                status: 'COMPLETED',
-                overallScore: { lt: userScore }
-            }
-        });
-
         const percentile = totalUsers > 0 ? Math.round((usersBelow / totalUsers) * 100) : 0;
+
 
         return {
             averageScore,
@@ -530,63 +532,101 @@ export class AssessmentService {
     }
 
     // Restore for regular session analysis (backward compatibility)
-    async analyzeAndStore(sessionId: string, participantId: string, audioUrl: string, transcript?: string) {
-        const evidence = await this.azure.analyzeSpeech(audioUrl, transcript || '');
-        const feedback = await this.brain.interpretAzureEvidence(
-            evidence.transcript,
-            evidence.pronunciationEvidence
-        );
+    async analyzeAndStoreJoint(sessionId: string, audioUrls: Record<string, string>) {
+        this.logger.log(`Starting joint analysis for session ${sessionId}`);
 
-        // Use AI-generated scores, falling back to Azure raw scores
-        const aiScores: any = feedback.scores || {};
-        const scores = {
-            grammar: aiScores.grammar ?? 0,
-            pronunciation: aiScores.pronunciation ?? evidence.accuracyScore ?? 0,
-            fluency: aiScores.fluency ?? evidence.fluencyScore ?? 0,
-            vocabulary: aiScores.vocabulary ?? 0,
-            overall: aiScores.overall ?? Math.round(
-                ((aiScores.grammar ?? 0) * 0.3) +
-                ((aiScores.pronunciation ?? evidence.accuracyScore ?? 0) * 0.25) +
-                ((aiScores.fluency ?? evidence.fluencyScore ?? 0) * 0.25) +
-                ((aiScores.vocabulary ?? 0) * 0.2)
-            ),
-        };
+        const session = await this.prisma.conversationSession.findUnique({
+            where: { id: sessionId },
+            include: { participants: true }
+        });
 
-        const analysis = await this.prisma.analysis.create({
+        if (!session) throw new NotFoundException('Session not found');
+
+        const segments: any[] = [];
+        const participantEvidence: Record<string, any> = {};
+
+        // 1. STT for each participant
+        for (const participant of session.participants) {
+            const url = audioUrls[participant.userId];
+            if (!url) continue;
+
+            const evidence = await this.azure.analyzeSpeech(url, '');
+            participantEvidence[participant.userId] = evidence;
+
+            segments.push({
+                speaker_id: participant.userId,
+                text: evidence.transcript,
+                timestamp: 0, // Simplified for now
+                context: feedback => feedback.pronunciationTip
+            });
+        }
+
+        // 2. Call Joint AI Analysis
+        const jointResult = await this.brain.analyzeJoint(sessionId, segments);
+
+        // 3. Store Interaction Metrics & Peer Comparison
+        await this.prisma.conversationSession.update({
+            where: { id: sessionId },
             data: {
-                sessionId,
-                participantId,
-                rawData: {
-                    azureEvidence: evidence,
-                    aiFeedback: feedback.feedback || feedback.explanation || '',
-                    strengths: feedback.strengths || [],
-                    improvementAreas: feedback.improvementAreas || [],
-                    accentNotes: feedback.accentNotes || null,
-                    pronunciationTip: feedback.pronunciationTip || null,
-                } as any,
-                cefrLevel: feedback.cefrLevel || null,
-                scores: scores,
-                mistakes: {
-                    create: feedback.mistakes?.map(m => ({
-                        type: m.type || 'general',
-                        severity: m.severity || 'medium',
-                        original: m.original,
-                        corrected: m.corrected,
-                        explanation: m.explanation || feedback.explanation || '',
-                        timestamp: 0,
-                        segmentId: '0'
-                    })) || []
-                }
-            },
-            include: {
-                mistakes: true
+                status: 'COMPLETED',
+                interactionMetrics: jointResult.interaction_metrics,
+                peerComparison: jointResult.peer_comparison
             }
         });
 
-        return {
-            analysisId: analysis.id,
-            transcript: evidence.transcript,
-            feedback
-        };
+        // 4. Store Individual Analyses & Generate Tasks
+        for (const pa of jointResult.participant_analyses) {
+            const participant = session.participants.find(p => p.userId === pa.participant_id);
+            if (!participant) continue;
+
+            const evidence = participantEvidence[pa.participant_id];
+            const feedback = pa.analysis;
+
+            const analysis = await this.prisma.analysis.create({
+                data: {
+                    sessionId,
+                    participantId: participant.id,
+                    rawData: {
+                        azureEvidence: evidence,
+                        aiFeedback: feedback.feedback || '',
+                        strengths: feedback.strengths || [],
+                        improvementAreas: feedback.improvement_areas || [],
+                        confidenceTimeline: pa.confidence_timeline,
+                        hesitationMarkers: pa.hesitation_markers,
+                        topicVocabulary: pa.topic_vocabulary
+                    } as any,
+                    cefrLevel: feedback.cefr_assessment?.level || 'B1',
+                    scores: feedback.metrics as any,
+                    confidenceTimeline: pa.confidence_timeline as any,
+                    hesitationMarkers: pa.hesitation_markers as any,
+                    topicVocabulary: pa.topic_vocabulary as any,
+                    mistakes: {
+                        create: feedback.errors?.map(e => ({
+                            type: e.type || 'general',
+                            severity: e.severity || 'medium',
+                            original: e.original_text,
+                            corrected: e.corrected_text,
+                            explanation: e.explanation || '',
+                            timestamp: 0,
+                            segmentId: '0'
+                        })) || []
+                    }
+                },
+                include: { mistakes: true }
+            });
+
+            // B) Generate Tasks based on mistakes
+            if (analysis.mistakes && analysis.mistakes.length > 0) {
+                try {
+                    await this.tasksService.createTasksFromMistakes(analysis.mistakes as any, participant.userId, sessionId);
+                } catch (err) {
+                    this.logger.error(`Failed to generate tasks for user ${participant.userId}: ${err.message}`);
+                }
+            }
+        }
+
+        return { status: 'COMPLETED', sessionId };
     }
 }
+
+

@@ -54,41 +54,15 @@ export class SessionsProcessor {
                 return;
             }
 
-            // 2) AI Pipeline - Process all participants in parallel
-            await Promise.all(participantIds.map(async (participantId) => {
-                const participant = await this.prisma.sessionParticipant.findUnique({
-                    where: { id: participantId },
-                });
+            // 2) AI Pipeline - Joint Session Analysis
+            await this.assessmentService.analyzeAndStoreJoint(sessionId, audioUrls);
 
-                if (!participant || !participant.audioUrl) {
-                    this.logger.warn(`No audio URL for participant ${participantId}, skipping.`);
-                    return;
-                }
-
-                this.logger.log(`Starting AI pipeline for participant ${participantId}`);
-
-                // A) Analyze and Store using AssessmentService (Orchestrator)
-                const result = await this.assessmentService.analyzeAndStore(
-                    sessionId,
-                    participantId,
-                    participant.audioUrl,
-                    job.data.transcript
-                );
-
-                // B) Generate Tasks based on mistakes
-                if (result.feedback.mistakes && result.feedback.mistakes.length > 0) {
-                    // Map mistakes to format expected by TasksService if necessary
-                    // Assuming tasksService handles raw mistakes list or we adapt it here
-                    // For now, simpler integration:
-                    await this.tasksService.createTasksFromMistakes(result.feedback.mistakes, participant.userId, sessionId);
-                }
-            }));
-
-            // 3) Mark session as COMPLETED
+            // 3) Mark session as COMPLETED (analyzeAndStoreJoint already updates status, but ensure idempotency)
             await this.prisma.conversationSession.update({
                 where: { id: sessionId },
                 data: { status: 'COMPLETED' },
             });
+
 
             this.logger.log(`Session ${sessionId} processing completed successfully.`);
         } catch (error) {

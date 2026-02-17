@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import Optional
+from typing import Optional, List
 from app.models.base import AnalysisTaskType
 
 class TranscriptionRequest(BaseModel):
@@ -24,3 +24,22 @@ class PronunciationRequest(BaseModel):
     reference_text: str
     user_id: str
     language: str = "en-US"
+
+class SpeakerSegment(BaseModel):
+    speaker_id: str
+    text: str
+    timestamp: float
+    context: Optional[str] = None
+    user_native_language: Optional[str] = None
+
+class JointAnalysisRequest(BaseModel):
+    session_id: str
+    segments: List[SpeakerSegment]
+
+class HinglishSTTRequest(BaseModel):
+    audio_base64: str
+    user_id: str
+
+class HinglishTTSRequest(BaseModel):
+    text: str
+    gender: str = "female"

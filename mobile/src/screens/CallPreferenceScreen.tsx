@@ -103,6 +103,18 @@ export default function CallPreferenceScreen() {
                     <Ionicons name="search" size={20} color="white" style={{ marginRight: 8 }} />
                     <Text style={styles.actionBtnText}>Find My Co-learner</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.aiTutorLink}
+                    onPress={() => {
+                        navigation.goBack();
+                        navigation.navigate('AITutor');
+                    }}
+                    activeOpacity={0.7}
+                >
+                    <Ionicons name="sparkles" size={16} color="#8B5CF6" />
+                    <Text style={styles.aiTutorLinkText}>Or practice with AI Tutor</Text>
+                </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
@@ -238,5 +250,18 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: theme.typography.sizes.m,
         fontWeight: 'bold',
+    },
+    aiTutorLink: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: theme.spacing.m,
+        paddingVertical: theme.spacing.s,
+    },
+    aiTutorLinkText: {
+        color: '#8B5CF6',
+        fontSize: theme.typography.sizes.m,
+        fontWeight: '600',
     },
 });

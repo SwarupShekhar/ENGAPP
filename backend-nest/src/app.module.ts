@@ -17,6 +17,7 @@ import { AssessmentModule } from './modules/assessment/assessment.module';
 import { FriendshipModule } from './modules/friendship/friendship.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { UsersModule } from './modules/users/users.module';
+import { ConversationalTutorModule } from './modules/conversational-tutor/conversational-tutor.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -56,6 +57,7 @@ import { PrismaModule } from './database/prisma/prisma.module';
     ChatModule,
     PrismaModule,
     UsersModule,
+    ConversationalTutorModule,
   ],
   controllers: [AppController],
   providers: [AppService],

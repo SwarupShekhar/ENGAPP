@@ -89,6 +89,37 @@ export default function PracticeScreen() {
                         <Text style={styles.subtitle}>Choose a mode to sharpen your skills</Text>
                     </Animated.View>
 
+                    {/* AI Tutor Feature Card */}
+                    <Animated.View entering={FadeInDown.delay(150).springify()}>
+                        <TouchableOpacity
+                            style={styles.aiTutorCard}
+                            activeOpacity={0.85}
+                            onPress={() => navigation.navigate('AITutor')}
+                        >
+                            <LinearGradient
+                                colors={theme.colors.gradients.premium}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.aiTutorGradient}
+                            >
+                                <View style={styles.aiTutorLeft}>
+                                    <View style={styles.aiTutorAvatarRing}>
+                                        <Text style={styles.aiTutorAvatarText}>✨</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.aiTutorTitle}>Talk to Priya (AI)</Text>
+                                        <Text style={styles.aiTutorDesc}>
+                                            Practice English conversation with your AI tutor
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={styles.aiTutorArrow}>
+                                    <Ionicons name="arrow-forward" size={18} color="white" />
+                                </View>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </Animated.View>
+
                     <View style={styles.grid}>
                         {practiceModes.map((mode, index) => (
                             <PracticeModeCard
@@ -175,5 +206,59 @@ const styles = StyleSheet.create({
         fontSize: theme.typography.sizes.s,
         color: theme.colors.text.secondary,
         lineHeight: 18,
+    },
+
+    // AI Tutor Card
+    aiTutorCard: {
+        marginHorizontal: theme.spacing.l,
+        marginBottom: theme.spacing.xl,
+        borderRadius: theme.borderRadius.xl,
+        overflow: 'hidden',
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    aiTutorGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: theme.spacing.l,
+    },
+    aiTutorLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+    },
+    aiTutorAvatarRing: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    aiTutorAvatarText: {
+        fontSize: 22,
+    },
+    aiTutorTitle: {
+        color: 'white',
+        fontSize: theme.typography.sizes.l,
+        fontWeight: 'bold',
+    },
+    aiTutorDesc: {
+        color: 'rgba(255,255,255,0.75)',
+        fontSize: theme.typography.sizes.xs,
+        marginTop: 2,
+    },
+    aiTutorArrow: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

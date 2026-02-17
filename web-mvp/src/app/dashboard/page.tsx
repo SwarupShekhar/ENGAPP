@@ -9,7 +9,7 @@ import api from '@/lib/api';
 import { AssessmentSession } from '@/types';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@clerk/nextjs';
-import { Loader2, CheckCircle2, Circle } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle, Zap } from 'lucide-react';
 
 export default function DashboardPage() {
     const { isLoaded, userId, getToken } = useAuth();
@@ -23,37 +23,26 @@ export default function DashboardPage() {
         const fetchData = async () => {
             if (!isLoaded || !userId) return;
 
-            setLoadingMessage("Authenticating...");
             try {
                 const token = await getToken();
-                setLoadingMessage("Fetching Data...");
 
-                // Parallel fetch
-                const [dashboardRes, sessionsRes, tasksRes] = await Promise.allSettled([
-                    api.get('/assessment/dashboard', { headers: { Authorization: `Bearer ${token}` } }),
-                    api.get('/sessions', { headers: { Authorization: `Bearer ${token}` } }),
-                    api.get('/tasks/daily', { headers: { Authorization: `Bearer ${token}` } })
-                ]);
+                // Fetch independently for speed
+                api.get('/assessment/dashboard', { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => setData(res.data))
+                    .catch(err => console.error("Dashboard error:", err))
+                    .finally(() => setLoadingMessage(""));
 
-                if (dashboardRes.status === 'fulfilled') {
-                    setData(dashboardRes.value.data);
-                } else {
-                    console.error("Dashboard error:", dashboardRes.reason);
-                }
+                api.get('/sessions', { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => setSessions(res.data))
+                    .catch(err => console.error("Sessions error:", err));
 
-                if (sessionsRes.status === 'fulfilled') {
-                    setSessions(sessionsRes.value.data);
-                }
-
-                if (tasksRes.status === 'fulfilled') {
-                    setTasks(tasksRes.value.data.tasks || []);
-                }
+                api.get('/tasks/daily', { headers: { Authorization: `Bearer ${token}` } })
+                    .then(res => setTasks(res.data.tasks || []))
+                    .catch(err => console.error("Tasks error:", err));
 
             } catch (err: any) {
-                console.error("Dashboard fetch error:", err);
-                const msg = err.response?.data?.message || err.message || "Failed to load dashboard.";
-                setError(msg);
-            } finally {
+                console.error("Auth error:", err);
+                setError("Failed to authenticate.");
                 setLoadingMessage("");
             }
         };
@@ -62,6 +51,7 @@ export default function DashboardPage() {
             fetchData();
         }
     }, [isLoaded, userId, getToken]);
+
 
     const completeTask = async (taskId: string) => {
         try {
@@ -114,6 +104,23 @@ export default function DashboardPage() {
                         <Link href="/assessment">Start Assessment</Link>
                     </Button>
                 </div>
+
+                {data?.state === 'ONBOARDING' && (
+                    <div className="mb-8 p-8 rounded-2xl bg-primary/5 border border-primary/10 text-center space-y-4">
+                        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                            <Zap className="w-8 h-8 text-primary" />
+                        </div>
+                        <h2 className="text-2xl font-bold">Welcome to EngR!</h2>
+                        <p className="text-muted-foreground max-w-md mx-auto">
+                            Complete your first assessment to unlock personalized learning plans,
+                            detailed skill breakdowns, and performance benchmarking.
+                        </p>
+                        <Button asChild size="lg" className="rounded-full">
+                            <Link href="/assessment">Get Started</Link>
+                        </Button>
+                    </div>
+                )}
+
 
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {/* Overall Score Card */}

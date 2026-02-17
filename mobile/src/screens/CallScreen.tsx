@@ -154,6 +154,7 @@ export default function CallScreen() {
     const { user } = useUser();
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
     const [isSearching, setIsSearching] = useState(false);
+    const [showAiOption, setShowAiOption] = useState(false);
 
     const meta = (user?.unsafeMetadata || {}) as any;
     const userLevel = meta.assessmentLevel || 'B1';
@@ -189,7 +190,9 @@ export default function CallScreen() {
                         // Timeout or other message
                         clearInterval(pollInterval);
                         setIsSearching(false);
-                        alert(status.message);
+                        // Instead of just alerting, we could show a state that offers AI Tutor
+                        // For now, let's use a confirmed navigation or a simple choice
+                        setShowAiOption(true);
                     }
                 } catch (error) {
                     console.error('Matchmaking poll error:', error);
@@ -225,18 +228,24 @@ export default function CallScreen() {
                         {/* Find Partner Button */}
                         <AnimatedRN.View entering={FadeInDown.delay(200).springify()} style={styles.findPartnerContainer}>
                             <View style={styles.pulseContainer}>
-                                <PulseRing delay={0} />
-                                <PulseRing delay={700} />
-                                <PulseRing delay={1400} />
+                                {!showAiOption && (
+                                    <>
+                                        <PulseRing delay={0} />
+                                        <PulseRing delay={700} />
+                                        <PulseRing delay={1400} />
+                                    </>
+                                )}
                                 <TouchableOpacity
                                     activeOpacity={0.85}
-                                    onPress={handleFindPartner}
+                                    onPress={showAiOption ? () => navigation.navigate('AITutor') : handleFindPartner}
                                     disabled={isSearching}
                                 >
                                     <LinearGradient
-                                        colors={isSearching
-                                            ? [theme.colors.primaryLight, theme.colors.primary]
-                                            : theme.colors.gradients.primary
+                                        colors={showAiOption 
+                                            ? theme.colors.gradients.premium
+                                            : isSearching
+                                                ? [theme.colors.primaryLight, theme.colors.primary]
+                                                : theme.colors.gradients.primary
                                         }
                                         style={styles.findButton}
                                     >
@@ -244,6 +253,11 @@ export default function CallScreen() {
                                             <>
                                                 <Ionicons name="search" size={36} color="white" />
                                                 <Text style={styles.findButtonText}>Searching...</Text>
+                                            </>
+                                        ) : showAiOption ? (
+                                            <>
+                                                <Ionicons name="sparkles" size={36} color="white" />
+                                                <Text style={styles.findButtonText}>Talk to Priya (AI)</Text>
                                             </>
                                         ) : (
                                             <>
@@ -254,6 +268,17 @@ export default function CallScreen() {
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>
+                            {showAiOption && (
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        setShowAiOption(false);
+                                        handleFindPartner();
+                                    }}
+                                    style={styles.retryTextButton}
+                                >
+                                    <Text style={styles.retryText}>Or try searching again</Text>
+                                </TouchableOpacity>
+                            )}
                         </AnimatedRN.View>
 
                         {/* Suggested Topics */}
@@ -491,5 +516,13 @@ const styles = StyleSheet.create({
     emptySubtext: {
         fontSize: theme.typography.sizes.s,
         color: theme.colors.text.secondary,
+    },
+    retryTextButton: {
+        marginTop: theme.spacing.m,
+    },
+    retryText: {
+        color: theme.colors.primary,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
     },
 });

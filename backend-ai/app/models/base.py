@@ -13,6 +13,7 @@ class CEFRLevel(str, Enum):
 class AnalysisTaskType(str, Enum):
     GENERAL = "general"
     IMAGE_DESCRIPTION = "image_description"
+    JOINT_CONVERSATION = "joint_conversation"
 
 class ErrorType(str, Enum):
     GRAMMAR = "grammar"
