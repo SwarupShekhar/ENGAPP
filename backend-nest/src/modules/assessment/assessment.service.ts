@@ -108,7 +108,9 @@ export class AssessmentService {
     }
 
     private async handlePhase1(session: any, audioUrl: string, audioBase64: string) {
-        const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
+        // Use predefined text for Phase 1 to skip transcription step
+        const referenceText = "I like to eat breakfast at home.";
+        const result = await this.azure.analyzeSpeech(audioUrl, referenceText, audioBase64);
 
         if (result.wordCount === 0) {
             return { hint: "We couldn't hear you clearly. Please try again.", nextPhase: AssessmentPhase.PHASE_1 };
@@ -137,7 +139,11 @@ export class AssessmentService {
     }
 
     private async handlePhase2(session: any, audioUrl: string, attempt: number, audioBase64: string) {
-        const referenceText = attempt === 1 ? ELICITED_SENTENCES.B1 : (session.phase2Data?.adaptiveSentence?.text || ELICITED_SENTENCES.B1);
+        // Re-fetch session to get latest phase2Data (important for attempt 2)
+        const latestSession = await this.prisma.assessmentSession.findUnique({ where: { id: session.id } });
+        const currentPhase2Data = (latestSession?.phase2Data as any) || {};
+
+        const referenceText = attempt === 1 ? ELICITED_SENTENCES.B1 : (currentPhase2Data?.adaptiveSentence?.text || ELICITED_SENTENCES.B1);
         const result = await this.azure.analyzeSpeech(audioUrl, referenceText, audioBase64);
 
         const attemptData = {
@@ -149,7 +155,7 @@ export class AssessmentService {
             emotionData: (result as any).emotionData // Capture emotion data
         };
 
-        let phase2Data = (session.phase2Data as any) || {};
+        let phase2Data = currentPhase2Data;
         if (attempt === 1) {
             phase2Data.attempt1 = attemptData;
 
@@ -209,16 +215,18 @@ export class AssessmentService {
     }
 
     private async handlePhase3(session: any, audioUrl: string, audioBase64: string) {
+        // Re-fetch session to get latest phase data from previous phases
+        const latestSession = await this.prisma.assessmentSession.findUnique({ where: { id: session.id } });
         const azureResult = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
 
         // Determine image level from Phase 2
-        const phase2Data = session.phase2Data as any;
+        const phase2Data = (latestSession?.phase2Data as any) || {};
         let imgLevel = 'B1';
-        if (phase2Data.finalPronunciationScore < 50) imgLevel = 'A2';
-        else if (phase2Data.finalPronunciationScore > 75) imgLevel = 'B2';
+        if (phase2Data.finalPronunciationScore != null && phase2Data.finalPronunciationScore < 50) imgLevel = 'A2';
+        else if (phase2Data.finalPronunciationScore != null && phase2Data.finalPronunciationScore > 75) imgLevel = 'B2';
 
         // Use adaptive image description if available, else fallback
-        const targetedImage = (session.phase3Data as any)?.targetedImage;
+        const targetedImage = (latestSession?.phase3Data as any)?.targetedImage;
         const imageDescription = targetedImage?.text || IMAGE_DESCRIPTIONS[imgLevel];
 
         const geminiResult = await this.brain.analyzeImageDescription(

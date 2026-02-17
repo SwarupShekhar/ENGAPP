@@ -64,6 +64,10 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
     };
 
     const startRecording = async () => {
+        if (!assessmentId) {
+            Alert.alert('Please Wait', 'Assessment is still initializing...');
+            return;
+        }
         try {
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: true,
@@ -76,21 +80,26 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
             setRecording(recording);
             setIsRecording(true);
         } catch (err) {
-            Alert.alert('Error', 'Failed to start recording');
+            Alert.alert('Error', 'Failed to start recording. Please check microphone permissions.');
         }
     };
 
     const stopRecording = async () => {
-        setRecording(null);
+        if (!recording) return;
         setIsRecording(false);
         try {
-            await recording?.stopAndUnloadAsync();
-            const uri = recording?.getURI();
+            await recording.stopAndUnloadAsync();
+            const uri = recording.getURI();
+            setRecording(null);
             if (uri) {
                 handleSubmit(uri);
+            } else {
+                Alert.alert('Error', 'Recording failed to save. Please try again.');
             }
         } catch (error) {
-            console.error(error);
+            console.error('Stop recording error:', error);
+            setRecording(null);
+            Alert.alert('Error', 'Failed to process recording. Please try again.');
         }
     };
 
@@ -116,6 +125,9 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
 
                 // If retrying phase 2? logic handled by backend returning same phase
                 if (res.nextPhase === phase) {
+                    if (res.hint) {
+                        Alert.alert("Feedback", res.hint);
+                    }
                     setAttempt(prev => prev + 1);
                 } else {
                     setAttempt(1);
@@ -230,11 +242,30 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
                     </Text>
                 </View>
             </ScrollView>
+            {isSubmitting && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={styles.loadingText}>Analyzing Speech...</Text>
+                </View>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    loadingText: {
+        marginTop: theme.spacing.m,
+        color: theme.colors.surface,
+        fontSize: theme.typography.sizes.l,
+        fontWeight: 'bold',
+    },
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,
