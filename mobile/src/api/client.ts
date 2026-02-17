@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
-const FORCE_PRODUCTION = false; // Switch to LOCAL backend for testing
+const FORCE_PRODUCTION = true; // Switch to LOCAL backend for testing
 
 // Using localhost for iOS Simulator and the detected local IP for everything else
 const LOCAL_IP = '192.168.1.16';
