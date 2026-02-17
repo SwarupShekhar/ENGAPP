@@ -131,8 +131,17 @@ const getTypeConfig = (type: string) => ({
   assessment: { icon: '📋', label: 'Assessment', color: '#f59e0b' },
 }[type] || { icon: '📞', label: 'Call', color: '#6b7280' });
 
+// ── Helper: detect bot users by name ──────
+function isBot(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes('bot') || lower.includes('ai tutor') || lower === 'engr';
+}
+
 // ── Map real API data to the UI shape ──────
-function mapSessionToCallSession(session: ConversationSession, currentClerkId?: string | null): CallSession {
+function mapSessionToCallSession(
+  session: ConversationSession,
+  currentUser?: { clerkId?: string; fullName?: string } | null,
+): CallSession {
   const analysis = session.analyses?.[0];
   const scores = analysis?.scores || { grammar: 0, vocabulary: 0, fluency: 0, pronunciation: 0, overall: 0 };
   const rawData = analysis?.rawData;
@@ -154,43 +163,40 @@ function mapSessionToCallSession(session: ConversationSession, currentClerkId?: 
     errorType: p.issueType || (p.severity === 'high' ? 'Mispronunciation' : 'None'),
   }));
 
-  // Determine type based on participants
-  // 1 participant = AI/Solo, >1 = P2P
-  const isP2P = (session.participants?.length || 0) > 1;
-  const type = isP2P ? 'p2p' : 'ai_tutor';
+  // ── Find the REAL partner (not self, not bot) ──────
+  let realPartner: typeof session.participants[0] | undefined;
 
-  // Find partner (exclude self by ID if possible)
-  let partner = session.participants?.find(p => p.user);
-  
-  if (currentClerkId && session.participants) {
-    // Try to find someone who is NOT the current user
-    const other = session.participants.find(p => {
-        if (!p.user) return false;
-        // Robust ID check
-        if (p.user.clerkId && currentClerkId) {
-             return p.user.clerkId !== currentClerkId;
-        }
-        // Fallback to name check if ID missing (shouldn't happen with new backend)
-        // const name = `${p.user.fname || ''} ${p.user.lname || ''}`.trim();
-        // return name !== currentUserFullName.trim();
-        return false;
-    });
-    if (other) partner = other;
+  if (session.participants && currentUser) {
+    for (const p of session.participants) {
+      if (!p.user) continue;
+      const name = `${p.user.fname || ''} ${p.user.lname || ''}`.trim();
+
+      // Skip bots
+      if (isBot(name)) continue;
+
+      // Skip self — check clerkId first, fall back to name
+      if (p.user.clerkId && currentUser.clerkId) {
+        if (p.user.clerkId === currentUser.clerkId) continue;
+      } else if (currentUser.fullName && name === currentUser.fullName.trim()) {
+        continue;
+      }
+
+      // This is a real, different human
+      realPartner = p;
+      break;
+    }
   }
 
-  const resolvedName = partner?.user
-    ? `${partner.user.fname || ''} ${partner.user.lname || ''}`.trim()
-    : '';
-  
-  // Check if resolved partner is actually self
-  const isSelf = currentClerkId && partner?.user?.clerkId === currentClerkId;
+  // Determine session type
+  const hasRealPartner = !!realPartner;
+  const type = hasRealPartner ? 'p2p' : 'ai_tutor';
 
-  const partnerName = (resolvedName && !isSelf) ? resolvedName : 'AI Tutor';
+  const partnerName = hasRealPartner
+    ? `${realPartner!.user!.fname || ''} ${realPartner!.user!.lname || ''}`.trim() || 'Partner'
+    : 'AI Tutor';
 
-  // If we couldn't find a distinct partner (e.g. self-session identified as P2P?), don't set partnerId
-  // Also if it's AI tutor, no partnerId
-  // Also if the resolved partner IS me (isSelf), definitely don't show connect button
-  const partnerId = (isP2P && partner?.userId && !isSelf) ? partner.userId : undefined;
+  // Only set partnerId for real human partners — this controls Connect button
+  const partnerId = hasRealPartner ? realPartner!.userId : undefined;
 
   return {
     id: session.id,
@@ -305,8 +311,12 @@ function SessionCard({ session, onPress, onConnectionPress }: {
 
       {/* Middle: Info */}
       <View style={styles.sessionInfo}>
-        <Text style={styles.sessionTopic} numberOfLines={1}>{session.topic}</Text>
-        <Text style={styles.sessionPartner}>{session.partnerName}</Text>
+        <Text style={styles.sessionTopic} numberOfLines={1}>
+          {session.type === 'p2p' ? session.partnerName : session.topic}
+        </Text>
+        <Text style={styles.sessionPartner}>
+          {session.type === 'p2p' ? session.topic : session.partnerName}
+        </Text>
         <View style={styles.sessionMeta}>
           <Text style={styles.sessionMetaText}>
             {formatDuration(session.duration)} · {formatDate(session.date)}
@@ -667,19 +677,20 @@ export default function FeedbackScreen() {
   const [selectedSession, setSelectedSession] = useState<CallSession | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
 
-  // ── Fetch real data from API ──────────────
+  // ── Current user info for partner filtering ──
   const { user } = useUser();
+  const currentUserInfo = user ? { clerkId: user.id, fullName: user.fullName || '' } : null;
 
   // ── Fetch real data from API ──────────────
   const fetchSessions = useCallback(async () => {
     try {
       const rawSessions = await sessionsApi.listSessions();
-      const mapped = rawSessions.map(s => mapSessionToCallSession(s, user?.id));
+      const mapped = rawSessions.map(s => mapSessionToCallSession(s, currentUserInfo));
       setSessions(mapped);
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
     }
-  }, [user?.id]);
+  }, [currentUserInfo?.clerkId]);
 
   useFocusEffect(
     useCallback(() => {
