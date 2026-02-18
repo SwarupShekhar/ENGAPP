@@ -143,8 +143,10 @@ class SocketService {
         });
     }
 
-    acceptCall(conversationId: string) {
-        this.socket?.emit('accept_call', { conversationId });
+    acceptCall(conversationId: string, callback?: (response: any) => void) {
+        this.socket?.emit('accept_call', { conversationId }, (response: any) => {
+            if (callback) callback(response);
+        });
     }
 
     declineCall(conversationId: string) {

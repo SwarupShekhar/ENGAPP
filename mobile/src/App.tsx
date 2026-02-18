@@ -75,7 +75,7 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
           { 
             text: "Accept", 
             onPress: () => {
-              socketService.socket?.emit('accept_call', { conversationId: data.conversationId }, (res: any) => {
+              socketService.acceptCall(data.conversationId, (res: any) => {
                 const realId = res?.sessionId || data.sessionId;
                 navigate('InCall', { 
                   sessionId: realId, 
