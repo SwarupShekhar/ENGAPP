@@ -53,6 +53,12 @@ export const chatApi = {
         client.get('/chat/conversations').then(r => r.data),
 
     /**
+     * Find or create a conversation with a target user.
+     */
+    findOrCreate: (targetUserId: string) =>
+        client.post('/chat/find-or-create', { targetUserId }).then(r => r.data),
+
+    /**
      * Get messages for a conversation (paginated).
      */
     getMessages: (conversationId: string, limit = 30, before?: string) =>

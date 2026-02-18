@@ -15,6 +15,12 @@ export class ChatController {
         return this.chatService.getUserConversations(req.user.id);
     }
 
+    @Post('find-or-create')
+    async findOrCreate(@Request() req, @Body('targetUserId') targetUserId: string) {
+        const conversationId = await this.chatService.getOrCreateConversation(req.user.id, targetUserId);
+        return { conversationId };
+    }
+
     @Get('conversations/:conversationId/messages')
     getMessages(
         @Request() req,

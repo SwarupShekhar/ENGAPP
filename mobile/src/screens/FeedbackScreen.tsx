@@ -710,10 +710,10 @@ export default function FeedbackScreen() {
               });
           }
 
-          const pendingReceivedIds = new Set<string>();
+          const pendingReceivedMap = new Map<string, string>();
           if (Array.isArray(pendingReceived)) {
               pendingReceived.forEach((r: any) => {
-                  pendingReceivedIds.add(r.senderId);
+                  pendingReceivedMap.set(r.senderId, r.id);
               });
           }
 
@@ -722,11 +722,13 @@ export default function FeedbackScreen() {
                   if (friendIds.has(s.partnerId)) {
                       return { ...s, connectionStatus: 'connected' };
                   }
-                  if (pendingReceivedIds.has(s.partnerId)) {
-                      return { ...s, connectionStatus: 'pending_received' };
+                  if (pendingReceivedMap.has(s.partnerId)) {
+                      return { 
+                          ...s, 
+                          connectionStatus: 'pending_received',
+                          requestId: pendingReceivedMap.get(s.partnerId)
+                      } as any;
                   }
-                  // We cannot detect pending_sent easily without a specific API, 
-                  // but this covers the "Already Friends" case.
               }
               return s;
           });
@@ -819,7 +821,14 @@ export default function FeedbackScreen() {
             text: 'Accept',
             onPress: async () => {
               try {
-                // We'd need the requestId — for now just update UI
+                // If we don't have requestId on the session object, we'll try to get it from Status
+                // But the user said getStatus throws 500. 
+                // Let's assume we'll fix the mapping in the next step.
+                // For now, restoring the API call structure.
+                if ((session as any).requestId) {
+                    await connectionsApi.acceptRequest((session as any).requestId);
+                }
+                
                 setSessions(prev => prev.map(s =>
                   s.id === session.id ? { ...s, connectionStatus: 'connected' as const } : s
                 ));
@@ -832,24 +841,25 @@ export default function FeedbackScreen() {
       );
     } else if (session.connectionStatus === 'connected') {
       try {
-        // Fetch all conversations to find the one with this partner
-        // (Avoids getStatus which throws 500)
-        const convs = await chatApi.getConversations();
-        const existing = convs.find((c: any) => c.partner?.id === session.partnerId);
+        setLoading(true);
+        // Robustly get or create conversation
+        const result = await chatApi.findOrCreate(session.partnerId);
 
-        if (existing) {
+        if (result && result.conversationId) {
           (navigation as any).navigate('Chat', {
-            conversationId: existing.conversationId,
+            conversationId: result.conversationId,
             partnerId: session.partnerId,
             partnerName: session.partnerName,
             partnerAvatar: session.partnerAvatar,
           });
         } else {
-          Alert.alert('Chat', 'Conversation not found. Please try again later.');
+          Alert.alert('Chat', 'Could not initialize conversation. Please try again.');
         }
       } catch (err: any) {
         console.error('Failed to open chat:', err);
         Alert.alert('Error', 'Could not open chat. Please try again.');
+      } finally {
+        setLoading(false);
       }
     }
   }, [navigation]);
