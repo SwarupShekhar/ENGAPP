@@ -1,6 +1,6 @@
 import {
     Controller, Get, Post, Param, Query,
-    Request, UseGuards,
+    Request, UseGuards, Body,
 } from '@nestjs/common';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { ChatService } from './chat.service';
