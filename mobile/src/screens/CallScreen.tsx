@@ -174,11 +174,32 @@ export default function CallScreen() {
     const userLevel = meta.assessmentLevel || 'B1';
     const userLevelNum = getLevelScore(userLevel);
 
-    const navigation: any = useNavigation();
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+        };
+    }, []);
+
+    const cleanupMatchmaking = () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+        if (safetyTimeoutRef.current) {
+            clearTimeout(safetyTimeoutRef.current);
+            safetyTimeoutRef.current = null;
+        }
+    };
 
     const handleFindPartner = async () => {
         if (!user) return;
 
+        cleanupMatchmaking();
         setIsSearching(true);
         setError(null);
 
@@ -187,7 +208,7 @@ export default function CallScreen() {
                 // ── Structured Matchmaking (Progressive) ──
                 const result = await matchmakingApi.findStructured(
                     user.id, 
-                    'ielts_speaking' // Default structure for now
+                    'ielts_speaking'
                 );
 
                 setIsSearching(false);
@@ -199,7 +220,6 @@ export default function CallScreen() {
                         mode: 'structured'
                     });
                 } else {
-                    // Timeout / Fallback
                     setShowAiOption(true);
                 }
 
@@ -212,11 +232,11 @@ export default function CallScreen() {
                 });
 
                 // Start Polling
-                const pollInterval = setInterval(async () => {
+                pollIntervalRef.current = setInterval(async () => {
                     try {
                         const status = await matchmakingApi.checkStatus(user.id, userLevel);
                         if (status.matched && status.sessionId) {
-                            clearInterval(pollInterval);
+                            cleanupMatchmaking();
                             setIsSearching(false);
                             navigation.replace('InCall', {
                                 sessionId: status.sessionId,
@@ -226,20 +246,18 @@ export default function CallScreen() {
                                 topic: selectedTopic || 'general'
                             });
                         } else if (status.message) {
-                            clearInterval(pollInterval);
+                            cleanupMatchmaking();
                             setIsSearching(false);
                             setShowAiOption(true);
                         }
                     } catch (error) {
-                        console.error('Poll error', error);
-                        // Don't stop polling on transient errors, but maybe limit retries
+                        console.error('[Matchmaking] Poll error:', error);
                     }
                 }, 3000);
 
-                // Safety timeout for polling (manual cleanup if component unmounts is handled by effect usually, but here in handler)
-                // In production, use a useRef for interval to clear on unmount.
-                setTimeout(() => {
-                    clearInterval(pollInterval);
+                // Safety timeout
+                safetyTimeoutRef.current = setTimeout(() => {
+                    cleanupMatchmaking();
                     if (isSearching) {
                         setIsSearching(false);
                         setShowAiOption(true);
@@ -247,8 +265,9 @@ export default function CallScreen() {
                 }, 45000); 
             }
         } catch (error) {
-            console.error('Failed to join:', error);
+            console.error('[Matchmaking] Join failed:', error);
             setIsSearching(false);
+            cleanupMatchmaking();
         }
     };
 

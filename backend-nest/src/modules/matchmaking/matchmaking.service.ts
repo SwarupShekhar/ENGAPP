@@ -29,8 +29,20 @@ export class MatchmakingService {
     }
 
     async checkMatch(userId: string, level: string) {
-        // 1) Handle Timeout Check
         const userMeta = await this.redisService.getClient().hgetall(`user:${userId}:meta`);
+        
+        // 1) Check if a match was already found by the partner
+        if (userMeta && userMeta.matchResult) {
+            const result = JSON.parse(userMeta.matchResult);
+            await this.redisService.getClient().del(`user:${userId}:meta`);
+            this.logger.log(`User ${userId} retrieved stored match result: ${result.sessionId}`);
+            return {
+                matched: true,
+                ...result
+            };
+        }
+
+        // 2) Handle Timeout Check
         if (userMeta && userMeta.joinedAt) {
             const waitTime = (Date.now() - parseInt(userMeta.joinedAt)) / 1000;
             if (waitTime > this.TIMEOUT_SECONDS) {
@@ -44,14 +56,14 @@ export class MatchmakingService {
             }
         }
 
-        // 2) Normal Match Checking with Avoid-List
+        // 3) Normal Match Checking
         const queueKey = `queue:${level}`;
         const queueLength = await this.redisService.getClient().llen(queueKey);
 
         if (queueLength >= 2) {
             const queue = await this.redisService.getClient().lrange(queueKey, 0, -1);
             if (queue.includes(userId)) {
-                // Find blocks for this user
+                // Find blocked users
                 const blocks = await this.prisma.blockedUser.findMany({
                     where: {
                         OR: [
@@ -78,21 +90,18 @@ export class MatchmakingService {
                 }
 
                 if (partnerId) {
-                    // Specific user pops to avoid race conditions with lpop
-                    // Actually Redis doesn't have "pop specific", but we can use lrem u1 and lrem u2
+                    // Specific user pops to avoid race conditions
                     const removedU1 = await this.redisService.getClient().lrem(queueKey, 1, userId);
                     const removedU2 = await this.redisService.getClient().lrem(queueKey, 1, partnerId);
 
                     if (removedU1 > 0 && removedU2 > 0) {
                         this.logger.log(`Match found between ${userId} and ${partnerId} for level ${level}`);
 
-                        // Resolve IDs to internal UUIDs for DB creation
                         const dbUserId = await this.resolveToUuid(userId);
                         const dbPartnerId = await this.resolveToUuid(partnerId);
 
                         if (!dbUserId || !dbPartnerId) {
-                            this.logger.error(`Failed to resolve users to UUIDs: ${userId} -> ${dbUserId}, ${partnerId} -> ${dbPartnerId}`);
-                            // Rollback queue changes
+                            this.logger.error(`Failed to resolve users to UUIDs: ${userId}, ${partnerId}`);
                             await this.redisService.getClient().rpush(queueKey, userId);
                             await this.redisService.getClient().rpush(queueKey, partnerId);
                             return { matched: false };
@@ -111,23 +120,43 @@ export class MatchmakingService {
                             },
                         });
 
-                        const partner = await this.prisma.user.findUnique({
-                            where: { id: partnerId },
+                        const currentUser = await this.prisma.user.findUnique({
+                            where: { id: dbUserId },
                             select: { fname: true, lname: true }
                         });
 
-                        await this.redisService.getClient().del(`user:${userId}:meta`);
-                        await this.redisService.getClient().del(`user:${partnerId}:meta`);
+                        const partnerUser = await this.prisma.user.findUnique({
+                            where: { id: dbPartnerId },
+                            select: { fname: true, lname: true }
+                        });
 
-                        return {
-                            matched: true,
+                        const matchResultForInitiator = {
                             sessionId: session.id,
                             roomName: `room_${session.id}`,
                             partnerId: partnerId,
-                            partnerName: partner ? `${partner.fname} ${partner.lname}` : 'Co-learner',
+                            partnerName: partnerUser ? `${partnerUser.fname} ${partnerUser.lname}` : 'Co-learner',
+                        };
+
+                        const matchResultForPartner = {
+                            sessionId: session.id,
+                            roomName: `room_${session.id}`,
+                            partnerId: userId,
+                            partnerName: currentUser ? `${currentUser.fname} ${currentUser.lname}` : 'Co-learner',
+                        };
+
+                        // Store for partner to pick up
+                        await this.redisService.getClient().hset(`user:${partnerId}:meta`, {
+                            matchResult: JSON.stringify(matchResultForPartner)
+                        });
+
+                        // Clear initiator's meta (returning directly)
+                        await this.redisService.getClient().del(`user:${userId}:meta`);
+
+                        return {
+                            matched: true,
+                            ...matchResultForInitiator
                         };
                     } else {
-                        // If one failed to remove, put the other back (unlikely but safe)
                         if (removedU1 > 0) await this.redisService.getClient().rpush(queueKey, userId);
                         if (removedU2 > 0) await this.redisService.getClient().rpush(queueKey, partnerId);
                         return { matched: false };
