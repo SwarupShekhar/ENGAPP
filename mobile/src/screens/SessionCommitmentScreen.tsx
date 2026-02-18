@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     alignItems: 'center',
     marginBottom: 16,
-    ...theme.shadows.primary,
+    ...theme.shadows.primaryGlow,
   },
   startBtnDisabled: { backgroundColor: '#cbd5e1', shadowOpacity: 0 },
   startBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },

@@ -15,21 +15,15 @@ export class PointsService {
       where: { userId },
       create: {
         userId,
-        totalPoints: amount,
-        weeklyPoints: amount,
-        monthlyPoints: amount,
-        [`pointsFrom${category.charAt(0).toUpperCase() + category.slice(1)}`]: amount,
+        total: amount,
       },
       update: {
-        totalPoints: { increment: amount },
-        weeklyPoints: { increment: amount },
-        monthlyPoints: { increment: amount },
-        [`pointsFrom${category.charAt(0).toUpperCase() + category.slice(1)}`]: { increment: amount },
+        total: { increment: amount },
       },
     });
 
     // Check for level up
-    if (userPoints.totalPoints >= this.getXPForLevel(userPoints.level + 1)) {
+    if (userPoints.total >= this.getXPForLevel(userPoints.level + 1)) {
       await this.levelUp(userId);
     }
 
@@ -104,7 +98,6 @@ export class PointsService {
       where: { userId },
       data: {
         level: newLevel,
-        xpToNext: newXPRequired,
       },
     });
 
