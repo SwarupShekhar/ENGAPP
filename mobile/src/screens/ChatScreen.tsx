@@ -215,7 +215,8 @@ export default function ChatScreen() {
                         (navigation as any).navigate('InCall', {
                             sessionId: conversationId,
                             partnerName: partnerName,
-                            isDirect: true
+                            isDirect: true,
+                            isCaller: true
                         });
                     },
                 },
