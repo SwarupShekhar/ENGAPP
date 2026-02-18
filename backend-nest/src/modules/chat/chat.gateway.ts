@@ -80,7 +80,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             // Broadcast presence
             this.broadcastPresence(user.id, 'online');
 
-            this.logger.log(`User ${user.id} (${client.userName}) connected — socket: ${client.id}`);
+            this.logger.log(`[Socket] User ${user.id} (${client.userName}) connected — socket: ${client.id}`);
         } catch (error) {
             this.logger.warn(`Connection failed: ${error.message}`);
             client.disconnect(true);
@@ -221,15 +221,38 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             message,
         });
 
+        // Find other participants to send a direct incoming call signal
+        const conversation = await this.prisma.conversation.findUnique({
+            where: { id: data.conversationId },
+            include: { participants: true },
+        });
+
+        if (conversation) {
+            conversation.participants.forEach(p => {
+                if (p.userId !== client.userId) {
+                    this.logger.log(`[DirectCall] Notifying user ${p.userId} of incoming call from ${client.userId}`);
+                    this.notifyUser(p.userId, 'incoming_call', {
+                        conversationId: data.conversationId,
+                        initiatorId: client.userId,
+                        initiatorName: client.userName,
+                        callType: data.callType,
+                        sessionId: data.conversationId,
+                    });
+                }
+            });
+        }
+
         return { success: true, messageId: message.id };
     }
 
     // ── Presence Sync ──────────────────────────────────
     @SubscribeMessage('get_online_users')
     handleGetOnlineUsers() {
+        const ids = Array.from(this.onlineUsers.keys());
+        this.logger.log(`[Socket] get_online_users request. Current online count: ${ids.length}`);
         return { 
             success: true, 
-            onlineUserIds: Array.from(this.onlineUsers.keys()) 
+            onlineUserIds: ids
         };
     }
 

@@ -2,12 +2,14 @@ import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser } from "@clerk/clerk-expo";
 import RootNavigator from "./navigation/RootNavigator";
+import { navigationRef, navigate } from "./navigation/navigationRef";
 import AuthNavigator from "./navigation/AuthNavigator";
 import { StatusBar } from "expo-status-bar";
 import { tokenCache } from "./utils/tokenCache";
 import { setAuthTokenFetcher } from "./api/client";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, AppState, Alert } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import SocketService from "./services/socketService";
 
 // Ideally this should be in an .env file, but for now hardcoding as retrieved
 const CLERK_PUBLISHABLE_KEY = "pk_test_ZGVzdGluZWQtc3VuZmlzaC03OS5jbGVyay5hY2NvdW50cy5kZXYk";
@@ -18,6 +20,75 @@ function AuthTokenInjector({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setAuthTokenFetcher(getToken);
   }, [getToken]);
+
+  return <>{children}</>;
+}
+
+function AppSocketHandler({ children }: { children: React.ReactNode }) {
+  const { getToken, userId, isSignedIn } = useAuth();
+  const socketService = SocketService.getInstance();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const connectSocket = async () => {
+      if (isSignedIn && userId) {
+        try {
+          const token = await getToken();
+          if (token && mounted) {
+            socketService.connect(token);
+          }
+        } catch (err) {
+          console.warn("[App] Socket connection failed:", err);
+        }
+      } else {
+        socketService.disconnect();
+      }
+    };
+
+    connectSocket();
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active' && isSignedIn) {
+        connectSocket();
+      }
+    });
+
+    // Incoming Call Listener
+    const handleIncomingCall = (data: { 
+      initiatorName: string; 
+      sessionId: string; 
+      callType: string;
+      conversationId: string;
+    }) => {
+      Alert.alert(
+        "Incoming Call",
+        `${data.initiatorName} is calling you...`,
+        [
+          { text: "Decline", style: "cancel" },
+          { 
+            text: "Accept", 
+            onPress: () => {
+              navigate('InCall', { 
+                sessionId: data.sessionId, 
+                partnerName: data.initiatorName,
+                isDirect: true,
+                conversationId: data.conversationId
+              });
+            }
+          }
+        ]
+      );
+    };
+
+    socketService.onIncomingCall(handleIncomingCall);
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+      socketService.offIncomingCall(handleIncomingCall);
+    };
+  }, [isSignedIn, userId]);
 
   return <>{children}</>;
 }
@@ -63,17 +134,19 @@ export default function App() {
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
       <AuthTokenInjector>
-        <SafeAreaProvider>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <SignedIn>
-              <OnboardingGate />
-            </SignedIn>
-            <SignedOut>
-              <AuthNavigator onLoginSuccess={() => { }} />
-            </SignedOut>
-          </NavigationContainer>
-        </SafeAreaProvider>
+        <AppSocketHandler>
+          <SafeAreaProvider>
+            <NavigationContainer ref={navigationRef}>
+              <StatusBar style="auto" />
+              <SignedIn>
+                <OnboardingGate />
+              </SignedIn>
+              <SignedOut>
+                <AuthNavigator onLoginSuccess={() => { }} />
+              </SignedOut>
+            </NavigationContainer>
+          </SafeAreaProvider>
+        </AppSocketHandler>
       </AuthTokenInjector>
     </ClerkProvider>
   );

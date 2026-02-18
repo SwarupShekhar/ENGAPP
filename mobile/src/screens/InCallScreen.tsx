@@ -186,7 +186,9 @@ export default function InCallScreen({ navigation, route }: any) {
         const fetchToken = async () => {
             if (!user || !sessionId) return;
             try {
-                const res = await livekitApi.getToken(user.id, sessionId);
+                // For direct calls, we prefix the room name to avoid matchmaking collisions
+                const roomSessionId = route.params?.isDirect ? `direct_${sessionId}` : sessionId;
+                const res = await livekitApi.getToken(user.id, roomSessionId);
                 setToken(res.token);
             } catch (error) {
                 console.error('Failed to get LiveKit token:', error);

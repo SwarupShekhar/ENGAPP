@@ -140,23 +140,28 @@ export default function ChatScreen() {
             }
         };
 
-        socketService.onNewMessage(handleNewMessage);
-        socketService.onUserTyping(handleTyping);
-        socketService.onPresenceUpdate(handlePresence);
-        socketService.onMessagesRead(handleRead);
-
-        // Fetch initial presence
-        socketService.getOnlineUsers((data) => {
-            if (data.onlineUserIds.includes(partnerId)) {
-                setPartnerOnline(true);
-            }
         });
+
+        const handleConnect = () => {
+            console.log('[ChatScreen] Socket connected, fetching presence');
+            socketService.getOnlineUsers((data) => {
+                if (data.onlineUserIds.includes(partnerId)) {
+                    setPartnerOnline(true);
+                }
+            });
+        };
+
+        socketService.on('connect', handleConnect);
+        if (socketService.isConnected()) {
+            handleConnect();
+        }
 
         return () => {
             socketService.offNewMessage(handleNewMessage);
             socketService.offUserTyping(handleTyping);
             socketService.offPresenceUpdate(handlePresence);
             socketService.offMessagesRead(handleRead);
+            socketService.off('connect', handleConnect);
         };
     }, [conversationId, partnerId, internalUserId]);
 
@@ -204,8 +209,12 @@ export default function ChatScreen() {
                     onPress: () => {
                         const callId = `call_${Date.now()}`;
                         socketService.sendCallInvite(conversationId, callId, 'voice');
-                        // Navigate to call screen
-                        (navigation as any).navigate('CallPreference');
+                        // Navigate directly to call screen for friend session
+                        (navigation as any).navigate('InCall', {
+                            sessionId: conversationId,
+                            partnerName: partnerName,
+                            isDirect: true
+                        });
                     },
                 },
             ],
