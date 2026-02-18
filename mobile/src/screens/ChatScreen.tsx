@@ -7,6 +7,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { chatApi } from '../api/connections';
 import SocketService from '../services/socketService';
 
@@ -51,6 +52,24 @@ export default function ChatScreen() {
     const socketService = useRef(SocketService.getInstance()).current;
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [internalUserId, setInternalUserId] = useState<string>('');
+    const soundRef = useRef<Audio.Sound | null>(null);
+
+    // ── Sound Helper ────────────────────────────────────
+    const playNotificationSound = async () => {
+        try {
+            if (soundRef.current) {
+                await soundRef.current.replayAsync();
+            } else {
+                const { sound } = await Audio.Sound.createAsync(
+                    { uri: 'https://res.cloudinary.com/de8vvmpip/video/upload/v1771405321/preview_uxlib8.mp3' },
+                    { shouldPlay: true }
+                );
+                soundRef.current = sound;
+            }
+        } catch (error) {
+            console.warn('[Chat] Failed to play notification sound:', error);
+        }
+    };
 
     // ── Init socket + load messages ─────────────────────
     useEffect(() => {
@@ -92,6 +111,12 @@ export default function ChatScreen() {
     useEffect(() => {
         const handleNewMessage = (data: { conversationId: string; message: ChatMessage }) => {
             if (data.conversationId !== conversationId) return;
+            
+            // Play sound if message is from partner
+            if (data.message.senderId === partnerId) {
+                playNotificationSound();
+            }
+
             setMessages(prev => [...prev, data.message]);
             socketService.markRead(conversationId);
 
@@ -129,6 +154,10 @@ export default function ChatScreen() {
             socketService.offUserTyping(handleTyping);
             socketService.offPresenceUpdate(handlePresence);
             socketService.offMessagesRead(handleRead);
+            
+            if (soundRef.current) {
+                soundRef.current.unloadAsync();
+            }
         };
     }, [conversationId, partnerId, internalUserId]);
 
