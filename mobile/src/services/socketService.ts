@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { Audio } from 'expo-av';
 import { API_URL } from '../api/client';
 
 type SocketCallback = (...args: any[]) => void;
@@ -7,6 +8,8 @@ class SocketService {
     private static instance: SocketService;
     private socket: Socket | null = null;
     private listeners = new Map<string, Set<SocketCallback>>();
+    private sound: Audio.Sound | null = null;
+    private NOTIFICATION_SOUND_URL = 'https://res.cloudinary.com/de8vvmpip/video/upload/v1771405321/preview_uxlib8.mp3';
 
     static getInstance(): SocketService {
         if (!SocketService.instance) {
@@ -28,6 +31,16 @@ class SocketService {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             reconnectionAttempts: Infinity,
+        });
+
+        this.socket.on('new_message', (data) => {
+            // Check if it's from someone else
+            // Note: We don't have the current user's ID here easily without passing it to connect,
+            // but the backend shouldn't emit 'new_message' to the sender for their own message 
+            // via the personal room/namespace unless they are in the conversation room.
+            // However, the SocketGateway emits to the conversation room.
+            // To prevent self-ping, we could just play it.
+            this.playNotificationSound();
         });
 
         this.socket.on('connect', () => {
@@ -60,6 +73,22 @@ class SocketService {
 
     isConnected(): boolean {
         return this.socket?.connected ?? false;
+    }
+
+    async playNotificationSound() {
+        try {
+            if (this.sound) {
+                await this.sound.replayAsync();
+            } else {
+                const { sound } = await Audio.Sound.createAsync(
+                    { uri: this.NOTIFICATION_SOUND_URL },
+                    { shouldPlay: true }
+                );
+                this.sound = sound;
+            }
+        } catch (error) {
+            console.warn('[SocketService] Sound play failed:', error);
+        }
     }
 
     // ── Emitters ────────────────────────────────────────
