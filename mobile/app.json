@@ -45,6 +45,12 @@
           "microphonePermission": "Allow EngR to access your microphone"
         }
       ]
-    ]
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2286e998-c3a9-4582-bf36-0cfde9a7dc57"
+    }
   }
 }
