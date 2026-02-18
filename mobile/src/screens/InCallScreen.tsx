@@ -23,6 +23,7 @@ import {
 } from '@livekit/react-native';
 import { Track, RoomEvent } from 'livekit-client';
 import { io, Socket } from 'socket.io-client';
+import SocketService from '../services/socketService';
 import { theme } from '../theme/theme';
 import { livekitApi } from '../api/livekit';
 import { sessionsApi } from '../api/sessions';
@@ -158,10 +159,11 @@ export default function InCallScreen({ navigation, route }: any) {
 
     const socketRef = useRef<Socket | null>(null);
 
-    const sessionId = route?.params?.sessionId;
+    const [sessionId, setSessionId] = useState(route?.params?.sessionId);
     const partnerName = route?.params?.partnerName || 'Co-learner';
     const topic = route?.params?.topic || 'General Practice';
     const isDirect = route?.params?.isDirect;
+    const conversationId = route?.params?.conversationId || sessionId;
 
     const [isWaiting, setIsWaiting] = useState(isDirect);
     const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'declined'>('calling');
@@ -189,9 +191,10 @@ export default function InCallScreen({ navigation, route }: any) {
     useEffect(() => {
         if (!isDirect) return;
 
-        const handleStatus = (data: { status: 'accepted' | 'declined', conversationId: string }) => {
-            if (data.conversationId === sessionId) {
+        const handleStatus = (data: { status: 'accepted' | 'declined', conversationId: string, sessionId?: string }) => {
+            if (data.conversationId === conversationId || data.conversationId === sessionId) {
                 if (data.status === 'accepted') {
+                    if (data.sessionId) setSessionId(data.sessionId);
                     setCallStatus('connected');
                     setIsWaiting(false);
                 } else {
@@ -539,11 +542,6 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 14,
         fontWeight: '600',
-    },
-    statusText: {
-        fontSize: 14,
-        color: '#94A3B8',
-        fontWeight: '500',
     },
     waitingOverlay: {
         marginTop: 40,

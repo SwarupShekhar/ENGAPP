@@ -226,9 +226,17 @@ export class ChatService {
             orderBy: { conversation: { updatedAt: 'desc' } },
         });
 
-        return participations.map(p => {
+        const results = await Promise.all(participations.map(async p => {
             const lastMessage = p.conversation.messages[0];
             const otherParticipant = p.conversation.participants[0];
+
+            const unreadCount = await this.prisma.message.count({
+                where: {
+                    conversationId: p.conversationId,
+                    NOT: { senderId: userId },
+                    createdAt: { gt: p.lastReadAt },
+                },
+            });
 
             return {
                 conversationId: p.conversationId,
@@ -249,8 +257,11 @@ export class ChatService {
                           createdAt: lastMessage.createdAt,
                       }
                     : null,
+                unreadCount,
                 lastActivityAt: p.conversation.updatedAt,
             };
-        });
+        }));
+
+        return results;
     }
 }

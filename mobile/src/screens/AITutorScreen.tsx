@@ -138,28 +138,30 @@ export default function AITutorScreen({ navigation }: any) {
     const handleStreamMessage = (chunk: StreamChunk) => {
         if (chunk.type === 'sentence') {
             setIsStreaming(true);
-            setTranscript(prev => {
-                const last = prev[prev.length - 1];
-                if (last && last.speaker === 'ai' && last.isStreaming) {
-                    // Append to existing bubble
-                    const updated = [...prev];
-                    updated[updated.length - 1] = {
-                        ...last,
-                        text: last.text + chunk.text
-                    };
-                    return updated;
-                } else {
-                    // New bubble
-                    return [...prev, {
-                        id: Date.now().toString(),
-                        speaker: 'ai',
-                        text: chunk.text || '',
-                        isStreaming: true
-                    }];
-                }
-            });
-        } 
-        else if (chunk.type === 'audio' && chunk.audio) {
+            if (chunk.text) {
+                setTranscript(prev => {
+                    const last = prev[prev.length - 1];
+                    if (last && last.speaker === 'ai' && last.isStreaming) {
+                        const updated = [...prev];
+                        updated[updated.length - 1] = {
+                            ...last,
+                            text: last.text + ' ' + chunk.text
+                        };
+                        return updated;
+                    } else {
+                        return [...prev, {
+                            id: Date.now().toString(),
+                            speaker: 'ai',
+                            text: chunk.text,
+                            isStreaming: true
+                        }];
+                    }
+                });
+            }
+        }
+
+        // Always check for audio in any chunk
+        if (chunk.audio) {
             queueAudio(chunk.audio);
         }
     };

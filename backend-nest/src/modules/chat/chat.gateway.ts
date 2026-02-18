@@ -10,8 +10,9 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { ClerkService } from '../../integrations/clerk.service';
-import { PrismaService } from '../../database/prisma/prisma.service';
 import { ChatService } from './chat.service';
+import { SessionsService } from '../sessions/sessions.service';
+import { PrismaService } from '../../database/prisma/prisma.service';
 
 interface AuthenticatedSocket extends Socket {
     userId?: string;
@@ -39,6 +40,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         private clerkService: ClerkService,
         private prisma: PrismaService,
         private chatService: ChatService,
+        private sessionsService: SessionsService,
     ) {}
 
     // ── Connection ──────────────────────────────────────
@@ -248,23 +250,37 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @SubscribeMessage('accept_call')
     async handleAcceptCall(client: AuthenticatedSocket, data: { conversationId: string }) {
         this.logger.log(`[DirectCall] User ${client.userId} accepted call in ${data.conversationId}`);
-        // Notify other participants in the conversation that the call was accepted
+        
         const conversation = await this.prisma.conversation.findUnique({
             where: { id: data.conversationId },
             include: { participants: true },
         });
 
-        if (conversation) {
-            conversation.participants.forEach(p => {
-                if (p.userId !== client.userId) {
-                    this.notifyUser(p.userId, 'call_status_update', {
-                        conversationId: data.conversationId,
-                        status: 'accepted',
-                        responderId: client.userId,
-                    });
-                }
-            });
-        }
+        if (!conversation) return { success: false, error: 'Conversation not found' };
+
+        // Create a real DB session for analysis and tracking
+        const session = await this.sessionsService.startSession({
+            matchId: `direct_${data.conversationId}`,
+            participants: conversation.participants.map(p => p.userId),
+            topic: 'Direct Friend Call',
+            estimatedDuration: 600
+        });
+
+        this.logger.log(`[DirectCall] Created real session ${session.id} for conversation ${data.conversationId}`);
+
+        // Notify initiator with the REAL sessionId
+        conversation.participants.forEach(p => {
+            if (p.userId !== client.userId) {
+                this.notifyUser(p.userId, 'call_status_update', {
+                    conversationId: data.conversationId,
+                    status: 'accepted',
+                    sessionId: session.id, // REAL DB ID
+                    responderId: client.userId,
+                });
+            }
+        });
+
+        return { success: true, sessionId: session.id };
     }
 
     @SubscribeMessage('decline_call')

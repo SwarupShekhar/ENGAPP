@@ -60,6 +60,14 @@ export default function ConversationsScreen() {
         useCallback(() => {
             fetchConversations();
 
+            // Presence listener
+            const handlePresence = (data: { userId: string, status: string }) => {
+                setOnlineUsers(prev => {
+                    const next = new Set(prev);
+                    if (data.status === 'online') next.add(data.userId);
+                    else next.delete(data.userId);
+                    return next;
+                });
             };
 
             socketService.onPresenceUpdate(handlePresence);

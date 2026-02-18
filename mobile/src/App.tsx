@@ -75,12 +75,14 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
           { 
             text: "Accept", 
             onPress: () => {
-              socketService.acceptCall(data.conversationId);
-              navigate('InCall', { 
-                sessionId: data.sessionId, 
-                partnerName: data.initiatorName,
-                isDirect: true,
-                conversationId: data.conversationId
+              socketService.socket?.emit('accept_call', { conversationId: data.conversationId }, (res: any) => {
+                const realId = res?.sessionId || data.sessionId;
+                navigate('InCall', { 
+                  sessionId: realId, 
+                  partnerName: data.initiatorName,
+                  isDirect: true,
+                  conversationId: data.conversationId
+                });
               });
             }
           }
