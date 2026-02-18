@@ -135,6 +135,14 @@ class SocketService {
         });
     }
 
+    getOnlineUsers(callback: (data: { onlineUserIds: string[] }) => void) {
+        this.socket?.emit('get_online_users', (response: any) => {
+            if (response && response.success) {
+                callback({ onlineUserIds: response.onlineUserIds });
+            }
+        });
+    }
+
     // ── Listeners ───────────────────────────────────────
 
     on(event: string, callback: SocketCallback) {

@@ -224,6 +224,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { success: true, messageId: message.id };
     }
 
+    // ── Presence Sync ──────────────────────────────────
+    @SubscribeMessage('get_online_users')
+    handleGetOnlineUsers() {
+        return { 
+            success: true, 
+            onlineUserIds: Array.from(this.onlineUsers.keys()) 
+        };
+    }
+
     // ── Helpers ─────────────────────────────────────────
     private broadcastPresence(userId: string, status: 'online' | 'offline') {
         this.server.emit('presence_update', {

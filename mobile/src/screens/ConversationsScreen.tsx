@@ -7,6 +7,7 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { chatApi } from '../api/connections';
+import SocketService from '../services/socketService';
 import { theme } from '../theme/theme';
 
 interface Conversation {
@@ -25,18 +26,28 @@ interface Conversation {
         createdAt: string;
     } | null;
     lastActivityAt: string;
+    isOnline?: boolean;
+    unreadCount: number;
 }
 
 export default function ConversationsScreen() {
     const navigation = useNavigation();
     const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const socketService = SocketService.getInstance();
 
     const fetchConversations = async () => {
         try {
-            const data = await chatApi.getConversations();
-            setConversations(data);
+            const data: Conversation[] = await chatApi.getConversations();
+            
+            // Ensure uniqueness just in case
+            const unique = data.filter((conv, index, self) =>
+                index === self.findIndex((c) => c.conversationId === conv.conversationId)
+            );
+            
+            setConversations(unique);
         } catch (error) {
             console.error('[ConversationsScreen] Fetch error:', error);
         } finally {
@@ -48,6 +59,19 @@ export default function ConversationsScreen() {
     useFocusEffect(
         useCallback(() => {
             fetchConversations();
+
+            };
+
+            socketService.onPresenceUpdate(handlePresence);
+
+            // Fetch initial presence
+            socketService.getOnlineUsers((data) => {
+                setOnlineUsers(new Set(data.onlineUserIds));
+            });
+
+            return () => {
+                socketService.offPresenceUpdate(handlePresence);
+            };
         }, [])
     );
 
@@ -93,23 +117,41 @@ export default function ConversationsScreen() {
                         </Text>
                     </View>
                 )}
+                {onlineUsers.has(item.partner?.id || '') && (
+                    <View style={styles.onlineBadge} />
+                )}
             </View>
 
             <View style={styles.contentContainer}>
                 <View style={styles.headerRow}>
-                    <Text style={styles.partnerName} numberOfLines={1}>
+                    <Text 
+                        style={[styles.partnerName, item.unreadCount > 0 && styles.unreadText]} 
+                        numberOfLines={1}
+                    >
                         {item.partner?.name || 'Unknown User'}
                     </Text>
-                    <Text style={styles.timeText}>
+                    <Text style={[styles.timeText, item.unreadCount > 0 && styles.unreadTime]}>
                         {item.lastMessage ? formatTime(item.lastMessage.createdAt) : formatTime(item.lastActivityAt)}
                     </Text>
                 </View>
 
-                <Text style={styles.lastMessage} numberOfLines={1}>
-                    {item.lastMessage
-                        ? (item.lastMessage.type === 'call_invite' ? '📞 Voice Call' : item.lastMessage.content)
-                        : 'No messages yet'}
-                </Text>
+                <View style={styles.messageRow}>
+                    <Text 
+                        style={[styles.lastMessage, item.unreadCount > 0 && styles.unreadMessage]} 
+                        numberOfLines={1}
+                    >
+                        {item.lastMessage
+                            ? (item.lastMessage.type === 'call_invite' ? '📞 Voice Call' : item.lastMessage.content)
+                            : 'No messages yet'}
+                    </Text>
+                    {item.unreadCount > 0 && (
+                        <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadBadgeText}>
+                                {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                            </Text>
+                        </View>
+                    )}
+                </View>
             </View>
             
             <Ionicons name="chevron-forward" size={16} color="#4B5563" />
@@ -206,6 +248,17 @@ const styles = StyleSheet.create({
         height: 50,
         borderRadius: 25,
     },
+    onlineBadge: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#10B981',
+        borderWidth: 2,
+        borderColor: '#FFF',
+    },
     avatarPlaceholder: {
         width: 50,
         height: 50,
@@ -239,9 +292,42 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#6B7280',
     },
+    messageRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
     lastMessage: {
         fontSize: 14,
         color: '#4B5563',
+        flex: 1,
+        marginRight: 8,
+    },
+    unreadText: {
+        fontWeight: '700',
+        color: '#111827',
+    },
+    unreadMessage: {
+        fontWeight: '600',
+        color: '#1F2937',
+    },
+    unreadTime: {
+        color: '#4F46E5',
+        fontWeight: '600',
+    },
+    unreadBadge: {
+        backgroundColor: '#4F46E5',
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+    },
+    unreadBadgeText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontWeight: '700',
     },
     emptyContainer: {
         flex: 1,

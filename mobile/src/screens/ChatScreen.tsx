@@ -127,15 +127,30 @@ export default function ChatScreen() {
             }
         };
 
-        const handleRead = (data: { conversationId: string; readByUserId: string }) => {
+        const handleRead = (data: { conversationId: string; readByUserId: string; readAt: string }) => {
             if (data.conversationId !== conversationId) return;
-            // Could update read receipts UI here
+            if (data.readByUserId === partnerId) {
+                // Update messages to include partner in readBy
+                setMessages(prev => prev.map(msg => {
+                    if (msg.senderId !== partnerId && !msg.readBy?.includes(partnerId)) {
+                        return { ...msg, readBy: [...(msg.readBy || []), partnerId] };
+                    }
+                    return msg;
+                }));
+            }
         };
 
         socketService.onNewMessage(handleNewMessage);
         socketService.onUserTyping(handleTyping);
         socketService.onPresenceUpdate(handlePresence);
         socketService.onMessagesRead(handleRead);
+
+        // Fetch initial presence
+        socketService.getOnlineUsers((data) => {
+            if (data.onlineUserIds.includes(partnerId)) {
+                setPartnerOnline(true);
+            }
+        });
 
         return () => {
             socketService.offNewMessage(handleNewMessage);
@@ -239,15 +254,20 @@ export default function ChatScreen() {
                     ]}>
                         {item.content}
                     </Text>
-                    <Text style={[
-                        styles.messageTime,
-                        isMine ? styles.myTimeText : styles.theirTimeText,
-                    ]}>
-                        {new Date(item.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        })}
-                    </Text>
+                    <View style={styles.messageFooter}>
+                        <Text style={[
+                            styles.messageTime,
+                            isMine ? styles.myTimeText : styles.theirTimeText,
+                        ]}>
+                            {new Date(item.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            })}
+                        </Text>
+                        {isMine && item.readBy?.includes(partnerId) && (
+                            <Text style={styles.seenText}>Seen</Text>
+                        )}
+                    </View>
                 </View>
             </View>
         );
@@ -467,6 +487,18 @@ const styles = StyleSheet.create({
     },
     theirTimeText: {
         color: 'rgba(255,255,255,0.4)',
+    },
+    messageFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 4,
+        marginTop: 4,
+    },
+    seenText: {
+        fontSize: 10,
+        color: '#A78BFA',
+        fontWeight: '600',
     },
 
     // Call invite
