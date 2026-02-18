@@ -163,9 +163,11 @@ export default function InCallScreen({ navigation, route }: any) {
     const partnerName = route?.params?.partnerName || 'Co-learner';
     const topic = route?.params?.topic || 'General Practice';
     const isDirect = route?.params?.isDirect;
+    const isCaller = route?.params?.isCaller ?? false;
     const conversationId = route?.params?.conversationId || sessionId;
 
-    const [isWaiting, setIsWaiting] = useState(isDirect);
+    // Only the caller waits. The receiver has already accepted.
+    const [isWaiting, setIsWaiting] = useState(isDirect && isCaller);
     const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'declined'>('calling');
 
     const pulseScale = useSharedValue(1);
@@ -215,6 +217,9 @@ export default function InCallScreen({ navigation, route }: any) {
     useEffect(() => {
         const fetchToken = async () => {
             if (!user || !sessionId) return;
+            // Don't connect if we are waiting for the partner to accept
+            if (isWaiting) return;
+
             try {
                 // For direct calls, we prefix the room name to avoid matchmaking collisions
                 const roomSessionId = route.params?.isDirect ? `direct_${sessionId}` : sessionId;
@@ -370,7 +375,7 @@ export default function InCallScreen({ navigation, route }: any) {
             <LiveKitRoom
                 serverUrl={LIVEKIT_URL}
                 token={token}
-                connect={true}
+                connect={!isWaiting}
                 audio={true}
                 video={false}
                 onDisconnected={() => handleEndCall(true)}
