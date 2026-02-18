@@ -34,7 +34,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const LIVEKIT_URL = 'wss://engrapp-8lz8v8ia.livekit.cloud';
 
 // ─── Data Listener Component ───────────────────────────────
-function DataListener({ onTranscription }: { onTranscription: (data: any) => void }) {
+function DataListener({ onTranscription, onEndSession }: { 
+    onTranscription: (data: any) => void;
+    onEndSession: () => void;
+}) {
     const room = useRoomContext();
 
     useEffect(() => {
@@ -44,6 +47,9 @@ function DataListener({ onTranscription }: { onTranscription: (data: any) => voi
                 const data = JSON.parse(str);
                 if (data.type === 'transcription') {
                     onTranscription(data);
+                } else if (data.type === 'end_session') {
+                    console.log('[LiveKit] Received end_session signal');
+                    onEndSession();
                 }
             } catch (e) {
                 console.error('Failed to parse data packet:', e);
@@ -54,8 +60,17 @@ function DataListener({ onTranscription }: { onTranscription: (data: any) => voi
         return () => {
             room.off(RoomEvent.DataReceived, handleData);
         };
-    }, [room, onTranscription]);
+    }, [room, onTranscription, onEndSession]);
 
+    return null;
+}
+
+// ─── Room Handler Component ────────────────────────────────
+function RoomHandler({ onRoomReady }: { onRoomReady: (room: any) => void }) {
+    const room = useRoomContext();
+    useEffect(() => {
+        onRoomReady(room);
+    }, [room, onRoomReady]);
     return null;
 }
 
@@ -138,6 +153,8 @@ export default function InCallScreen({ navigation, route }: any) {
     const [isSpeaker, setIsSpeaker] = useState(false);
     const [transcript, setTranscript] = useState<any[]>(MOCK_TRANSCRIPT);
     const scrollRef = useRef<ScrollView>(null);
+    const roomRef = useRef<any>(null);
+    const hasEndedRef = useRef(false);
 
     const socketRef = useRef<Socket | null>(null);
 
@@ -259,9 +276,21 @@ export default function InCallScreen({ navigation, route }: any) {
         return `${m}:${s}`;
     };
 
-    const handleEndCall = async () => {
-        console.log(`[InCall] Ending session: ${sessionId}`);
+    const handleEndCall = async (remoteTriggered = false) => {
+        if (hasEndedRef.current) return;
+        hasEndedRef.current = true;
+
+        console.log(`[InCall] Ending session: ${sessionId} (remote: ${remoteTriggered})`);
+        
         try {
+            // If we are the ones ending it, tell the partner
+            if (!remoteTriggered && roomRef.current) {
+                const signal = JSON.stringify({ type: 'end_session' });
+                const data = Buffer.from(signal);
+                await roomRef.current.localParticipant.publishData(data, { reliable: true });
+                console.log('[InCall] Broadcasted end_session signal');
+            }
+
             if (sessionId && sessionId !== 'session-id') {
                 // Collect all user transcript text to help backend short-circuit if empty
                 const fullTranscriptText = transcript
@@ -269,6 +298,8 @@ export default function InCallScreen({ navigation, route }: any) {
                     .map(t => t.text)
                     .join(' ');
 
+                // We only call the end API if we are the initiator, or if we want to be safe
+                // In a P2P scenario, both calling is fine for idempotency
                 await sessionsApi.endSession(sessionId, {
                     transcript: fullTranscriptText,
                     actualDuration: duration,
@@ -280,7 +311,7 @@ export default function InCallScreen({ navigation, route }: any) {
         } catch (error) {
             console.error('[InCall] Failed to end session:', error);
         }
-        console.log(`[InCall] Navigating to CallFeedback with sessionId: ${sessionId}`);
+        
         navigation.replace('CallFeedback', {
             sessionId: sessionId || 'session-id',
             partnerName,
@@ -310,20 +341,24 @@ export default function InCallScreen({ navigation, route }: any) {
                 connect={true}
                 audio={true}
                 video={false}
-                onDisconnected={() => handleEndCall()}
+                onDisconnected={() => handleEndCall(true)}
             >
                 <StatusBar barStyle="light-content" />
-                <DataListener onTranscription={(data) => {
-                    setTranscript(prev => [
-                        ...prev,
-                        {
-                            id: Date.now().toString(),
-                            speaker: data.userId === user?.id ? 'user' : 'partner',
-                            text: data.text,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }
-                    ]);
-                }} />
+                <RoomHandler onRoomReady={(room) => { roomRef.current = room; }} />
+                <DataListener 
+                    onTranscription={(data) => {
+                        setTranscript(prev => [
+                            ...prev,
+                            {
+                                id: Date.now().toString(),
+                                speaker: data.userId === user?.id ? 'user' : 'partner',
+                                text: data.text,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }
+                        ]);
+                    }} 
+                    onEndSession={() => handleEndCall(true)}
+                />
                 <LinearGradient
                     colors={['#0F172A', '#1E293B', '#111827']}
                     style={styles.background}
@@ -416,7 +451,7 @@ export default function InCallScreen({ navigation, route }: any) {
                                 icon="close"
                                 label="End"
                                 danger
-                                onPress={handleEndCall}
+                                onPress={() => handleEndCall(false)}
                             />
                         </Animated.View>
                     </View>

@@ -174,6 +174,7 @@ export default function CallScreen() {
     const userLevel = meta.assessmentLevel || 'B1';
     const userLevelNum = getLevelScore(userLevel);
 
+    const navigation: any = useNavigation();
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
