@@ -19,6 +19,7 @@ import AssessmentSpeakingScreen from "../screens/assessment/AssessmentSpeakingSc
 import AssessmentResultScreen from "../screens/assessment/AssessmentResultScreen";
 import AITutorScreen from "../screens/AITutorScreen";
 import ChatScreen from "../screens/ChatScreen";
+import SocketDebugScreen from "../screens/SocketDebugScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
@@ -100,7 +101,9 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
             {/* Assessment Flow */}
             <Stack.Screen name="AssessmentIntro" component={AssessmentIntroScreen} />
             <Stack.Screen name="AssessmentSpeaking" component={AssessmentSpeakingScreen} />
+            <Stack.Screen name="AssessmentSpeaking" component={AssessmentSpeakingScreen} />
             <Stack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
+            <Stack.Screen name="SocketDebug" component={SocketDebugScreen} />
 
             {/* screens accessible from logic/header */}
             <Stack.Screen name="Notifications" component={NotificationScreen} />

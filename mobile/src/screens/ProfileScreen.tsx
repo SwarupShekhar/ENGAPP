@@ -252,6 +252,12 @@ export default function ProfileScreen() {
                     />
                     <View style={styles.separator} />
                     <SettingRow
+                        icon="construct-outline"
+                        label="Debug Socket"
+                        onPress={() => (navigation as any).navigate('SocketDebug')}
+                    />
+                    <View style={styles.separator} />
+                    <SettingRow
                         icon="star-outline"
                         label="Rate the App"
                         onPress={() => Alert.alert('Thank you!', 'We appreciate your support.')}
