@@ -18,10 +18,12 @@ export class ConversationalTutorController {
   @Post('start-session')
   async startSession(@Body() dto: StartSessionDto) {
     const sessionId = uuidv4();
+    const greeting = await this.tutorService.generateGreetingInternal(dto.userId);
+
     return {
       sessionId,
-      message:
-        "Namaste! 🙏 I'm Priya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!",
+      message: greeting.message,
+      audioBase64: greeting.audioBase64,
     };
   }
 
@@ -41,6 +43,19 @@ export class ConversationalTutorController {
       userId,
       sessionId,
     );
+  }
+
+  @Post('transcribe')
+  @UseInterceptors(FileInterceptor('audio'))
+  async transcribe(
+    @UploadedFile() audio: Express.Multer.File,
+    @Body('userId') userId: string,
+  ) {
+    if (!audio) throw new BadRequestException('Audio file is required');
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const result = await this.tutorService.transcribeHinglish(audio.buffer, userId);
+    return { text: result.text };
   }
 
   @Post('assess-pronunciation')

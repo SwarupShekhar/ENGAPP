@@ -36,6 +36,12 @@ model User {
   blockedBy    BlockedUser[] @relation("BlockedUser")
 
   @@index([clerkId])
+
+  // Gamification
+  points      UserPoints?
+  badges      UserBadge[]
+  leaderboard Leaderboard[]
+  reliability UserReliability?
 }
 
 model Profile {
@@ -208,9 +214,109 @@ model BlockedUser {
   blockedUserId String
   createdAt     DateTime @default(now())
 
+  // Commitment tracking
+  structure       String?
+  objectives      String[]  @default([])
+  checkpoints     Json?
+  userACommitted  Boolean   @default(false)
+  userBCommitted  Boolean   @default(false)
+  
+  // Completion tracking
+  objectivesMetByA Json?    // Which objectives A completed
+  objectivesMetByB Json?    // Which objectives B completed
+
   blocker     User @relation("BlockingUser", fields: [blockerId], references: [id], onDelete: Cascade)
   blockedUser User @relation("BlockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedUserId])
   @@index([blockedUserId])
+}
+
+// ─── Gamification Models ──────────────────────────────
+
+model UserPoints {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  totalPoints     Int      @default(0)
+  weeklyPoints    Int      @default(0)
+  monthlyPoints   Int      @default(0)
+  
+  // Breakdown
+  pointsFromP2P       Int  @default(0)
+  pointsFromAI        Int  @default(0)
+  pointsFromStreaks   Int  @default(0)
+  pointsFromBadges    Int  @default(0)
+  
+  level       Int      @default(1)    // User level (1-100)
+  xpToNext    Int      @default(100)  // XP needed for next level
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  icon        String
+  tier        String   // bronze, silver, gold, platinum
+  requirement String   // "Complete 10 P2P sessions"
+  points      Int      // Points awarded
+  
+  earnedBy    UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  
+  @@unique([userId, badgeId])
+}
+
+model Leaderboard {
+  id        String   @id @default(uuid())
+  period    String   // daily, weekly, monthly, all_time
+  rank      Int
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  points    Int
+  createdAt DateTime @default(now())
+  
+  @@unique([period, userId])
+  @@index([period, rank])
+}
+
+model UserReliability {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  
+  reliabilityScore  Float    @default(100.0)
+  
+  // Session metrics
+  totalSessions         Int      @default(0)
+  completedSessions     Int      @default(0)
+  earlyExits            Int      @default(0)
+  noShows               Int      @default(0)
+  reportsReceived       Int      @default(0)
+  
+  // Streaks
+  consecutiveCompletions Int     @default(0)
+  lastSessionAt         DateTime?
+  
+  // Tier (calculated from reliability + CEFR + engagement)
+  tier                  String   @default("bronze")  // bronze, silver, gold, platinum
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([reliabilityScore])
+  @@index([tier])
 }

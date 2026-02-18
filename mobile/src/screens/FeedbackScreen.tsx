@@ -21,7 +21,7 @@ import Svg, {
 } from 'react-native-svg';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { sessionsApi, ConversationSession } from '../api/sessions';
-import { connectionsApi } from '../api/connections';
+import { connectionsApi, chatApi } from '../api/connections';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -685,7 +685,55 @@ export default function FeedbackScreen() {
   const fetchSessions = useCallback(async () => {
     try {
       const rawSessions = await sessionsApi.listSessions();
-      const mapped = rawSessions.map(s => mapSessionToCallSession(s, currentUserInfo));
+      let mapped = rawSessions.map(s => mapSessionToCallSession(s, currentUserInfo));
+      
+      // Fetch connection statuses for real partners
+      const partnerIds = [...new Set(mapped
+          .filter(s => s.partnerId && s.type === 'p2p')
+          .map(s => s.partnerId!)
+      )];
+
+      console.log('[Feedback] Fetching status for partners:', partnerIds);
+
+      // Fetch connection statuses via bulk APIs (avoids 500 error on single check)
+      try {
+          const [friends, pendingReceived] = await Promise.all([
+              connectionsApi.getFriends(),
+              connectionsApi.getPendingRequests(),
+          ]);
+
+          const friendIds = new Set<string>();
+          if (Array.isArray(friends)) {
+              friends.forEach((f: any) => {
+                  friendIds.add(f.requesterId);
+                  friendIds.add(f.addresseeId);
+              });
+          }
+
+          const pendingReceivedIds = new Set<string>();
+          if (Array.isArray(pendingReceived)) {
+              pendingReceived.forEach((r: any) => {
+                  pendingReceivedIds.add(r.senderId);
+              });
+          }
+
+          mapped = mapped.map(s => {
+              if (s.partnerId && s.type === 'p2p') {
+                  if (friendIds.has(s.partnerId)) {
+                      return { ...s, connectionStatus: 'connected' };
+                  }
+                  if (pendingReceivedIds.has(s.partnerId)) {
+                      return { ...s, connectionStatus: 'pending_received' };
+                  }
+                  // We cannot detect pending_sent easily without a specific API, 
+                  // but this covers the "Already Friends" case.
+              }
+              return s;
+          });
+      } catch (e) {
+          console.error('[Feedback] Bulk fetch failed:', e);
+      }
+
       setSessions(mapped);
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
@@ -784,18 +832,23 @@ export default function FeedbackScreen() {
       );
     } else if (session.connectionStatus === 'connected') {
       try {
-        const status = await connectionsApi.getStatus(session.partnerId!);
-        if (status.conversationId) {
+        // Fetch all conversations to find the one with this partner
+        // (Avoids getStatus which throws 500)
+        const convs = await chatApi.getConversations();
+        const existing = convs.find((c: any) => c.partner?.id === session.partnerId);
+
+        if (existing) {
           (navigation as any).navigate('Chat', {
-            conversationId: status.conversationId,
+            conversationId: existing.conversationId,
             partnerId: session.partnerId,
             partnerName: session.partnerName,
             partnerAvatar: session.partnerAvatar,
           });
         } else {
-          Alert.alert('Chat', 'Conversation not available yet.');
+          Alert.alert('Chat', 'Conversation not found. Please try again later.');
         }
       } catch (err: any) {
+        console.error('Failed to open chat:', err);
         Alert.alert('Error', 'Could not open chat. Please try again.');
       }
     }

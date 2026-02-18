@@ -22,6 +22,16 @@ export const tutorApi = {
         return res.data;
     },
 
+
+
+    transcribe: async (formData: FormData) => {
+        const res = await client.post('/conversational-tutor/transcribe', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 15000,
+        });
+        return res.data;
+    },
+
     endSession: async (sessionId: string) => {
         const res = await client.post('/conversational-tutor/end-session', { sessionId });
         return res.data;

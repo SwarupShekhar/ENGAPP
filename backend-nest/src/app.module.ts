@@ -23,6 +23,7 @@ import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
 import livekitConfig from './config/livekit.config';
 import { PrismaModule } from './database/prisma/prisma.module';
+import { ReliabilityModule } from './modules/reliability/reliability.module';
 
 @Module({
   imports: [
@@ -57,7 +58,9 @@ import { PrismaModule } from './database/prisma/prisma.module';
     ChatModule,
     PrismaModule,
     UsersModule,
+    UsersModule,
     ConversationalTutorModule,
+    ReliabilityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

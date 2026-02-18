@@ -51,7 +51,67 @@ model User {
   chatParticipants     ConversationParticipant[]
   chatMessages         Message[]     @relation("ChatMessagesSent")
 
+  // Gamification & Reliability
+  reliability     UserReliability?
+  points          UserPoints?
+  matchmakingQueue MatchmakingQueue[]
+
   @@index([clerkId])
+}
+
+model UserReliability {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  reliabilityScore Float    @default(100.0)
+  tier             String   @default("bronze") // bronze, silver, gold, platinum
+  lastSessionAt    DateTime?
+  lastDisconnectAt DateTime?
+  lastDisconnectReason String? // manual_exit, network_drop, etc.
+  consecutiveDrops Int      @default(0)
+  totalSessions    Int      @default(0)
+  successfulSessions Int    @default(0)
+  completedSessions Int     @default(0)
+  earlyExits       Int      @default(0)
+  noShows          Int      @default(0)
+  reportsReceived  Int      @default(0)
+  consecutiveCompletions Int @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserPoints {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  total     Int      @default(0)
+  level     Int      @default(1)
+  history   PointHistory[]
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PointHistory {
+  id        String   @id @default(uuid())
+  userPointsId String
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  userPoints UserPoints @relation(fields: [userPointsId], references: [id], onDelete: Cascade)
+}
+
+model MatchmakingQueue {
+  id        String   @id @default(uuid())
+  userId    String
+  structure String // 'free_talk', 'ielts_speaking', etc.
+  status    String   @default("waiting") // waiting, matched, timeout
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, structure])
 }
 
 model Friendship {
@@ -113,6 +173,9 @@ model Profile {
 model ConversationSession {
   id          String    @id @default(uuid())
   topic       String?
+  structure   String?   // 'free_talk', 'ielts_speaking', etc.
+  objectives  Json?     // Structured objectives for the session
+  checkpoints Json?     // Progress checkpoints
   status      String    @default("CREATED") // CREATED, IN_PROGRESS, ENDED, PROCESSING, COMPLETED, ANALYSIS_FAILED
   startedAt   DateTime  @default(now())
   endedAt     DateTime?

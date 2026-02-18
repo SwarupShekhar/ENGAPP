@@ -1,5 +1,5 @@
 import React from "react";
-import { View } from "react-native";
+import { View, Text, StyleSheet as RNStyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "../screens/HomeScreen";
@@ -10,8 +10,8 @@ import FeedbackScreen from "../screens/FeedbackScreen";
 import CallScreen from "../screens/CallScreen";
 import CallPreferenceScreen from "../screens/CallPreferenceScreen";
 import PracticeScreen from "../screens/PracticeScreen";
-import InCallScreen from "../screens/InCallScreen";
 import CallFeedbackScreen from "../screens/CallFeedbackScreen";
+import NotificationScreen from "../screens/NotificationScreen";
 import CreateProfileScreen from "../screens/auth/CreateProfileScreen";
 import AssessmentIntroScreen from "../screens/assessment/AssessmentIntroScreen";
 import AssessmentSpeakingScreen from "../screens/assessment/AssessmentSpeakingScreen";
@@ -19,6 +19,42 @@ import AssessmentResultScreen from "../screens/assessment/AssessmentResultScreen
 import AITutorScreen from "../screens/AITutorScreen";
 import ChatScreen from "../screens/ChatScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
+
+// Safe wrapper for InCallScreen — LiveKit requires native modules
+// that are not available in Expo Go. This defers the import.
+let RealInCallScreen: React.ComponentType<any> | null = null;
+try {
+    RealInCallScreen = require("../screens/InCallScreen").default;
+} catch (e) {
+    console.warn("[LiveKit] Native module not available — InCallScreen disabled (Expo Go mode)");
+}
+
+function InCallScreen(props: any) {
+    if (RealInCallScreen) {
+        return <RealInCallScreen {...props} />;
+    }
+    return (
+        <View style={expoGoFallback.container}>
+            <Text style={expoGoFallback.emoji}>📞</Text>
+            <Text style={expoGoFallback.title}>Calling Not Available</Text>
+            <Text style={expoGoFallback.subtitle}>
+                LiveKit requires a development build.{"\n"}
+                Run `npx expo run:ios` or `npx expo run:android` to test calls.
+            </Text>
+            <Text style={expoGoFallback.back} onPress={() => props.navigation.goBack()}>
+                ← Go Back
+            </Text>
+        </View>
+    );
+}
+
+const expoGoFallback = RNStyleSheet.create({
+    container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0F172A", padding: 32 },
+    emoji: { fontSize: 48, marginBottom: 16 },
+    title: { color: "white", fontSize: 22, fontWeight: "bold", marginBottom: 8 },
+    subtitle: { color: "#94A3B8", fontSize: 14, textAlign: "center", lineHeight: 22 },
+    back: { color: "#818CF8", fontSize: 16, fontWeight: "600", marginTop: 24 },
+});
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -66,6 +102,7 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
             <Stack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
 
             {/* screens accessible from logic/header */}
+            <Stack.Screen name="Notifications" component={NotificationScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="Call" component={CallScreen} />
 

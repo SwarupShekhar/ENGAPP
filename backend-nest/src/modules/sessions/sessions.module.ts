@@ -7,6 +7,7 @@ import { PrismaModule } from '../../database/prisma/prisma.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { IntegrationsModule } from '../../integrations/integrations.module';
 import { AssessmentModule } from '../assessment/assessment.module';
+import { ReliabilityModule } from '../reliability/reliability.module';
 
 @Module({
     imports: [
@@ -17,6 +18,7 @@ import { AssessmentModule } from '../assessment/assessment.module';
         BullModule.registerQueue({
             name: 'sessions',
         }),
+        ReliabilityModule,
     ],
     controllers: [SessionsController],
     providers: [SessionsService, SessionsProcessor],

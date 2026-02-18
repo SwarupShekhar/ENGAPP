@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "UserReliability" ADD COLUMN     "completedSessions" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "consecutiveCompletions" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "earlyExits" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "noShows" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "reportsReceived" INTEGER NOT NULL DEFAULT 0;

@@ -32,10 +32,19 @@ export const setAuthTokenFetcher = (fetcher: () => Promise<string | null>) => {
 client.interceptors.request.use(
     async (config) => {
         if (getToken) {
-            const token = await getToken();
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
+            try {
+                const token = await getToken();
+                if (token) {
+                   // console.log('[API] Attaching auth token');
+                    config.headers.Authorization = `Bearer ${token}`;
+                } else {
+                    console.warn('[API] getToken returned null - request sent without Auth header');
+                }
+            } catch (e) {
+                console.error('[API] Failed to retrieve token:', e);
             }
+        } else {
+            console.warn('[API] No token fetcher configured');
         }
         return config;
     },

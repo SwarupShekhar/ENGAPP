@@ -97,9 +97,9 @@ export default function HomeScreen() {
                                     <Text style={styles.streakText}>{displayData.streak}</Text>
                                 </View>
                             )}
-                            <View style={styles.notifBtn}>
+                            <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
                                 <Ionicons name="notifications-outline" size={22} color="white" />
-                            </View>
+                            </TouchableOpacity>
                         </View>
                     </View>
 

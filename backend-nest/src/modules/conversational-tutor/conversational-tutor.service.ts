@@ -284,6 +284,18 @@ export class ConversationalTutorService {
     };
   }
 
+  // ─── Verification: Generate initial greeting ───────────────
+
+  async generateGreetingInternal(userId: string): Promise<{ message: string; audioBase64: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const name = user?.fname || 'Friend';
+    const message = `Namaste ${name}! 🙏 I'm Priya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!`;
+
+    const audioBase64 = await this.synthesizeHinglish(message);
+
+    return { message, audioBase64 };
+  }
+
   // ─── Helper: get or create session ─────────────────────────
 
   private getOrCreateSession(sessionId: string): ConversationSession {

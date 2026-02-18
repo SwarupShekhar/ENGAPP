@@ -11,8 +11,20 @@ import { useUser } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../theme/theme';
 import { matchmakingApi } from '../api/matchmaking';
+import { ActivityIndicator } from 'react-native';
+import { FeatureLock } from '../components/FeatureLock';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ─── Constants & Helpers ───────────────────────────────────
+
+const getLevelScore = (levelStr?: string): number => {
+    if (!levelStr) return 1;
+    const map: { [key: string]: number } = {
+        'A1': 1, 'A2': 2, 'B1': 3, 'B2': 4, 'C1': 5, 'C2': 6
+    };
+    return map[levelStr.toUpperCase()] || 1;
+};
 
 // ─── Mock Data ─────────────────────────────────────────────
 const SUGGESTED_TOPICS = [
@@ -155,9 +167,12 @@ export default function CallScreen() {
     const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [showAiOption, setShowAiOption] = useState(false);
+    const [isStructured, setIsStructured] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const meta = (user?.unsafeMetadata || {}) as any;
     const userLevel = meta.assessmentLevel || 'B1';
+    const userLevelNum = getLevelScore(userLevel);
 
     const navigation: any = useNavigation();
 
@@ -165,41 +180,74 @@ export default function CallScreen() {
         if (!user) return;
 
         setIsSearching(true);
-        try {
-            await matchmakingApi.join({
-                userId: user.id,
-                englishLevel: userLevel,
-                topic: selectedTopic || 'general'
-            });
+        setError(null);
 
-            // Start Polling
-            const pollInterval = setInterval(async () => {
-                try {
-                    const status = await matchmakingApi.checkStatus(user.id, userLevel);
-                    if (status.matched && status.sessionId) {
-                        clearInterval(pollInterval);
+        try {
+            if (isStructured) {
+                // ── Structured Matchmaking (Progressive) ──
+                const result = await matchmakingApi.findStructured(
+                    user.id, 
+                    'ielts_speaking' // Default structure for now
+                );
+
+                setIsSearching(false);
+
+                if (result.matched && result.partnerId && result.sessionId) {
+                    navigation.replace('InCall', {
+                        sessionId: result.sessionId,
+                        partnerId: result.partnerId,
+                        mode: 'structured'
+                    });
+                } else {
+                    // Timeout / Fallback
+                    setShowAiOption(true);
+                }
+
+            } else {
+                // ── Free Talk (Queue & Poll) ──
+                await matchmakingApi.join({
+                    userId: user.id,
+                    englishLevel: userLevel,
+                    topic: selectedTopic || 'general'
+                });
+
+                // Start Polling
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const status = await matchmakingApi.checkStatus(user.id, userLevel);
+                        if (status.matched && status.sessionId) {
+                            clearInterval(pollInterval);
+                            setIsSearching(false);
+                            navigation.replace('InCall', {
+                                sessionId: status.sessionId,
+                                roomName: status.roomName,
+                                partnerId: status.partnerId,
+                                partnerName: status.partnerName,
+                                topic: selectedTopic || 'general'
+                            });
+                        } else if (status.message) {
+                            clearInterval(pollInterval);
+                            setIsSearching(false);
+                            setShowAiOption(true);
+                        }
+                    } catch (error) {
+                        console.error('Poll error', error);
+                        // Don't stop polling on transient errors, but maybe limit retries
+                    }
+                }, 3000);
+
+                // Safety timeout for polling (manual cleanup if component unmounts is handled by effect usually, but here in handler)
+                // In production, use a useRef for interval to clear on unmount.
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    if (isSearching) {
                         setIsSearching(false);
-                        navigation.replace('InCall', {
-                            sessionId: status.sessionId,
-                            roomName: status.roomName,
-                            partnerId: status.partnerId,
-                            partnerName: status.partnerName,
-                            topic: selectedTopic || 'general'
-                        });
-                    } else if (status.message) {
-                        // Timeout or other message
-                        clearInterval(pollInterval);
-                        setIsSearching(false);
-                        // Instead of just alerting, we could show a state that offers AI Tutor
-                        // For now, let's use a confirmed navigation or a simple choice
                         setShowAiOption(true);
                     }
-                } catch (error) {
-                    console.error('Matchmaking poll error:', error);
-                }
-            }, 3000);
+                }, 45000); 
+            }
         } catch (error) {
-            console.error('Failed to join queue:', error);
+            console.error('Failed to join:', error);
             setIsSearching(false);
         }
     };
@@ -227,8 +275,34 @@ export default function CallScreen() {
 
                         {/* Find Partner Button */}
                         <AnimatedRN.View entering={FadeInDown.delay(200).springify()} style={styles.findPartnerContainer}>
-                            <View style={styles.pulseContainer}>
-                                {!showAiOption && (
+                            
+                            {/* Mode Toggle */}
+                            <View style={styles.modeToggle}>
+                                <TouchableOpacity 
+                                    style={[styles.modeBtn, !isStructured && styles.modeBtnActive]}
+                                    onPress={() => setIsStructured(false)}
+                                >
+                                    <Text style={[styles.modeText, !isStructured && styles.modeTextActive]}>Free Talk</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.modeBtn, isStructured && styles.modeBtnActive]}
+                                    onPress={() => setIsStructured(true)}
+                                >
+                                    <Text style={[styles.modeText, isStructured && styles.modeTextActive]}>Structured</Text>
+                                    <Ionicons name="lock-closed" size={12} color={isStructured ? 'white' : theme.colors.text.secondary} style={{marginLeft: 4, opacity: 0.7}} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={[styles.pulseContainer, isStructured && styles.pulseContainerLocked]}>
+                                {/* Feature Lock Overlay for Structured Mode */}
+                                {isStructured && userLevelNum < 5 && (
+                                    <FeatureLock 
+                                        currentLevel={userLevelNum} 
+                                        requiredLevel={5} 
+                                    />
+                                )}
+
+                                {!showAiOption && !isStructured && (
                                     <>
                                         <PulseRing delay={0} />
                                         <PulseRing delay={700} />
@@ -238,21 +312,28 @@ export default function CallScreen() {
                                 <TouchableOpacity
                                     activeOpacity={0.85}
                                     onPress={showAiOption ? () => navigation.navigate('AITutor') : handleFindPartner}
-                                    disabled={isSearching}
+                                    disabled={isSearching || (isStructured && userLevelNum < 5)}
                                 >
                                     <LinearGradient
                                         colors={showAiOption 
                                             ? theme.colors.gradients.premium
                                             : isSearching
                                                 ? [theme.colors.primaryLight, theme.colors.primary]
-                                                : theme.colors.gradients.primary
+                                                : isStructured
+                                                    ? ['#8B5CF6', '#7C3AED'] // Purple for structured
+                                                    : theme.colors.gradients.primary
                                         }
                                         style={styles.findButton}
                                     >
                                         {isSearching ? (
                                             <>
-                                                <Ionicons name="search" size={36} color="white" />
-                                                <Text style={styles.findButtonText}>Searching...</Text>
+                                                <ActivityIndicator color="white" size="large" />
+                                                <Text style={styles.findButtonText}>
+                                                    {isStructured ? 'Finding Match...' : 'Searching...'}
+                                                </Text>
+                                                {isStructured && (
+                                                    <Text style={styles.searchHint}>Expanding criteria...</Text>
+                                                )}
                                             </>
                                         ) : showAiOption ? (
                                             <>
@@ -261,8 +342,10 @@ export default function CallScreen() {
                                             </>
                                         ) : (
                                             <>
-                                                <Ionicons name="call" size={36} color="white" />
-                                                <Text style={styles.findButtonText}>Find a Partner</Text>
+                                                <Ionicons name={isStructured ? "school" : "call"} size={36} color="white" />
+                                                <Text style={styles.findButtonText}>
+                                                    {isStructured ? 'Start Practice' : 'Find a Partner'}
+                                                </Text>
                                             </>
                                         )}
                                     </LinearGradient>
@@ -524,5 +607,42 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
         fontWeight: '600',
         textDecorationLine: 'underline',
+    },
+
+    // Mode Toggle
+    modeToggle: {
+        flexDirection: 'row',
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.l,
+        padding: 4,
+        marginBottom: theme.spacing.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    modeBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: theme.borderRadius.m,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    modeBtnActive: {
+        backgroundColor: theme.colors.primary,
+    },
+    modeText: {
+        color: theme.colors.text.secondary,
+        fontWeight: '600',
+        fontSize: theme.typography.sizes.s,
+    },
+    modeTextActive: {
+        color: 'white',
+    },
+    pulseContainerLocked: {
+        opacity: 0.8,
+    },
+    searchHint: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 12,
+        marginTop: 4,
     },
 });

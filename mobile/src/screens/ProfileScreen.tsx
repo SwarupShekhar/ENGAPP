@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme/theme';
 import { useUser, useAuth } from '@clerk/clerk-expo';
+import { useFocusEffect } from '@react-navigation/native';
+import { reliabilityApi, UserReliability } from '../api/reliability';
 
 // ─── Setting Row ───────────────────────────────────────────
 function SettingRow({ icon, label, subtitle, onPress, rightElement, danger }: {
@@ -46,6 +48,38 @@ function SectionHeader({ title }: { title: string }) {
     return <Text style={styles.sectionTitle}>{title}</Text>;
 }
 
+// ─── Reliability Badge ─────────────────────────────────────
+function ReliabilityBadge({ score }: { score: number }) {
+    let color = theme.colors.primary;
+    let label = 'Reliable';
+    let icon = 'shield-checkmark';
+
+    if (score >= 90) {
+        color = '#10b981'; // Green
+        label = 'Excellent';
+        icon = 'star';
+    } else if (score >= 75) {
+        color = '#3b82f6'; // Blue
+        label = 'Good';
+        icon = 'shield-checkmark';
+    } else if (score >= 60) {
+        color = '#f59e0b'; // Amber
+        label = 'Fair';
+        icon = 'alert-circle';
+    } else {
+        color = '#ef4444'; // Red
+        label = 'Low';
+        icon = 'warning';
+    }
+
+    return (
+        <View style={[styles.reliabilityBadge, { backgroundColor: color + '15', borderColor: color + '30' }]}>
+            <Ionicons name={icon as any} size={14} color={color} />
+            <Text style={[styles.reliabilityText, { color }]}>{score}% {label}</Text>
+        </View>
+    );
+}
+
 // ─── Main Component ────────────────────────────────────────
 export default function ProfileScreen() {
     const { user } = useUser();
@@ -53,11 +87,22 @@ export default function ProfileScreen() {
     const [signingOut, setSigningOut] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [practiceReminders, setPracticeReminders] = useState(true);
+    const [reliability, setReliability] = useState<UserReliability | null>(null);
 
     const meta = (user?.unsafeMetadata || {}) as any;
     const name = user?.firstName || 'User';
     const email = user?.primaryEmailAddress?.emailAddress || '';
     const initials = name.substring(0, 2).toUpperCase();
+
+    useFocusEffect(
+        React.useCallback(() => {
+            if (user?.id) {
+                reliabilityApi.getUserReliability(user.id)
+                    .then(setReliability)
+                    .catch(err => console.error('Failed to fetch reliability', err));
+            }
+        }, [user?.id])
+    );
 
     const handleSignOut = () => {
         Alert.alert(
@@ -120,11 +165,17 @@ export default function ProfileScreen() {
                     <View style={styles.userInfo}>
                         <Text style={styles.nameText}>{name}</Text>
                         {email ? <Text style={styles.emailText}>{email}</Text> : null}
-                        <View style={styles.levelPill}>
-                            <Ionicons name="trophy-outline" size={12} color={theme.colors.primary} />
-                            <Text style={styles.levelPillText}>
-                                {meta.assessmentCompleted ? (meta.assessmentLevel || 'Assessed') : 'Not Assessed'}
-                            </Text>
+                        
+                        <View style={styles.badgesRow}>
+                            <View style={styles.levelPill}>
+                                <Ionicons name="trophy-outline" size={12} color={theme.colors.primary} />
+                                <Text style={styles.levelPillText}>
+                                    {meta.assessmentCompleted ? (meta.assessmentLevel || 'Assessed') : 'Not Assessed'}
+                                </Text>
+                            </View>
+                            {reliability && (
+                                <ReliabilityBadge score={reliability.reliabilityScore} />
+                            )}
                         </View>
                     </View>
                 </View>
@@ -295,13 +346,30 @@ const styles = StyleSheet.create({
     levelPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
-        gap: 4,
-        marginTop: theme.spacing.s,
         paddingHorizontal: theme.spacing.s,
         paddingVertical: 3,
         borderRadius: theme.borderRadius.circle,
         backgroundColor: theme.colors.primary + '12',
+    },
+    badgesRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: theme.spacing.s,
+        gap: 8,
+        flexWrap: 'wrap',
+    },
+    reliabilityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: theme.spacing.s,
+        paddingVertical: 3,
+        borderRadius: theme.borderRadius.circle,
+        borderWidth: 1,
+        gap: 4,
+    },
+    reliabilityText: {
+        fontSize: theme.typography.sizes.xs,
+        fontWeight: '600',
     },
     levelPillText: {
         fontSize: theme.typography.sizes.xs,

@@ -26,5 +26,10 @@ export const matchmakingApi = {
             params: { userId, level }
         });
         return response.data;
+    },
+
+    findStructured: async (userId: string, structure: string): Promise<{ matched: boolean; partnerId?: string; sessionId?: string }> => {
+        const response = await client.post('/matchmaking/find-structured', { userId, structure });
+        return response.data;
     }
 };

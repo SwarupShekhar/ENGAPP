@@ -26,6 +26,7 @@
     "expo-av": "~16.0.8",
     "expo-blur": "~15.0.8",
     "expo-crypto": "^15.0.8",
+    "expo-dev-client": "~6.0.20",
     "expo-file-system": "~19.0.21",
     "expo-linear-gradient": "~15.0.8",
     "expo-secure-store": "~15.0.8",

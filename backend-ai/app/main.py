@@ -104,13 +104,15 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 # 4. Routers
-from app.api.routes import health, transcribe, analyze, pronunciation, tutor
+from app.api.routes import health, transcribe, analyze, pronunciation, tutor, streaming_tutor, admin
 # ...
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(transcribe.router, prefix="/api", tags=["Transcribe"])
 app.include_router(analyze.router, prefix="/api", tags=["Analyze"])
 app.include_router(pronunciation.router, prefix="/api", tags=["Pronunciation"])
 app.include_router(tutor.router, prefix="/api/tutor", tags=["Tutor"])
+app.include_router(streaming_tutor.router, prefix="/api/tutor", tags=["Streaming"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 # 5. Monitoring
 metrics_app = make_asgi_app()

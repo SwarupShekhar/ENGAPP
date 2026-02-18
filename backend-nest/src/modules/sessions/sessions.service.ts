@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
+import { ReliabilityService } from '../reliability/reliability.service';
 
 @Injectable()
 export class SessionsService {
@@ -11,6 +12,7 @@ export class SessionsService {
     constructor(
         private prisma: PrismaService,
         private azureStorage: AzureStorageService,
+        private reliabilityService: ReliabilityService,
         @InjectQueue('sessions') private sessionsQueue: Queue,
     ) { }
 
@@ -120,6 +122,40 @@ export class SessionsService {
         }
     }
 
+    async startStructuredSession(userAId: string, userBId: string, structureName: string) {
+        // Dynamic import to avoid circular dependency issues if any, or just standard import
+        const { SESSION_STRUCTURES } = await import('./session-structures.data');
+        const structure = SESSION_STRUCTURES[structureName as keyof typeof SESSION_STRUCTURES];
+
+        if (!structure) {
+            throw new BadRequestException('Invalid session structure');
+        }
+
+        const session = await this.prisma.conversationSession.create({
+            data: {
+                topic: structure.topic,
+                status: 'CREATED',
+                structure: structureName,
+                objectives: structure.objectives,
+                checkpoints: structure.checkpoints as any, // Prisma Json type workaround
+                participants: {
+                    create: [
+                        { userId: userAId },
+                        { userId: userBId }
+                    ]
+                }
+            } as any,
+            include: {
+                participants: true
+            }
+        });
+
+        // TODO: Schedule checkpoint notifications via a queue or scheduler
+        // For now, we store them and the client or a background job can handle them
+        
+        return session;
+    }
+
     async heartbeat(sessionId: string, userId: string) {
         try {
             // Also update session status to IN_PROGRESS if it was CREATED
@@ -182,6 +218,24 @@ export class SessionsService {
                     } : undefined,
                 },
             });
+
+            // Update reliability scores
+            const sessionData = session as any;
+            if (sessionData.structure && session.participants.length === 2) {
+                // Determine expected duration
+                // We need to fetch the structure definition to know the expected duration
+                 const { SESSION_STRUCTURES } = await import('./session-structures.data');
+                 const structure = SESSION_STRUCTURES[sessionData.structure as keyof typeof SESSION_STRUCTURES];
+                 const expectedDuration = structure ? structure.duration * 60 : 600; // Default 10 min
+
+                 for (const participant of session.participants) {
+                     await this.reliabilityService.recordSessionComplete(
+                         participant.userId,
+                         duration,
+                         expectedDuration
+                     );
+                 }
+            }
 
             // 3) Trigger Analysis via Queue
             // We use participant IDs from the fetched session
