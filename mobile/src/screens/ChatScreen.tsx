@@ -139,8 +139,10 @@ export default function ChatScreen() {
                 }));
             }
         };
-
-        });
+        socketService.onNewMessage(handleNewMessage);
+        socketService.onUserTyping(handleTyping);
+        socketService.onPresenceUpdate(handlePresence);
+        socketService.onMessagesRead(handleRead);
 
         const handleConnect = () => {
             console.log('[ChatScreen] Socket connected, fetching presence');
