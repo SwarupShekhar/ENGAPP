@@ -12,6 +12,7 @@ import CallPreferenceScreen from "../screens/CallPreferenceScreen";
 import PracticeScreen from "../screens/PracticeScreen";
 import CallFeedbackScreen from "../screens/CallFeedbackScreen";
 import NotificationScreen from "../screens/NotificationScreen";
+import ConversationsScreen from "../screens/ConversationsScreen";
 import CreateProfileScreen from "../screens/auth/CreateProfileScreen";
 import AssessmentIntroScreen from "../screens/assessment/AssessmentIntroScreen";
 import AssessmentSpeakingScreen from "../screens/assessment/AssessmentSpeakingScreen";
@@ -121,6 +122,7 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
             <Stack.Screen name="CallFeedback" component={CallFeedbackScreen} />
 
             {/* Chat */}
+            <Stack.Screen name="Conversations" component={ConversationsScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
         </Stack.Navigator>
     );

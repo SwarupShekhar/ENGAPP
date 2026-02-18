@@ -14,12 +14,14 @@ import { FeedbackReadyCard } from '../components/home/FeedbackReadyCard';
 import { SkillRingsRow } from '../components/home/SkillRingsRow';
 import { WeeklyActivityBar } from '../components/home/WeeklyActivityBar';
 import { userApi, UserStats } from '../api/user';
+import { chatApi } from '../api/connections';
 
 export default function HomeScreen() {
     const { user, isLoaded } = useUser();
     const navigation: any = useNavigation();
 
     const [stats, setStats] = useState<UserStats | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -31,17 +33,21 @@ export default function HomeScreen() {
     useFocusEffect(
         useCallback(() => {
             if (!user) return;
-            const fetchStats = async () => {
+            const fetchData = async () => {
                 try {
-                    const data = await userApi.getStats();
-                    setStats(data);
+                    const [statsData, unreadData] = await Promise.all([
+                        userApi.getStats(),
+                        chatApi.getUnreadCount()
+                    ]);
+                    setStats(statsData);
+                    setUnreadCount(unreadData.count || 0);
                 } catch (error) {
-                    console.error('Failed to fetch user stats:', error);
+                    console.error('Failed to fetch home data:', error);
                 } finally {
                     setLoading(false);
                 }
             };
-            fetchStats();
+            fetchData();
         }, [user])
     );
 
@@ -97,6 +103,16 @@ export default function HomeScreen() {
                                     <Text style={styles.streakText}>{displayData.streak}</Text>
                                 </View>
                             )}
+                            <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Conversations')}>
+                                <Ionicons name="chatbox-ellipses-outline" size={22} color="white" />
+                                {unreadCount > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
                             <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate('Notifications')}>
                                 <Ionicons name="notifications-outline" size={22} color="white" />
                             </TouchableOpacity>
@@ -237,6 +253,26 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.25)',
+        position: 'relative',
+    },
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#EF4444',
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 1.5,
+        borderColor: '#4F46E5',
+    },
+    badgeText: {
+        color: 'white',
+        fontSize: 10,
+        fontWeight: 'bold',
     },
     levelRow: {
         flexDirection: 'row',
