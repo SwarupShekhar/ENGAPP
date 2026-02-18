@@ -65,10 +65,17 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
         "Incoming Call",
         `${data.initiatorName} is calling you...`,
         [
-          { text: "Decline", style: "cancel" },
+          { 
+            text: "Decline", 
+            style: "cancel",
+            onPress: () => {
+                socketService.declineCall(data.conversationId);
+            }
+          },
           { 
             text: "Accept", 
             onPress: () => {
+              socketService.acceptCall(data.conversationId);
               navigate('InCall', { 
                 sessionId: data.sessionId, 
                 partnerName: data.initiatorName,
@@ -77,7 +84,8 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
               });
             }
           }
-        ]
+        ],
+        { cancelable: false }
       );
     };
 

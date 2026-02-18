@@ -143,6 +143,14 @@ class SocketService {
         });
     }
 
+    acceptCall(conversationId: string) {
+        this.socket?.emit('accept_call', { conversationId });
+    }
+
+    declineCall(conversationId: string) {
+        this.socket?.emit('decline_call', { conversationId });
+    }
+
     // ── Listeners ───────────────────────────────────────
 
     on(event: string, callback: SocketCallback) {
@@ -172,6 +180,9 @@ class SocketService {
 
     onIncomingCall(callback: SocketCallback) { this.on('incoming_call', callback); }
     offIncomingCall(callback: SocketCallback) { this.off('incoming_call', callback); }
+
+    onCallStatusUpdate(callback: SocketCallback) { this.on('call_status_update', callback); }
+    offCallStatusUpdate(callback: SocketCallback) { this.off('call_status_update', callback); }
 }
 
 export default SocketService;

@@ -245,6 +245,50 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { success: true, messageId: message.id };
     }
 
+    @SubscribeMessage('accept_call')
+    async handleAcceptCall(client: AuthenticatedSocket, data: { conversationId: string }) {
+        this.logger.log(`[DirectCall] User ${client.userId} accepted call in ${data.conversationId}`);
+        // Notify other participants in the conversation that the call was accepted
+        const conversation = await this.prisma.conversation.findUnique({
+            where: { id: data.conversationId },
+            include: { participants: true },
+        });
+
+        if (conversation) {
+            conversation.participants.forEach(p => {
+                if (p.userId !== client.userId) {
+                    this.notifyUser(p.userId, 'call_status_update', {
+                        conversationId: data.conversationId,
+                        status: 'accepted',
+                        responderId: client.userId,
+                    });
+                }
+            });
+        }
+    }
+
+    @SubscribeMessage('decline_call')
+    async handleDeclineCall(client: AuthenticatedSocket, data: { conversationId: string }) {
+        this.logger.log(`[DirectCall] User ${client.userId} declined call in ${data.conversationId}`);
+        // Notify other participants in the conversation that the call was declined
+        const conversation = await this.prisma.conversation.findUnique({
+            where: { id: data.conversationId },
+            include: { participants: true },
+        });
+
+        if (conversation) {
+            conversation.participants.forEach(p => {
+                if (p.userId !== client.userId) {
+                    this.notifyUser(p.userId, 'call_status_update', {
+                        conversationId: data.conversationId,
+                        status: 'declined',
+                        responderId: client.userId,
+                    });
+                }
+            });
+        }
+    }
+
     // ── Presence Sync ──────────────────────────────────
     @SubscribeMessage('get_online_users')
     handleGetOnlineUsers() {

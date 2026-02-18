@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    Dimensions, StatusBar
+    Dimensions, StatusBar, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -161,6 +161,10 @@ export default function InCallScreen({ navigation, route }: any) {
     const sessionId = route?.params?.sessionId;
     const partnerName = route?.params?.partnerName || 'Co-learner';
     const topic = route?.params?.topic || 'General Practice';
+    const isDirect = route?.params?.isDirect;
+
+    const [isWaiting, setIsWaiting] = useState(isDirect);
+    const [callStatus, setCallStatus] = useState<'calling' | 'connected' | 'declined'>('calling');
 
     const pulseScale = useSharedValue(1);
     const pulseOpacity = useSharedValue(0.15);
@@ -182,6 +186,29 @@ export default function InCallScreen({ navigation, route }: any) {
         transform: [{ scale: pulseScale.value }],
         opacity: pulseOpacity.value,
     }));
+    useEffect(() => {
+        if (!isDirect) return;
+
+        const handleStatus = (data: { status: 'accepted' | 'declined', conversationId: string }) => {
+            if (data.conversationId === sessionId) {
+                if (data.status === 'accepted') {
+                    setCallStatus('connected');
+                    setIsWaiting(false);
+                } else {
+                    setCallStatus('declined');
+                    setTimeout(() => navigation.goBack(), 2000);
+                }
+            }
+        };
+
+        const socketService = SocketService.getInstance();
+        socketService.onCallStatusUpdate(handleStatus);
+        
+        return () => {
+            socketService.offCallStatusUpdate(handleStatus);
+        };
+    }, [sessionId, isDirect]);
+
     useEffect(() => {
         const fetchToken = async () => {
             if (!user || !sessionId) return;
@@ -396,8 +423,17 @@ export default function InCallScreen({ navigation, route }: any) {
                             </LinearGradient>
                         </View>
                         <Text style={styles.partnerName}>{partnerName}</Text>
-                        <Text style={styles.statusText}>Live Connection</Text>
+                        <Text style={styles.statusText}>
+                            {isWaiting ? (callStatus === 'declined' ? 'Call Declined' : 'Calling...') : 'Live Connection'}
+                        </Text>
                     </Animated.View>
+
+                    {isWaiting && callStatus !== 'declined' && (
+                        <View style={styles.waitingOverlay}>
+                            <ActivityIndicator size="large" color={theme.colors.primaryLight} />
+                            <Text style={styles.waitingText}>Waiting for {partnerName} to join...</Text>
+                        </View>
+                    )}
 
                     {/* Transcript: Glassmorphism container */}
                     <View style={styles.transcriptContainer}>
@@ -503,6 +539,21 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 14,
         fontWeight: '600',
+    },
+    statusText: {
+        fontSize: 14,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+    waitingOverlay: {
+        marginTop: 40,
+        alignItems: 'center',
+        gap: 12,
+    },
+    waitingText: {
+        color: '#94A3B8',
+        fontSize: 16,
+        fontWeight: '500',
     },
     partnerSection: {
         alignItems: 'center',
