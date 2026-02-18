@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme/theme';
 import { useUser, useAuth } from '@clerk/clerk-expo';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { reliabilityApi, UserReliability } from '../api/reliability';
 
 // ─── Setting Row ───────────────────────────────────────────
@@ -84,6 +84,7 @@ function ReliabilityBadge({ score }: { score: number }) {
 export default function ProfileScreen() {
     const { user } = useUser();
     const { signOut } = useAuth();
+    const navigation = useNavigation();
     const [signingOut, setSigningOut] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [practiceReminders, setPracticeReminders] = useState(true);

@@ -18,9 +18,9 @@ export default function SocketDebugScreen() {
         const service = SocketService.getInstance();
         const isConnected = service.isConnected();
         setStatus(isConnected ? 'Connected' : 'Disconnected');
-        setSocketId(service.socket?.id || 'None');
+        setSocketId(service.getSocketId() || 'None');
         addLog(`Connection Status: ${isConnected ? 'Connected' : 'Disconnected'}`);
-        addLog(`Socket ID: ${service.socket?.id || 'None'}`);
+        addLog(`Socket ID: ${service.getSocketId() || 'None'}`);
         addLog(`User ID: ${user?.id}`);
     };
 

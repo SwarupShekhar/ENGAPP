@@ -75,6 +75,10 @@ class SocketService {
         return this.socket?.connected ?? false;
     }
 
+    getSocketId(): string | undefined {
+        return this.socket?.id;
+    }
+
     async playNotificationSound() {
         try {
             if (this.sound) {
