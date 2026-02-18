@@ -232,6 +232,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (conversation) {
             conversation.participants.forEach(p => {
                 if (p.userId !== client.userId) {
+                    this.logger.log(`[DirectCall] Found participant ${p.userId}. Checking if they are in room user:${p.userId}`);
+                    // Debug: check if anyone is in the room
+                    const socketIds = this.server.sockets.adapter.rooms.get(`user:${p.userId}`);
+                    this.logger.log(`[DirectCall] Socket IDs in room user:${p.userId}: ${socketIds ? Array.from(socketIds).join(', ') : 'NONE'}`);
+
                     this.logger.log(`[DirectCall] Notifying user ${p.userId} of incoming call from ${client.userId}`);
                     this.notifyUser(p.userId, 'incoming_call', {
                         conversationId: data.conversationId,

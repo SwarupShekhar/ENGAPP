@@ -61,6 +61,7 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
       callType: string;
       conversationId: string;
     }) => {
+      console.log("[App] Incoming call received:", data);
       Alert.alert(
         "Incoming Call",
         `${data.initiatorName} is calling you...`,
@@ -69,13 +70,16 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
             text: "Decline", 
             style: "cancel",
             onPress: () => {
+                console.log("[App] Declining call:", data.conversationId);
                 socketService.declineCall(data.conversationId);
             }
           },
           { 
             text: "Accept", 
             onPress: () => {
+              console.log("[App] Accepting call:", data.conversationId);
               socketService.acceptCall(data.conversationId, (res: any) => {
+                console.log("[App] Call accepted, response:", res);
                 const realId = res?.sessionId || data.sessionId;
                 navigate('InCall', { 
                   sessionId: realId, 
