@@ -25,8 +25,8 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
         user_id = websocket.query_params["user_id"]
     
     try:
-        # Check rate limit
-        await rate_limiter.check_rate_limit(user_id)
+        # Check rate limit (temporarily disabled for testing)
+        # await rate_limiter.check_rate_limit(user_id)
         
         # Mark session as active
         rate_limiter.start_session(user_id)

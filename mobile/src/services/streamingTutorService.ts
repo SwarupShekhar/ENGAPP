@@ -23,15 +23,13 @@ class StreamingTutorService {
         // Also handle port 3000 -> 8000 mapping if on localhost
         let wsUrl = API_URL.replace('http', 'ws');
         
-        // Quick hack for local dev: Map 3000 to 8000 for Python service if needed
-        // Assuming API_URL points to NestJS (3000) but we need Python (8000)
-        // Adjust logic based on actual environment setup.
-        // For Render, if they are separate services, we might need a specific URL.
-        // Since we don't have the Python URL env var here, we'll try to infer or use the same host.
-        // If it's localhost:3000, we try localhost:8000.
+        // For local development, we need to connect to Python service on port 8000
+        // If API_URL points to localhost:3000 or local IP:3000, change to :8000
         if (wsUrl.includes(':3000')) {
              wsUrl = wsUrl.replace(':3000', ':8000');
         }
+        // For production, we might need a different approach if Python service is separate
+        // For now, assume same host but different port for local dev
 
         this.ws = new WebSocket(`${wsUrl}/ws/${sessionId}?user_id=${userId}`);
 

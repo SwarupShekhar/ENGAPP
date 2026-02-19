@@ -111,6 +111,13 @@ export default function AITutorScreen({ navigation }: any) {
         // Start Session
         const init = async () => {
             try {
+                // Request Permission First
+                const perm = await Audio.requestPermissionsAsync();
+                if (perm.status !== 'granted') {
+                    Alert.alert('Permission Required', 'Microphone access is needed for the AI Tutor.');
+                    return; 
+                }
+
                 const res = await tutorApi.startSession(user?.id || 'test');
                 setSessionId(res.sessionId);
                 
@@ -201,6 +208,12 @@ export default function AITutorScreen({ navigation }: any) {
     const startRecording = async () => {
         if (isProcessing || isStreaming) return; // Block while streaming
         try {
+            const perm = await Audio.requestPermissionsAsync();
+            if (perm.status !== 'granted') {
+                Alert.alert('Permission Required', 'Please enable microphone access locally.');
+                return;
+            }
+
             await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
             const { recording } = await Audio.Recording.createAsync(
                 Audio.RecordingOptionsPresets.HIGH_QUALITY

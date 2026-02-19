@@ -101,7 +101,6 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
             {/* Assessment Flow */}
             <Stack.Screen name="AssessmentIntro" component={AssessmentIntroScreen} />
             <Stack.Screen name="AssessmentSpeaking" component={AssessmentSpeakingScreen} />
-            <Stack.Screen name="AssessmentSpeaking" component={AssessmentSpeakingScreen} />
             <Stack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
             <Stack.Screen name="SocketDebug" component={SocketDebugScreen} />
 
