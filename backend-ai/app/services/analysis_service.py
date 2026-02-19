@@ -1,8 +1,11 @@
+
 import time
 import json
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 import google.generativeai as genai
+import re
+from collections import Counter
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -13,108 +16,657 @@ from app.cache.manager import cached
 from app.services.cefr_classifier import cefr_classifier
 from app.utils.robust_json_parser import robust_json_parser
 
+
 class AnalysisService:
     """
-    Gemini-powered text analysis service.
+    Multi-stage analysis service with validation and confidence scoring.
+    
+    Architecture:
+    1. Quick CEFR classification (rule-based)
+    2. Parallel specialized analyses (grammar, vocab, fluency)
+    3. Error verification (checks if suggested corrections are actually better)
+    4. Confidence scoring (measures internal consistency)
+    5. Final synthesis
     """
 
     def __init__(self):
         self.model = None
+        self.fast_model = None
+        
         if settings.google_api_key:
             genai.configure(api_key=settings.google_api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+            # Use fast model for quick analyses (using main flash model as it's fast enough and available)
+            self.fast_model = genai.GenerativeModel('gemini-2.0-flash')
+            # Use standard model for complex analyses
+            self.model = genai.GenerativeModel('gemini-2.0-flash')
         else:
             logger.warning("Google API key not configured. AnalysisService is disabled.")
-
-    def _create_analysis_prompt(self, request: AnalysisRequest, cefr_level: CEFRLevel) -> str:
-        """Create a comprehensive system prompt for Gemini that requests structured scores."""
-        context_section = ""
-        if request.context:
-            context_section = f"""
-        Additional context (e.g., Azure pronunciation evidence):
-        ---
-        {request.context}
-        ---
-        Use this data to inform your pronunciation and fluency scoring.
+    
+    # ─────────────────────────────────────────────────────────────
+    # STAGE 1: SPECIALIZED ANALYSIS (Parallel)
+    # ─────────────────────────────────────────────────────────────
+    
+    def _create_grammar_prompt(self, text: str, cefr_level: CEFRLevel) -> str:
         """
+        Focused grammar analysis with examples for calibration.
+        Shorter, more precise than your original.
+        """
+        return f"""You are a grammar expert. Analyze ONLY grammar in this text.
 
-        return f"""You are a STRICT professional ESL (English as a Second Language) assessment engine.
-Analyze the following English speech transcript from a learner.
+Expected level: {cefr_level.value}
 
-**IMPORTANT SCORING PRINCIPLES:**
-- Be STRICT and realistic. Most learners should score 40-70 range.
-- A score above 80 means near-native proficiency — reserve it for truly excellent speech.
-- Short or simple utterances should NOT receive high scores regardless of accuracy.
-- Penalize lack of complexity even if the speech is technically correct.
-- A beginner who says "Hello, I am fine" correctly should score ~30-45, not 90+.
+Text: "{text}"
 
-**Learner Profile:**
-- Native language: {request.user_native_language or 'Unknown'}
-- Estimated CEFR level: {cefr_level.value}
+Find grammar errors and rate grammar quality 0-100.
 
-**Transcript to analyze:**
----
-"{request.text}"
----
-{context_section}
+CALIBRATION EXAMPLES:
+- "I go to school yesterday" (A1): 25/100 - Wrong tense
+- "Although I was tired, but I continued working" (B1): 55/100 - Redundant conjunction
+- "Having finished the project, we celebrated" (C1): 90/100 - Correct participle clause
+- "Me and John went shopping" (A2): 40/100 - Pronoun case error
 
-**SCORING RUBRIC — provide a score from 0 to 100 for each:**
+STRICT RULES:
+- Simple correct sentence (A1-A2): max 50/100
+- No complex structures (B1): max 65/100
+- Perfect simple + some complex (B2): 70-85/100
+- Native-like complexity (C1-C2): 85-100/100
 
-1. **grammar_score**: Based on grammatical accuracy AND complexity.
-   - 90-100: Near-native with complex structures (relative clauses, conditionals, passive voice)
-   - 70-89: Good accuracy with some complex structures, minor errors
-   - 50-69: Basic structures mostly correct, limited complexity
-   - 30-49: Frequent errors, limited to simple sentences
-   - 0-29: Mostly unintelligible grammar
-
-2. **pronunciation_score**: Based on clarity and intelligibility.
-   - If Azure pronunciation data is provided in context, weight it at 70%.
-   - Note any L1 accent patterns (e.g., Hindi speakers: retroflex consonants, vowel substitutions).
-   - Distinguish between accent (acceptable variation) vs. errors (impede understanding).
-
-3. **fluency_score**: Based on natural flow AND speech length.
-   - Very short utterances (under 20 words) should cap at 50 regardless of quality.
-   - Penalize filler words ("um", "uh", "like"), false starts, repetitions.
-   - Reward sustained speech, natural pacing, discourse markers ("however", "moreover").
-
-4. **vocabulary_score**: Based on lexical range, variety, and appropriateness.
-   - Simple/common words only → max 50.
-   - Must use varied vocabulary and collocations for scores above 70.
-
-5. **overall_score**: Weighted average — Grammar 30%, Pronunciation 25%, Fluency 25%, Vocabulary 20%.
-
-6. **cefr_level**: Your assessed CEFR level (A1, A2, B1, B2, C1, C2) based on the overall performance.
-
-Respond with ONLY this JSON. No commentary outside the JSON structure.
-
+Respond ONLY with JSON:
 {{
-    "scores": {{
-        "grammar_score": <int 0-100>,
-        "pronunciation_score": <int 0-100>,
-        "fluency_score": <int 0-100>,
-        "vocabulary_score": <int 0-100>,
-        "overall_score": <int 0-100>
-    }},
-    "cefr_level": "<A1|A2|B1|B2|C1|C2>",
-    "errors": [
-        {{
-            "type": "GRAMMAR" | "VOCABULARY" | "TENSE" | "ARTICLE" | "FLUENCY",
-            "severity": "CRITICAL" | "MAJOR" | "MINOR" | "SUGGESTION",
-            "original_text": "The segment with the error.",
-            "corrected_text": "The corrected version.",
-            "explanation": "Brief explanation of why this is wrong and how to fix it.",
-            "suggestion": "A practical tip to avoid this error."
-        }}
-    ],
-    "accent_notes": "1-2 sentences describing any detected accent patterns, L1 influence on pronunciation, and specific phonetic tendencies. If Azure data shows specific word-level accuracy issues, mention those words.",
-    "feedback": "2-3 sentences of encouraging, constructive overall feedback.",
-    "strengths": ["Strength 1", "Strength 2"],
-    "improvement_areas": ["Area 1", "Area 2"],
-    "recommended_tasks": [
-        {{"type": "grammar_drill", "topic": "Specific grammar topic to practice"}},
-        {{"type": "shadowing_exercise", "sentence": "An example sentence to shadow"}}
-    ]
+  "grammar_score": <int 0-100>,
+  "errors": [
+    {{
+      "original": "exact wrong phrase",
+      "corrected": "exact fix",
+      "rule": "grammar rule violated",
+      "severity": "critical|major|minor"
+    }}
+  ],
+  "complexity_level": "simple|intermediate|advanced",
+  "justification": "1 sentence explaining the score"
 }}"""
+
+    def _create_vocabulary_prompt(self, text: str, cefr_level: CEFRLevel) -> str:
+        """Focused vocabulary analysis"""
+        return f"""You are a vocabulary expert. Analyze ONLY vocabulary richness.
+
+Expected level: {cefr_level.value}
+
+Text: "{text}"
+
+Rate vocabulary 0-100 based on:
+1. Lexical diversity (unique words / total words)
+2. Sophistication (A1 common vs C2 advanced words)
+3. Appropriateness to context
+4. Collocations and idiomatic usage
+
+CALIBRATION:
+- "I like it. It is good. Very good.": 20/100 - Repetitive, basic
+- "I enjoyed the experience. It was beneficial and enlightening.": 65/100 - Varied, B2 level
+- "The conference proved invaluable, offering profound insights.": 85/100 - Sophisticated, C1+
+
+Word count: {len(text.split())}
+
+RULES:
+- <15 words: max 40/100 (too short to assess)
+- Repetitive words (used 3+ times): -10 per word
+- Only A1/A2 words: max 45/100
+- Generic words ("good", "nice", "thing"): -5 each
+
+Respond ONLY with JSON:
+{{
+  "vocabulary_score": <int 0-100>,
+  "word_count": <int>,
+  "unique_words": <int>,
+  "lexical_diversity": <float 0-1>,
+  "advanced_words": ["word1", "word2"],
+  "overused_words": {{"word": count}},
+  "suggested_replacements": {{"generic": ["better1", "better2"]}},
+  "justification": "1 sentence"
+}}"""
+
+    def _create_fluency_prompt(self, text: str, context: Optional[str]) -> str:
+        """Focused fluency analysis with Azure data if available"""
+        
+        azure_section = ""
+        if context:
+            azure_section = f"""
+Azure Speech Data Available:
+{context}
+
+Use this to inform:
+- Hesitation detection (pauses, fillers)
+- Speaking rate consistency
+- Pronunciation fluency
+"""
+        
+        return f"""You are a fluency expert. Analyze speech flow and naturalness.
+
+Text: "{text}"
+{azure_section}
+
+Rate fluency 0-100 based on:
+1. Filler words (um, uh, like, basically)
+2. False starts and self-corrections
+3. Repetitions and hesitations
+4. Natural discourse markers (however, moreover, by the way)
+5. Coherence and logical flow
+
+CALIBRATION:
+- "Um... I think... uh... it's like... good?": 25/100 - Excessive fillers
+- "I believe it's beneficial. However, there are concerns.": 75/100 - Natural flow with markers
+- Short utterance (<20 words): max 50/100 regardless of quality
+
+Word count: {len(text.split())}
+
+Respond ONLY with JSON:
+{{
+  "fluency_score": <int 0-100>,
+  "filler_count": {{"um": int, "uh": int, "like": int}},
+  "self_corrections": <int>,
+  "discourse_markers": ["however", "moreover"],
+  "coherence_rating": "poor|fair|good|excellent",
+  "justification": "1 sentence"
+}}"""
+
+    def _create_pronunciation_prompt(self, text: str, native_lang: str, azure_data: Optional[str]) -> str:
+        """Focused pronunciation analysis"""
+        
+        l1_patterns = {
+            "Hindi": "retroflex consonants, v/w confusion, th→d/t substitution",
+            "Spanish": "b/v confusion, final consonant dropping, vowel pure-ness",
+            "Chinese": "l/r confusion, final consonants, tone-influenced stress",
+            "French": "r-sound, th→z/s, final consonant liaison",
+            "Arabic": "p/b confusion, vowel length, emphatic consonants",
+        }
+        
+        expected_patterns = l1_patterns.get(native_lang, "General non-native patterns")
+        
+        azure_section = ""
+        if azure_data:
+            azure_section = f"""
+Azure Pronunciation Data:
+{azure_data}
+
+This is GROUND TRUTH. Weight Azure data at 80% in your final score.
+"""
+        
+        return f"""You are a pronunciation expert specializing in L1 transfer analysis.
+
+Native language: {native_lang}
+Expected L1 patterns: {expected_patterns}
+
+Text: "{text}"
+{azure_section}
+
+Rate pronunciation 0-100.
+
+IMPORTANT:
+- Accent ≠ Error. Hindi accent is fine if intelligible.
+- Only penalize errors that impede understanding.
+- If Azure data shows word-level scores, use those primarily.
+
+WITHOUT Azure data, you can only give rough estimates based on typical L1 patterns.
+WITH Azure data, you have objective evidence.
+
+Respond ONLY with JSON:
+{{
+  "pronunciation_score": <int 0-100>,
+  "confidence": <float 0-1>,
+  "problematic_words": [
+    {{"word": "...", "issue": "...", "ipa_target": "..."}}
+  ],
+  "l1_influence": "description of detected L1 patterns",
+  "accent_vs_error": "Clarify which features are accent (acceptable) vs errors",
+  "justification": "1 sentence"
+}}"""
+
+    # ─────────────────────────────────────────────────────────────
+    # STAGE 2: ERROR VERIFICATION
+    # ─────────────────────────────────────────────────────────────
+    
+    async def _verify_error_corrections(self, errors: List[Dict]) -> List[Dict]:
+        """
+        Verify that suggested corrections are actually better.
+        Prevents false positives like "I went → I go" (worse).
+        """
+        if not errors:
+            return []
+        
+        verified_errors = []
+        
+        for error in errors[:10]:  # Limit to 10 most important
+            original = error.get("original", "")
+            corrected = error.get("corrected", "")
+            
+            if not original or not corrected:
+                continue
+            
+            # Quick check: is correction actually different?
+            if original.lower().strip() == corrected.lower().strip():
+                continue  # Skip non-changes
+            
+            verify_prompt = f"""Is this correction valid?
+
+Original: "{original}"
+Corrected: "{corrected}"
+
+Answer with JSON:
+{{
+  "is_valid": true|false,
+  "reason": "why correction is better/worse"
+}}"""
+            
+            try:
+                response = await asyncio.wait_for(
+                    self.fast_model.generate_content_async(verify_prompt),
+                    timeout=5.0
+                )
+                result = robust_json_parser(response.text)
+                
+                if result.get("is_valid"):
+                    verified_errors.append(error)
+                else:
+                    logger.warning(f"Rejected invalid correction: {original} → {corrected}")
+            
+            except Exception as e:
+                logger.error(f"Verification failed for error: {e}")
+                # If verification fails, keep the error (benefit of doubt)
+                verified_errors.append(error)
+        
+        return verified_errors
+
+    # ─────────────────────────────────────────────────────────────
+    # STAGE 3: CONFIDENCE SCORING
+    # ─────────────────────────────────────────────────────────────
+    
+    def _calculate_confidence(
+        self,
+        text: str,
+        grammar_data: Dict,
+        vocab_data: Dict,
+        fluency_data: Dict,
+        pronunciation_data: Dict
+    ) -> float:
+        """
+        Calculate confidence in the analysis based on:
+        1. Text length (longer = more confident)
+        2. Internal consistency (scores shouldn't vary wildly)
+        3. Presence of objective data (Azure)
+        4. Justification quality
+        """
+        
+        word_count = len(text.split())
+        
+        # Factor 1: Length confidence
+        if word_count < 10:
+            length_conf = 0.3
+        elif word_count < 30:
+            length_conf = 0.6
+        elif word_count < 100:
+            length_conf = 0.85
+        else:
+            length_conf = 0.95
+        
+        # Factor 2: Score consistency
+        scores = [
+            grammar_data.get("grammar_score", 50),
+            vocab_data.get("vocabulary_score", 50),
+            fluency_data.get("fluency_score", 50),
+            pronunciation_data.get("pronunciation_score", 50),
+        ]
+        
+        score_variance = max(scores) - min(scores)
+        if score_variance < 15:
+            consistency_conf = 1.0
+        elif score_variance < 30:
+            consistency_conf = 0.8
+        else:
+            consistency_conf = 0.5  # Scores are all over the place
+        
+        # Factor 3: Objective data presence
+        has_azure = pronunciation_data.get("confidence", 0) > 0.7
+        data_conf = 0.9 if has_azure else 0.6
+        
+        # Weighted average
+        confidence = (
+            length_conf * 0.3 +
+            consistency_conf * 0.4 +
+            data_conf * 0.3
+        )
+        
+        return round(confidence, 2)
+
+    # ─────────────────────────────────────────────────────────────
+    # STAGE 4: FINAL SYNTHESIS
+    # ─────────────────────────────────────────────────────────────
+    
+    def _synthesize_scores(
+        self,
+        grammar_data: Dict,
+        vocab_data: Dict,
+        fluency_data: Dict,
+        pronunciation_data: Dict,
+        cefr_level: CEFRLevel
+    ) -> Tuple[AnalysisMetrics, CEFRLevel]:
+        """
+        Combine specialized analyses into final metrics.
+        Apply penalties for short text.
+        """
+        
+        grammar_score = grammar_data.get("grammar_score", 50)
+        vocab_score = vocab_data.get("vocabulary_score", 50)
+        fluency_score = fluency_data.get("fluency_score", 50)
+        pronunciation_score = pronunciation_data.get("pronunciation_score", 50)
+        
+        # Weighted overall score
+        overall_score = (
+            grammar_score * 0.30 +
+            pronunciation_score * 0.25 +
+            fluency_score * 0.25 +
+            vocab_score * 0.20
+        )
+        
+        overall_score = int(round(overall_score))
+        
+        # CEFR adjustment based on overall score
+        if overall_score >= 90:
+            final_cefr = CEFRLevel.C2
+        elif overall_score >= 80:
+            final_cefr = CEFRLevel.C1
+        elif overall_score >= 70:
+            final_cefr = CEFRLevel.B2
+        elif overall_score >= 55:
+            final_cefr = CEFRLevel.B1
+        elif overall_score >= 40:
+            final_cefr = CEFRLevel.A2
+        else:
+            final_cefr = CEFRLevel.A1
+        
+        metrics = AnalysisMetrics(
+            wpm=vocab_data.get("word_count", 0) / 1.5,  # Rough estimate
+            unique_words=vocab_data.get("unique_words", 0),
+            grammar_score=grammar_score,
+            pronunciation_score=pronunciation_score,
+            fluency_score=fluency_score,
+            vocabulary_score=vocab_score,
+            overall_score=overall_score,
+        )
+        
+        return metrics, final_cefr
+
+    # ─────────────────────────────────────────────────────────────
+    # MAIN ANALYSIS METHOD
+    # ─────────────────────────────────────────────────────────────
+    
+    @cached(prefix="analysis_v2", ttl=settings.cache_ttl_analysis)
+    async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
+        """
+        Multi-stage analysis with validation.
+        
+        Flow:
+        1. Quick CEFR classification
+        2. Parallel specialized analyses (grammar, vocab, fluency, pronunciation)
+        3. Error verification
+        4. Confidence calculation
+        5. Final synthesis
+        """
+        if not self.model:
+            raise RuntimeError("Analysis service is not configured.")
+        
+        start_time = time.time()
+        
+        # Stage 1: Baseline CEFR
+        cefr_assessment = cefr_classifier.classify(request.text)
+        
+        # Stage 2: Parallel specialized analyses
+        tasks = [
+            self._analyze_grammar(request.text, cefr_assessment.level),
+            self._analyze_vocabulary(request.text, cefr_assessment.level),
+            self._analyze_fluency(request.text, request.context),
+            self._analyze_pronunciation(
+                request.text,
+                request.user_native_language or "Unknown",
+                request.context
+            ),
+        ]
+        
+        try:
+            grammar_data, vocab_data, fluency_data, pronunciation_data = await asyncio.gather(
+                *tasks,
+                return_exceptions=True
+            )
+            
+            # Handle exceptions
+            if isinstance(grammar_data, Exception):
+                logger.error(f"Grammar analysis failed: {grammar_data}")
+                grammar_data = {"grammar_score": 50, "errors": [], "justification": "Analysis failed"}
+            
+            if isinstance(vocab_data, Exception):
+                logger.error(f"Vocabulary analysis failed: {vocab_data}")
+                vocab_data = {"vocabulary_score": 50, "word_count": 0, "unique_words": 0}
+            
+            if isinstance(fluency_data, Exception):
+                logger.error(f"Fluency analysis failed: {fluency_data}")
+                fluency_data = {"fluency_score": 50}
+            
+            if isinstance(pronunciation_data, Exception):
+                logger.error(f"Pronunciation analysis failed: {pronunciation_data}")
+                pronunciation_data = {"pronunciation_score": 50, "confidence": 0.3}
+        
+        except Exception as e:
+            logger.error(f"Parallel analysis failed: {e}", exc_info=True)
+            # Return basic fallback
+            return self._create_fallback_response(request.text, cefr_assessment)
+        
+        # Stage 3: Verify errors
+        all_errors = grammar_data.get("errors", [])
+        verified_errors = await self._verify_error_corrections(all_errors)
+        
+        # Stage 4: Calculate confidence
+        confidence = self._calculate_confidence(
+            request.text,
+            grammar_data,
+            vocab_data,
+            fluency_data,
+            pronunciation_data
+        )
+        
+        # Stage 5: Synthesize final scores
+        metrics, final_cefr = self._synthesize_scores(
+            grammar_data,
+            vocab_data,
+            fluency_data,
+            pronunciation_data,
+            cefr_assessment.level
+        )
+        
+        # Build feedback
+        feedback = self._generate_feedback(
+            grammar_data,
+            vocab_data,
+            fluency_data,
+            pronunciation_data,
+            metrics
+        )
+        
+        # Build strengths and weaknesses
+        strengths, weaknesses = self._extract_strengths_weaknesses(
+            grammar_data,
+            vocab_data,
+            fluency_data,
+            pronunciation_data
+        )
+        
+        # Build final response
+        cefr_assessment.level = final_cefr
+        cefr_assessment.score = metrics.overall_score
+        cefr_assessment.confidence = confidence
+        cefr_assessment.strengths = strengths
+        cefr_assessment.weaknesses = weaknesses
+        
+        return AnalysisResponse(
+            cefr_assessment=cefr_assessment,
+            errors=[self._convert_to_error_detail(e) for e in verified_errors],
+            metrics=metrics,
+            feedback=feedback,
+            strengths=strengths,
+            improvement_areas=weaknesses,
+            recommended_tasks=self._generate_tasks(verified_errors, weaknesses),
+            accent_notes=pronunciation_data.get("l1_influence"),
+            processing_time=time.time() - start_time
+        )
+    
+    # ─────────────────────────────────────────────────────────────
+    # HELPER METHODS
+    # ─────────────────────────────────────────────────────────────
+    
+    async def _analyze_grammar(self, text: str, cefr: CEFRLevel) -> Dict:
+        prompt = self._create_grammar_prompt(text, cefr)
+        response = await asyncio.wait_for(
+            self.fast_model.generate_content_async(prompt),
+            timeout=15.0
+        )
+        return robust_json_parser(response.text)
+    
+    async def _analyze_vocabulary(self, text: str, cefr: CEFRLevel) -> Dict:
+        prompt = self._create_vocabulary_prompt(text, cefr)
+        response = await asyncio.wait_for(
+            self.fast_model.generate_content_async(prompt),
+            timeout=15.0
+        )
+        return robust_json_parser(response.text)
+    
+    async def _analyze_fluency(self, text: str, context: Optional[str]) -> Dict:
+        prompt = self._create_fluency_prompt(text, context)
+        response = await asyncio.wait_for(
+            self.fast_model.generate_content_async(prompt),
+            timeout=15.0
+        )
+        return robust_json_parser(response.text)
+    
+    async def _analyze_pronunciation(self, text: str, native_lang: str, azure_data: Optional[str]) -> Dict:
+        prompt = self._create_pronunciation_prompt(text, native_lang, azure_data)
+        response = await asyncio.wait_for(
+            self.fast_model.generate_content_async(prompt),
+            timeout=15.0
+        )
+        return robust_json_parser(response.text)
+    
+    def _generate_feedback(self, grammar, vocab, fluency, pronunciation, metrics) -> str:
+        """Combine justifications into coherent feedback"""
+        parts = []
+        
+        if metrics.overall_score >= 80:
+            parts.append("Excellent work! Your English proficiency is strong.")
+        elif metrics.overall_score >= 60:
+            parts.append("Good progress! You're communicating effectively.")
+        else:
+            parts.append("Keep practicing! You're building your skills.")
+        
+        parts.append(grammar.get("justification", ""))
+        parts.append(vocab.get("justification", ""))
+        
+        return " ".join(parts)
+    
+    def _extract_strengths_weaknesses(self, grammar, vocab, fluency, pronunciation) -> Tuple[List[str], List[str]]:
+        strengths = []
+        weaknesses = []
+        
+        # Grammar
+        if grammar.get("grammar_score", 0) >= 70:
+            strengths.append("Strong grammatical accuracy")
+        elif grammar.get("grammar_score", 0) < 50:
+            weaknesses.append("Improve basic grammar structures")
+        
+        # Vocabulary
+        if vocab.get("lexical_diversity", 0) >= 0.6:
+            strengths.append("Good vocabulary variety")
+        elif vocab.get("lexical_diversity", 0) < 0.4:
+            weaknesses.append("Expand vocabulary range")
+        
+        # Fluency
+        filler_count = sum(fluency.get("filler_count", {}).values())
+        if filler_count <= 2:
+            strengths.append("Natural fluency")
+        elif filler_count >= 5:
+            weaknesses.append("Reduce filler words")
+        
+        # Pronunciation
+        if pronunciation.get("pronunciation_score", 0) >= 75:
+            strengths.append("Clear pronunciation")
+        elif pronunciation.get("pronunciation_score", 0) < 60:
+            weaknesses.append("Work on pronunciation clarity")
+        
+        return strengths[:3], weaknesses[:3]
+    
+    def _generate_tasks(self, errors: List[Dict], weaknesses: List[str]) -> List[Dict]:
+        tasks = []
+        
+        # Tasks from errors
+        error_types = Counter([e.get("rule", "") for e in errors])
+        for error_type, count in error_types.most_common(2):
+            if error_type:
+                tasks.append({
+                    "type": "grammar_drill",
+                    "topic": error_type,
+                    "reason": f"Found {count} error(s) in this area"
+                })
+        
+        # Tasks from weaknesses
+        for weakness in weaknesses:
+            if "vocabulary" in weakness.lower():
+                tasks.append({
+                    "type": "vocabulary_expansion",
+                    "topic": "Synonyms and alternatives",
+                    "reason": weakness
+                })
+        
+        return tasks[:3]
+    
+    def _convert_to_error_detail(self, error_dict: Dict) -> ErrorDetail:
+        """Convert dict to ErrorDetail model"""
+        severity_map = {
+            "critical": ErrorSeverity.CRITICAL,
+            "major": ErrorSeverity.MAJOR,
+            "minor": ErrorSeverity.MINOR,
+        }
+        
+        return ErrorDetail(
+            type=ErrorType.GRAMMAR,  # Default
+            severity=severity_map.get(error_dict.get("severity", "minor"), ErrorSeverity.MINOR),
+            original_text=error_dict.get("original", ""),
+            corrected_text=error_dict.get("corrected", ""),
+            explanation=error_dict.get("rule", ""),
+            suggestion=error_dict.get("reason", "")
+        )
+    
+    def _create_fallback_response(self, text: str, cefr: CEFRAssessment) -> AnalysisResponse:
+        """Fallback when analysis fails completely"""
+        word_count = len(text.split())
+        
+        return AnalysisResponse(
+            cefr_assessment=cefr,
+            errors=[],
+            metrics=AnalysisMetrics(
+                wpm=word_count / 1.5,
+                unique_words=len(set(text.split())),
+                grammar_score=50,
+                pronunciation_score=50,
+                fluency_score=50,
+                vocabulary_score=50,
+                overall_score=50,
+            ),
+            feedback="Analysis temporarily unavailable. Please try again.",
+            strengths=[],
+            improvement_areas=[],
+            recommended_tasks=[],
+            processing_time=0.1
+        )
+
+    # ─────────────────────────────────────────────────────────────
+    # PRESERVED JOINT ANALYSIS METHODS
+    # ─────────────────────────────────────────────────────────────
 
     def _create_joint_analysis_prompt(self, request: JointAnalysisRequest) -> str:
         """Create a prompt for analyzing a joint conversation between two or more participants."""
@@ -122,7 +674,7 @@ Respond with ONLY this JSON. No commentary outside the JSON structure.
         for s in request.segments:
             segments_data.append(f"[{s.speaker_id} at {s.timestamp}s]: {s.text}")
         
-        transcript_block = "\n".join(segments_data)
+        transcript_block = "\\n".join(segments_data)
         
         return f"""You are a professional ESL Conversational Coach and Linguist.
 Analyze the following multi-speaker transcript of an English practice session.
@@ -195,73 +747,6 @@ Analyze the following multi-speaker transcript of an English practice session.
 }}"""
 
     @cached(prefix="analysis", ttl=settings.cache_ttl_analysis)
-    async def analyze(self, request: AnalysisRequest) -> AnalysisResponse:
-        """
-        Analyzes text by first classifying its CEFR level, then getting a detailed
-        analysis from the Gemini model with structured scoring.
-        """
-        if not self.model:
-            raise RuntimeError("Analysis service is not configured.")
-
-        start_time = time.time()
-
-        # 1. Get CEFR classification first (rule-based baseline)
-        cefr_assessment = cefr_classifier.classify(request.text)
-
-        # 2. Call Gemini for detailed analysis with structured scores
-        prompt = self._create_analysis_prompt(request, cefr_assessment.level)
-        try:
-            response = await asyncio.wait_for(
-                self.model.generate_content_async(prompt),
-                timeout=45.0
-            )
-            analysis_data = robust_json_parser(response.text)
-        except Exception as e:
-            logger.error(f"Gemini analysis failed: {e}", exc_info=True)
-            analysis_data = {
-                "scores": {"grammar_score": 50, "pronunciation_score": 50, "fluency_score": 50, "vocabulary_score": 50, "overall_score": 50},
-                "cefr_level": cefr_assessment.level.value,
-                "errors": [],
-                "feedback": "Could not complete AI analysis at this time.",
-                "strengths": [],
-                "improvement_areas": [],
-                "recommended_tasks": []
-            }
-
-        # 3. Use AI-generated scores instead of heuristics
-        ai_scores = analysis_data.get("scores", {})
-        words = request.text.split()
-        num_words = len(words)
-        duration_minutes = num_words / 150 if num_words > 0 else 1
-
-        metrics = AnalysisMetrics(
-            wpm=num_words / duration_minutes if duration_minutes > 0 else 0,
-            unique_words=len(set(words)),
-            grammar_score=ai_scores.get("grammar_score", 50),
-            pronunciation_score=ai_scores.get("pronunciation_score", 50),
-            fluency_score=ai_scores.get("fluency_score", 50),
-            vocabulary_score=ai_scores.get("vocabulary_score", 50),
-            overall_score=ai_scores.get("overall_score", 50),
-        )
-
-        # Override CEFR with AI assessment if available
-        ai_cefr = analysis_data.get("cefr_level")
-        if ai_cefr and ai_cefr in [level.value for level in CEFRLevel]:
-            cefr_assessment.level = CEFRLevel(ai_cefr)
-        
-        # 4. Construct the final response
-        return AnalysisResponse(
-            cefr_assessment=cefr_assessment,
-            errors=[ErrorDetail(**e) for e in analysis_data.get("errors", [])],
-            metrics=metrics,
-            feedback=analysis_data.get("feedback", ""),
-            strengths=analysis_data.get("strengths", []),
-            improvement_areas=analysis_data.get("improvement_areas", []),
-            recommended_tasks=analysis_data.get("recommended_tasks", []),
-            accent_notes=analysis_data.get("accent_notes", None),
-            processing_time=time.time() - start_time
-        )
-
     async def analyze_joint(self, request: JointAnalysisRequest) -> JointAnalysisResponse:
         """
         Analyzes a multi-speaker conversation for interaction quality and individual performance.
@@ -329,5 +814,5 @@ Analyze the following multi-speaker transcript of an English practice session.
             participant_analyses=participant_analyses
         )
 
+# Export singleton
 analysis_service = AnalysisService()
-

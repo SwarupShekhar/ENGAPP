@@ -21,7 +21,7 @@ class OptimizedTTSService:
         )
         
         # Use Azure Neural Voice
-        self.speech_config.speech_synthesis_voice_name = "en-IN-NeerjaNeural"
+        self.speech_config.speech_synthesis_voice_name = "en-IN-AnanyaNeural"
         
         # Output format
         self.speech_config.set_speech_synthesis_output_format(
@@ -36,15 +36,17 @@ class OptimizedTTSService:
         
         synthesizer = speechsdk.SpeechSynthesizer(
             speech_config=self.speech_config,
-            audio_config=None 
         )
+        
+        # Clean text for TTS (remove markdown asterisks etc)
+        text = text.replace('*', '').replace('`', '').replace('_', '')
         
         # Use SSML for better control
         ssml = f"""
         <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'
                xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='en-IN'>
-            <voice name='en-IN-NeerjaNeural'>
-                <prosody rate='0.95' pitch='+2%'>
+            <voice name='en-IN-AnanyaNeural'>
+                <prosody rate='1.05' pitch='+5%'>
                     {text}
                 </prosody>
             </voice>

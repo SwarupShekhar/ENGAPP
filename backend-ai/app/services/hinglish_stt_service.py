@@ -24,11 +24,8 @@ class HinglishSTTService:
             subscription=settings.azure_speech_key,
             region=settings.azure_speech_region,
         )
-
-        # Enable continuous language identification for Indian English and Hindi
-        self.auto_detect_config = speechsdk.languageconfig.AutoDetectSourceLanguageConfig(
-            languages=["en-IN", "hi-IN"]
-        )
+        self.speech_config.speech_recognition_language = "en-IN"
+        self.auto_detect_config = None
 
     # ─── Audio Conversion ─────────────────────────────────────
 
@@ -50,49 +47,21 @@ class HinglishSTTService:
         audio.export(wav_buf, format="wav")
         return wav_buf.getvalue()
 
-    # ─── Core Transcription (existing, preserved) ─────────────
+    # ─── Core Transcription ───────────────────────────────────
 
     def transcribe_hinglish(self, audio_data: bytes) -> dict:
-        """
-        Transcribe Hinglish audio with automatic language switching.
-        This is the original method kept intact for backward-compat.
-        """
         if not self.speech_config:
             raise RuntimeError("Hinglish STT service is not configured.")
 
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as temp_audio:
-            temp_audio.write(audio_data)
-            temp_audio.flush()
+        try:
+            wav_bytes = self._convert_to_wav(audio_data)
+        except Exception as e:
+            logger.error(f"Audio conversion failed: {e}")
+            return {"text": "", "language": None, "error": "Invalid audio format"}
 
-            audio_config = speechsdk.audio.AudioConfig(filename=temp_audio.name)
-
-            speech_recognizer = speechsdk.SpeechRecognizer(
-                speech_config=self.speech_config,
-                auto_detect_source_language_config=self.auto_detect_config,
-                audio_config=audio_config,
-            )
-
-            result = speech_recognizer.recognize_once()
-
-            if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-                detected_language = result.properties.get(
-                    speechsdk.PropertyId.SpeechServiceConnection_AutoDetectSourceLanguageResult
-                )
-                return {"text": result.text, "language": detected_language}
-            elif result.reason == speechsdk.ResultReason.NoMatch:
-                logger.info("No speech could be recognized.")
-                return {"text": "", "language": None}
-            elif result.reason == speechsdk.ResultReason.Canceled:
-                cancellation_details = result.cancellation_details
-                logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
-                return {"text": "", "language": None, "error": cancellation_details.error_details}
-
-            return {"text": "", "language": None}
-
-    # ─── Transcription with push-stream (for raw bytes) ───────
+        return self._transcribe_push_stream(wav_bytes)
 
     def _transcribe_push_stream(self, wav_bytes: bytes) -> dict:
-        """Transcribe using push-stream (no temp file)."""
         if not self.speech_config:
             raise RuntimeError("Hinglish STT service is not configured.")
 
@@ -101,7 +70,6 @@ class HinglishSTTService:
 
         recognizer = speechsdk.SpeechRecognizer(
             speech_config=self.speech_config,
-            auto_detect_source_language_config=self.auto_detect_config,
             audio_config=audio_config,
         )
 
@@ -111,17 +79,13 @@ class HinglishSTTService:
         result = recognizer.recognize_once()
 
         if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            detected_language = result.properties.get(
-                speechsdk.PropertyId.SpeechServiceConnection_AutoDetectSourceLanguageResult,
-                "en-IN",
-            )
-            return {"text": result.text, "language": detected_language, "success": True}
+            return {"text": result.text, "language": "en-IN", "success": True}
         elif result.reason == speechsdk.ResultReason.NoMatch:
             return {"text": "", "language": None, "success": False, "error": "No speech detected"}
         else:
             return {"text": "", "language": None, "success": False, "error": str(result.reason)}
 
-    # ─── Feature 1: Pronunciation Assessment ──────────────────
+    # ─── Pronunciation Assessment ──────────────────────────────
 
     def assess_pronunciation(
         self,
@@ -130,7 +94,7 @@ class HinglishSTTService:
     ) -> TutorPronunciationAssessmentResult:
         """
         Assess how well the user pronounced a specific reference phrase.
-        Called when Priya asks the user to repeat a corrected phrase.
+        Called when Maya asks the user to repeat a corrected phrase.
         """
         if not self.speech_config:
             raise RuntimeError("Hinglish STT service is not configured.")
@@ -138,7 +102,6 @@ class HinglishSTTService:
         try:
             wav_bytes = self._convert_to_wav(audio_bytes)
 
-            # Configure pronunciation assessment
             pronunciation_config = speechsdk.PronunciationAssessmentConfig(
                 reference_text=reference_text,
                 grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
@@ -147,11 +110,9 @@ class HinglishSTTService:
             )
             pronunciation_config.enable_prosody_assessment()
 
-            # Audio via push stream
             audio_stream = speechsdk.audio.PushAudioInputStream()
             audio_config = speechsdk.audio.AudioConfig(stream=audio_stream)
 
-            # Fresh SpeechConfig scoped to this call (en-IN only for assessment)
             speech_cfg = speechsdk.SpeechConfig(
                 subscription=settings.azure_speech_key,
                 region=settings.azure_speech_region,
@@ -169,13 +130,12 @@ class HinglishSTTService:
 
             result = recognizer.recognize_once()
 
-            # ── No speech ────────────────────────────────────
             if result.reason == speechsdk.ResultReason.NoMatch:
                 return TutorPronunciationAssessmentResult(
                     accuracy_score=0, fluency_score=0, completeness_score=0, prosody_score=0,
                     recognized_text="", reference_text=reference_text,
                     passed=False,
-                    priya_feedback="मुझे आपकी आवाज़ सुनाई नहीं दी। Can you try again, a bit louder?",
+                    maya_feedback="Aapki awaaz nahi aayi mujhe. Thoda aur loud boliye?",
                 )
 
             if result.reason != speechsdk.ResultReason.RecognizedSpeech:
@@ -183,10 +143,9 @@ class HinglishSTTService:
                     accuracy_score=0, fluency_score=0, completeness_score=0, prosody_score=0,
                     recognized_text="", reference_text=reference_text,
                     passed=False,
-                    priya_feedback="कुछ technical issue हो गया। Let's try once more?",
+                    maya_feedback="Kuch technical issue ho gaya, koi baat nahi. Phir se try karein?",
                 )
 
-            # ── Parse assessment result ──────────────────────
             pron_result = speechsdk.PronunciationAssessmentResult(result)
 
             raw_json_str = result.properties.get(
@@ -233,8 +192,9 @@ class HinglishSTTService:
 
             passed = accuracy >= 70 and completeness >= 80
 
-            priya_feedback = self._generate_priya_score_feedback(
+            maya_feedback = self._generate_maya_feedback(
                 accuracy=accuracy,
+                fluency=fluency,
                 passed=passed,
                 problem_words=problem_words,
                 reference_text=reference_text,
@@ -249,7 +209,7 @@ class HinglishSTTService:
                 reference_text=reference_text,
                 words=words_data,
                 passed=passed,
-                priya_feedback=priya_feedback,
+                maya_feedback=maya_feedback,
                 problem_words=problem_words,
             )
 
@@ -259,127 +219,181 @@ class HinglishSTTService:
                 accuracy_score=0, fluency_score=0, completeness_score=0, prosody_score=0,
                 recognized_text="", reference_text=reference_text,
                 passed=False,
-                priya_feedback="Oops, kuch ho gaya! Let's continue our conversation.",
+                maya_feedback="Oops, kuch ho gaya! Koi baat nahi, chalte hain aage.",
             )
 
-    def _generate_priya_score_feedback(
+    def _generate_maya_feedback(
         self,
         accuracy: float,
+        fluency: float,
         passed: bool,
-        problem_words: list,
+        problem_words: list[str],
         reference_text: str,
     ) -> str:
-        """Generate Priya's empathetic response based on pronunciation score."""
+        """
+        Generate Maya's feedback based on pronunciation scores.
+        Uses both accuracy AND fluency to give more nuanced responses.
+        Varies phrasing so it doesn't feel like a template every time.
+        """
         if accuracy >= 90:
-            return f"Wah! बिल्कुल perfect! 🎉 Your pronunciation was {accuracy:.0f}/100! Native speakers would be proud!"
+            # Vary high-score responses so they don't feel identical each time
+            responses = [
+                f"Yaar, that was really clean! {accuracy:.0f}/100 — honestly impressive.",
+                f"Arre wah! {accuracy:.0f}/100. Native speakers bolte hain exactly aisa!",
+                f"Perfect! {accuracy:.0f}/100. Bilkul sahi tha — keep that energy!",
+            ]
+            # Deterministic variation based on score decimal to avoid randomness issues
+            return responses[int(accuracy * 10) % len(responses)]
+
         elif accuracy >= 80:
-            return f"Bahut acha! {accuracy:.0f}/100 - that's really good! Keep practicing like this!"
+            if fluency < 70:
+                return (
+                    f"Good pronunciation — {accuracy:.0f}/100! "
+                    f"Bas thodi fluency improve karo, bich mein ruk mat. "
+                    f"Ek baar aur, smoothly boliye?"
+                )
+            return (
+                f"Bahut acha! {accuracy:.0f}/100. "
+                f"Thoda aur practice karo aur yeh perfect ho jaayega."
+            )
+
         elif accuracy >= 70:
             if problem_words:
-                words_str = ", ".join([f"'{w}'" for w in problem_words[:2]])
-                return f"Almost there! {accuracy:.0f}/100. Just focus a little more on {words_str}. Try once more?"
-            return f"Good effort! {accuracy:.0f}/100. You're getting there! Ek baar aur try karein?"
+                focus = " aur ".join([f"'{w}'" for w in problem_words[:2]])
+                return (
+                    f"Almost! {accuracy:.0f}/100. "
+                    f"Bas {focus} pe thoda dhyan do. Try karo ek baar aur?"
+                )
+            return (
+                f"Accha attempt! {accuracy:.0f}/100. "
+                f"Slowly phir se boliye — '{reference_text}'"
+            )
+
         elif accuracy >= 50:
             if problem_words:
-                words_str = ", ".join([f"'{w}'" for w in problem_words[:2]])
-                return f"Keep trying! {accuracy:.0f}/100. The words {words_str} need more practice. Slowly boliye - '{reference_text}'"
-            return f"Keep going! {accuracy:.0f}/100. Let's try slowly: '{reference_text}'"
-        else:
-            return f"Koi baat nahi! Practice makes perfect. Suniye main kaise kehti hoon: '{reference_text}' - ab aap try karein!"
+                focus = problem_words[0]
+                return (
+                    f"Haan, {accuracy:.0f}/100 — getting there! "
+                    f"'{focus}' pe focus karo. Break it down: "
+                    f"'{reference_text}' — slowly, ek ek word."
+                )
+            return (
+                f"Keep going! {accuracy:.0f}/100. "
+                f"Aram se boliye: '{reference_text}'. No rush."
+            )
 
-    # ─── Feature 2: Intent Recognition ────────────────────────
+        else:
+            return (
+                f"Koi baat nahi, yahi toh practice ke liye hai! "
+                f"Suniye main kaise kehti hoon: '{reference_text}' — "
+                f"ab aap try karein, bilkul slowly."
+            )
+
+    # ─── Intent Detection ──────────────────────────────────────
 
     def detect_intent_from_text(self, text: str) -> dict:
         """
         Detect voice command intent from transcribed text.
-        Uses keyword matching — no LUIS required.
+        Intents are ordered by priority — higher priority intents are checked first.
         """
         text_lower = text.lower().strip()
 
-        intent_map = {
-            "end_session": {
-                "keywords": [
-                    "end session", "stop session", "finish", "end call",
+        # Ordered by priority: critical commands first, passive reactions last
+        intent_map = [
+            (
+                "end_session",
+                [
+                    "end session", "stop session", "end call", "finish session",
                     "bye", "goodbye", "bye bye", "that's all", "thats all",
                     "band karo", "khatam karo", "bas karo", "done",
                 ],
-            },
-            "repeat_please": {
-                "keywords": [
+            ),
+            (
+                "speak_slower",
+                [
+                    "slow down", "speak slowly", "too fast", "slower please",
+                    "speak slower", "dhire", "dhire bolo", "dhire boliye",
+                    "aram se", "aram se bolo",
+                ],
+            ),
+            (
+                "repeat_please",
+                [
                     "repeat", "say again", "say that again", "can you repeat",
                     "repeat that", "once more", "ek baar aur", "phir se",
                     "phir se bolo", "dobara bolo", "dobara", "again",
                 ],
-            },
-            "dont_understand": {
-                "keywords": [
+            ),
+            (
+                "dont_understand",
+                [
                     "i don't understand", "i dont understand", "don't understand",
                     "samajh nahi aaya", "samajh nahi", "nahi samjha", "nahi samjhi",
                     "what does that mean", "what do you mean", "confused",
-                    "explain", "explain please", "matlab kya hai", "matlab",
+                    "explain please", "matlab kya hai", "matlab",
                 ],
-            },
-            "speak_slower": {
-                "keywords": [
-                    "slow down", "speak slowly", "too fast", "slowly",
-                    "slower please", "speak slower", "dhire", "dhire bolo",
-                    "dhire boliye", "aram se", "aram se bolo",
-                ],
-            },
-            "skip_topic": {
-                "keywords": [
+            ),
+            (
+                "skip_topic",
+                [
                     "change topic", "next topic", "something else", "different topic",
-                    "boring", "skip", "let's move on", "move on",
+                    "skip", "let's move on", "move on",
                     "alag topic", "kuch aur", "nayi baat", "badlo",
                 ],
-            },
-            "help": {
-                "keywords": [
+            ),
+            (
+                "help",
+                [
                     "help", "help me", "i need help", "what can i say",
-                    "what can you do", "commands", "madad", "madad karo",
-                    "kya kar sakte ho",
+                    "what can you do", "madad", "madad karo", "kya kar sakte ho",
                 ],
-            },
-            "good_job_response": {
-                "keywords": [
+            ),
+            (
+                "good_job_response",
+                [
                     "thank you", "thanks", "got it", "i understand now",
                     "okay i see", "shukriya", "dhanyavaad", "achha", "theek hai",
                 ],
-            },
-        }
+            ),
+        ]
 
         detected_intent = "none"
-        detected_keywords: list[str] = []
+        matched_keyword = None
 
-        for intent_name, intent_data in intent_map.items():
-            for keyword in intent_data["keywords"]:
+        for intent_name, keywords in intent_map:
+            for keyword in keywords:
                 if keyword in text_lower:
                     detected_intent = intent_name
-                    detected_keywords.append(keyword)
+                    matched_keyword = keyword
                     break
             if detected_intent != "none":
                 break
 
+        # Confidence: longer keyword match relative to utterance = more confident
         confidence = 0.0
-        if detected_intent != "none" and detected_keywords:
-            keyword_length = len(detected_keywords[0].split())
-            total_words = len(text_lower.split()) or 1
-            confidence = min(1.0, keyword_length / total_words + 0.5)
+        if matched_keyword:
+            keyword_word_count = len(matched_keyword.split())
+            total_word_count = max(len(text_lower.split()), 1)
+            # Base confidence 0.6 for any match, boosted by how specific the keyword is
+            confidence = min(1.0, 0.6 + (keyword_word_count / total_word_count) * 0.4)
 
         return {
             "intent": detected_intent,
             "confidence": round(confidence, 2),
             "original_text": text,
-            "matched_keyword": detected_keywords[0] if detected_keywords else None,
+            "matched_keyword": matched_keyword,
             "is_command": detected_intent != "none" and confidence >= 0.3,
         }
 
     def transcribe_with_intent(self, audio_data: bytes) -> dict:
         """
         Transcribe audio AND detect intent in one call.
-        Combines the regular transcription with keyword-based intent detection.
         """
         transcription_result = self.transcribe_hinglish(audio_data)
+
+        if transcription_result is None:
+            logger.error("transcribe_hinglish returned None")
+            transcription_result = {"text": "", "language": None, "error": "Transcription failed"}
 
         text = transcription_result.get("text", "")
         if not text:

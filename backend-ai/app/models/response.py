@@ -136,7 +136,7 @@ class TutorPronunciationAssessmentResult(BaseModel):
     reference_text: str
     words: List[WordAssessment] = []
     passed: bool
-    priya_feedback: str
+    maya_feedback: str
     problem_words: List[str] = []
 
 

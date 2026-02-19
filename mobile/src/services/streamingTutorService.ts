@@ -23,15 +23,16 @@ class StreamingTutorService {
         // Also handle port 3000 -> 8000 mapping if on localhost
         let wsUrl = API_URL.replace('http', 'ws');
         
-        // For local development, we need to connect to Python service on port 8000
-        // If API_URL points to localhost:3000 or local IP:3000, change to :8000
+        // For local development, we need to connect to Python service on port 8001 (default in config.py)
+        // If API_URL points to localhost:3000 or local IP:3000, change to :8001
         if (wsUrl.includes(':3000')) {
-             wsUrl = wsUrl.replace(':3000', ':8000');
+             wsUrl = wsUrl.replace(':3000', ':8001');
         }
         // For production, we might need a different approach if Python service is separate
         // For now, assume same host but different port for local dev
 
-        this.ws = new WebSocket(`${wsUrl}/ws/${sessionId}?user_id=${userId}`);
+        // Path is prefixed with /api/tutor in backend-ai/app/main.py
+        this.ws = new WebSocket(`${wsUrl}/api/tutor/ws/${sessionId}?user_id=${userId}`);
 
         this.ws.onopen = () => {
             console.log('[StreamingTutor] Connected');

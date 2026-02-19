@@ -43,7 +43,7 @@ function TypingDots() {
     return (
         <View style={styles.typingRow}>
             <View style={[styles.miniAvatar, { backgroundColor: theme.colors.primary }]}>
-                <Text style={styles.miniAvatarText}>P</Text>
+                <Text style={styles.miniAvatarText}>L</Text>
             </View>
             <View style={styles.typingBubble}>
                 <Animated.View style={[styles.dot, s1]} />
@@ -64,7 +64,7 @@ function TranscriptBubble({ item, index }: { item: any; index: number }) {
         >
             {!isUser && (
                 <View style={[styles.miniAvatar, { backgroundColor: theme.colors.primary }]}>
-                    <Text style={styles.miniAvatarText}>P</Text>
+                    <Text style={styles.miniAvatarText}>L</Text>
                 </View>
             )}
             <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubblePartner]}>
@@ -91,7 +91,7 @@ export default function AITutorScreen({ navigation }: any) {
     const [error, setError] = useState<string | null>(null);
     const [turnCount, setTurnCount] = useState(0);
     const [transcript, setTranscript] = useState<any[]>([
-        { id: 'welcome', speaker: 'ai', text: "Namaste! 🙏 I'm Priya. Hold the mic to speak!" }
+        { id: 'welcome', speaker: 'ai', text: "Namaste! 🙏 I'm Lexa. I'm listening..." }
     ]);
 
     const scrollRef = useRef<ScrollView>(null);
@@ -100,6 +100,13 @@ export default function AITutorScreen({ navigation }: any) {
     const isPlayingRef = useRef(false);
     const soundRef = useRef<Audio.Sound | null>(null);
 
+    // VAD Refs
+    const silenceStartRef = useRef<number | null>(null);
+    const isSpeakingRef = useRef(false);
+    const silenceThresholdDb = -50; // Silence threshold
+    const speechThresholdDb = -45; // Speech threshold
+    const silenceDurationMs = 2000; // 2 seconds to trigger end
+
     // Pulse
     const pulseScale = useSharedValue(1);
     const pulseOpacity = useSharedValue(0.2);
@@ -107,6 +114,16 @@ export default function AITutorScreen({ navigation }: any) {
     useEffect(() => {
         pulseScale.value = withRepeat(withTiming(1.5, { duration: 1200 }), -1, true);
         pulseOpacity.value = withRepeat(withTiming(0, { duration: 1200 }), -1, true);
+
+        // Personalized Greeting
+        const userName = user?.firstName || 'Friend';
+        const greeting = `Namaste ${userName}! 🙏 I'm Maya. I'm listening...`;
+        
+        setTranscript([{ 
+            id: 'welcome', 
+            speaker: 'ai', 
+            text: greeting 
+        }]);
 
         // Start Session
         const init = async () => {
@@ -125,9 +142,20 @@ export default function AITutorScreen({ navigation }: any) {
                 streamingTutor.connect(res.sessionId, user?.id || 'test');
                 streamingTutor.onMessage(handleStreamMessage);
                 
+                // Audio mode setup - play and record
+                await Audio.setAudioModeAsync({
+                    allowsRecordingIOS: false,
+                    playsInSilentModeIOS: true,
+                    staysActiveInBackground: false,
+                    shouldDuckAndroid: true,
+                    playThroughEarpieceAndroid: false,
+                });
+
                 if (res.audioBase64) {
                     queueAudio(res.audioBase64);
-                }
+                } 
+                // Removed auto-start recording to prevent loops/echo
+
             } catch (e) {
                 console.error('Init error:', e);
                 setError('Failed to connect.');
@@ -138,6 +166,7 @@ export default function AITutorScreen({ navigation }: any) {
         return () => {
             streamingTutor.disconnect();
             if (soundRef.current) soundRef.current.unloadAsync();
+            if (recordingRef.current) stopRecording(); // Ensure recording stops
         };
     }, []);
 
@@ -186,6 +215,15 @@ export default function AITutorScreen({ navigation }: any) {
         const nextAudio = audioQueueRef.current.shift();
         
         try {
+            if (!nextAudio) {
+                isPlayingRef.current = false;
+                playNext();
+                return;
+            }
+
+            // Ensure mode allows playback
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+            
             const { sound } = await Audio.Sound.createAsync(
                 { uri: `data:audio/mp3;base64,${nextAudio}` },
                 { shouldPlay: true }
@@ -195,28 +233,77 @@ export default function AITutorScreen({ navigation }: any) {
                 if (status.isLoaded && status.didJustFinish) {
                     isPlayingRef.current = false;
                     playNext();
+                    
+                    if (audioQueueRef.current.length === 0) {
+                        setIsStreaming(false); // Enable mic again
+                    }
                 }
             });
         } catch (e) {
             console.error('Play error', e);
             isPlayingRef.current = false;
+            setIsStreaming(false); // Enable mic on error
             playNext();
         }
     };
+    
+    // Auto-start recording logic disabled to prevent echo loops
+    /*
+    useEffect(() => {
+        if (!isPlayingRef.current && audioQueueRef.current.length === 0 && !isProcessing && !isRecording && turnCount > 0) {
+             // AI finished speaking (or processing error occurred), start listening (VAD)
+             // Check if we are still on this screen/session valid
+             if (sessionId) {
+                setTimeout(() => startRecording(), 500);
+             }
+        }
+    }, [turnCount, isPlayingRef.current, isProcessing]); 
+    */ 
 
     // ─── Recording ──────────────────────────────────────────
     const startRecording = async () => {
-        if (isProcessing || isStreaming) return; // Block while streaming
+        if (isProcessing || isStreaming || isRecording) return; // Block while streaming/recording
         try {
             const perm = await Audio.requestPermissionsAsync();
-            if (perm.status !== 'granted') {
-                Alert.alert('Permission Required', 'Please enable microphone access locally.');
-                return;
-            }
+            if (perm.status !== 'granted') return;
 
+            // Switch to recording mode
             await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+            
+            // Validate previous recording is cleared
+            if (recordingRef.current) {
+                try { await recordingRef.current.stopAndUnloadAsync(); } catch(e) {}
+                recordingRef.current = null;
+            }
             const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
+                Audio.RecordingOptionsPresets.HIGH_QUALITY,
+                (status) => {
+                    if (status.metering !== undefined) {
+                        const level = status.metering;
+                        
+                        // Check for speech
+                        if (level > speechThresholdDb) {
+                            isSpeakingRef.current = true;
+                            silenceStartRef.current = null; // Reset silence timer
+                        } 
+                        
+                        // Check for silence
+                        if (level < silenceThresholdDb && isSpeakingRef.current) {
+                            if (silenceStartRef.current === null) {
+                                silenceStartRef.current = Date.now();
+                            } else {
+                                const silenceDuration = Date.now() - silenceStartRef.current;
+                                if (silenceDuration > silenceDurationMs) {
+                                    // User finished speaking
+                                    stopRecording();
+                                    isSpeakingRef.current = false;
+                                    silenceStartRef.current = null;
+                                }
+                            }
+                        }
+                    }
+                },
+                100 // Metering interval ms
             );
             recordingRef.current = recording;
             setIsRecording(true);
@@ -231,8 +318,26 @@ export default function AITutorScreen({ navigation }: any) {
         setIsProcessing(true);
 
         try {
-            await recordingRef.current.stopAndUnloadAsync();
+            // Check status first if possible, or just try-catch the unload
+            try {
+                const status = await recordingRef.current.getStatusAsync();
+                if (status.isRecording) {
+                    await recordingRef.current.stopAndUnloadAsync();
+                } else if (status.isDoneRecording) {
+                     // Already stopped, just unload if not unloaded
+                     // But getStatusAsync might throw if unloaded? 
+                     // easiest is just robust try-catch on stopAndUnloadAsync
+                     await recordingRef.current.stopAndUnloadAsync();
+                }
+            } catch (unloadError: any) {
+                // Ignore "already unloaded" error
+                if (!unloadError.message?.includes('already been unloaded')) {
+                     console.log('Unload error (ignoring):', unloadError);
+                }
+            }
+            
             const uri = recordingRef.current.getURI();
+             recordingRef.current = null; // Clear ref immediately to prevent double calls
             
             if (uri) {
                 // 1. Transcribe
@@ -280,7 +385,7 @@ export default function AITutorScreen({ navigation }: any) {
                     </TouchableOpacity>
                     <View style={styles.headerCenter}>
                          <View style={styles.onlineBadge} />
-                         <Text style={styles.headerTitle}>Priya (Streaming)</Text>
+                         <Text style={styles.headerTitle}>Maya (AI Tutor)</Text>
                     </View>
                 </View>
 
@@ -303,9 +408,9 @@ export default function AITutorScreen({ navigation }: any) {
                         onPressIn={startRecording}
                         onPressOut={stopRecording}
                         activeOpacity={0.8}
-                        disabled={isProcessing}
+                        disabled={isProcessing || isStreaming}
                     >
-                        <View style={styles.micContainer}>
+                        <View style={[styles.micContainer, (isProcessing || isStreaming) && { opacity: 0.5 }]}>
                             {isRecording && <Animated.View style={[styles.pulse, animatedPulseStyle]} />}
                             <LinearGradient
                                 colors={isRecording ? ['#ef4444', '#dc2626'] : ['#3b82f6', '#2563eb']}
@@ -316,7 +421,7 @@ export default function AITutorScreen({ navigation }: any) {
                         </View>
                     </TouchableOpacity>
                     <Text style={styles.hintText}>
-                        {isProcessing ? 'Transcribing...' : isRecording ? 'Release to Send' : 'Hold to Speak'}
+                        {isProcessing ? 'Thinking...' : isStreaming ? 'Maya is speaking...' : isRecording ? 'Listening...' : 'Hold to Speak'}
                     </Text>
                 </View>
             </SafeAreaView>
