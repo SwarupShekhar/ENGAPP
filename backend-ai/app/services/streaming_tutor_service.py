@@ -61,37 +61,22 @@ class StreamingTutorService:
         self,
         user_utterance: str,
         conversation_history: list,
-        session_id: str
+        session_id: str,
+        phonetic_context: dict | None = None,
+        audio_base64: str | None = None
     ) -> AsyncGenerator[dict, None]:
         """
-        Generate AI response in chunks:
-        1. Immediate acknowledgment (< 300ms)
-        2. Stream sentences from Gemini
-        3. Synthesize and yield audio along with text
+        Generate AI response in chunks with optional audio for pronunciation analysis.
         """
         
-        # 1. IMMEDIATE ACKNOWLEDGMENT (Optional)
-        # acknowledgment = self.get_quick_acknowledgment(user_utterance)
-        # if acknowledgment:
-        #     audio_bytes = None
-        #     if self.tts_service:
-        #         audio_bytes = await self.tts_service.synthesize_sentence(acknowledgment)
-        #     
-        #     yield {
-        #         'type': 'acknowledgment',
-        #         'text': acknowledgment,
-        #         'audio': audio_bytes,
-        #         'delay': 0
-        #     }
-        
-        await asyncio.sleep(0.3)  # Simulate realistic human pause
-        
-        # 2. STREAM SENTENCES FROM GEMINI
+        # STREAM SENTENCES FROM GEMINI
         async for sentence in self.gemini_service.stream_response(
             user_utterance,
-            conversation_history
+            conversation_history,
+            phonetic_context,
+            audio_base64
         ):
-            # Generate TTS for this sentence while Gemini continues generating next
+            # Generate TTS for this sentence
             audio_bytes = None
             if self.tts_service:
                 try:
@@ -103,13 +88,9 @@ class StreamingTutorService:
                 'type': 'sentence',
                 'text': sentence,
                 'audio': audio_bytes,
-                'is_final': False, # We don't know if it's final until stream ends, or we can assume Gemini stream end means final
-                # Actually, gemini service yields sentences. Last one is final. 
-                # But here inside loop we assume stream continues.
-                # Client typically handles 'is_final' by checking if stream closed.
+                'is_final': False,
             }
             
-            # Small natural pause is usually built into TTS duration, but we yield control
             await asyncio.sleep(0.01)
 
     def get_quick_acknowledgment(self, text: str) -> str:

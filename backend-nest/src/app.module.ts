@@ -58,7 +58,6 @@ import { ReliabilityModule } from './modules/reliability/reliability.module';
     ChatModule,
     PrismaModule,
     UsersModule,
-    UsersModule,
     ConversationalTutorModule,
     ReliabilityModule,
   ],

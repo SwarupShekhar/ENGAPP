@@ -33,10 +33,12 @@ class HinglishTTSService:
 
         synthesizer = speechsdk.SpeechSynthesizer(speech_config=self.speech_config, audio_config=None)
         
-        # Remove emojis to prevent TTS from reading them
-        # This regex matches most emoji characters
+        # Robust emoji removal - specifically targeting the emoji unicode range
         import re
-        clean_text = re.sub(r'[^\w\s,!.?]', '', text)
+        # Remove characters in the emoji/pictographic range
+        clean_text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
+        # Also apply a general safety filter for other non-alphanumeric chars (excluding punctuation)
+        clean_text = re.sub(r'[^\w\s,!.?\'"]', '', clean_text)
         
         # Wrap text in SSML to ensure proper handling if needed, 
         # but for Neerja/Ananya, plain text often works surprisingly well for Hinglish.

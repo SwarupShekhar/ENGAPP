@@ -63,6 +63,35 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
             try:
                 message = json.loads(data)
                 user_utterance = message.get("text")
+                phonetic_context = message.get("phonetic_context") # Optional context from assessment
+                audio_base64 = message.get("audio_base64") # Raw audio for Gemini pronunciation analysis
+                
+                if phonetic_context:
+                    logger.info("Received phonetic_context for next turn")
+                if audio_base64:
+                    logger.info(f"Received audio_base64 for pronunciation analysis ({len(audio_base64)} chars)")
+                
+                if not user_utterance and audio_base64:
+                    import base64
+                    from app.services.hinglish_stt_service import hinglish_stt_service
+                    try:
+                        audio_bytes = base64.b64decode(audio_base64)
+                        logger.info("Transcribing audio on the fly via WebSocket...")
+                        stt_res = hinglish_stt_service.transcribe_with_soft_assessment(audio_bytes)
+                        user_utterance = stt_res.get("text")
+                        
+                        if stt_res.get("phonetic_insights"):
+                            phonetic_context = stt_res["phonetic_insights"]
+                            
+                        # Immediately send transcription back to UI
+                        if user_utterance:
+                            await websocket.send_json({
+                                "type": "transcription",
+                                "text": user_utterance,
+                                "assessmentResult": {"phonetic_insights": phonetic_context} if phonetic_context else None
+                            })
+                    except Exception as e:
+                        logger.error(f"WebSocket on-the-fly STT error: {e}")
                 
                 if not user_utterance:
                     continue
@@ -75,7 +104,9 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                 async for chunk in streaming_tutor_service.generate_chunked_response(
                     user_utterance, 
                     conversation_history, 
-                    session_id
+                    session_id,
+                    phonetic_context,
+                    audio_base64
                 ):
                     # Convert bytes to base64 if audio present (JSON safe)
                     if chunk.get('audio'):

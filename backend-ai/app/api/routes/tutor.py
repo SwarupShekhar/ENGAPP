@@ -51,6 +51,7 @@ async def transcribe_hinglish(
                 intent_confidence=result.get("intent_confidence", 0.0),
                 is_command=result.get("is_command", False),
                 matched_keyword=result.get("matched_keyword"),
+                phonetic_insights=result.get("phonetic_insights"),
             ),
             meta=Meta(
                 processing_time_ms=processing_time_ms,
@@ -58,7 +59,7 @@ async def transcribe_hinglish(
             ),
         )
     except Exception as e:
-        log.error("endpoint_hinglish_stt_failed", error=str(e))
+        log.error("endpoint_hinglish_stt_failed", error=str(e), type=type(e).__name__, b64_len=len(body.audio_base64) if body and body.audio_base64 else 0)
         raise e
 
 
@@ -170,40 +171,21 @@ async def transcribe_hinglish_upload(
         wav_bytes = service._convert_to_wav(audio_bytes)
 
         if detect_intent:
-            # Transcribe using temp-file approach (existing proven path)
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as f:
-                f.write(wav_bytes)
-                f.flush()
-                transcription = service.transcribe_hinglish(open(f.name, "rb").read())
-
-            text = transcription.get("text", "")
-            if text and detect_intent:
-                intent_result = service.detect_intent_from_text(text)
-            else:
-                intent_result = {
-                    "intent": "none",
-                    "confidence": 0.0,
-                    "is_command": False,
-                    "matched_keyword": None,
-                }
+            transcription = service.transcribe_with_intent(wav_bytes)
 
             response_data = HinglishSTTWithIntentResponse(
-                text=text,
+                text=transcription.get("text", ""),
                 language=transcription.get("language"),
-                success=bool(text),
-                intent=intent_result["intent"],
-                intent_confidence=intent_result["confidence"],
-                is_command=intent_result["is_command"],
-                matched_keyword=intent_result["matched_keyword"],
+                success=transcription.get("success", False),
+                intent=transcription.get("intent", "none"),
+                intent_confidence=transcription.get("intent_confidence", 0.0),
+                is_command=transcription.get("is_command", False),
+                matched_keyword=transcription.get("matched_keyword"),
+                phonetic_insights=transcription.get("phonetic_insights"),
             )
         else:
-            # Transcribe without intent
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as f:
-                f.write(wav_bytes)
-                f.flush()
-                transcription = service.transcribe_hinglish(open(f.name, "rb").read())
+            # Transcribe without intent (standard STT)
+            transcription = service.transcribe_hinglish(wav_bytes)
 
             response_data = HinglishSTTWithIntentResponse(
                 text=transcription.get("text", ""),
@@ -226,3 +208,37 @@ async def transcribe_hinglish_upload(
     except Exception as e:
         log.error("endpoint_stt_upload_failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+@router.post("/debug-phonemes")
+async def debug_phonemes(
+    request: Request,
+    audio: UploadFile = File(...),
+    reference_text: str = Form(...),
+    service: HinglishSTTService = Depends(lambda: hinglish_stt_service),
+):
+    """
+    Temporary debug endpoint to get raw phoneme scores and N-Best data.
+    """
+    log = get_logger(request)
+    try:
+        log.info("endpoint_debug_phonemes_started", reference_text=reference_text)
+        start_time = time.time()
+
+        audio_bytes = await audio.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+
+        result = service.debug_phoneme_scores(audio_bytes, reference_text)
+
+        processing_time_ms = int((time.time() - start_time) * 1000)
+
+        return StandardResponse(
+            success=True,
+            data=result,
+            meta=Meta(
+                processing_time_ms=processing_time_ms,
+                request_id=getattr(request.state, "request_id", None),
+            ),
+        )
+    except Exception as e:
+        log.error("endpoint_debug_phonemes_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")

@@ -94,6 +94,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
+    logger.error("value_error_validation_failed", error=str(exc), path=request.url.path)
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content=StandardResponse(

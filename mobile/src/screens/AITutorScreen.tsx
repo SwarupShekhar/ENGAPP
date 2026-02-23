@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
     FadeInUp,
@@ -21,6 +22,7 @@ import { Audio } from 'expo-av';
 import { theme } from '../theme/theme';
 import { tutorApi } from '../api/tutor';
 import { streamingTutor, StreamChunk } from '../services/streamingTutorService';
+import { PronunciationBreakdown } from '../components/PronunciationBreakdown';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -59,22 +61,46 @@ function TranscriptBubble({ item, index }: { item: any; index: number }) {
     const isUser = item.speaker === 'user';
     return (
         <Animated.View
-            entering={FadeInUp.delay(index * 80).springify()}
-            style={[styles.bubbleRow, isUser ? styles.bubbleRowRight : styles.bubbleRowLeft]}
+            entering={FadeInUp.delay(index * 80).springify().damping(15)}
+            style={[{ width: '100%', marginBottom: 16 }, isUser ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}
         >
-            {!isUser && (
-                <View style={[styles.miniAvatar, { backgroundColor: theme.colors.primary }]}>
-                    <Text style={styles.miniAvatarText}>L</Text>
+            <View style={[styles.bubbleRow, isUser ? styles.bubbleRowRight : styles.bubbleRowLeft]}>
+                {!isUser && (
+                    <View style={styles.avatarContainer}>
+                        <View style={styles.avatarGlow} />
+                        <LinearGradient colors={['#6366f1', '#a855f7']} style={styles.miniAvatar}>
+                            <Text style={styles.miniAvatarText}>M</Text>
+                        </LinearGradient>
+                    </View>
+                )}
+                
+                <View style={[styles.bubbleWrapper, isUser ? styles.bubbleWrapperUser : styles.bubbleWrapperPartner]}>
+                    {isUser ? (
+                        <View style={[styles.bubble, styles.bubbleUser]}>
+                            <Text style={[styles.bubbleText, styles.bubbleTextUser]}>
+                                {item.text}
+                            </Text>
+                        </View>
+                    ) : (
+                        <BlurView intensity={25} tint="dark" style={[styles.bubble, styles.bubblePartner]}>
+                            <Text style={[styles.bubbleText, styles.bubbleTextPartner]}>
+                                {item.text}
+                            </Text>
+                        </BlurView>
+                    )}
                 </View>
-            )}
-            <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubblePartner]}>
-                <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextPartner]}>
-                    {item.text}
-                </Text>
+
+                {isUser && (
+                    <View style={styles.userAvatarContainer}>
+                        <LinearGradient colors={['#3b82f6', '#2dd4bf']} style={styles.miniAvatar}>
+                            <Ionicons name="person" size={14} color="white" />
+                        </LinearGradient>
+                    </View>
+                )}
             </View>
-            {isUser && (
-                <View style={[styles.miniAvatar, { backgroundColor: theme.colors.primaryLight }]}>
-                    <Ionicons name="person" size={16} color={theme.colors.primary} />
+            {isUser && item.assessmentResult && (
+                <View style={{ width: '90%', marginTop: 8 }}>
+                    <PronunciationBreakdown result={item.assessmentResult} />
                 </View>
             )}
         </Animated.View>
@@ -90,10 +116,10 @@ export default function AITutorScreen({ navigation }: any) {
     const [isStreaming, setIsStreaming] = useState(false); // Receiving AI response
     const [error, setError] = useState<string | null>(null);
     const [turnCount, setTurnCount] = useState(0);
-    const [transcript, setTranscript] = useState<any[]>([
-        { id: 'welcome', speaker: 'ai', text: "Namaste! 🙏 I'm Lexa. I'm listening..." }
-    ]);
+    const [referenceTextForNextTurn, setReferenceTextForNextTurn] = useState<string | null>(null);
+    const [transcript, setTranscript] = useState<any[]>([]);
 
+    const sessionIdRef = useRef<string | null>(null);
     const scrollRef = useRef<ScrollView>(null);
     const recordingRef = useRef<Audio.Recording | null>(null);
     const audioQueueRef = useRef<string[]>([]);
@@ -107,54 +133,68 @@ export default function AITutorScreen({ navigation }: any) {
     const speechThresholdDb = -45; // Speech threshold
     const silenceDurationMs = 2000; // 2 seconds to trigger end
 
-    // Pulse
-    const pulseScale = useSharedValue(1);
-    const pulseOpacity = useSharedValue(0.2);
+    // Pulse Rings
+    const pulseScale1 = useSharedValue(1);
+    const pulseOpacity1 = useSharedValue(0);
+    const pulseScale2 = useSharedValue(1);
+    const pulseOpacity2 = useSharedValue(0);
 
     useEffect(() => {
-        pulseScale.value = withRepeat(withTiming(1.5, { duration: 1200 }), -1, true);
-        pulseOpacity.value = withRepeat(withTiming(0, { duration: 1200 }), -1, true);
+        pulseScale1.value = withRepeat(withTiming(1.6, { duration: 1500 }), -1, false);
+        pulseOpacity1.value = withRepeat(withSequence(withTiming(0.4, { duration: 0 }), withTiming(0, { duration: 1500 })), -1, false);
 
-        // Personalized Greeting
-        const userName = user?.firstName || 'Friend';
-        const greeting = `Namaste ${userName}! 🙏 I'm Maya. I'm listening...`;
-        
-        setTranscript([{ 
-            id: 'welcome', 
-            speaker: 'ai', 
-            text: greeting 
-        }]);
+        pulseScale2.value = withRepeat(withDelay(750, withTiming(1.6, { duration: 1500 })), -1, false);
+        pulseOpacity2.value = withRepeat(withDelay(750, withSequence(withTiming(0.3, { duration: 0 }), withTiming(0, { duration: 1500 }))), -1, false);
+
+        // Initialize Session
 
         // Start Session
         const init = async () => {
             try {
-                // Request Permission First
-                const perm = await Audio.requestPermissionsAsync();
+                // 1. Show immediate joining bubble to eliminate perceived lag
+                const initialName = user?.firstName || 'Friend';
+                setTranscript([{ 
+                    id: 'welcome', 
+                    speaker: 'ai', 
+                    text: `Namaste ${initialName}! Maya is joining...` 
+                }]);
+
+                // 2. Parallelize Permission + API Call
+                const [perm, res] = await Promise.all([
+                    Audio.requestPermissionsAsync(),
+                    tutorApi.startSession(user?.id || 'test')
+                ]);
+
                 if (perm.status !== 'granted') {
-                    Alert.alert('Permission Required', 'Microphone access is needed for the AI Tutor.');
+                    Alert.alert('Permission Required', 'Microphone access is needed.');
                     return; 
                 }
 
-                const res = await tutorApi.startSession(user?.id || 'test');
                 setSessionId(res.sessionId);
+                sessionIdRef.current = res.sessionId;
+
+                // 3. Update bubble with actual greeting
+                setTranscript([{ 
+                    id: 'welcome', 
+                    speaker: 'ai', 
+                    text: res.message 
+                }]);
                 
-                // Connect WebSocket
+                // 4. Connect WebSocket + Setup Audio (non-blocking)
                 streamingTutor.connect(res.sessionId, user?.id || 'test');
                 streamingTutor.onMessage(handleStreamMessage);
                 
-                // Audio mode setup - play and record
-                await Audio.setAudioModeAsync({
+                Audio.setAudioModeAsync({
                     allowsRecordingIOS: false,
                     playsInSilentModeIOS: true,
                     staysActiveInBackground: false,
                     shouldDuckAndroid: true,
                     playThroughEarpieceAndroid: false,
-                });
+                }).catch(err => console.warn("Audio mode error:", err));
 
                 if (res.audioBase64) {
                     queueAudio(res.audioBase64);
                 } 
-                // Removed auto-start recording to prevent loops/echo
 
             } catch (e) {
                 console.error('Init error:', e);
@@ -167,12 +207,45 @@ export default function AITutorScreen({ navigation }: any) {
             streamingTutor.disconnect();
             if (soundRef.current) soundRef.current.unloadAsync();
             if (recordingRef.current) stopRecording(); // Ensure recording stops
+            
+            // Trigger final analysis and save session
+            if (sessionIdRef.current) {
+                console.log("[AITutor] Ending session for analysis:", sessionIdRef.current);
+                tutorApi.endSession(sessionIdRef.current).catch(err => {
+                    console.warn("[AITutor] Failed to end session gracefully:", err.message);
+                });
+            }
         };
     }, []);
 
     // ─── Stream Handling ────────────────────────────────────
     const handleStreamMessage = (chunk: StreamChunk) => {
-        if (chunk.type === 'sentence') {
+        if (chunk.type === 'transcription') {
+            // Update the placeholder user bubble with the actual transcription
+            if (chunk.text) {
+                setTranscript(prev => {
+                    const tempIndex = prev.findIndex(p => p.speaker === 'user' && p.tempId);
+                    if (tempIndex >= 0) {
+                        const updated = [...prev];
+                        updated[tempIndex] = {
+                            ...updated[tempIndex],
+                            text: chunk.text,
+                            assessmentResult: chunk.assessmentResult,
+                            tempId: false,
+                            isTranscribing: false
+                        };
+                        return updated;
+                    }
+                    // Fallback
+                    return [...prev, {
+                        id: Date.now().toString(),
+                        speaker: 'user',
+                        text: chunk.text,
+                        assessmentResult: chunk.assessmentResult
+                    }];
+                });
+            }
+        } else if (chunk.type === 'sentence') {
             setIsStreaming(true);
             if (chunk.text) {
                 setTranscript(prev => {
@@ -199,6 +272,43 @@ export default function AITutorScreen({ navigation }: any) {
         // Always check for audio in any chunk
         if (chunk.audio) {
             queueAudio(chunk.audio);
+        }
+
+        // --- NEW: Detect if Maya is asking the user to repeat something ---
+        // Basic heuristic: check if the string contains a quoted phrase after words like "say", "saying", "repeat"
+        if (chunk.text && chunk.is_final !== false) { // Wait for the chunk to assemble or just check the full string
+            // We'll run the check on the accumulated string once we know the stream is done, 
+            // but since chunk.text comes in pieces, we'll wait for the `playNext` queue finish to evaluate the whole last message.
+        }
+    };
+
+    // Evaluate last message for repetition prompts
+    const evaluateLastMessageForPronunciation = () => {
+        if (transcript.length === 0) return;
+        const lastMsg = transcript[transcript.length - 1];
+        if (lastMsg.speaker !== 'ai') return;
+        
+        const txt = lastMsg.text.toLowerCase();
+        
+        // Match patterns like:
+        // - "say: 'word'"
+        // - "repeat after me: 'phrase'"
+        // - "try saying 'this'"
+        
+        const match = lastMsg.text.match(/(?:say|saying|repeat|try|boli(?:ye|o))\s*(?:after me|this|say)?\s*[:,-]?\s*['"]([^'"]+)['"]/i);
+        
+        if (match && match[1]) {
+            console.log("[Pronunciation] Detected reference text:", match[1]);
+            setReferenceTextForNextTurn(match[1]);
+        } else {
+            // Check if user explicitly asked to practice
+            const userMatch = lastMsg.text.match(/['"]([^'"]+)['"]/i); // Fallback: just grab quotes if it feels like a correction
+            if (txt.includes('practice') && userMatch && userMatch[1]) {
+                 console.log("[Pronunciation] Detected practice word:", userMatch[1]);
+                 setReferenceTextForNextTurn(userMatch[1]);
+            } else {
+                 setReferenceTextForNextTurn(null);
+            }
         }
     };
 
@@ -236,6 +346,7 @@ export default function AITutorScreen({ navigation }: any) {
                     
                     if (audioQueueRef.current.length === 0) {
                         setIsStreaming(false); // Enable mic again
+                        evaluateLastMessageForPronunciation(); // Check if we need to assess next
                     }
                 }
             });
@@ -340,23 +451,60 @@ export default function AITutorScreen({ navigation }: any) {
              recordingRef.current = null; // Clear ref immediately to prevent double calls
             
             if (uri) {
-                // 1. Transcribe
-                const formData = new FormData();
-                formData.append('audio', { uri, type: 'audio/m4a', name: 'audio.m4a' } as any);
-                formData.append('userId', user?.id || 'test');
-                
-                const res = await tutorApi.transcribe(formData);
-                const text = res.text;
+                // 1. Prepare Audio Base64 (always needed now)
+                let audioBase64: string | undefined;
+                try {
+                    const FileSystem = require('expo-file-system');
+                    audioBase64 = await FileSystem.readAsStringAsync(uri, { 
+                        encoding: FileSystem.EncodingType.Base64 
+                    });
+                } catch (e) {
+                    console.warn('[AITutor] Could not read audio file:', e);
+                }
 
-                // 2. Add User Bubble
-                setTranscript(prev => [...prev, {
-                    id: Date.now().toString(),
-                    speaker: 'user',
-                    text: text
-                }]);
+                if (referenceTextForNextTurn && sessionId) {
+                    // Route to specialized pronunciation assessment (REST)
+                    const formData = new FormData();
+                    formData.append('audio', { uri, type: 'audio/m4a', name: 'audio.m4a' } as any);
+                    formData.append('userId', user?.id || 'test');
+                    formData.append('referenceText', referenceTextForNextTurn);
+                    formData.append('sessionId', sessionId);
+                    console.log("[AITutor] Assessing pronunciation for:", referenceTextForNextTurn);
+                    
+                    const res = await tutorApi.assessPronunciation(formData);
+                    const text = res.recognized_text || referenceTextForNextTurn; // Try to use STT result if any
+                    const phoneticContext = res.phonetic_insights;
+                    const assessmentData = res;
+                    
+                    // Clear reference text after use
+                    setReferenceTextForNextTurn(null);
 
-                // 3. Send to Stream
-                streamingTutor.sendText(text);
+                    // Add User Bubble
+                    setTranscript(prev => [...prev, {
+                        id: Date.now().toString(),
+                        speaker: 'user',
+                        text: text || '(Audio Sent)',
+                        assessmentResult: assessmentData
+                    }]);
+
+                    // Send to Stream (include raw audio for Gemini analysis)
+                    streamingTutor.sendText(text, phoneticContext, audioBase64);
+                } else {
+                    // Fast path: Standard conversation via WebSocket directly!
+                    
+                    // 1. Add Placeholder User Bubble
+                    setTranscript(prev => [...prev, {
+                        id: Date.now().toString(),
+                        speaker: 'user',
+                        text: '...', // Will be updated by WS transcription event
+                        tempId: true
+                    }]);
+
+                    // 2. Send raw audio straight to the WS, no REST!
+                    if (audioBase64) {
+                        streamingTutor.sendText(null, null, audioBase64);
+                    }
+                }
                 setTurnCount(c => c + 1);
             }
         } catch (e) {
@@ -369,14 +517,18 @@ export default function AITutorScreen({ navigation }: any) {
     };
 
     // Animation
-    const animatedPulseStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: pulseScale.value }],
-        opacity: pulseOpacity.value,
+    const animatedPulseStyle1 = useAnimatedStyle(() => ({
+        transform: [{ scale: pulseScale1.value }],
+        opacity: pulseOpacity1.value,
+    }));
+    const animatedPulseStyle2 = useAnimatedStyle(() => ({
+        transform: [{ scale: pulseScale2.value }],
+        opacity: pulseOpacity2.value,
     }));
 
     return (
         <View style={styles.container}>
-            <LinearGradient colors={['#0F172A', '#1E293B', '#111827']} style={styles.background} />
+            <LinearGradient colors={['#0F0C29', '#302B63', '#0F0C29']} start={{x: 0, y: 0}} end={{x: 1, y: 1}} style={styles.background} />
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
@@ -387,6 +539,41 @@ export default function AITutorScreen({ navigation }: any) {
                          <View style={styles.onlineBadge} />
                          <Text style={styles.headerTitle}>Maya (AI Tutor)</Text>
                     </View>
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity 
+                        style={styles.endSessionBtn}
+                        onPress={async () => {
+                            if (isProcessing) return;
+                            setIsProcessing(true);
+                            if (sessionIdRef.current) {
+                                try {
+                                    await tutorApi.endSession(sessionIdRef.current);
+                                    // Make sure we go to the feedback screen instead of just back
+                                    navigation.replace('CallFeedbackScreen', {
+                                        sessionId: sessionIdRef.current,
+                                        clerkId: user?.id,
+                                        partnerInfo: {
+                                            id: 'maya',
+                                            fname: 'Maya',
+                                            lname: '(AI Tutor)'
+                                        },
+                                        isAI: true
+                                    });
+                                } catch (e) {
+                                    setIsProcessing(false);
+                                    Alert.alert("Error", "Could not load feedback.");
+                                }
+                            } else {
+                                navigation.goBack();
+                            }
+                        }}
+                    >
+                        {isProcessing ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <Text style={styles.endSessionText}>End Session</Text>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* Chat */}
@@ -411,10 +598,15 @@ export default function AITutorScreen({ navigation }: any) {
                         disabled={isProcessing || isStreaming}
                     >
                         <View style={[styles.micContainer, (isProcessing || isStreaming) && { opacity: 0.5 }]}>
-                            {isRecording && <Animated.View style={[styles.pulse, animatedPulseStyle]} />}
+                            {isRecording && (
+                                <>
+                                    <Animated.View style={[styles.pulse, animatedPulseStyle1]} />
+                                    <Animated.View style={[styles.pulse, animatedPulseStyle2]} />
+                                </>
+                            )}
                             <LinearGradient
-                                colors={isRecording ? ['#ef4444', '#dc2626'] : ['#3b82f6', '#2563eb']}
-                                style={styles.micButton}
+                                colors={isRecording ? ['#ef4444', '#dc2626'] : ['#6366f1', '#a855f7']}
+                                style={[styles.micButton, isRecording && styles.micButtonRecording]}
                             >
                                 <Ionicons name={isRecording ? "stop" : "mic"} size={28} color="white" />
                             </LinearGradient>
@@ -436,33 +628,49 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', alignItems: 'center', padding: 16 },
     backBtn: { padding: 8 },
     headerCenter: { flexDirection: 'row', alignItems: 'center', marginLeft: 10, gap: 8 },
-    onlineBadge: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' },
-    headerTitle: { color: 'white', fontWeight: 'bold', fontSize: 18 },
+    onlineBadge: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981', shadowColor: '#10b981', shadowOpacity: 0.6, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
+    headerTitle: { color: 'white', fontWeight: 'bold', fontSize: 18, letterSpacing: 0.5 },
+    endSessionBtn: { 
+        backgroundColor: 'rgba(239, 68, 68, 0.15)', 
+        paddingHorizontal: 16, 
+        paddingVertical: 8, 
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.4)'
+    },
+    endSessionText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
     transcriptScroll: { flex: 1 },
-    transcriptContent: { padding: 16, gap: 12, paddingBottom: 100 },
+    transcriptContent: { padding: 16, gap: 16, paddingBottom: 100 },
     
     // Bubbles
-    bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+    bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
     bubbleRowLeft: { justifyContent: 'flex-start' },
     bubbleRowRight: { justifyContent: 'flex-end' },
-    miniAvatar: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-    miniAvatarText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
-    bubble: { maxWidth: SCREEN_WIDTH * 0.75, padding: 12, borderRadius: 16 },
-    bubbleUser: { backgroundColor: theme.colors.primary, borderBottomRightRadius: 2 },
-    bubblePartner: { backgroundColor: 'rgba(255,255,255,0.1)', borderBottomLeftRadius: 2 },
-    bubbleText: { color: 'white', fontSize: 16, lineHeight: 22 },
+    avatarContainer: { position: 'relative', width: 32, height: 32 },
+    userAvatarContainer: { position: 'relative', width: 32, height: 32 },
+    avatarGlow: { position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, borderRadius: 20, backgroundColor: '#a855f7', opacity: 0.4 },
+    miniAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    miniAvatarText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+    bubbleWrapper: { maxWidth: SCREEN_WIDTH * 0.72, borderRadius: 20, overflow: 'hidden' },
+    bubbleWrapperUser: { borderBottomRightRadius: 4, shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+    bubbleWrapperPartner: { borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+    bubble: { paddingHorizontal: 16, paddingVertical: 12 },
+    bubbleUser: { backgroundColor: theme.colors.primary },
+    bubblePartner: { backgroundColor: 'transparent' },
+    bubbleText: { color: 'white', fontSize: 16, lineHeight: 24, letterSpacing: 0.2 },
     bubbleTextUser: { color: 'white' },
-    bubbleTextPartner: { color: '#e2e8f0' },
+    bubbleTextPartner: { color: '#f8fafc' },
 
     // Footer
     footer: { alignItems: 'center', paddingBottom: 40 },
-    micContainer: { width: 72, height: 72, justifyContent: 'center', alignItems: 'center' },
-    micButton: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
-    pulse: { position: 'absolute', width: '100%', height: '100%', borderRadius: 40, backgroundColor: 'rgba(239, 68, 68, 0.5)' },
-    hintText: { color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 14 },
+    micContainer: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
+    micButton: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', zIndex: 2, shadowColor: '#a855f7', shadowOpacity: 0.4, shadowOffset: {width: 0, height: 4}, shadowRadius: 10},
+    micButtonRecording: { shadowColor: '#ef4444', shadowOpacity: 0.6, shadowRadius: 15 },
+    pulse: { position: 'absolute', width: '100%', height: '100%', borderRadius: 40, backgroundColor: 'rgba(239, 68, 68, 0.4)' },
+    hintText: { color: 'rgba(255,255,255,0.7)', marginTop: 16, fontSize: 14, fontWeight: '500', letterSpacing: 0.5 },
 
     // Typing
-    typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 8 },
-    typingBubble: { flexDirection: 'row', gap: 4, padding: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, borderBottomLeftRadius: 2 },
-    dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.6)' },
+    typingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 8 },
+    typingBubble: { flexDirection: 'row', gap: 5, paddingVertical: 14, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 20, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.8)' },
 });

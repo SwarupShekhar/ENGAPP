@@ -67,6 +67,7 @@ THINGS TO AVOID:
 - Don't start every message the same way (avoid always opening with "Arre!" or always with the user's name)
 - Never break character or mention that you're an AI
 - NEVER use familial terms like "bhai", "didi", "brother", "sister", "bro". You are a tutor, not a sibling.
+- NEVER use emojis (icons/symbols) in your response. Stay purely text-based.
 
 ---
 
@@ -109,25 +110,37 @@ export class ConversationalTutorService {
     private httpService: HttpService,
     private prisma: PrismaService,
   ) {
-    this.genAI = new GoogleGenerativeAI(this.configService.get<string>('GOOGLE_API_KEY'));
-    this.aiBackendUrl = this.configService.get<string>('AI_BACKEND_URL') || 'http://localhost:8001';
+    this.genAI = new GoogleGenerativeAI(
+      this.configService.get<string>('GOOGLE_API_KEY'),
+    );
+    this.aiBackendUrl =
+      this.configService.get<string>('AI_BACKEND_URL') ||
+      'http://localhost:8001';
   }
 
   // ─── Existing: Process user utterance with Gemini ──────────
 
-  async processUserUtterance(sessionId: string, userUtterance: string, userId: string) {
+  async processUserUtterance(
+    sessionId: string,
+    userUtterance: string,
+    userId: string,
+  ) {
     const session = this.getOrCreateSession(sessionId);
 
     // Build conversation history for context
     const historyStr = session.history
       .slice(-10) // last 10 turns
-      .map(t => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
+      .map((t) => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
       .join('\n');
 
     const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = CONVERSATIONAL_TUTOR_PROMPT
-      .replace('{user_utterance}', userUtterance)
-      .replace('{conversation_history}', historyStr || '(start of conversation)');
+    const prompt = CONVERSATIONAL_TUTOR_PROMPT.replace(
+      '{user_utterance}',
+      userUtterance,
+    ).replace(
+      '{conversation_history}',
+      historyStr || '(start of conversation)',
+    );
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
@@ -136,14 +149,20 @@ export class ConversationalTutorService {
     let responseJson: any;
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      responseJson = jsonMatch ? JSON.parse(jsonMatch[0]) : { response: responseText };
+      responseJson = jsonMatch
+        ? JSON.parse(jsonMatch[0])
+        : { response: responseText };
     } catch (e) {
       this.logger.error(`Failed to parse Gemini response: ${e.message}`);
       responseJson = { response: responseText };
     }
 
     // Store history
-    session.history.push({ speaker: 'user', text: userUtterance, timestamp: new Date() });
+    session.history.push({
+      speaker: 'user',
+      text: userUtterance,
+      timestamp: new Date(),
+    });
     session.history.push({
       speaker: 'ai',
       text: responseJson.response || responseText,
@@ -168,11 +187,15 @@ export class ConversationalTutorService {
       );
       return response.data.data;
     } catch (error) {
-       this.logger.error(`Generic STT failed: ${error.message} - URL: ${this.aiBackendUrl}/api/tutor/stt`);
-       if (error.response) {
-         this.logger.error(`Upstream error data: ${JSON.stringify(error.response.data)}`);
-       }
-       throw error;
+      this.logger.error(
+        `Generic STT failed: ${error.message} - URL: ${this.aiBackendUrl}/api/tutor/stt`,
+      );
+      if (error.response) {
+        this.logger.error(
+          `Upstream error data: ${JSON.stringify(error.response.data)}`,
+        );
+      }
+      throw error;
     }
   }
 
@@ -195,16 +218,208 @@ export class ConversationalTutorService {
 
   // ─── Existing: End session ─────────────────────────────────
 
+  async startSession(userId: string) {
+    // 1. Create session in DB + get user name in parallel
+    const [dbSession, user] = await Promise.all([
+      this.prisma.conversationSession.create({
+        data: {
+          structure: 'ai_tutor',
+          status: 'IN_PROGRESS',
+          participants: {
+            create: [{ userId }],
+          },
+        },
+        include: {
+          participants: true,
+        },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fname: true },
+      }),
+    ]);
+
+    const sessionId = dbSession.id;
+    const name = user?.fname || 'Friend';
+    const message = `Namaste ${name}! I'm Maya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!`;
+
+    // 2. Initialize in-memory state immediately (no waiting for TTS)
+    const session = {
+      history: [
+        {
+          speaker: 'ai' as const,
+          text: message,
+          timestamp: new Date(),
+        },
+      ],
+      pronunciationAttempts: [],
+    };
+    this.conversations.set(sessionId, session);
+
+    // 3. Return immediately — NO TTS for greeting (saves 1-2s)
+    //    The user reads the text. Audio will come through WebSocket on subsequent turns.
+    return {
+      sessionId,
+      message,
+      audioBase64: '', // Skip TTS for instant loading
+    };
+  }
+
   async endSession(sessionId: string) {
     const session = this.conversations.get(sessionId);
-    const turnCount = session?.history?.length || 0;
-    const pronunciationAttempts = session?.pronunciationAttempts?.length || 0;
+    if (!session) {
+      return { message: 'Session not found or already ended' };
+    }
+
+    const turnCount = session.history.length;
+    const userTurns = session.history.filter((h) => h.speaker === 'user');
+
+    // 1. Build Transcript
+    const transcript = session.history
+      .map((t) => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
+      .join('\n\n');
+
+    try {
+      // 2. Perform Final Analysis with Gemini
+      const analysisData = await this.generateFinalRecap(session);
+
+      // 3. Find participant record
+      const dbSession = await this.prisma.conversationSession.findUnique({
+        where: { id: sessionId },
+        include: { participants: true },
+      });
+      const participant = dbSession?.participants[0];
+
+      if (participant) {
+        // 4. Create Analysis and Mistakes
+        await this.prisma.analysis.create({
+          data: {
+            sessionId: sessionId,
+            participantId: participant.id,
+            scores: analysisData.scores as any,
+            cefrLevel: analysisData.cefrLevel,
+            rawData: {
+              aiFeedback: analysisData.summary,
+              strengths: analysisData.strengths,
+              improvementAreas: analysisData.weaknesses,
+              nextSteps: analysisData.nextSteps,
+            } as any,
+            mistakes: {
+              create: analysisData.mistakes.map((m: any) => ({
+                original: m.wrong,
+                corrected: m.right,
+                explanation: m.explanation,
+                type: m.type || 'Grammar',
+                severity: m.severity || 'medium',
+                segmentId: '0',
+                timestamp: 0,
+              })),
+            },
+            pronunciationIssues: {
+              create: session.pronunciationAttempts
+                .filter((p) => !p.passed)
+                .map((p) => ({
+                  word: p.problemWords[0] || p.referenceText,
+                  issueType: 'Mispronunciation',
+                  severity: 'medium',
+                  suggestion: `Work on "${p.referenceText}"`,
+                })),
+            },
+          },
+        });
+      }
+
+      // 5. Update Session Status
+      await this.prisma.conversationSession.update({
+        where: { id: sessionId },
+        data: {
+          status: 'COMPLETED',
+          endedAt: new Date(),
+          duration: Math.floor(
+            (new Date().getTime() - (dbSession?.createdAt?.getTime() || 0)) /
+              1000,
+          ),
+          feedback: {
+            upsert: {
+              create: { transcript },
+              update: { transcript },
+            },
+          },
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Final analysis failed for AI session: ${error.message}`,
+      );
+      // Mark session as ended anyway
+      await this.prisma.conversationSession
+        .update({
+          where: { id: sessionId },
+          data: { status: 'ENDED', endedAt: new Date() },
+        })
+        .catch(() => {});
+    }
+
     this.conversations.delete(sessionId);
+
     return {
-      message: 'Session ended',
+      message: 'Session ended and analyzed',
       turnCount,
-      pronunciationAttempts,
+      pronunciationAttempts: session.pronunciationAttempts.length,
     };
+  }
+
+  async generateFinalRecap(session: ConversationSession) {
+    const historyStr = session.history
+      .map((h) => `${h.speaker === 'user' ? 'User' : 'AI'}: ${h.text}`)
+      .join('\n');
+
+    const prompt = `
+    You are Maya, the expert English tutor. You just finished a practice session with a student.
+    Analyze the following conversation and provide a structured feedback report.
+    
+    CONVERSATION:
+    ${historyStr}
+    
+    Format your response as a JSON object:
+    {
+      "summary": "A warm, personalized summary of how they did today (in Maya's Hinglish style)",
+      "scores": {
+        "grammar": 0-100,
+        "vocabulary": 0-100,
+        "fluency": 0-100,
+        "pronunciation": 0-100,
+        "overall": 0-100
+      },
+      "cefrLevel": "A1|A2|B1|B2|C1|C2",
+      "strengths": ["list common strengths"],
+      "weaknesses": ["list areas to improve"],
+      "mistakes": [
+        {
+          "wrong": "what they said",
+          "right": "correction",
+          "explanation": "why",
+          "severity": "low|medium|high",
+          "type": "Grammar|Vocabulary|Fluency"
+        }
+      ],
+      "nextSteps": ["Concrete advice for next time"]
+    }
+    
+    Respond STRICTLY in JSON.
+    `;
+
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    } catch (e) {
+      this.logger.error(`Failed to parse final recap JSON: ${e.message}`);
+      throw e;
+    }
   }
 
   // ─── Feature 1: Pronunciation Assessment ───────────────────
@@ -250,9 +465,44 @@ export class ConversationalTutorService {
 
       return result;
     } catch (error) {
-      const errorMessage = (error as any).response?.data?.detail || (error as any).message;
+      const errorMessage =
+        (error as any).response?.data?.detail || (error as any).message;
       this.logger.error(`Pronunciation assessment failed: ${errorMessage}`);
-      throw new Error(`Pronunciation assessment failed: ${errorMessage}`, { cause: error });
+      throw new Error(`Pronunciation assessment failed: ${errorMessage}`, {
+        cause: error,
+      });
+    }
+  }
+
+  async debugPhonemes(audioBuffer: Buffer, phrase: string): Promise<any> {
+    try {
+      const form = new FormData();
+      form.append('audio', audioBuffer, {
+        filename: 'audio.m4a',
+        contentType: 'audio/m4a',
+      });
+      form.append('reference_text', phrase);
+
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.aiBackendUrl}/api/tutor/debug-phonemes`,
+          form,
+          {
+            headers: { ...form.getHeaders() },
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity,
+          },
+        ),
+      );
+
+      return response.data.data;
+    } catch (error) {
+      const errorMessage =
+        (error as any).response?.data?.detail || (error as any).message;
+      this.logger.error(`Debug phonemes failed: ${errorMessage}`);
+      throw new Error(`Debug phonemes failed: ${errorMessage}`, {
+        cause: error,
+      });
     }
   }
 
@@ -298,7 +548,11 @@ export class ConversationalTutorService {
     }
 
     // Step 3: Not a command — process with Gemini as normal conversation
-    const aiResult = await this.processUserUtterance(sessionId, sttResult.text, userId);
+    const aiResult = await this.processUserUtterance(
+      sessionId,
+      sttResult.text,
+      userId,
+    );
 
     // Step 4: Synthesize AI response to speech
     const responseText = aiResult.response || '';
@@ -315,15 +569,18 @@ export class ConversationalTutorService {
       aiResponse: responseText,
       correction: aiResult.correction || null,
       audioBase64: audioBase64Response,
+      phoneticInsights: sttResult.phonetic_insights || null,
     };
   }
 
   // ─── Verification: Generate initial greeting ───────────────
 
-  async generateGreetingInternal(userId: string): Promise<{ message: string; audioBase64: string }> {
+  async generateGreetingInternal(
+    userId: string,
+  ): Promise<{ message: string; audioBase64: string }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const name = user?.fname || 'Friend';
-    const message = `Namaste ${name}! 🙏 I'm Maya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!`;
+    const message = `Namaste ${name}! I'm Maya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!`;
 
     const audioBase64 = await this.synthesizeHinglish(message);
 

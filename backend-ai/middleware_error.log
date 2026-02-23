@@ -1010,3 +1010,573 @@ LookupError:
     - '/usr/local/lib/nltk_data'
 **********************************************************************
 
+
+--- MIDDLEWARE ERROR at 1771496138.203049 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771496148.194838 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771496151.039652 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771496159.6014788 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771496396.9279191 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771496401.3586078 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771496705.2275012 ---
+Path: /api/tutor/stt
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 382, in transcribe_with_intent
+    transcription_result = self.transcribe_hinglish(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 69, in transcribe_hinglish
+    speech_recognizer = speechsdk.SpeechRecognizer(
+        speech_config=self.speech_config,
+        auto_detect_source_language_config=self.auto_detect_config,
+        audio_config=audio_config,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1166, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_auto_detect_source_lang_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, auto_detect_source_language_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+
+--- MIDDLEWARE ERROR at 1771501979.0925922 ---
+Path: /api/tutor/stt
+Error: 'NoneType' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 62, in transcribe_hinglish
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/tutor.py", line 39, in transcribe_hinglish
+    result = service.transcribe_with_intent(audio_data)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/hinglish_stt_service.py", line 364, in transcribe_with_intent
+    text = transcription_result.get("text", "")
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'get'

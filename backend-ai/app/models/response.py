@@ -120,23 +120,27 @@ class HinglishTTSResponse(BaseModel):
 class PhonemeDetail(BaseModel):
     phoneme: str
     accuracy_score: float
+    is_correct: bool = True
+    actually_said: str | None = None  # What the user actually said (if different)
+    nbest: List[Dict[str, Any]] = []  # All candidates from Azure
 
-class WordAssessment(BaseModel):
+class WordDetail(BaseModel):
     word: str
     accuracy_score: float
-    error_type: str  # "None", "Omission", "Insertion", "Mispronunciation"
+    error_type: str = "None"  # None, Omission, Insertion, Mispronunciation
     phonemes: List[PhonemeDetail] = []
 
 class TutorPronunciationAssessmentResult(BaseModel):
-    accuracy_score: float
-    fluency_score: float
-    completeness_score: float
-    prosody_score: float
+    original_text: str
     recognized_text: str
-    reference_text: str
-    words: List[WordAssessment] = []
+    accuracy_score: float
+    pronunciation_score: float
+    completeness_score: float
+    fluency_score: float
+    words: List[WordDetail] = []
+    maya_feedback: str  # Hinglish feedback in Maya's persona
+    phonetic_insights: dict | None = None  # Detailed pattern analysis for Maya context
     passed: bool
-    maya_feedback: str
     problem_words: List[str] = []
 
 
@@ -151,3 +155,4 @@ class HinglishSTTWithIntentResponse(BaseModel):
     intent_confidence: float = 0.0
     is_command: bool = False
     matched_keyword: Optional[str] = None
+    phonetic_insights: Optional[Dict[str, Any]] = None
