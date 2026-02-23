@@ -549,7 +549,7 @@ export default function AITutorScreen({ navigation }: any) {
                                 try {
                                     await tutorApi.endSession(sessionIdRef.current);
                                     // Make sure we go to the feedback screen instead of just back
-                                    navigation.replace('CallFeedbackScreen', {
+                                    navigation.replace('CallFeedback', {
                                         sessionId: sessionIdRef.current,
                                         clerkId: user?.id,
                                         partnerInfo: {
