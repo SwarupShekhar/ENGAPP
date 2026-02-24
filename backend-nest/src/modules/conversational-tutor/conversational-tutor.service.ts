@@ -111,10 +111,10 @@ export class ConversationalTutorService {
     private prisma: PrismaService,
   ) {
     this.genAI = new GoogleGenerativeAI(
-      this.configService.get<string>('GOOGLE_API_KEY'),
+      this.configService.get<string>('GEMINI_API_KEY'),
     );
     this.aiBackendUrl =
-      this.configService.get<string>('AI_BACKEND_URL') ||
+      this.configService.get<string>('AI_ENGINE_URL') ||
       'http://localhost:8001';
   }
 

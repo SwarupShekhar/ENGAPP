@@ -23,39 +23,54 @@ export default function EBitesScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const flatListRef = useRef<FlatList>(null);
+    const baseFeedRef = useRef<FeedItem[]>([]); // Store original feed for looping
+
     const fetchFeed = useCallback(async () => {
         try {
             setLoading(true);
+            setActiveIndex(0);
             const reels = await reelsApi.getFeed();
             
-            // Logic: Every 3 reels, we inject the activity of the 3rd reel if it exists.
-            const mixedFeed: FeedItem[] = [];
-            reels.forEach((reel, index) => {
-                mixedFeed.push({
+            // Build base feed: video + activity pairs
+            const baseFeed: FeedItem[] = [];
+            reels.forEach((reel) => {
+                baseFeed.push({
                     id: `video-${reel.id}`,
                     type: 'video',
                     data: reel
                 });
 
-                // Activity Injection Logic: For each reel, if it has a question, attach it right after.
-                // This makes eBites feel like interactive capsules: "Watch -> Learn -> Test"
                 if (reel.activity) {
-                    mixedFeed.push({
+                    baseFeed.push({
                         id: `activity-${reel.id}`,
                         type: 'activity',
                         data: {
                             ...reel.activity,
-                            reelId: reel.id, // Ensure reelId is passed for submission
-                            topic_tag: reel.topic_tag, // Include topic_tag for score updates
-                            title: reel.activity.question, // Map backend 'question' to component 'title'
-                            activityType: reel.activity.type // Map backend 'type' to component 'activityType'
+                            reelId: reel.id,
+                            topic_tag: reel.topic_tag,
+                            title: reel.activity.question,
+                            activityType: reel.activity.type
                         }
                     });
                 }
             });
 
-            setFeedItems(mixedFeed);
+            baseFeedRef.current = baseFeed;
+
+            // Repeat the feed 10x for infinite-scroll feel
+            const loopedFeed: FeedItem[] = [];
+            for (let i = 0; i < 10; i++) {
+                baseFeed.forEach((item) => {
+                    loopedFeed.push({ ...item, id: `${item.id}-loop${i}` });
+                });
+            }
+
+            setFeedItems(loopedFeed);
             setError(null);
+            setTimeout(() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+            }, 100);
         } catch (err) {
             console.error('Failed to load reels feed:', err);
             setError('Failed to load feed. Please try again.');
@@ -143,7 +158,7 @@ export default function EBitesScreen() {
         return (
             <View style={[styles.container, styles.centered]}>
                 <Ionicons name="film-outline" size={64} color="#475569" style={{ marginBottom: 16 }} />
-                <Text style={[styles.loadingText, { color: '#94a3b8' }]}>You're all caught up!</Text>
+                <Text style={[styles.loadingText, { color: '#94a3b8' }]}>No eBites available yet</Text>
                 <Text style={[styles.retryText, { marginTop: 8 }]} onPress={fetchFeed}>Refresh Feed</Text>
             </View>
         );
@@ -153,6 +168,7 @@ export default function EBitesScreen() {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
             <FlatList
+                ref={flatListRef}
                 data={feedItems}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
@@ -172,8 +188,6 @@ export default function EBitesScreen() {
                     offset: SCREEN_HEIGHT * index,
                     index,
                 })}
-                onRefresh={fetchFeed}
-                refreshing={loading}
             />
         </View>
     );

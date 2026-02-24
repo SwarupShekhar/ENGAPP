@@ -19,11 +19,18 @@ class StreamingTutorService {
     if (this.ws) {
       this.ws.close();
     }
+    // In production, connect to the deployed AI backend directly
+    // In dev, swap port 3000 → 8001 on the local URL
+    const IS_PROD = !__DEV__;
+    let wsUrl: string;
 
-    let wsUrl = API_URL.replace("http", "ws");
-
-    if (wsUrl.includes(":3000")) {
-      wsUrl = wsUrl.replace(":3000", ":8001");
+    if (IS_PROD) {
+      wsUrl = "wss://engapp-2ai.onrender.com";
+    } else {
+      wsUrl = API_URL.replace("http", "ws");
+      if (wsUrl.includes(":3000")) {
+        wsUrl = wsUrl.replace(":3000", ":8001");
+      }
     }
 
     this.ws = new WebSocket(

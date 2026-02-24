@@ -98,6 +98,7 @@ export class ReelsService {
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: { Authorization: `Bearer ${this.strapiToken}` },
+          timeout: 60000, // 60s timeout for Render free-tier cold starts
         }),
       );
       return response.data.data || [];
