@@ -95,10 +95,11 @@ export class ReelsService {
     // }
 
     try {
-      // Because we enabled Public access in Strapi, sending an invalid API key
-      // actually overrides Public access and forces a 401 Unauthorized error.
-      // Therefore, we drop the Authorization header to rely entirely on the Public role.
-      const response = await firstValueFrom(this.httpService.get(url));
+      const response = await firstValueFrom(
+        this.httpService.get(url, {
+          headers: { Authorization: `Bearer ${this.strapiToken}` },
+        }),
+      );
       return response.data.data || [];
     } catch (error) {
       this.logger.error(`Strapi request failed: ${error.message}`);
