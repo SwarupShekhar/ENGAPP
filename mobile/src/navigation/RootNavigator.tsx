@@ -21,6 +21,7 @@ import AITutorScreen from "../screens/AITutorScreen";
 import ChatScreen from "../screens/ChatScreen";
 import SocketDebugScreen from "../screens/SocketDebugScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
+import EBitesScreen from "../screens/EBitesScreen";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.
@@ -79,8 +80,8 @@ function MainTabs() {
                     },
                 })}
             />
+            <Tab.Screen name="eBites" component={EBitesScreen} />
             <Tab.Screen name="Progress" component={ProgressScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
         </Tab.Navigator>
     );
 }

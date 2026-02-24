@@ -1,0 +1,72 @@
+{
+  "kind": "collectionType",
+  "collectionName": "reels",
+  "info": {
+    "singularName": "reel",
+    "pluralName": "reels",
+    "displayName": "Reel"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "mux_asset_id": {
+      "type": "string"
+    },
+    "mux_playback_id": {
+      "type": "string"
+    },
+    "duration_seconds": {
+      "type": "integer"
+    },
+    "difficulty_level": {
+      "type": "enumeration",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ]
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "topics": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::topic.topic"
+    },
+    "question": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::question.question"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "global",
+        "personalized"
+      ]
+    },
+    "xp_reward": {
+      "type": "integer"
+    },
+    "activity_type": {
+      "type": "enumeration",
+      "enum": [
+        "mcq",
+        "repeat_after_me",
+        "listening_check"
+      ]
+    },
+    "is_featured": {
+      "type": "boolean"
+    }
+  }
+}

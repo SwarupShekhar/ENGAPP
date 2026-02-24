@@ -51,8 +51,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                     let iconName: any = 'home';
                     if (route.name === 'Home') iconName = isFocused ? 'home' : 'home-outline';
                     if (route.name === 'Feedback') iconName = isFocused ? 'document-text' : 'document-text-outline';
-                    if (route.name === 'Progress') iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
-                    if (route.name === 'Profile') iconName = isFocused ? 'person' : 'person-outline';
+                    if (route.name === 'eBites') iconName = isFocused ? 'videocam' : 'videocam-outline';
+                    if (route.name === 'Progress') iconName = isFocused ? 'person' : 'person-outline';
 
                     return (
                         <TouchableOpacity

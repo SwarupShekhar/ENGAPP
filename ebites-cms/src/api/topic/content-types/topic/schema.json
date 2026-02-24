@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "topics",
+  "info": {
+    "singularName": "topic",
+    "pluralName": "topics",
+    "displayName": "Topic"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": [
+        "grammar",
+        "pronunciation",
+        "vocabulary",
+        "fluency",
+        "conversation"
+      ]
+    },
+    "reels": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::reel.reel"
+    }
+  }
+}

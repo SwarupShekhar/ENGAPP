@@ -151,7 +151,15 @@ export default function ProfileScreen() {
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
                 {/* Header */}
-                <Text style={styles.screenTitle}>Profile</Text>
+                <View style={styles.headerContainer}>
+                    <TouchableOpacity onPress={() => (navigation as any).goBack()} style={styles.iconButton}>
+                        <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
+                    </TouchableOpacity>
+                    <Text style={styles.screenTitle}>Profile</Text>
+                    <TouchableOpacity onPress={() => (navigation as any).navigate('MainTabs', { screen: 'Home' })} style={styles.iconButton}>
+                        <Ionicons name="home-outline" size={24} color={theme.colors.text.primary} />
+                    </TouchableOpacity>
+                </View>
 
                 {/* User Card */}
                 <View style={styles.userCard}>
@@ -302,16 +310,28 @@ const styles = StyleSheet.create({
         backgroundColor: '#F0F2F8',
     },
     scrollContent: {
-        padding: theme.spacing.l,
-        paddingBottom: 120,
+        paddingTop: theme.spacing.xl,
+        paddingBottom: theme.spacing.xl,
     },
-    screenTitle: {
-        fontSize: theme.typography.sizes.xxl,
-        fontWeight: 'bold',
-        color: theme.colors.text.primary,
+    headerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,
     },
-
+    iconButton: {
+        padding: theme.spacing.s,
+        borderRadius: 20,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border + '20',
+    },
+    screenTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: theme.colors.text.primary,
+    },
     // User Card
     userCard: {
         flexDirection: 'row',

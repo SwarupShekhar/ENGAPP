@@ -24,6 +24,7 @@ import redisConfig from './config/redis.config';
 import livekitConfig from './config/livekit.config';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { ReliabilityModule } from './modules/reliability/reliability.module';
+import { ReelsModule } from './modules/reels/reels.module';
 
 @Module({
   imports: [
@@ -60,8 +61,9 @@ import { ReliabilityModule } from './modules/reliability/reliability.module';
     UsersModule,
     ConversationalTutorModule,
     ReliabilityModule,
+    ReelsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

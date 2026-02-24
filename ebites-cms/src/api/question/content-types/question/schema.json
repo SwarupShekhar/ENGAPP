@@ -1,0 +1,47 @@
+{
+  "kind": "collectionType",
+  "collectionName": "questions",
+  "info": {
+    "singularName": "question",
+    "pluralName": "questions",
+    "displayName": "Question"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "question_text": {
+      "type": "string"
+    },
+    "option_a": {
+      "type": "string"
+    },
+    "option_b": {
+      "type": "string"
+    },
+    "option_c": {
+      "type": "string"
+    },
+    "option_d": {
+      "type": "string"
+    },
+    "correct_answer": {
+      "type": "enumeration",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "explaination": {
+      "type": "text"
+    },
+    "reel": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::reel.reel"
+    }
+  }
+}

@@ -77,7 +77,7 @@ function PulseRing({ delay }: { delay: number }) {
                     Animated.delay(delay),
                     Animated.parallel([
                         Animated.timing(scale, {
-                            toValue: 1.8,
+                            toValue: 1.15,
                             duration: 2000,
                             easing: Easing.out(Easing.ease),
                             useNativeDriver: true,
@@ -102,7 +102,7 @@ function PulseRing({ delay }: { delay: number }) {
         <Animated.View
             style={[
                 styles.pulseRing,
-                { transform: [{ scale }], opacity },
+                { transform: [{ scaleX: scale }, { scaleY: scale }], opacity },
             ]}
         />
     );
@@ -293,7 +293,7 @@ export default function CallScreen() {
                             </View>
                         </AnimatedRN.View>
 
-                        {/* Find Partner Button */}
+                        {/* Find Partner Button Area */}
                         <AnimatedRN.View entering={FadeInDown.delay(200).springify()} style={styles.findPartnerContainer}>
                             
                             {/* Mode Toggle */}
@@ -322,7 +322,7 @@ export default function CallScreen() {
                                     />
                                 )}
 
-                                {!showAiOption && !isStructured && (
+                                {!showAiOption && !isStructured && !isSearching && (
                                     <>
                                         <PulseRing delay={0} />
                                         <PulseRing delay={700} />
@@ -333,6 +333,7 @@ export default function CallScreen() {
                                     activeOpacity={0.85}
                                     onPress={showAiOption ? () => navigation.navigate('AITutor') : handleFindPartner}
                                     disabled={isSearching || (isStructured && userLevelNum < 5)}
+                                    style={styles.findButtonWrapper}
                                 >
                                     <LinearGradient
                                         colors={showAiOption 
@@ -341,15 +342,17 @@ export default function CallScreen() {
                                                 ? [theme.colors.primaryLight, theme.colors.primary]
                                                 : isStructured
                                                     ? ['#8B5CF6', '#7C3AED'] // Purple for structured
-                                                    : theme.colors.gradients.primary
+                                                    : ['#3b82f6', '#2563eb'] // Vivid blue for free talk
                                         }
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
                                         style={styles.findButton}
                                     >
                                         {isSearching ? (
                                             <>
-                                                <ActivityIndicator color="white" size="large" />
+                                                <ActivityIndicator color="white" size="small" />
                                                 <Text style={styles.findButtonText}>
-                                                    {isStructured ? 'Finding Match...' : 'Searching...'}
+                                                    {isStructured ? 'Finding Match...' : 'Searching for Partner...'}
                                                 </Text>
                                                 {isStructured && (
                                                     <Text style={styles.searchHint}>Expanding criteria...</Text>
@@ -357,20 +360,38 @@ export default function CallScreen() {
                                             </>
                                         ) : showAiOption ? (
                                             <>
-                                                <Ionicons name="sparkles" size={36} color="white" />
-                                                <Text style={styles.findButtonText}>Talk to Priya (AI)</Text>
+                                                <Ionicons name="sparkles" size={24} color="white" />
+                                                <Text style={styles.findButtonText}>Practice with Maya (AI)</Text>
                                             </>
                                         ) : (
                                             <>
-                                                <Ionicons name={isStructured ? "school" : "call"} size={36} color="white" />
+                                                <Ionicons name={isStructured ? "school" : "call"} size={24} color="white" />
                                                 <Text style={styles.findButtonText}>
-                                                    {isStructured ? 'Start Practice' : 'Find a Partner'}
+                                                    {isStructured ? 'Start Practice Session' : 'Tap to Start Calling'}
                                                 </Text>
                                             </>
                                         )}
                                     </LinearGradient>
                                 </TouchableOpacity>
                             </View>
+
+                            {!isSearching && !showAiOption && (
+                                <Text style={styles.callHintText}>Wait times are currently less than 30 seconds</Text>
+                            )}
+                            
+                            {isSearching && (
+                                <TouchableOpacity 
+                                    onPress={() => {
+                                        cleanupMatchmaking();
+                                        setIsSearching(false);
+                                    }}
+                                    style={styles.cancelButton}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel Search</Text>
+                                </TouchableOpacity>
+                            )}
+
                             {showAiOption && (
                                 <TouchableOpacity 
                                     onPress={() => {
@@ -481,34 +502,45 @@ const styles = StyleSheet.create({
     findPartnerContainer: {
         alignItems: 'center',
         marginBottom: theme.spacing.xl,
+        paddingHorizontal: theme.spacing.l,
     },
     pulseContainer: {
-        width: 180,
-        height: 180,
+        width: '100%',
+        height: 80,
         justifyContent: 'center',
         alignItems: 'center',
     },
     pulseRing: {
         position: 'absolute',
-        width: 140,
-        height: 140,
-        borderRadius: 70,
+        width: SCREEN_WIDTH - theme.spacing.l * 2,
+        height: 64,
+        borderRadius: 32,
         borderWidth: 2,
         borderColor: theme.colors.primaryLight,
     },
+    findButtonWrapper: {
+        width: '100%',
+        ...theme.shadows.primaryGlow,
+    },
     findButton: {
-        width: 140,
-        height: 140,
-        borderRadius: 70,
+        flexDirection: 'row',
+        width: '100%',
+        height: 64,
+        borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        gap: theme.spacing.s,
-        ...theme.shadows.primaryGlow,
+        gap: theme.spacing.m,
     },
     findButtonText: {
         color: 'white',
-        fontSize: theme.typography.sizes.s,
+        fontSize: theme.typography.sizes.l,
         fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    callHintText: {
+        marginTop: 16,
+        color: theme.colors.text.secondary,
+        fontSize: theme.typography.sizes.s,
     },
 
     // Topics
@@ -627,6 +659,20 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
         fontWeight: '600',
         textDecorationLine: 'underline',
+    },
+    cancelButton: {
+        marginTop: 20,
+        paddingHorizontal: 24,
+        paddingVertical: 10,
+        borderRadius: 20,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    cancelButtonText: {
+        color: theme.colors.text.secondary,
+        fontWeight: '600',
+        fontSize: theme.typography.sizes.s,
     },
 
     // Mode Toggle
