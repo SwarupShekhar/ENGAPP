@@ -5,6 +5,8 @@ import EBiteVideoCard from '../components/ebites/EBiteVideoCard';
 import EBiteActivityCard from '../components/ebites/EBiteActivityCard';
 import { Ionicons } from '@expo/vector-icons';
 import { reelsApi, Reel } from '../api/reels';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import FeedPrefetchService from '../services/feedPrefetchService';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -28,55 +30,108 @@ export default function EBitesScreen() {
 
     const fetchFeed = useCallback(async () => {
         try {
-            setLoading(true);
             setActiveIndex(0);
-            const reels = await reelsApi.getFeed();
-            
-            // Build base feed: video + activity pairs
-            const baseFeed: FeedItem[] = [];
-            reels.forEach((reel) => {
-                baseFeed.push({
-                    id: `video-${reel.id}`,
-                    type: 'video',
-                    data: reel
-                });
 
-                if (reel.activity) {
-                    baseFeed.push({
-                        id: `activity-${reel.id}`,
-                        type: 'activity',
-                        data: {
-                            ...reel.activity,
-                            reelId: reel.id,
-                            topic_tag: reel.topic_tag,
-                            title: reel.activity.question,
-                            activityType: reel.activity.type
-                        }
-                    });
-                }
-            });
+            // ── Layer 1: In-memory cache (instant, ~0ms) ──
+            const prefetchService = FeedPrefetchService.getInstance();
+            let cached = prefetchService.getCachedFeed();
+            let reels: Reel[] | null = null;
 
-            baseFeedRef.current = baseFeed;
-
-            // Repeat the feed 10x for infinite-scroll feel
-            const loopedFeed: FeedItem[] = [];
-            for (let i = 0; i < 10; i++) {
-                baseFeed.forEach((item) => {
-                    loopedFeed.push({ ...item, id: `${item.id}-loop${i}` });
-                });
+            if (cached && cached.items && cached.items.length > 0) {
+                console.log('[eBites] Using in-memory prefetched feed (zero latency)');
+                reels = cached.items;
             }
 
-            setFeedItems(loopedFeed);
-            setError(null);
-            setTimeout(() => {
-                flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-            }, 100);
+            // ── Layer 2: AsyncStorage (fast, ~10ms, survives restart) ──
+            if (!reels) {
+                try {
+                    const stored = await AsyncStorage.getItem('@ebites_feed_cache');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed.response?.items?.length > 0) {
+                            console.log('[eBites] Using AsyncStorage cached feed');
+                            reels = parsed.response.items;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[eBites] AsyncStorage read failed:', e);
+                }
+            }
+
+            // If we found cached data, render immediately
+            if (reels && reels.length > 0) {
+                buildAndSetFeed(reels);
+                setLoading(false);
+                
+                // Background refresh: silently fetch latest data
+                reelsApi.getFeed().then(response => {
+                    if (response.items && response.items.length > 0) {
+                        console.log('[eBites] Background refresh complete');
+                        buildAndSetFeed(response.items);
+                        // Update caches
+                        AsyncStorage.setItem('@ebites_feed_cache', JSON.stringify({
+                            response, timestamp: Date.now()
+                        }));
+                    }
+                }).catch(() => { /* silent */ });
+                return;
+            }
+
+            // ── Layer 3: API call (slow, last resort) ──
+            setLoading(true);
+            console.log('[eBites] Full cache miss, fetching from API...');
+            const response = await reelsApi.getFeed();
+            reels = response.items || [];
+            buildAndSetFeed(reels);
+            
+            // Save to AsyncStorage for next time
+            AsyncStorage.setItem('@ebites_feed_cache', JSON.stringify({
+                response, timestamp: Date.now()
+            }));
         } catch (err) {
             console.error('Failed to load reels feed:', err);
             setError('Failed to load feed. Please try again.');
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    const buildAndSetFeed = useCallback((reels: Reel[]) => {
+        const baseFeed: FeedItem[] = [];
+        reels.forEach((reel) => {
+            baseFeed.push({
+                id: `video-${reel.id}`,
+                type: 'video',
+                data: reel
+            });
+
+            if (reel.activity) {
+                baseFeed.push({
+                    id: `activity-${reel.id}`,
+                    type: 'activity',
+                    data: {
+                        ...reel.activity,
+                        reelId: reel.id,
+                        topic_tag: reel.topic_tag,
+                        title: reel.activity.question,
+                        activityType: reel.activity.type
+                    }
+                });
+            }
+        });
+
+        baseFeedRef.current = baseFeed;
+
+        // Repeat the feed 10x for infinite-scroll feel
+        const loopedFeed: FeedItem[] = [];
+        for (let i = 0; i < 10; i++) {
+            baseFeed.forEach((item) => {
+                loopedFeed.push({ ...item, id: `${item.id}-loop${i}` });
+            });
+        }
+
+        setFeedItems(loopedFeed);
+        setError(null);
     }, []);
 
     useEffect(() => {

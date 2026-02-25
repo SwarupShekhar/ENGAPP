@@ -8,6 +8,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useUser } from '@clerk/clerk-expo';
 import Svg, { Circle, Polygon, Line, Text as SvgText, Polyline } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { sessionsApi, ConversationSession } from '../api/sessions';
 import { userApi, UserStats } from '../api/user';
@@ -108,19 +109,42 @@ export default function ProgressScreen() {
     useFocusEffect(
         useCallback(() => {
             const fetchData = async () => {
-                setLoading(true);
                 try {
+                    // 1. Instant load from local cache
+                    const cachedStats = await AsyncStorage.getItem('@progress_stats_cache');
+                    const cachedSessions = await AsyncStorage.getItem('@progress_sessions_cache');
+                    const cachedReliability = await AsyncStorage.getItem('@progress_reliability_cache');
+                    
+                    if (cachedStats && cachedSessions) {
+                        setStats(JSON.parse(cachedStats));
+                        setSessions(JSON.parse(cachedSessions));
+                        if (cachedReliability) setReliabilityScore(JSON.parse(cachedReliability));
+                        setLoading(false); // Stop skeleton loaders immediately
+                    } else {
+                        // Only show loaders if we have no cache
+                        setLoading(true);
+                    }
+
+                    // 2. Fetch fresh data silently
                     const [statsData, sessionsData] = await Promise.all([
                         userApi.getStats(),
                         sessionsApi.listSessions(),
                     ]);
-                    setStats(statsData);
-                    setSessions(sessionsData);
                     
+                    let newReliability = reliabilityScore;
                     if (user?.id) {
                         const relData = await reliabilityApi.getUserReliability(user.id);
-                        if (relData) setReliabilityScore(relData.reliabilityScore);
+                        if (relData) newReliability = relData.reliabilityScore;
                     }
+                    
+                    // 3. Silently update UI & Cache
+                    setStats(statsData);
+                    setSessions(sessionsData);
+                    setReliabilityScore(newReliability);
+                    
+                    AsyncStorage.setItem('@progress_stats_cache', JSON.stringify(statsData));
+                    AsyncStorage.setItem('@progress_sessions_cache', JSON.stringify(sessionsData));
+                    AsyncStorage.setItem('@progress_reliability_cache', JSON.stringify(newReliability));
                 } catch (error) {
                     console.error('Failed to fetch progress data:', error);
                 } finally {

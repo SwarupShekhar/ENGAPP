@@ -1,21 +1,106 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useUser } from '@clerk/clerk-expo';
 import { theme } from '../theme/theme';
+import { matchmakingApi } from '../api/matchmaking';
 
 type CallType = 'random' | 'group';
 type Gender = 'any' | 'male' | 'female';
 
 export default function CallPreferenceScreen() {
     const navigation: any = useNavigation();
+    const { user } = useUser();
     const [callType, setCallType] = useState<CallType>('random');
     const [gender, setGender] = useState<Gender>('any');
+    const [isSearching, setIsSearching] = useState(false);
+    const [showAiOption, setShowAiOption] = useState(false);
 
-    const handleFindLearner = () => {
-        navigation.goBack(); // Close modal
-        navigation.navigate('Call'); // Navigate to Call matching screen
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const meta = (user?.unsafeMetadata || {}) as any;
+    const userLevel = meta.assessmentLevel || 'B1';
+
+    useEffect(() => {
+        return () => {
+            cleanupMatchmaking();
+        };
+    }, []);
+
+    const cleanupMatchmaking = () => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+        if (safetyTimeoutRef.current) {
+            clearTimeout(safetyTimeoutRef.current);
+            safetyTimeoutRef.current = null;
+        }
+    };
+
+    const handleFindLearner = async () => {
+        if (!user) return;
+
+        if (showAiOption) {
+            navigation.goBack();
+            setTimeout(() => navigation.navigate('AITutor'), 100);
+            return;
+        }
+
+        cleanupMatchmaking();
+        setIsSearching(true);
+        setShowAiOption(false);
+
+        try {
+            await matchmakingApi.join({
+                userId: user.id,
+                englishLevel: userLevel,
+                topic: 'General Practice'
+            });
+
+            pollIntervalRef.current = setInterval(async () => {
+                try {
+                    const status = await matchmakingApi.checkStatus(user.id, userLevel);
+                    if (status.matched && status.sessionId) {
+                        cleanupMatchmaking();
+                        setIsSearching(false);
+                        navigation.replace('InCall', {
+                            sessionId: status.sessionId,
+                            roomName: status.roomName,
+                            partnerId: status.partnerId,
+                            partnerName: status.partnerName,
+                            topic: 'General Practice'
+                        });
+                    } else if (status.message) {
+                        cleanupMatchmaking();
+                        setIsSearching(false);
+                        setShowAiOption(true);
+                    }
+                } catch (error) {
+                    console.error('[Matchmaking] Poll error:', error);
+                }
+            }, 3000);
+
+            safetyTimeoutRef.current = setTimeout(() => {
+                cleanupMatchmaking();
+                if (isSearching) {
+                    setIsSearching(false);
+                    setShowAiOption(true);
+                }
+            }, 45000);
+        } catch (error) {
+            console.error('[Matchmaking] Join failed:', error);
+            setIsSearching(false);
+            cleanupMatchmaking();
+        }
+    };
+
+    const handleCancelSearch = () => {
+        cleanupMatchmaking();
+        setIsSearching(false);
     };
 
     return (
@@ -96,25 +181,65 @@ export default function CallPreferenceScreen() {
                 <View style={{ flex: 1 }} />
 
                 <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={[styles.actionBtn, isSearching && { opacity: 0.8 }]}
                     onPress={handleFindLearner}
                     activeOpacity={0.8}
+                    disabled={isSearching}
                 >
-                    <Ionicons name="search" size={20} color="white" style={{ marginRight: 8 }} />
-                    <Text style={styles.actionBtnText}>Find My Co-learner</Text>
+                    {isSearching ? (
+                        <>
+                            <ActivityIndicator color="white" size="small" style={{ marginRight: 8 }} />
+                            <Text style={styles.actionBtnText}>Searching for Partner...</Text>
+                        </>
+                    ) : showAiOption ? (
+                        <>
+                            <Ionicons name="sparkles" size={20} color="white" style={{ marginRight: 8 }} />
+                            <Text style={styles.actionBtnText}>Practice with Maya (AI)</Text>
+                        </>
+                    ) : (
+                        <>
+                            <Ionicons name="search" size={20} color="white" style={{ marginRight: 8 }} />
+                            <Text style={styles.actionBtnText}>Find My Co-learner</Text>
+                        </>
+                    )}
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={styles.aiTutorLink}
-                    onPress={() => {
-                        navigation.goBack();
-                        navigation.navigate('AITutor');
-                    }}
-                    activeOpacity={0.7}
-                >
-                    <Ionicons name="sparkles" size={16} color="#8B5CF6" />
-                    <Text style={styles.aiTutorLinkText}>Or practice with AI Tutor</Text>
-                </TouchableOpacity>
+                {isSearching && (
+                    <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={handleCancelSearch}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.cancelBtnText}>Cancel Search</Text>
+                    </TouchableOpacity>
+                )}
+
+                {showAiOption && !isSearching && (
+                    <TouchableOpacity
+                        style={styles.retryBtn}
+                        onPress={() => {
+                            setShowAiOption(false);
+                            handleFindLearner();
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.retryBtnText}>Or try searching again</Text>
+                    </TouchableOpacity>
+                )}
+
+                {!isSearching && !showAiOption && (
+                    <TouchableOpacity
+                        style={styles.aiTutorLink}
+                        onPress={() => {
+                            navigation.goBack();
+                            setTimeout(() => navigation.navigate('AITutor'), 100);
+                        }}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="sparkles" size={16} color="#8B5CF6" />
+                        <Text style={styles.aiTutorLinkText}>Or practice with AI Tutor</Text>
+                    </TouchableOpacity>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -263,5 +388,26 @@ const styles = StyleSheet.create({
         color: '#8B5CF6',
         fontSize: theme.typography.sizes.m,
         fontWeight: '600',
+    },
+    cancelBtn: {
+        marginTop: theme.spacing.m,
+        alignItems: 'center',
+        paddingVertical: theme.spacing.s,
+    },
+    cancelBtnText: {
+        color: theme.colors.text.secondary,
+        fontWeight: '600',
+        fontSize: theme.typography.sizes.m,
+    },
+    retryBtn: {
+        marginTop: theme.spacing.m,
+        alignItems: 'center',
+        paddingVertical: theme.spacing.s,
+    },
+    retryBtnText: {
+        color: theme.colors.primary,
+        fontWeight: '600',
+        fontSize: theme.typography.sizes.m,
+        textDecorationLine: 'underline',
     },
 });

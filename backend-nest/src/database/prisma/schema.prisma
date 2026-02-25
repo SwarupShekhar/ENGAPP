@@ -22,6 +22,7 @@ model User {
   overallLevel String?
   talkStyle        TalkStyle?
   levelUpdatedAt   DateTime?
+  learningDurationDays Int @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -57,6 +58,13 @@ model User {
   matchmakingQueue MatchmakingQueue[]
   topicScores     UserTopicScore[]
   reelHistory     UserReelHistory[]
+  recurringErrors RecurringErrorPattern[]
+
+  // Privacy & GDPR Compliance
+  shareDataForResearch Boolean   @default(false)
+  allowBenchmarking    Boolean   @default(true)
+  dataRetentionDays    Int       @default(90)
+  dataDeletedAt        DateTime?
 
   @@index([clerkId])
 }
@@ -358,9 +366,15 @@ model AssessmentSession {
   talkStyle        TalkStyle?
 
   skillBreakdown   Json?
+  fluencyBreakdown Json?
+  rawAzureMetrics  Json?
   weaknessMap      Json?
   improvementDelta Json?
   personalizedPlan Json?
+  
+  benchmarking     Json?
+  readiness        Json?
+  confidence_metrics Json?
 
   phase1Data       Json?
   phase2Data       Json?
@@ -460,4 +474,30 @@ model UserReelHistory {
 
   @@unique([userId, strapiReelId])
   @@index([userId])
+}
+
+model RecurringErrorPattern {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  errorType       String   // "tense_mixing", "th_sound", etc
+  errorCategory   String   // "grammar", "pronunciation", "vocabulary"
+  
+  firstDetectedAt DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  occurrenceCount Int      @default(1)
+  
+  // Progress tracking
+  improvementRate Float?   // % reduction over time
+  status          String   @default("ACTIVE") // ACTIVE, IMPROVING, RESOLVED
+  
+  // Example instances
+  examples        Json     // [{ "original": "...", "corrected": "...", "context": "..." }]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, errorType])
+  @@index([userId, status])
 }

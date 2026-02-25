@@ -20,6 +20,7 @@ numpy>=1.26.0
 
 # ML/NLP
 nltk>=3.8.1
+lexical-diversity>=0.1.1
 
 # Database
 asyncpg>=0.29.0

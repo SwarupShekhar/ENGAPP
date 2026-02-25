@@ -286,7 +286,8 @@ class AsyncAzureSpeech:
                 "fluency_score": pronunciation_result.fluency_score,
                 "completeness_score": pronunciation_result.completeness_score,
                 "pronunciation_score": pronunciation_result.pronunciation_score,
-                "words": words
+                "words": words,
+                "azure_json": result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
             }
             
         except Exception as e:

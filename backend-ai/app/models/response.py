@@ -74,6 +74,14 @@ class ActionableFeedback(BaseModel):
     accent_specific_tips: List[str] = []
     strengths: List[str] = []
 
+class FluencyBreakdown(BaseModel):
+    speech_flow: float
+    connected_speech: float
+    prosody: float
+    pace_control: float
+    connected_speech_details: Optional[Dict[str, float]] = None
+    examples: Optional[Dict[str, List[str]]] = None
+
 class PronunciationResponse(BaseModel):
     accuracy_score: float
     fluency_score: float
@@ -83,6 +91,10 @@ class PronunciationResponse(BaseModel):
     common_issues: List[str]
     improvement_tips: List[str]
     processing_time: float
+    # New Breakdown
+    fluency_breakdown: Optional[FluencyBreakdown] = None
+    azure_raw_fluency: Optional[float] = None
+    azure_raw_prosody: Optional[float] = None
     # Deep Intelligence Additions
     prosody_score: Optional[float] = None
     speech_rate_wpm: Optional[float] = None

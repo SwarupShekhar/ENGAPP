@@ -15,7 +15,56 @@ from app.models.base import CEFRAssessment, ErrorDetail, ErrorType, ErrorSeverit
 from app.cache.manager import cached
 from app.services.cefr_classifier import cefr_classifier
 from app.utils.robust_json_parser import robust_json_parser
+from app.assessment.scoring.grammar_classifier import GrammarErrorClassifier
+from app.assessment.scoring.vocabulary_analyzer import VocabularyAnalyzer
+from app.assessment.scoring.confidence_calculator import ConfidenceCalculator
 
+
+PHASE_3_ANALYSIS_PROMPT = """
+You are an English language assessment expert. Analyze this engineering student's spoken description.
+
+TRANSCRIPT:
+{transcript}
+
+Provide analysis in this EXACT JSON format:
+{{
+  "grammatical_errors": [
+    {{
+      "original": "exact phrase with error",
+      "corrected": "correct version",
+      "error_type": "wrong_tense_context|article_error|preposition_error|etc",
+      "severity": "TIER_1|TIER_2|TIER_3",
+      "explanation": "brief explanation"
+    }}
+  ],
+  "sentence_structures": [
+    {{
+      "sentence": "full sentence",
+      "type": "simple|compound|complex|compound-complex",
+      "features": ["subordinate_clause", "passive_voice", "conditional"]
+    }}
+  ],
+  "vocabulary_analysis": {{
+    "advanced_words": ["list", "of", "B2+", "words"],
+    "domain_terms": ["technical", "engineering", "terms"],
+    "collocation_errors": [
+      {{
+        "incorrect": "make research",
+        "correct": "conduct research"
+      }}
+    ]
+  }},
+  "talkStyle": "DRIVER|PASSENGER",
+  "vocabularyCEFR": "A1|A2|B1|B2|C1|C2",
+  "justification": "Overall synthesis of performance"
+}}
+
+Focus on:
+1. Error severity (Tier 1 = blocks comprehension, Tier 3 = minor slip)
+2. Complex structure usage (award points for correct usage)
+3. Collocation accuracy (word partnerships)
+4. Domain-appropriate vocabulary
+"""
 
 class AnalysisService:
     """
@@ -41,6 +90,10 @@ class AnalysisService:
             self.model = genai.GenerativeModel('gemini-2.0-flash')
         else:
             logger.warning("Google API key not configured. AnalysisService is disabled.")
+            
+        self.grammar_classifier = GrammarErrorClassifier()
+        self.vocab_analyzer = VocabularyAnalyzer()
+        self.confidence_calculator = ConfidenceCalculator()
     
     # ─────────────────────────────────────────────────────────────
     # STAGE 1: SPECIALIZED ANALYSIS (Parallel)
@@ -74,12 +127,20 @@ STRICT RULES:
 Respond ONLY with JSON:
 {{
   "grammar_score": <int 0-100>,
-  "errors": [
+  "grammatical_errors": [
     {{
-      "original": "exact wrong phrase",
-      "corrected": "exact fix",
-      "rule": "grammar rule violated",
-      "severity": "critical|major|minor"
+      "original": "exact phrase with error",
+      "corrected": "correct version",
+      "error_type": "wrong_tense_context|subject_verb_disagreement|missing_auxiliary|word_order_chaos|article_error|preposition_error|plural_form_error|wrong_verb_form|article_omission_casual|uncountable_plural|redundant_preposition|colloquial_contraction",
+      "severity": "TIER_1|TIER_2|TIER_3",
+      "explanation": "brief explanation"
+    }}
+  ],
+  "sentence_structures": [
+    {{
+      "sentence": "full sentence",
+      "type": "simple|compound|complex|compound-complex",
+      "features": ["subordinate_clause", "passive_voice", "conditional"]
     }}
   ],
   "complexity_level": "simple|intermediate|advanced",
@@ -118,10 +179,17 @@ Respond ONLY with JSON:
   "vocabulary_score": <int 0-100>,
   "word_count": <int>,
   "unique_words": <int>,
-  "lexical_diversity": <float 0-1>,
-  "advanced_words": ["word1", "word2"],
-  "overused_words": {{"word": count}},
-  "suggested_replacements": {{"generic": ["better1", "better2"]}},
+  "vocabulary_analysis": {{
+    "advanced_words": ["list", "of", "B2+", "words"],
+    "domain_terms": ["technical", "engineering", "terms"],
+    "collocation_errors": [
+      {{
+        "incorrect": "make research",
+        "correct": "conduct research"
+      }}
+    ]
+  }},
+  "vocabularyCEFR": "A1|A2|B1|B2|C1|C2",
   "justification": "1 sentence"
 }}"""
 
@@ -280,118 +348,56 @@ Answer with JSON:
     # STAGE 3: CONFIDENCE SCORING
     # ─────────────────────────────────────────────────────────────
     
-    def _calculate_confidence(
-        self,
-        text: str,
-        grammar_data: Dict,
-        vocab_data: Dict,
-        fluency_data: Dict,
-        pronunciation_data: Dict
-    ) -> float:
-        """
-        Calculate confidence in the analysis based on:
-        1. Text length (longer = more confident)
-        2. Internal consistency (scores shouldn't vary wildly)
-        3. Presence of objective data (Azure)
-        4. Justification quality
-        """
-        
-        word_count = len(text.split())
-        
-        # Factor 1: Length confidence
-        if word_count < 10:
-            length_conf = 0.3
-        elif word_count < 30:
-            length_conf = 0.6
-        elif word_count < 100:
-            length_conf = 0.85
-        else:
-            length_conf = 0.95
-        
-        # Factor 2: Score consistency
-        scores = [
-            grammar_data.get("grammar_score", 50),
-            vocab_data.get("vocabulary_score", 50),
-            fluency_data.get("fluency_score", 50),
-            pronunciation_data.get("pronunciation_score", 50),
-        ]
-        
-        score_variance = max(scores) - min(scores)
-        if score_variance < 15:
-            consistency_conf = 1.0
-        elif score_variance < 30:
-            consistency_conf = 0.8
-        else:
-            consistency_conf = 0.5  # Scores are all over the place
-        
-        # Factor 3: Objective data presence
-        has_azure = pronunciation_data.get("confidence", 0) > 0.7
-        data_conf = 0.9 if has_azure else 0.6
-        
-        # Weighted average
-        confidence = (
-            length_conf * 0.3 +
-            consistency_conf * 0.4 +
-            data_conf * 0.3
-        )
-        
-        return round(confidence, 2)
-
-    # ─────────────────────────────────────────────────────────────
     # STAGE 4: FINAL SYNTHESIS
     # ─────────────────────────────────────────────────────────────
     
-    def _synthesize_scores(
+    async def _synthesize_scores(
         self,
         grammar_data: Dict,
         vocab_data: Dict,
         fluency_data: Dict,
         pronunciation_data: Dict,
-        cefr_level: CEFRLevel
-    ) -> Tuple[AnalysisMetrics, CEFRLevel]:
-        """
-        Combine specialized analyses into final metrics.
-        Apply penalties for short text.
-        """
+        initial_cefr: CEFRLevel
+    ) -> Tuple[AnalysisMetrics, CEFRAssessment]:
+        """Combine individual analyses into final metrics"""
         
-        grammar_score = grammar_data.get("grammar_score", 50)
-        vocab_score = vocab_data.get("vocabulary_score", 50)
-        fluency_score = fluency_data.get("fluency_score", 50)
-        pronunciation_score = pronunciation_data.get("pronunciation_score", 50)
+        grammar_score = min(max(grammar_data.get("score", 50), 0), 100)
+        vocab_score = min(max(vocab_data.get("score", 50), 0), 100)
+        fluency_score = min(max(fluency_data.get("score", 50), 0), 100)
+        pronunciation_score = min(max(pronunciation_data.get("score", 50), 0), 100)
         
-        # Weighted overall score
+        # Calculate overall score (weighted)
         overall_score = (
-            grammar_score * 0.30 +
-            pronunciation_score * 0.25 +
+            grammar_score * 0.25 +
+            vocab_score * 0.20 +
             fluency_score * 0.25 +
-            vocab_score * 0.20
+            pronunciation_score * 0.30
         )
         
-        overall_score = int(round(overall_score))
-        
-        # CEFR adjustment based on overall score
-        if overall_score >= 90:
-            final_cefr = CEFRLevel.C2
-        elif overall_score >= 80:
-            final_cefr = CEFRLevel.C1
-        elif overall_score >= 70:
-            final_cefr = CEFRLevel.B2
-        elif overall_score >= 55:
-            final_cefr = CEFRLevel.B1
-        elif overall_score >= 40:
-            final_cefr = CEFRLevel.A2
-        else:
-            final_cefr = CEFRLevel.A1
-        
+        # Calculate confidence
+        confidence_result = self.confidence_calculator.calculate_confidence({
+            "audio_quality": pronunciation_data.get("accuracy_score", 85),
+            "duration": pronunciation_data.get("processing_time", 30),
+            "word_count": vocab_data.get("word_count", 0)
+        })
+
         metrics = AnalysisMetrics(
-            wpm=vocab_data.get("word_count", 0) / 1.5,  # Rough estimate
+            wpm=vocab_data.get("word_count", 0) / 1.5,
             unique_words=vocab_data.get("unique_words", 0),
             grammar_score=grammar_score,
             pronunciation_score=pronunciation_score,
             fluency_score=fluency_score,
             vocabulary_score=vocab_score,
             overall_score=overall_score,
+            grammar_breakdown=grammar_data.get("breakdown"),
+            vocab_breakdown=vocab_data.get("breakdown"),
+            confidence_metrics=confidence_result
         )
+        
+        # Determine CEFR level
+        final_cefr = cefr_classifier.classify(metrics)
+        # Update CEFR confidence from our new calculator
+        final_cefr.confidence = confidence_result["overall_confidence"]["score"] / 100.0
         
         return metrics, final_cefr
 
@@ -458,22 +464,25 @@ Answer with JSON:
             logger.error(f"Parallel analysis failed: {e}", exc_info=True)
             # Return basic fallback
             return self._create_fallback_response(request.text, cefr_assessment)
+            
+        # Apply enhanced classifiers
+        gemini_grammar = grammar_data.copy()
+        grammar_data = self.grammar_classifier.classify_errors(gemini_grammar)
+        grammar_data["justification"] = gemini_grammar.get("justification", "")
+        
+        # Vocabulary: Use the specialized analyzer
+        vocab_data = self.vocab_analyzer.analyze_vocabulary(request.text)
+        vocab_data["word_count"] = len(request.text.split())
+        vocab_data["unique_words"] = len(set(request.text.lower().split()))
+        vocab_data["justification"] = "Vocabulary enrichment and MTLD analysis complete."
         
         # Stage 3: Verify errors
-        all_errors = grammar_data.get("errors", [])
+        all_errors = gemini_grammar.get("grammatical_errors", [])
         verified_errors = await self._verify_error_corrections(all_errors)
         
-        # Stage 4: Calculate confidence
-        confidence = self._calculate_confidence(
-            request.text,
-            grammar_data,
-            vocab_data,
-            fluency_data,
-            pronunciation_data
-        )
         
         # Stage 5: Synthesize final scores
-        metrics, final_cefr = self._synthesize_scores(
+        metrics, final_cefr = await self._synthesize_scores(
             grammar_data,
             vocab_data,
             fluency_data,
@@ -499,9 +508,9 @@ Answer with JSON:
         )
         
         # Build final response
-        cefr_assessment.level = final_cefr
+        cefr_assessment.level = final_cefr.level
         cefr_assessment.score = metrics.overall_score
-        cefr_assessment.confidence = confidence
+        cefr_assessment.confidence = final_cefr.confidence
         cefr_assessment.strengths = strengths
         cefr_assessment.weaknesses = weaknesses
         
@@ -627,18 +636,22 @@ Answer with JSON:
     def _convert_to_error_detail(self, error_dict: Dict) -> ErrorDetail:
         """Convert dict to ErrorDetail model"""
         severity_map = {
+            "TIER_1": ErrorSeverity.CRITICAL,
+            "TIER_2": ErrorSeverity.MAJOR,
+            "TIER_3": ErrorSeverity.MINOR,
             "critical": ErrorSeverity.CRITICAL,
             "major": ErrorSeverity.MAJOR,
             "minor": ErrorSeverity.MINOR,
         }
         
+        # New prompt uses 'error_type', 'explanation' and 'severity' (TIERs)
         return ErrorDetail(
-            type=ErrorType.GRAMMAR,  # Default
-            severity=severity_map.get(error_dict.get("severity", "minor"), ErrorSeverity.MINOR),
+            type=ErrorType.GRAMMAR,
+            severity=severity_map.get(error_dict.get("severity", "").upper(), ErrorSeverity.MINOR),
             original_text=error_dict.get("original", ""),
             corrected_text=error_dict.get("corrected", ""),
-            explanation=error_dict.get("rule", ""),
-            suggestion=error_dict.get("reason", "")
+            explanation=error_dict.get("explanation") or error_dict.get("rule", ""),
+            suggestion=error_dict.get("explanation", "")
         )
     
     def _create_fallback_response(self, text: str, cefr: CEFRAssessment) -> AnalysisResponse:

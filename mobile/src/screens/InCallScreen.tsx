@@ -130,15 +130,16 @@ function TranscriptBubble({ item, index, isPartnerBot }: { item: any; index: num
 function ControlButton({ icon, label, onPress, danger, active, secondary }: {
     icon: string; label: string; onPress: () => void; danger?: boolean; active?: boolean; secondary?: boolean;
 }) {
+    const iconColor = secondary && !active && !danger ? theme.colors.text.primary : "white";
     return (
         <TouchableOpacity style={styles.controlButton} onPress={onPress} activeOpacity={0.7}>
             <View style={[
                 styles.controlIcon,
                 danger && styles.controlIconDanger,
                 active && styles.controlIconActive,
-                secondary && styles.controlIconSecondary,
+                secondary && !active && styles.controlIconSecondary,
             ]}>
-                <Ionicons name={icon as any} size={22} color="white" />
+                <Ionicons name={icon as any} size={22} color={iconColor} />
             </View>
             <Text style={styles.controlLabel}>{label}</Text>
         </TouchableOpacity>
@@ -360,11 +361,11 @@ export default function InCallScreen({ navigation, route }: any) {
     if (!token) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <StatusBar barStyle="light-content" />
-                <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.background} />
-                <Animated.View entering={FadeIn}>
-                    <Ionicons name="call" size={48} color={theme.colors.primaryLight} style={{ marginBottom: 20 }} />
-                    <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>Connecting...</Text>
+                <StatusBar barStyle="dark-content" />
+                <View style={[styles.background, { backgroundColor: theme.colors.background }]} />
+                <Animated.View entering={FadeIn} style={{ alignItems: 'center' }}>
+                    <Ionicons name="call" size={48} color={theme.colors.primary} style={{ marginBottom: 20 }} />
+                    <Text style={{ color: theme.colors.text.primary, fontSize: 18, fontWeight: '600' }}>Connecting...</Text>
                 </Animated.View>
             </View>
         );
@@ -380,7 +381,7 @@ export default function InCallScreen({ navigation, route }: any) {
                 video={false}
                 onDisconnected={() => handleEndCall(true)}
             >
-                <StatusBar barStyle="light-content" />
+                <StatusBar barStyle="dark-content" />
                 <RoomHandler onRoomReady={(room) => { roomRef.current = room; }} />
                 <DataListener 
                     onTranscription={(data) => {
@@ -396,10 +397,7 @@ export default function InCallScreen({ navigation, route }: any) {
                     }} 
                     onEndSession={() => handleEndCall(true)}
                 />
-                <LinearGradient
-                    colors={['#0F172A', '#1E293B', '#111827']}
-                    style={styles.background}
-                />
+                <View style={[styles.background, { backgroundColor: theme.colors.background }]} />
 
                 <SafeAreaView style={styles.safeArea}>
                     {/* AudioConference handles actual audio */}
@@ -409,7 +407,7 @@ export default function InCallScreen({ navigation, route }: any) {
                     <Animated.View entering={FadeIn.delay(200)} style={styles.header}>
                         <View style={styles.headerGlass}>
                             <View style={styles.topicPill}>
-                                <Ionicons name="chatbubbles" size={14} color={theme.colors.primaryLight} />
+                                <Ionicons name="chatbubbles" size={14} color={theme.colors.primary} />
                                 <Text style={styles.topicText}>{topic}</Text>
                             </View>
                             <View style={styles.timerContainer}>
@@ -438,7 +436,7 @@ export default function InCallScreen({ navigation, route }: any) {
 
                     {isWaiting && callStatus !== 'declined' && (
                         <View style={styles.waitingOverlay}>
-                            <ActivityIndicator size="large" color={theme.colors.primaryLight} />
+                            <ActivityIndicator size="large" color={theme.colors.primary} />
                             <Text style={styles.waitingText}>Waiting for {partnerName} to join...</Text>
                         </View>
                     )}
@@ -531,12 +529,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         width: '100%',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: theme.colors.surface,
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: theme.colors.border + '20',
+        ...theme.shadows.small,
     },
     topicPill: {
         flexDirection: 'row',
@@ -544,7 +543,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     topicText: {
-        color: 'white',
+        color: theme.colors.text.primary,
         fontSize: 14,
         fontWeight: '600',
     },
@@ -554,7 +553,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     waitingText: {
-        color: '#94A3B8',
+        color: theme.colors.text.secondary,
         fontSize: 16,
         fontWeight: '500',
     },
@@ -583,7 +582,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderColor: 'white',
+        ...theme.shadows.medium,
     },
     partnerInitial: {
         color: 'white',
@@ -591,22 +591,21 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     partnerName: {
-        color: 'white',
+        color: theme.colors.text.primary,
         fontSize: 22,
         fontWeight: 'bold',
         letterSpacing: 0.5,
     },
     statusText: {
-        color: theme.colors.primaryLight,
+        color: theme.colors.text.secondary,
         fontSize: 12,
         fontWeight: '600',
         marginTop: 4,
-        opacity: 0.8,
     },
     timerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: theme.colors.primary + '15',
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
@@ -619,7 +618,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.success,
     },
     timerText: {
-        color: 'white',
+        color: theme.colors.primary,
         fontSize: 12,
         fontWeight: '700',
         fontVariant: ['tabular-nums'],
@@ -629,10 +628,11 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         marginBottom: 100, // Room for dock
         borderRadius: 24,
-        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+        backgroundColor: theme.colors.surface,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: theme.colors.border + '20',
         overflow: 'hidden',
+        ...theme.shadows.small,
     },
     transcriptHeader: {
         flexDirection: 'row',
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+        borderBottomColor: theme.colors.border + '15',
         gap: 10,
     },
     transcriptIndicator: {
@@ -651,19 +651,19 @@ const styles = StyleSheet.create({
         borderColor: theme.colors.primary,
     },
     transcriptLabel: {
-        color: 'white',
+        color: theme.colors.text.primary,
         fontSize: 14,
         fontWeight: '700',
         flex: 1,
     },
     activeLabel: {
-        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+        backgroundColor: theme.colors.primary + '20',
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
     },
     activeLabelText: {
-        color: theme.colors.primaryLight,
+        color: theme.colors.primary,
         fontSize: 10,
         fontWeight: '800',
     },
@@ -710,10 +710,10 @@ const styles = StyleSheet.create({
         ...theme.shadows.primaryGlow,
     },
     bubblePartner: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: 'white',
         borderBottomLeftRadius: 4,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.05)',
+        borderColor: theme.colors.border + '20',
     },
     bubbleText: {
         fontSize: 15,
@@ -724,11 +724,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     bubbleTextPartner: {
-        color: '#E2E8F0',
+        color: theme.colors.text.primary,
     },
     bubbleTime: {
         fontSize: 9,
-        color: 'rgba(255, 255, 255, 0.4)',
+        color: theme.colors.text.light,
         textAlign: 'right',
         marginTop: 4,
     },
@@ -743,19 +743,19 @@ const styles = StyleSheet.create({
     controlsDock: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+        backgroundColor: 'white',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 35,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: theme.colors.border + '20',
         gap: 15,
         ...theme.shadows.large,
     },
     controlDivider: {
         width: 1,
         height: 30,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: theme.colors.border + '20',
         marginHorizontal: 5,
     },
     controlButton: {
@@ -771,7 +771,9 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     controlIconSecondary: {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border + '15',
     },
     controlIconDanger: {
         backgroundColor: theme.colors.error,
@@ -780,7 +782,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.primary,
     },
     controlLabel: {
-        color: 'rgba(255, 255, 255, 0.5)',
+        color: theme.colors.text.secondary,
         fontSize: 10,
         fontWeight: '600',
     },

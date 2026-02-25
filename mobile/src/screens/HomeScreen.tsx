@@ -7,6 +7,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { theme } from '../theme/theme';
 import { ConnectPracticeCard } from '../components/home/ConnectPracticeCard';
@@ -35,12 +36,30 @@ export default function HomeScreen() {
             if (!user) return;
             const fetchData = async () => {
                 try {
+                    // 1. Instant load from local cache
+                    const cachedStats = await AsyncStorage.getItem('@home_stats_cache');
+                    const cachedUnread = await AsyncStorage.getItem('@home_unread_cache');
+                    if (cachedStats) {
+                        setStats(JSON.parse(cachedStats));
+                        setLoading(false); // Remove activity indicator immediately
+                    }
+                    if (cachedUnread) {
+                        setUnreadCount(JSON.parse(cachedUnread));
+                    }
+
+                    // 2. Fetch fresh data in the background
                     const [statsData, unreadData] = await Promise.all([
                         userApi.getStats(),
                         chatApi.getUnreadCount()
                     ]);
+                    
+                    // 3. Silently update UI & cache with fresh data
                     setStats(statsData);
-                    setUnreadCount(unreadData.count || 0);
+                    const unread = unreadData.count || 0;
+                    setUnreadCount(unread);
+                    
+                    AsyncStorage.setItem('@home_stats_cache', JSON.stringify(statsData));
+                    AsyncStorage.setItem('@home_unread_cache', JSON.stringify(unread));
                 } catch (error) {
                     console.error('Failed to fetch home data:', error);
                 } finally {
@@ -91,9 +110,9 @@ export default function HomeScreen() {
                                     <Text style={styles.avatarText}>{displayData.name.charAt(0)}</Text>
                                 )}
                             </View>
-                            <View>
+                            <View style={{ flexShrink: 1 }}>
                                 <Text style={styles.greetingSmall}>Welcome back</Text>
-                                <Text style={styles.greeting}>{displayData.name} 👋</Text>
+                                <Text style={styles.greeting} numberOfLines={1}>{displayData.name} 👋</Text>
                             </View>
                         </View>
                         <View style={styles.headerRight}>
@@ -186,12 +205,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: theme.spacing.l,
         paddingTop: theme.spacing.s,
-        paddingBottom: theme.spacing.s,
+        paddingBottom: theme.spacing.m,
+        overflow: 'visible',
     },
     headerLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
+        flexShrink: 1,
+        marginRight: 8,
     },
     avatarContainer: {
         width: 46,
@@ -226,7 +248,8 @@ const styles = StyleSheet.create({
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
+        flexShrink: 0,
     },
     streakBadge: {
         flexDirection: 'row',
@@ -248,11 +271,14 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     notifBtn: {
-        padding: 8,
-        backgroundColor: 'rgba(255,255,255,0.18)',
-        borderRadius: 14,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.25)',
+        borderColor: 'rgba(255,255,255,0.3)',
         position: 'relative',
     },
     badge: {

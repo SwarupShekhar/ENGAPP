@@ -61,6 +61,10 @@ class AnalysisMetrics(BaseModel):
     fluency_score: float = 50.0
     vocabulary_score: float
     overall_score: float = 50.0
+    # New Breakdowns
+    grammar_breakdown: Optional[Dict[str, float]] = None
+    vocab_breakdown: Optional[Dict[str, float]] = None
+    confidence_metrics: Optional[Dict[str, Any]] = None
 
 class PhonemeScore(BaseModel):
     phoneme: str

@@ -17,9 +17,17 @@ export interface Reel {
   activity: ReelActivity | null;
 }
 
+export interface FeedResponse {
+  items: Reel[];
+  nextCursor: number | null;
+  totalAvailable: number;
+}
+
 export const reelsApi = {
-  getFeed: async (): Promise<Reel[]> => {
-    const response = await client.get("/reels/feed");
+  getFeed: async (cursor?: number): Promise<FeedResponse> => {
+    const response = await client.get("/reels/feed", {
+      params: cursor !== undefined ? { cursor } : undefined,
+    });
     return response.data;
   },
   submitActivityResult: async (

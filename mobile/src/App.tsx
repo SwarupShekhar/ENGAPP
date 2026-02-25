@@ -10,6 +10,7 @@ import { setAuthTokenFetcher } from "./api/client";
 import { View, ActivityIndicator, StyleSheet, AppState, Alert } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SocketService from "./services/socketService";
+import FeedPrefetchService from "./services/feedPrefetchService";
 
 // Ideally this should be in an .env file, but for now hardcoding as retrieved
 const CLERK_PUBLISHABLE_KEY = "pk_test_ZGVzdGluZWQtc3VuZmlzaC03OS5jbGVyay5hY2NvdW50cy5kZXYk";
@@ -130,6 +131,10 @@ function OnboardingGate() {
       setInitialRoute("AssessmentIntro");
     } else {
       setInitialRoute("MainTabs");
+      // Delay prefetch slightly to let auth token initialize
+      setTimeout(() => {
+        FeedPrefetchService.getInstance().prefetch();
+      }, 2000);
     }
   }, [isLoaded, user]);
 

@@ -20,6 +20,7 @@ import Svg, {
   Circle, Text as SvgText,
 } from 'react-native-svg';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sessionsApi, ConversationSession } from '../api/sessions';
 import { connectionsApi, chatApi } from '../api/connections';
 
@@ -684,6 +685,16 @@ export default function FeedbackScreen() {
   // ── Fetch real data from API ──────────────
   const fetchSessions = useCallback(async () => {
     try {
+      // 1. Instant load from local cache
+      const cachedSessions = await AsyncStorage.getItem('@feedback_sessions_cache');
+      if (cachedSessions) {
+          setSessions(JSON.parse(cachedSessions));
+          setLoading(false); // Stop loader immediately
+      } else {
+          setLoading(true);
+      }
+
+      // 2. Fetch fresh data in the background
       const rawSessions = await sessionsApi.listSessions();
       let mapped = rawSessions.map(s => mapSessionToCallSession(s, currentUserInfo));
       
@@ -736,16 +747,19 @@ export default function FeedbackScreen() {
           console.error('[Feedback] Bulk fetch failed:', e);
       }
 
+      // 3. Silently update UI & Cache
       setSessions(mapped);
+      AsyncStorage.setItem('@feedback_sessions_cache', JSON.stringify(mapped));
     } catch (err) {
       console.error('Failed to fetch sessions:', err);
+    } finally {
+      setLoading(false);
     }
   }, [currentUserInfo?.clerkId]);
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      fetchSessions().finally(() => setLoading(false));
+      fetchSessions();
     }, [fetchSessions])
   );
 

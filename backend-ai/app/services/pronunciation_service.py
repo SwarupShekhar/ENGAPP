@@ -17,6 +17,8 @@ from app.models.request import PronunciationRequest
 from app.models.response import PronunciationResponse
 from app.cache.manager import cached
 from app.utils.audio_utils import validate_audio_url, download_audio_streamed
+from app.assessment.scoring.fluency_recalibrator import FluencyRecalibrator
+from app.models.response import DetailedPronunciationFeedback, ActionableFeedback, MispronuncedWord, WeakPhoneme, FluencyBreakdown
 
 class PronunciationService:
     """
@@ -31,6 +33,7 @@ class PronunciationService:
                 subscription=settings.azure_speech_key,
                 region=settings.azure_speech_region
             )
+        self.recalibrator = FluencyRecalibrator()
 
     async def _analyze_prosody(self, audio_path: str) -> Dict[str, float]:
         """Deep Intelligence prosody analysis using librosa."""
@@ -144,6 +147,21 @@ class PronunciationService:
             # Generate actionable tips (accent_notes will be passed in a separate flow or null for now)
             actionable_feedback_dict = generate_actionable_feedback(detailed_errors_dict, accent_notes=None)
 
+            # 4.5 Recalibrate Fluency
+            word_timing = self._extract_word_timing(azure_json)
+            nbest0 = azure_json.get("NBest", [{}])[0]
+            transcript_for_cs = nbest0.get("Display", request.reference_text)
+            
+            recalibrated = self.recalibrator.recalibrate_fluency(
+                result["fluency_score"],
+                result.get("prosody_score", prosody_metrics["prosody_score"]),
+                prosody_metrics["speech_rate_wpm"],
+                word_timing["pause_data"],
+                word_timing["word_durations"],
+                nbest0,
+                transcript_for_cs
+            )
+
             # Convert to Pydantic models
             detailed_errors = DetailedPronunciationFeedback(
                 mispronounced_words=[MispronuncedWord(**w) for w in detailed_errors_dict["mispronounced_words"]],
@@ -179,9 +197,16 @@ class PronunciationService:
             
             return PronunciationResponse(
                 accuracy_score=result["accuracy_score"],
-                fluency_score=result["fluency_score"],
+                fluency_score=recalibrated["overall_fluency"],
                 completeness_score=result["completeness_score"],
                 pronunciation_score=result["pronunciation_score"],
+                fluency_breakdown=FluencyBreakdown(
+                    **recalibrated["components"],
+                    connected_speech_details=recalibrated.get("connected_speech_details"),
+                    examples=recalibrated.get("examples")
+                ),
+                azure_raw_fluency=recalibrated["azure_raw"]["fluency"],
+                azure_raw_prosody=recalibrated["azure_raw"]["prosody"],
                 words=words,
                 common_issues=self._get_issues(words),
                 improvement_tips=self._get_tips(words),
@@ -233,5 +258,39 @@ class PronunciationService:
     def _get_issues(self, words: List[WordPronunciation]) -> List[str]:
         # Logic to identify issues...
         return ["Occasional vowel substitution"]
+
+    def _extract_word_timing(self, azure_json: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract word durations and pauses from Azure JSON."""
+        durations = []
+        pauses = []
+        mid_phrase_count = 0
+        
+        try:
+            nbest = azure_json.get("NBest", [])
+            if not nbest:
+                return {"word_durations": [], "pause_data": {"mid_phrase_count": 0}}
+            
+            words = nbest[0].get("Words", [])
+            for i, word in enumerate(words):
+                # Duration is in 100ns ticks
+                dur = word.get("Duration", 0) / 10000.0  # Convert to ms
+                durations.append(dur)
+                
+                if i < len(words) - 1:
+                    next_word = words[i+1]
+                    gap = (next_word.get("Offset", 0) - (word.get("Offset", 0) + word.get("Duration", 0))) / 10000.0
+                    if gap > 200:  # Pause > 200ms
+                        pauses.append(gap)
+                        mid_phrase_count += 1
+                        
+            return {
+                "word_durations": durations,
+                "pause_data": {
+                    "mid_phrase_count": mid_phrase_count,
+                    "pauses": pauses
+                }
+            }
+        except Exception:
+            return {"word_durations": [], "pause_data": {"mid_phrase_count": 0}}
 
 pronunciation_service = PronunciationService()

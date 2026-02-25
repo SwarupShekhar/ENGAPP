@@ -12,6 +12,13 @@ export class ReelsService {
   private readonly strapiBaseUrl: string;
   private readonly strapiToken: string;
 
+  // ─── In-memory feed cache (5-min TTL per user) ────────────
+  private readonly feedCache = new Map<
+    string,
+    { data: any; expiresAt: number }
+  >();
+  private readonly FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
@@ -21,6 +28,22 @@ export class ReelsService {
   ) {
     this.strapiBaseUrl = this.configService.get<string>('STRAPI_BASE_URL');
     this.strapiToken = this.configService.get<string>('STRAPI_API_KEY');
+
+    // Periodic cleanup of expired cache entries (every 10 min)
+    setInterval(() => this.cleanExpiredCache(), 10 * 60 * 1000);
+  }
+
+  private cleanExpiredCache() {
+    const now = Date.now();
+    for (const [key, entry] of this.feedCache) {
+      if (now > entry.expiresAt) this.feedCache.delete(key);
+    }
+  }
+
+  /** Invalidate a user's feed cache (call after session analysis, activity submit, etc.) */
+  invalidateFeedCache(userId: string) {
+    this.feedCache.delete(userId);
+    this.logger.debug(`Feed cache invalidated for user ${userId}`);
   }
 
   /**
@@ -39,6 +62,14 @@ export class ReelsService {
    */
   async getFeed(userId: string, cursor?: number) {
     try {
+      // ── Check cache first ──────────────────────────────────
+      const cacheKey = userId;
+      const cached = this.feedCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiresAt && !cursor) {
+        this.logger.debug(`Feed cache HIT for user ${userId}`);
+        return cached.data;
+      }
+
       // 1. Fetch user profile for difficulty filtering
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -129,7 +160,7 @@ export class ReelsService {
       const pagedReels = sortedReels.slice(startIndex, startIndex + pageSize);
 
       // 7. Format for client
-      return {
+      const result = {
         items: pagedReels.map((reel) => this.formatReelForClient(reel)),
         nextCursor:
           startIndex + pageSize < sortedReels.length
@@ -137,6 +168,17 @@ export class ReelsService {
             : null,
         totalAvailable: sortedReels.length,
       };
+
+      // 8. Cache the first page for this user
+      if (!cursor) {
+        this.feedCache.set(cacheKey, {
+          data: result,
+          expiresAt: Date.now() + this.FEED_CACHE_TTL_MS,
+        });
+        this.logger.debug(`Feed cached for user ${userId} (TTL: 5m)`);
+      }
+
+      return result;
     } catch (error) {
       this.logger.error(`Failed to generate reels feed: ${error.message}`);
       throw error;
@@ -189,8 +231,9 @@ export class ReelsService {
     const priorityWeight = reelAttributes.priority_weight || 0;
     score += priorityWeight * 2;
 
-    // Small randomization to avoid staleness (±10%)
-    score *= 0.9 + Math.random() * 0.2;
+    // Significant randomization to ensure feed rotation
+    // Multiply by a random factor between 0.5 and 1.5 (±50%)
+    score *= 0.5 + Math.random();
 
     return score;
   }
@@ -330,6 +373,9 @@ export class ReelsService {
     const updatedScore = await this.prisma.userTopicScore.findUnique({
       where: { userId_topicTag: { userId, topicTag } },
     });
+
+    // Invalidate feed cache since weakness scores changed
+    this.invalidateFeedCache(userId);
 
     return { success: true, newScore: updatedScore?.score || 50 };
   }
