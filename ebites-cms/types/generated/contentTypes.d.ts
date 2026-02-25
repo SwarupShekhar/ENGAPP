@@ -529,8 +529,16 @@ export interface ApiReelReel extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     mux_asset_id: Schema.Attribute.String;
     mux_playback_id: Schema.Attribute.String;
+    priority_weight: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
     question: Schema.Attribute.Relation<'oneToOne', 'api::question.question'>;
+    skill_tags: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::skill-tag.skill-tag'
+    >;
+    tags: Schema.Attribute.JSON;
+    target_mistakes: Schema.Attribute.JSON;
+    target_sounds: Schema.Attribute.JSON;
     title: Schema.Attribute.String;
     topics: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'>;
     type: Schema.Attribute.Enumeration<['global', 'personalized']>;
@@ -538,6 +546,42 @@ export interface ApiReelReel extends Struct.CollectionTypeSchema {
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     xp_reward: Schema.Attribute.Integer;
+  };
+}
+
+export interface ApiSkillTagSkillTag extends Struct.CollectionTypeSchema {
+  collectionName: 'skill_tags';
+  info: {
+    description: 'Maps AI-detected pronunciation/grammar issues to corrective content';
+    displayName: 'Skill Tag';
+    pluralName: 'skill-tags';
+    singularName: 'skill-tag';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::skill-tag.skill-tag'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    native_lang_affected: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    reels: Schema.Attribute.Relation<'manyToMany', 'api::reel.reel'>;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    type: Schema.Attribute.Enumeration<
+      ['sound', 'grammar', 'vocabulary', 'fluency']
+    > &
+      Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -555,13 +599,17 @@ export interface ApiTopicTopic extends Struct.CollectionTypeSchema {
     category: Schema.Attribute.Enumeration<
       ['grammar', 'pronunciation', 'vocabulary', 'fluency', 'conversation']
     >;
+    child_topics: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    icon: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::topic.topic'> &
       Schema.Attribute.Private;
     name: Schema.Attribute.String;
+    parent_topic: Schema.Attribute.Relation<'manyToOne', 'api::topic.topic'>;
     publishedAt: Schema.Attribute.DateTime;
     reels: Schema.Attribute.Relation<'oneToMany', 'api::reel.reel'>;
     slug: Schema.Attribute.UID<'name'>;
@@ -1085,6 +1133,7 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::question.question': ApiQuestionQuestion;
       'api::reel.reel': ApiReelReel;
+      'api::skill-tag.skill-tag': ApiSkillTagSkillTag;
       'api::topic.topic': ApiTopicTopic;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

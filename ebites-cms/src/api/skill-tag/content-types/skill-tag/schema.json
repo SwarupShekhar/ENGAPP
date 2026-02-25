@@ -1,0 +1,41 @@
+{
+  "kind": "collectionType",
+  "collectionName": "skill_tags",
+  "info": {
+    "singularName": "skill-tag",
+    "pluralName": "skill-tags",
+    "displayName": "Skill Tag",
+    "description": "Maps AI-detected pronunciation/grammar issues to corrective content"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Human-readable name, e.g. 'TH Sound', 'Article Usage'"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": ["sound", "grammar", "vocabulary", "fluency"],
+      "required": true
+    },
+    "native_lang_affected": {
+      "type": "json",
+      "description": "Array of L1 languages whose speakers typically struggle with this, e.g. [\"hindi\", \"tamil\"]"
+    },
+    "reels": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::reel.reel",
+      "mappedBy": "skill_tags"
+    }
+  }
+}

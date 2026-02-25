@@ -32,6 +32,26 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::reel.reel"
+    },
+    "parent_topic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::topic.topic",
+      "inversedBy": "child_topics"
+    },
+    "child_topics": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::topic.topic",
+      "mappedBy": "parent_topic"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Emoji or icon name for UI display"
+    },
+    "description": {
+      "type": "text",
+      "description": "Short description for CMS editors"
     }
   }
 }

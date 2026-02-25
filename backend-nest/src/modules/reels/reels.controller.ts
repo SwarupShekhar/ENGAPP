@@ -1,7 +1,15 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { ReelsService } from './reels.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('Reels')
 @Controller('reels')
@@ -15,11 +23,18 @@ export class ReelsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Return a mixed feed of Reels with activities.',
+    description:
+      'Return a smart-ranked feed of Reels with activities. Weakness reels appear first.',
   })
-  async getFeed(@Req() req: any) {
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: 'Cursor for pagination (index offset)',
+  })
+  async getFeed(@Req() req: any, @Query('cursor') cursor?: string) {
     const userId = req.user.id;
-    return this.reelsService.getFeed(userId);
+    const cursorNum = cursor ? parseInt(cursor, 10) : undefined;
+    return this.reelsService.getFeed(userId, cursorNum);
   }
 
   @Post('activity/submit')
@@ -38,5 +53,23 @@ export class ReelsController {
       data.isCorrect,
       data.topicTag,
     );
+  }
+
+  @Post('watch')
+  @UseGuards(ClerkGuard)
+  @ApiOperation({
+    summary: 'Record that a user watched a reel (for feed deduplication)',
+  })
+  async recordWatch(
+    @Req() req: any,
+    @Body() data: { strapiReelId: number; completed: boolean },
+  ) {
+    const userId = req.user.id;
+    await this.reelsService.recordReelWatch(
+      userId,
+      data.strapiReelId,
+      data.completed,
+    );
+    return { success: true };
   }
 }

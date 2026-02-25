@@ -12,6 +12,6 @@ import { IntegrationsModule } from '../../integrations/integrations.module';
   ],
   controllers: [ReelsController],
   providers: [ReelsService, WeaknessService],
-  exports: [ReelsService],
+  exports: [ReelsService, WeaknessService],
 })
 export class ReelsModule {}

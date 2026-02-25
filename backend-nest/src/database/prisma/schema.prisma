@@ -56,6 +56,7 @@ model User {
   points          UserPoints?
   matchmakingQueue MatchmakingQueue[]
   topicScores     UserTopicScore[]
+  reelHistory     UserReelHistory[]
 
   @@index([clerkId])
 }
@@ -430,14 +431,33 @@ enum AssessmentStatus {
 }
 
 model UserTopicScore {
-  id        String   @id @default(uuid())
-  userId    String
-  topicTag  String
-  score     Float    @default(0.0)
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  topicTag    String
+  score       Float    @default(50.0)
+  source      String   @default("activity") // "activity" | "session" | "assessment"
+  occurrences Int      @default(1)           // how many times this weakness was detected
+  lastSeenAt  DateTime @default(now())        // when was this weakness last detected
+  decayRate   Float    @default(0.95)         // for score decay over time (multiply per day)
+  updatedAt   DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, topicTag])
+  @@index([userId])
+  @@index([userId, score])  // for efficient top-weaknesses query
+}
+
+// Track which reels a user has already watched (to avoid repeats in feed)
+model UserReelHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  strapiReelId Int      // Strapi reel ID
+  watchedAt    DateTime @default(now())
+  completed    Boolean  @default(false) // watched >80%
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, strapiReelId])
   @@index([userId])
 }

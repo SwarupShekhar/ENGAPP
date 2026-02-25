@@ -28,11 +28,7 @@
     },
     "difficulty_level": {
       "type": "enumeration",
-      "enum": [
-        "easy",
-        "medium",
-        "hard"
-      ]
+      "enum": ["easy", "medium", "hard"]
     },
     "active": {
       "type": "boolean"
@@ -49,24 +45,40 @@
     },
     "type": {
       "type": "enumeration",
-      "enum": [
-        "global",
-        "personalized"
-      ]
+      "enum": ["global", "personalized"]
     },
     "xp_reward": {
       "type": "integer"
     },
     "activity_type": {
       "type": "enumeration",
-      "enum": [
-        "mcq",
-        "repeat_after_me",
-        "listening_check"
-      ]
+      "enum": ["mcq", "repeat_after_me", "listening_check"]
     },
     "is_featured": {
       "type": "boolean"
+    },
+    "target_sounds": {
+      "type": "json",
+      "description": "Array of pronunciation sounds this reel teaches, e.g. [\"th\", \"v\", \"w\"]"
+    },
+    "target_mistakes": {
+      "type": "json",
+      "description": "Array of grammar/vocab mistake types this reel fixes, e.g. [\"verb_form\", \"article_usage\"]"
+    },
+    "priority_weight": {
+      "type": "integer",
+      "default": 0,
+      "description": "Manual editorial boost. Higher = shown earlier in personalized feeds"
+    },
+    "tags": {
+      "type": "json",
+      "description": "Free-form tags for flexible matching, e.g. [\"hindi-speaker\", \"common-confusion\"]"
+    },
+    "skill_tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::skill-tag.skill-tag",
+      "inversedBy": "reels"
     }
   }
 }

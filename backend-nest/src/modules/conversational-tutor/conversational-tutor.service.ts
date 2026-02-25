@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { WeaknessService } from '../reels/weakness.service';
 import * as FormData from 'form-data';
 
 interface ConversationTurn {
@@ -109,6 +110,7 @@ export class ConversationalTutorService {
     private configService: ConfigService,
     private httpService: HttpService,
     private prisma: PrismaService,
+    private weaknessService: WeaknessService,
   ) {
     this.genAI = new GoogleGenerativeAI(
       this.configService.get<string>('GEMINI_API_KEY'),
@@ -327,6 +329,25 @@ export class ConversationalTutorService {
             },
           },
         });
+
+        // ─── Smart Coach: Sync weaknesses to eBites feed ──────
+        // This bridges session analysis → eBites personalization.
+        try {
+          await this.weaknessService.ingestFromSessionAnalysis(
+            participant.userId,
+            analysisData.mistakes || [],
+            session.pronunciationAttempts
+              .filter((p) => !p.passed)
+              .map((p) => ({
+                issueType: 'pronunciation',
+                word: p.problemWords[0] || p.referenceText,
+              })),
+          );
+        } catch (weaknessError) {
+          this.logger.warn(
+            `Failed to sync weaknesses to eBites: ${weaknessError.message}`,
+          );
+        }
       }
 
       // 5. Update Session Status
