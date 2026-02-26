@@ -6,7 +6,7 @@ import { clerkClient } from '@clerk/clerk-sdk-node';
 export class ClerkService {
   private readonly logger = new Logger(ClerkService.name);
 
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {}
 
   async verifyToken(token: string): Promise<any | null> {
     try {
@@ -16,8 +16,8 @@ export class ClerkService {
       if (token.startsWith('TEST_TOKEN_')) {
         const userId = token.replace('TEST_TOKEN_', 'user_'); // e.g.,user_1
         return {
-          id: userId,        // For ChatGateway
-          userId: userId,    // For ClerkGuard
+          id: userId, // For ChatGateway
+          userId: userId, // For ClerkGuard
           sessionId: `session_${userId}`,
           email: `${userId}@test.com`,
           firstName: 'Test',
@@ -37,9 +37,9 @@ export class ClerkService {
         };
       } catch (e) {
         this.logger.error(`Token verification failed: ${e.message}`);
+        this.logger.error(`Token error details:`, e);
         return null;
       }
-
     } catch (error) {
       this.logger.error('Clerk token verification failed:', error);
       return null;
