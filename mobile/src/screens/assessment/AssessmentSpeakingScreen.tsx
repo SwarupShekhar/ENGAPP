@@ -5,13 +5,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { assessmentApi } from '../../api/assessment';
 import { theme } from '../../theme/theme';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function AssessmentSpeakingScreen({ navigation, route }: any) {
     const { user } = useUser();
+    const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
     const insets = useSafeAreaInsets();
     const [phase, setPhase] = useState('PHASE_1');
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -25,10 +26,12 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
     const [attempt, setAttempt] = useState(1);
     const [assessmentId, setAssessmentId] = useState<string | null>(null);
 
-    // Phase 1 initialization
+    // Phase 1 initialization — wait for auth to be ready
     useEffect(() => {
-        startAssessment();
-    }, []);
+        if (isAuthLoaded && isSignedIn) {
+            startAssessment();
+        }
+    }, [isAuthLoaded, isSignedIn]);
 
     useEffect(() => {
         let interval: any;

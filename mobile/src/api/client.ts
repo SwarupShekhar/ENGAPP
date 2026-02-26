@@ -5,13 +5,13 @@ import Constants from "expo-constants";
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
-const FORCE_PRODUCTION = false; // Switch to LOCAL backend for testing
+const FORCE_LOCAL = true; // Set to true to force LOCAL backend even in prod builds
 
 // Using localhost for iOS Simulator, 10.0.2.2 for Android Emulator, and LOCAL_IP for physical devices
-const LOCAL_IP = "192.168.1.7";
+const LOCAL_IP = "172.20.10.13";
 
 export const API_URL =
-  IS_PROD || FORCE_PRODUCTION
+  !FORCE_LOCAL && IS_PROD
     ? "https://engapp-3210.onrender.com"
     : Platform.select({
         ios: !Constants.appOwnership
