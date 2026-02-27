@@ -11,6 +11,7 @@ class SocketService {
   private sound: Audio.Sound | null = null;
   private tokenFetcher: (() => Promise<string | null>) | null = null;
   private localUserId: string | null = null;
+  private heartbeatInterval: NodeJS.Timeout | null = null;
   private NOTIFICATION_SOUND_URL =
     "https://res.cloudinary.com/de8vvmpip/video/upload/v1771405321/preview_uxlib8.mp3";
 
@@ -74,14 +75,17 @@ class SocketService {
 
     this.socket.on("connect", () => {
       console.log("[Socket] Connected with fresh token:", this.socket?.id);
+      this.startHeartbeat();
     });
 
     this.socket.on("disconnect", (reason) => {
       console.log("[Socket] Disconnected:", reason);
+      this.stopHeartbeat();
     });
 
     this.socket.on("connect_error", (err) => {
       console.warn("[Socket] Connection error:", err.message);
+      this.stopHeartbeat();
     });
 
     // Re-register existing listeners on reconnect
@@ -95,9 +99,26 @@ class SocketService {
   }
 
   disconnect() {
+    this.stopHeartbeat();
     this.socket?.disconnect();
     this.socket = null;
     this.listeners.clear();
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket?.connected) {
+        this.socket.emit("heartbeat");
+      }
+    }, 30000); // 30 seconds
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
   }
 
   isConnected(): boolean {

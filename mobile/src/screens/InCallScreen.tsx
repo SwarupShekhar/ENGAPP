@@ -8,6 +8,7 @@ import {
   Dimensions,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import {
   SafeAreaView,
@@ -119,6 +120,37 @@ function AudioConference() {
 
 // ─── Initial Transcript State ────────────────────────────────
 const INITIAL_TRANSCRIPT: any[] = [];
+
+// ─── Transcription Status Indicator ───────────────────────
+function TranscriptionStatus({
+  status,
+}: {
+  status: "idle" | "active" | "error" | "unavailable";
+}) {
+  return (
+    <View style={styles.transcriptionStatus}>
+      <View
+        style={[
+          styles.statusDot,
+          status === "active"
+            ? styles.statusDotActive
+            : status === "error"
+              ? styles.statusDotError
+              : styles.statusDotIdle,
+        ]}
+      />
+      <Text style={styles.statusTextMini}>
+        {status === "active"
+          ? "Live Transcribing..."
+          : status === "error"
+            ? "Transcription Error"
+            : status === "unavailable"
+              ? "Transcription Unavailable"
+              : "Initializing STT..."}
+      </Text>
+    </View>
+  );
+}
 
 // ─── Transcript Bubble ────────────────────────────────────
 function TranscriptBubble({
@@ -237,6 +269,7 @@ export default function InCallScreen({ navigation, route }: any) {
   const scrollRef = useRef<ScrollView>(null);
   const roomRef = useRef<any>(null);
   const hasEndedRef = useRef(false);
+  const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -247,6 +280,10 @@ export default function InCallScreen({ navigation, route }: any) {
   const isDirect = route?.params?.isDirect;
   const isCaller = route?.params?.isCaller ?? false;
   const conversationId = route?.params?.conversationId || sessionId;
+
+  const [transcriptionStatus, setTranscriptionStatus] = useState<
+    "idle" | "active" | "error" | "unavailable"
+  >("idle");
 
   // Only the caller waits. The receiver has already accepted.
   const [isWaiting, setIsWaiting] = useState(isDirect && isCaller);
@@ -338,8 +375,24 @@ export default function InCallScreen({ navigation, route }: any) {
     const interval = setInterval(() => {
       setDuration((prev) => prev + 1);
     }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+
+    // Point 4: Peer join timeout (30s)
+    if (isWaiting) {
+      joinTimeoutRef.current = setTimeout(() => {
+        if (isWaiting && callStatus === "calling") {
+          Alert.alert("No Answer", `${partnerName} didn't join the call.`, [
+            { text: "OK", onPress: () => navigation.goBack() },
+          ]);
+          handleEndCall(false);
+        }
+      }, 30000);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (joinTimeoutRef.current) clearTimeout(joinTimeoutRef.current);
+    };
+  }, [isWaiting, callStatus]);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -458,6 +511,7 @@ export default function InCallScreen({ navigation, route }: any) {
         />
         <DataListener
           onTranscription={(data) => {
+            setTranscriptionStatus("active");
             setTranscript((prev) => [
               ...prev,
               {
@@ -471,7 +525,10 @@ export default function InCallScreen({ navigation, route }: any) {
               },
             ]);
           }}
-          onEndSession={() => handleEndCall(true)}
+          onEndSession={() => {
+            console.log("[InCall] Remote ended call");
+            handleEndCall(true);
+          }}
         />
         <View
           style={[
@@ -541,7 +598,10 @@ export default function InCallScreen({ navigation, route }: any) {
           <View style={styles.transcriptContainer}>
             <View style={styles.transcriptHeader}>
               <View style={styles.transcriptIndicator} />
-              <Text style={styles.transcriptLabel}>Live Analysis</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.transcriptLabel}>Live Analysis</Text>
+                <TranscriptionStatus status={transcriptionStatus} />
+              </View>
               <View style={styles.activeLabel}>
                 <Text style={styles.activeLabelText}>AI ASSISTANT</Text>
               </View>
@@ -889,5 +949,32 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     fontSize: 10,
     fontWeight: "600",
+  },
+  transcriptionStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusDotIdle: {
+    backgroundColor: "#94a3b8",
+  },
+  statusDotActive: {
+    backgroundColor: "#10b981",
+  },
+  statusDotError: {
+    backgroundColor: "#ef4444",
+  },
+  statusTextMini: {
+    fontSize: 10,
+    color: "#64748b",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });

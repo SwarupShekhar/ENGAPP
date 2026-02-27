@@ -770,6 +770,7 @@ export class AssessmentService {
   async analyzeAndStoreJoint(
     sessionId: string,
     audioUrls: Record<string, string>,
+    transcript?: string,
   ) {
     this.logger.log(`Starting joint analysis for session ${sessionId}`);
 
@@ -783,20 +784,32 @@ export class AssessmentService {
     const segments: any[] = [];
     const participantEvidence: Record<string, any> = {};
 
-    // 1. STT for each participant
+    // 1. STT for each participant (or fallback to provided transcript)
     for (const participant of session.participants) {
       const url = audioUrls[participant.userId];
-      if (!url) continue;
+      if (url) {
+        const evidence = await this.azure.analyzeSpeech(url, '');
+        participantEvidence[participant.userId] = evidence;
 
-      const evidence = await this.azure.analyzeSpeech(url, '');
-      participantEvidence[participant.userId] = evidence;
-
-      segments.push({
-        speaker_id: participant.userId,
-        text: evidence.transcript,
-        timestamp: 0, // Simplified for now
-        context: (feedback) => feedback.pronunciationTip,
-      });
+        segments.push({
+          speaker_id: participant.userId,
+          text: evidence.transcript,
+          timestamp: 0, // Simplified for now
+          context: (feedback: any) => feedback.pronunciationTip,
+        });
+      } else if (transcript) {
+        // Fallback for LiveKit calls where we don't upload audio files yet
+        // InCallScreen sends the transcript of the initiator. We use it for them.
+        this.logger.log(
+          `No audio URL for ${participant.userId}, using provided transcript.`,
+        );
+        segments.push({
+          speaker_id: participant.userId,
+          text: transcript,
+          timestamp: 0,
+          context: (feedback: any) => feedback.pronunciationTip,
+        });
+      }
     }
 
     // 2. Call Joint AI Analysis

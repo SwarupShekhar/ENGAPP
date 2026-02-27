@@ -164,6 +164,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     null,
   );
   const [retryCount, setRetryCount] = useState(0);
+  const [errorHeader, setErrorHeader] = useState(
+    "AI is analyzing your call...",
+  );
+  const [errorDetail, setErrorDetail] = useState(
+    "We're preparing your personalized feedback and corrections.",
+  );
+  const [isFailed, setIsFailed] = useState(false);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(true);
   const insets = useSafeAreaInsets();
 
@@ -186,21 +193,52 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
       try {
         const data = await sessionsApi.getSessionAnalysis(sessionId);
+
+        // Point 1: Handle different session statuses
+        if (data.status === "PROCESSING") {
+          setErrorHeader("Almost there...");
+          setErrorDetail("The AI is finalizing your speech metrics.");
+        } else if (data.status === "ANALYSIS_FAILED") {
+          setErrorHeader("Analysis Failed");
+          setErrorDetail(
+            "We couldn't process the audio analysis. Showing text-only feedback if available.",
+          );
+          setIsFailed(true);
+          setLoading(false);
+          setSessionData(data);
+          return;
+        }
+
         if (data.analyses && data.analyses.length > 0) {
           if (isMounted) {
             setSessionData(data);
             setLoading(false);
           }
-        } else if (retryCount < 10) {
+        } else if (retryCount < 12) {
+          // 60 seconds total
+          if (retryCount === 5) {
+            setErrorHeader("Still working...");
+            setErrorDetail(
+              "This session had a lot of great conversation! It's taking a bit longer to analyze.",
+            );
+          }
           setTimeout(() => {
             if (isMounted) setRetryCount((prev) => prev + 1);
           }, 5000);
         } else {
-          if (isMounted) setLoading(false);
+          // Point 7: Final fallback
+          if (isMounted) {
+            setIsFailed(true);
+            setLoading(false);
+            setSessionData(data);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch session analysis:", error);
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setIsFailed(true);
+          setLoading(false);
+        }
       }
     };
 
@@ -226,31 +264,87 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         ]}
       >
         <StatusBar barStyle="dark-content" />
-        <View style={{ alignItems: "center", gap: 20 }}>
+        <View style={{ alignItems: "center", gap: 20, paddingHorizontal: 40 }}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text
             style={{
               fontSize: 18,
               fontWeight: "600",
               color: theme.colors.text.primary,
+              textAlign: "center",
             }}
           >
-            AI is analyzing your call...
+            {errorHeader}
           </Text>
           <Text
             style={{
               color: theme.colors.text.secondary,
               textAlign: "center",
-              paddingHorizontal: 40,
             }}
           >
-            We're preparing your personalized feedback and corrections.
+            {errorDetail}
           </Text>
           {retryCount > 0 && (
             <Text style={{ color: theme.colors.text.secondary, fontSize: 12 }}>
-              Attempt {retryCount + 1}/10
+              Progress:{" "}
+              {Math.min(100, Math.round(((retryCount + 1) / 12) * 100))}%
             </Text>
           )}
+
+          <TouchableOpacity
+            style={{ marginTop: 20 }}
+            onPress={() => navigation.navigate("Home")}
+          >
+            <Text style={{ color: theme.colors.primary, fontWeight: "600" }}>
+              Cancel and Go Home
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Point 7: Handle failure UI
+  if (
+    isFailed &&
+    (!sessionData?.analyses || sessionData.analyses.length === 0)
+  ) {
+    return (
+      <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 40,
+          }}
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={64}
+            color={theme.colors.error}
+          />
+          <Text style={{ fontSize: 20, fontWeight: "bold", marginTop: 16 }}>
+            Analysis Unavailable
+          </Text>
+          <Text
+            style={{
+              textAlign: "center",
+              color: theme.colors.text.secondary,
+              marginTop: 12,
+            }}
+          >
+            We were unable to generate a full analysis for this call. This could
+            be due to a poor connection or very short audio.
+          </Text>
+          <TouchableOpacity
+            style={[styles.primaryAction, { marginTop: 32, width: "100%" }]}
+            onPress={() => navigation.navigate("Home")}
+          >
+            <Text style={{ color: "white", fontWeight: "bold" }}>
+              Back to Home
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );

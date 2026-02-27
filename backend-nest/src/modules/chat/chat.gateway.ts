@@ -1,11 +1,11 @@
 import {
-    WebSocketGateway,
-    WebSocketServer,
-    SubscribeMessage,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    ConnectedSocket,
-    MessageBody,
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
@@ -13,328 +13,396 @@ import { ClerkService } from '../../integrations/clerk.service';
 import { ChatService } from './chat.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { RedisService } from '../../database/redis/redis.service';
 
 interface AuthenticatedSocket extends Socket {
-    userId?: string;
-    userName?: string;
+  userId?: string;
+  userName?: string;
 }
 
 @WebSocketGateway({
-    cors: {
-        origin: '*',
-        credentials: true,
-    },
-    namespace: '/chat',
-    transports: ['websocket', 'polling'],
+  cors: {
+    origin: '*',
+    credentials: true,
+  },
+  namespace: '/chat',
+  transports: ['websocket', 'polling'],
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-    @WebSocketServer()
-    server: Server;
+  @WebSocketServer()
+  server: Server;
 
-    private readonly logger = new Logger(ChatGateway.name);
+  private readonly logger = new Logger(ChatGateway.name);
 
-    // userId → Set of socketIds (supports multi-device)
-    private onlineUsers = new Map<string, Set<string>>();
+  // userId → Set of socketIds (supports multi-device)
+  private onlineUsers = new Map<string, Set<string>>();
 
-    constructor(
-        private clerkService: ClerkService,
-        private prisma: PrismaService,
-        private chatService: ChatService,
-        private sessionsService: SessionsService,
-    ) {}
+  constructor(
+    private clerkService: ClerkService,
+    private prisma: PrismaService,
+    private chatService: ChatService,
+    private sessionsService: SessionsService,
+    private redisService: RedisService,
+  ) {}
 
-    // ── Connection ──────────────────────────────────────
-    async handleConnection(client: AuthenticatedSocket) {
-        try {
-            const token = client.handshake.auth?.token as string;
-            if (!token) {
-                throw new Error('No token provided');
-            }
+  // ── Connection ──────────────────────────────────────
+  async handleConnection(client: AuthenticatedSocket) {
+    try {
+      const token = client.handshake.auth?.token as string;
+      if (!token) {
+        throw new Error('No token provided');
+      }
 
-            // Verify using Clerk (same as existing auth pattern)
-            const session = await this.clerkService.verifyToken(token);
-            if (!session) {
-                throw new Error('Invalid token');
-            }
+      // Verify using Clerk (same as existing auth pattern)
+      const session = await this.clerkService.verifyToken(token);
+      if (!session) {
+        throw new Error('Invalid token');
+      }
 
-            // Resolve internal user from clerkId
-            const user = await this.prisma.user.findUnique({
-                where: { clerkId: session.userId },
-                select: { id: true, fname: true, lname: true },
-            });
+      // Resolve internal user from clerkId
+      const user = await this.prisma.user.findUnique({
+        where: { clerkId: session.userId },
+        select: { id: true, fname: true, lname: true },
+      });
 
-            if (!user) {
-                throw new Error('User not found in database');
-            }
+      if (!user) {
+        throw new Error('User not found in database');
+      }
 
-            client.userId = user.id;
-            client.userName = `${user.fname} ${user.lname}`.trim();
+      client.userId = user.id;
+      client.userName = `${user.fname} ${user.lname}`.trim();
 
-            // Track online users (multi-device)
-            if (!this.onlineUsers.has(user.id)) {
-                this.onlineUsers.set(user.id, new Set());
-            }
-            this.onlineUsers.get(user.id)!.add(client.id);
+      // Track online users (multi-device)
+      if (!this.onlineUsers.has(user.id)) {
+        this.onlineUsers.set(user.id, new Set());
+      }
+      this.onlineUsers.get(user.id)!.add(client.id);
 
-            // Join personal room for direct notifications
-            client.join(`user:${user.id}`);
+      // Store in Redis for cross-module presence checks
+      await this.redisService
+        .getClient()
+        .set(`online:${user.id}`, 'true', 'EX', 300); // 5 min TTL, will be refreshed or deleted
 
-            // Broadcast presence
-            this.broadcastPresence(user.id, 'online');
+      // Join personal room for direct notifications
+      client.join(`user:${user.id}`);
 
-            this.logger.log(`[Socket] User ${user.id} (${client.userName}) connected — socket: ${client.id}`);
-        } catch (error) {
-            this.logger.warn(`Connection failed: ${error.message}`);
-            client.disconnect(true);
-        }
+      // Broadcast presence
+      this.broadcastPresence(user.id, 'online');
+
+      this.logger.log(
+        `[Socket] User ${user.id} (${client.userName}) connected — socket: ${client.id}`,
+      );
+    } catch (error) {
+      this.logger.warn(`Connection failed: ${error.message}`);
+      client.disconnect(true);
+    }
+  }
+
+  handleDisconnect(client: AuthenticatedSocket) {
+    if (!client.userId) return;
+
+    const userSockets = this.onlineUsers.get(client.userId);
+    if (userSockets) {
+      userSockets.delete(client.id);
+      if (userSockets.size === 0) {
+        this.onlineUsers.delete(client.userId);
+        this.broadcastPresence(client.userId, 'offline');
+        this.redisService.getClient().del(`online:${client.userId}`);
+      }
     }
 
-    handleDisconnect(client: AuthenticatedSocket) {
-        if (!client.userId) return;
+    this.logger.log(`User ${client.userId} disconnected`);
+  }
 
-        const userSockets = this.onlineUsers.get(client.userId);
-        if (userSockets) {
-            userSockets.delete(client.id);
-            if (userSockets.size === 0) {
-                this.onlineUsers.delete(client.userId);
-                this.broadcastPresence(client.userId, 'offline');
-            }
-        }
+  // ── Join conversation room ──────────────────────────
+  @SubscribeMessage('join_conversation')
+  handleJoinConversation(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    client.join(`conversation:${data.conversationId}`);
+    this.logger.log(
+      `User ${client.userId} joined conversation ${data.conversationId}`,
+    );
+    return { success: true };
+  }
 
-        this.logger.log(`User ${client.userId} disconnected`);
+  // ── Send message ────────────────────────────────────
+  @SubscribeMessage('send_message')
+  async handleSendMessage(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      content: string;
+      type?: string;
+      metadata?: any;
+    },
+  ) {
+    try {
+      const message = await this.chatService.saveMessage(
+        data.conversationId,
+        client.userId!,
+        data.content,
+        data.type || 'text',
+        data.metadata,
+      );
+
+      // Broadcast to everyone in this conversation room
+      this.server
+        .to(`conversation:${data.conversationId}`)
+        .emit('new_message', {
+          conversationId: data.conversationId,
+          message,
+        });
+
+      return { success: true, messageId: message.id };
+    } catch (err) {
+      this.logger.error(`send_message error: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // ── Typing indicators ───────────────────────────────
+  @SubscribeMessage('typing_start')
+  handleTypingStart(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    client.to(`conversation:${data.conversationId}`).emit('user_typing', {
+      conversationId: data.conversationId,
+      userId: client.userId,
+      userName: client.userName,
+      isTyping: true,
+    });
+  }
+
+  @SubscribeMessage('typing_stop')
+  handleTypingStop(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    client.to(`conversation:${data.conversationId}`).emit('user_typing', {
+      conversationId: data.conversationId,
+      userId: client.userId,
+      isTyping: false,
+    });
+  }
+
+  // ── Heartbeat ────────────────────────────────────────
+  @SubscribeMessage('heartbeat')
+  async handleHeartbeat(@ConnectedSocket() client: AuthenticatedSocket) {
+    if (!client.userId) return;
+
+    // Refresh Redis online status
+    await this.redisService
+      .getClient()
+      .set(`online:${client.userId}`, 'true', 'EX', 60); // Refresh for 60s
+
+    // Update in-memory map if somehow lost
+    if (!this.onlineUsers.has(client.userId)) {
+      this.onlineUsers.set(client.userId, new Set([client.id]));
+      this.broadcastPresence(client.userId, 'online');
+    } else {
+      this.onlineUsers.get(client.userId)!.add(client.id);
     }
 
-    // ── Join conversation room ──────────────────────────
-    @SubscribeMessage('join_conversation')
-    handleJoinConversation(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { conversationId: string },
-    ) {
-        client.join(`conversation:${data.conversationId}`);
-        this.logger.log(`User ${client.userId} joined conversation ${data.conversationId}`);
-        return { success: true };
-    }
+    return { success: true };
+  }
 
-    // ── Send message ────────────────────────────────────
-    @SubscribeMessage('send_message')
-    async handleSendMessage(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: {
-            conversationId: string;
-            content: string;
-            type?: string;
-            metadata?: any;
-        },
-    ) {
-        try {
-            const message = await this.chatService.saveMessage(
-                data.conversationId,
-                client.userId!,
-                data.content,
-                data.type || 'text',
-                data.metadata,
+  // ── Mark as read ────────────────────────────────────
+  @SubscribeMessage('mark_read')
+  async handleMarkRead(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    await this.chatService.markAsRead(data.conversationId, client.userId!);
+
+    // Notify conversation members
+    client.to(`conversation:${data.conversationId}`).emit('messages_read', {
+      conversationId: data.conversationId,
+      readByUserId: client.userId,
+      readAt: new Date().toISOString(),
+    });
+
+    return { success: true };
+  }
+
+  // ── Call invite ─────────────────────────────────────
+  @SubscribeMessage('send_call_invite')
+  async handleCallInvite(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      callType: 'voice' | 'video';
+    },
+  ) {
+    // Save call invite as a message
+    const message = await this.chatService.saveMessage(
+      data.conversationId,
+      client.userId!,
+      `📞 ${client.userName} started a ${data.callType} call`,
+      'call_invite',
+      {
+        callId: data.callId,
+        callType: data.callType,
+        status: 'pending',
+        initiatorId: client.userId,
+        initiatorName: client.userName,
+      },
+    );
+
+    // Broadcast to conversation
+    this.server.to(`conversation:${data.conversationId}`).emit('new_message', {
+      conversationId: data.conversationId,
+      message,
+    });
+
+    // Find other participants to send a direct incoming call signal
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: data.conversationId },
+      include: { participants: true },
+    });
+
+    if (conversation) {
+      conversation.participants.forEach((p) => {
+        if (p.userId !== client.userId) {
+          this.logger.log(
+            `[DirectCall] Found participant ${p.userId}. Checking if they are in room user:${p.userId}`,
+          );
+
+          if (!this.isUserOnline(p.userId)) {
+            this.logger.log(
+              `[DirectCall] User ${p.userId} is offline. Auto-declining call from ${client.userId}.`,
             );
-
-            // Broadcast to everyone in this conversation room
-            this.server.to(`conversation:${data.conversationId}`).emit('new_message', {
-                conversationId: data.conversationId,
-                message,
+            // Auto-decline if offline
+            this.notifyUser(client.userId, 'call_status_update', {
+              conversationId: data.conversationId,
+              status: 'declined',
+              responderId: p.userId,
+              reason: 'User is offline',
             });
-
-            return { success: true, messageId: message.id };
-        } catch (err) {
-            this.logger.error(`send_message error: ${err.message}`);
-            return { success: false, error: err.message };
-        }
-    }
-
-    // ── Typing indicators ───────────────────────────────
-    @SubscribeMessage('typing_start')
-    handleTypingStart(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { conversationId: string },
-    ) {
-        client.to(`conversation:${data.conversationId}`).emit('user_typing', {
-            conversationId: data.conversationId,
-            userId: client.userId,
-            userName: client.userName,
-            isTyping: true,
-        });
-    }
-
-    @SubscribeMessage('typing_stop')
-    handleTypingStop(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { conversationId: string },
-    ) {
-        client.to(`conversation:${data.conversationId}`).emit('user_typing', {
-            conversationId: data.conversationId,
-            userId: client.userId,
-            isTyping: false,
-        });
-    }
-
-    // ── Mark as read ────────────────────────────────────
-    @SubscribeMessage('mark_read')
-    async handleMarkRead(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { conversationId: string },
-    ) {
-        await this.chatService.markAsRead(data.conversationId, client.userId!);
-
-        // Notify conversation members
-        client.to(`conversation:${data.conversationId}`).emit('messages_read', {
-            conversationId: data.conversationId,
-            readByUserId: client.userId,
-            readAt: new Date().toISOString(),
-        });
-
-        return { success: true };
-    }
-
-    // ── Call invite ─────────────────────────────────────
-    @SubscribeMessage('send_call_invite')
-    async handleCallInvite(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: {
-            conversationId: string;
-            callId: string;
-            callType: 'voice' | 'video';
-        },
-    ) {
-        // Save call invite as a message
-        const message = await this.chatService.saveMessage(
-            data.conversationId,
-            client.userId!,
-            `📞 ${client.userName} started a ${data.callType} call`,
-            'call_invite',
-            {
-                callId: data.callId,
-                callType: data.callType,
-                status: 'pending',
-                initiatorId: client.userId,
-                initiatorName: client.userName,
-            },
-        );
-
-        // Broadcast to conversation
-        this.server.to(`conversation:${data.conversationId}`).emit('new_message', {
-            conversationId: data.conversationId,
-            message,
-        });
-
-        // Find other participants to send a direct incoming call signal
-        const conversation = await this.prisma.conversation.findUnique({
-            where: { id: data.conversationId },
-            include: { participants: true },
-        });
-
-        if (conversation) {
-            conversation.participants.forEach(p => {
-                if (p.userId !== client.userId) {
-                    this.logger.log(`[DirectCall] Found participant ${p.userId}. Checking if they are in room user:${p.userId}`);
-                    // Debug: check if anyone is in the room
-                    const socketIds = this.server.sockets.adapter.rooms.get(`user:${p.userId}`);
-                    this.logger.log(`[DirectCall] Socket IDs in room user:${p.userId}: ${socketIds ? Array.from(socketIds).join(', ') : 'NONE'}`);
-
-                    this.logger.log(`[DirectCall] Notifying user ${p.userId} of incoming call from ${client.userId}`);
-                    this.notifyUser(p.userId, 'incoming_call', {
-                        conversationId: data.conversationId,
-                        initiatorId: client.userId,
-                        initiatorName: client.userName,
-                        callType: data.callType,
-                        sessionId: data.conversationId,
-                    });
-                }
+          } else {
+            this.logger.log(
+              `[DirectCall] Notifying user ${p.userId} of incoming call from ${client.userId}`,
+            );
+            this.notifyUser(p.userId, 'incoming_call', {
+              conversationId: data.conversationId,
+              initiatorId: client.userId,
+              initiatorName: client.userName,
+              callType: data.callType,
+              sessionId: data.conversationId,
             });
+          }
         }
-
-        return { success: true, messageId: message.id };
+      });
     }
 
-    @SubscribeMessage('accept_call')
-    async handleAcceptCall(client: AuthenticatedSocket, data: { conversationId: string }) {
-        this.logger.log(`[DirectCall] User ${client.userId} accepted call in ${data.conversationId}`);
-        
-        const conversation = await this.prisma.conversation.findUnique({
-            where: { id: data.conversationId },
-            include: { participants: true },
+    return { success: true, messageId: message.id };
+  }
+
+  @SubscribeMessage('accept_call')
+  async handleAcceptCall(
+    client: AuthenticatedSocket,
+    data: { conversationId: string },
+  ) {
+    this.logger.log(
+      `[DirectCall] User ${client.userId} accepted call in ${data.conversationId}`,
+    );
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: data.conversationId },
+      include: { participants: true },
+    });
+
+    if (!conversation)
+      return { success: false, error: 'Conversation not found' };
+
+    // Create a real DB session for analysis and tracking
+    const session = await this.sessionsService.startSession({
+      matchId: `direct_${data.conversationId}`,
+      participants: conversation.participants.map((p) => p.userId),
+      topic: 'Direct Friend Call',
+      estimatedDuration: 600,
+    });
+
+    this.logger.log(
+      `[DirectCall] Created real session ${session.id} for conversation ${data.conversationId}`,
+    );
+
+    // Notify initiator with the REAL sessionId
+    conversation.participants.forEach((p) => {
+      if (p.userId !== client.userId) {
+        this.notifyUser(p.userId, 'call_status_update', {
+          conversationId: data.conversationId,
+          status: 'accepted',
+          sessionId: session.id, // REAL DB ID
+          responderId: client.userId,
         });
+      }
+    });
 
-        if (!conversation) return { success: false, error: 'Conversation not found' };
+    return { success: true, sessionId: session.id };
+  }
 
-        // Create a real DB session for analysis and tracking
-        const session = await this.sessionsService.startSession({
-            matchId: `direct_${data.conversationId}`,
-            participants: conversation.participants.map(p => p.userId),
-            topic: 'Direct Friend Call',
-            estimatedDuration: 600
-        });
+  @SubscribeMessage('decline_call')
+  async handleDeclineCall(
+    client: AuthenticatedSocket,
+    data: { conversationId: string },
+  ) {
+    this.logger.log(
+      `[DirectCall] User ${client.userId} declined call in ${data.conversationId}`,
+    );
+    // Notify other participants in the conversation that the call was declined
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: data.conversationId },
+      include: { participants: true },
+    });
 
-        this.logger.log(`[DirectCall] Created real session ${session.id} for conversation ${data.conversationId}`);
-
-        // Notify initiator with the REAL sessionId
-        conversation.participants.forEach(p => {
-            if (p.userId !== client.userId) {
-                this.notifyUser(p.userId, 'call_status_update', {
-                    conversationId: data.conversationId,
-                    status: 'accepted',
-                    sessionId: session.id, // REAL DB ID
-                    responderId: client.userId,
-                });
-            }
-        });
-
-        return { success: true, sessionId: session.id };
-    }
-
-    @SubscribeMessage('decline_call')
-    async handleDeclineCall(client: AuthenticatedSocket, data: { conversationId: string }) {
-        this.logger.log(`[DirectCall] User ${client.userId} declined call in ${data.conversationId}`);
-        // Notify other participants in the conversation that the call was declined
-        const conversation = await this.prisma.conversation.findUnique({
-            where: { id: data.conversationId },
-            include: { participants: true },
-        });
-
-        if (conversation) {
-            conversation.participants.forEach(p => {
-                if (p.userId !== client.userId) {
-                    this.notifyUser(p.userId, 'call_status_update', {
-                        conversationId: data.conversationId,
-                        status: 'declined',
-                        responderId: client.userId,
-                    });
-                }
-            });
+    if (conversation) {
+      conversation.participants.forEach((p) => {
+        if (p.userId !== client.userId) {
+          this.notifyUser(p.userId, 'call_status_update', {
+            conversationId: data.conversationId,
+            status: 'declined',
+            responderId: client.userId,
+          });
         }
+      });
     }
+  }
 
-    // ── Presence Sync ──────────────────────────────────
-    @SubscribeMessage('get_online_users')
-    handleGetOnlineUsers() {
-        const ids = Array.from(this.onlineUsers.keys());
-        this.logger.log(`[Socket] get_online_users request. Current online count: ${ids.length}`);
-        return { 
-            success: true, 
-            onlineUserIds: ids
-        };
-    }
+  // ── Presence Sync ──────────────────────────────────
+  @SubscribeMessage('get_online_users')
+  handleGetOnlineUsers() {
+    const ids = Array.from(this.onlineUsers.keys());
+    this.logger.log(
+      `[Socket] get_online_users request. Current online count: ${ids.length}`,
+    );
+    return {
+      success: true,
+      onlineUserIds: ids,
+    };
+  }
 
-    // ── Helpers ─────────────────────────────────────────
-    private broadcastPresence(userId: string, status: 'online' | 'offline') {
-        this.server.emit('presence_update', {
-            userId,
-            status,
-            lastSeen: new Date().toISOString(),
-        });
-    }
+  // ── Helpers ─────────────────────────────────────────
+  private broadcastPresence(userId: string, status: 'online' | 'offline') {
+    this.server.emit('presence_update', {
+      userId,
+      status,
+      lastSeen: new Date().toISOString(),
+    });
+  }
 
-    isUserOnline(userId: string): boolean {
-        return this.onlineUsers.has(userId) && this.onlineUsers.get(userId)!.size > 0;
-    }
+  isUserOnline(userId: string): boolean {
+    return (
+      this.onlineUsers.has(userId) && this.onlineUsers.get(userId)!.size > 0
+    );
+  }
 
-    notifyUser(userId: string, event: string, data: any) {
-        this.server.to(`user:${userId}`).emit(event, data);
-    }
+  notifyUser(userId: string, event: string, data: any) {
+    this.server.to(`user:${userId}`).emit(event, data);
+  }
 }

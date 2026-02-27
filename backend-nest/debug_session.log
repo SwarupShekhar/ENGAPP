@@ -340,3 +340,315 @@ Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
     at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
     at async Promise.all (index 1)
     at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 866c7e00-b6fb-495a-9ec7-66c196823eab: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 0)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 866c7e00-b6fb-495a-9ec7-66c196823eab: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 866c7e00-b6fb-495a-9ec7-66c196823eab: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 4d42e674-7394-4951-941d-2ca0027feaff: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 0)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 4d42e674-7394-4951-941d-2ca0027feaff: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 4d42e674-7394-4951-941d-2ca0027feaff: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 0)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 3baa05c8-b99d-4ba1-bd7b-37ff77e5cc09: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 3baa05c8-b99d-4ba1-bd7b-37ff77e5cc09: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session f13d35da-14d6-44d8-a02b-56b3c598fdcf: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session f13d35da-14d6-44d8-a02b-56b3c598fdcf: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session 3baa05c8-b99d-4ba1-bd7b-37ff77e5cc09: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 0)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
+[SessionsProcessor] Error processing session f13d35da-14d6-44d8-a02b-56b3c598fdcf: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.upsert()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:48
+
+  34 
+  35 // Create dummy zero analyses for participants so the UI shows something
+  36 await Promise.all(participantIds.map(async (participantId) => {
+→ 37     await this.prisma.analysis.upsert(
+Foreign key constraint violated on the constraint: `Analysis_participantId_fkey`
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async <anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:37:21)
+    at async Promise.all (index 1)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:36:17)
