@@ -7,6 +7,7 @@ import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { assessmentApi } from '../../api/assessment';
+import { API_URL } from '../../api/client';
 import { theme } from '../../theme/theme';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -47,6 +48,8 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
 
     const startAssessment = async () => {
         try {
+            console.log('[Assessment] Starting assessment, API_URL:', API_URL);
+            
             // Ensure audio permissions are requested early
             const perm = await Audio.requestPermissionsAsync();
             if (perm.status !== 'granted') {
@@ -56,13 +59,15 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
 
             // No userId needed — backend extracts from auth token
             const res = await assessmentApi.startAssessment();
+            console.log('[Assessment] Started successfully:', res?.id);
             if (res && res.id) {
                 setAssessmentId(res.id);
             }
         } catch (err: any) {
             console.error("Failed to start assessment:", err);
-            const errorMsg = err?.response?.data?.message || "Could not start assessment. Please check your connection.";
-            Alert.alert("Error", errorMsg);
+            const status = err?.response?.status || 'No response';
+            const serverMsg = err?.response?.data?.message || err?.message || "Unknown error";
+            Alert.alert("Assessment Error", `Status: ${status}\nURL: ${API_URL}\nError: ${serverMsg}`);
         }
     };
 

@@ -7,19 +7,18 @@ import Constants from "expo-constants";
 const IS_PROD = !__DEV__;
 const FORCE_LOCAL = true; // Set to true to force LOCAL backend even in prod builds
 
-// Using localhost for iOS Simulator, 10.0.2.2 for Android Emulator, and LOCAL_IP for physical devices
+// Your Mac's local IP address on the Wi-Fi network
 const LOCAL_IP = "172.20.10.13";
 
-export const API_URL =
-  !FORCE_LOCAL && IS_PROD
+// When FORCE_LOCAL is true, always connect to your Mac's IP directly.
+// This works for physical devices, emulators, and iOS simulators.
+export const API_URL = FORCE_LOCAL
+  ? `http://${LOCAL_IP}:3000`
+  : IS_PROD
     ? "https://engapp-3210.onrender.com"
     : Platform.select({
-        ios: !Constants.appOwnership
-          ? "http://localhost:3000"
-          : `http://${LOCAL_IP}:3000`,
-        android: !Constants.appOwnership
-          ? "http://10.0.2.2:3000"
-          : `http://${LOCAL_IP}:3000`,
+        ios: "http://localhost:3000",
+        android: "http://10.0.2.2:3000",
         default: `http://${LOCAL_IP}:3000`,
       });
 
