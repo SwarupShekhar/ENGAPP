@@ -35,10 +35,9 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
     const connectSocket = async () => {
       if (isSignedIn && userId) {
         try {
-          const token = await getToken();
-          if (token && mounted) {
-            socketService.connect(token);
-          }
+          // Pass the getToken function directly so socket.io can
+          // fetch a fresh Clerk JWT on every connection/reconnection attempt
+          socketService.connect(() => getToken(), userId);
         } catch (err) {
           console.warn("[App] Socket connection failed:", err);
         }
@@ -98,10 +97,31 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
 
     socketService.onIncomingCall(handleIncomingCall);
 
+    // Friend Request Listener
+    const handleFriendRequest = (data: { senderName: string; requestId: string }) => {
+      console.log("[App] Friend request received:", data);
+      Alert.alert(
+        "New Friend Request",
+        `${data.senderName} sent you a friend request!`,
+        [
+          { text: "View Later", style: "cancel" },
+          { 
+            text: "View Now", 
+            onPress: () => {
+              navigate('Notifications');
+            }
+          }
+        ]
+      );
+    };
+
+    socketService.onFriendRequest(handleFriendRequest);
+
     return () => {
       mounted = false;
       subscription.remove();
       socketService.offIncomingCall(handleIncomingCall);
+      socketService.offFriendRequest(handleFriendRequest);
     };
   }, [isSignedIn, userId]);
 

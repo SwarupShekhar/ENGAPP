@@ -34,7 +34,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // In a real app, these would come from environment variables
 const LIVEKIT_URL = 'wss://engrapp-8lz8v8ia.livekit.cloud';
 
-// ─── Data Listener Component ───────────────────────────────
+// ─── Data & Transcription Listener Component ───────────────────────────────
 function DataListener({ onTranscription, onEndSession }: { 
     onTranscription: (data: any) => void;
     onEndSession: () => void;
@@ -46,20 +46,38 @@ function DataListener({ onTranscription, onEndSession }: {
             try {
                 const str = Buffer.from(payload).toString('utf-8');
                 const data = JSON.parse(str);
-                if (data.type === 'transcription') {
-                    onTranscription(data);
-                } else if (data.type === 'end_session') {
+                // Custom data signals
+                if (data.type === 'end_session') {
                     console.log('[LiveKit] Received end_session signal');
                     onEndSession();
                 }
             } catch (e) {
-                console.error('Failed to parse data packet:', e);
+                // Ignore parse errors (might be raw binary data)
             }
         };
 
+        const handleTranscription = (segments: any[]) => {
+            if (!segments || segments.length === 0) return;
+            
+            // segments is an array of TranscriptionSegment
+            segments.forEach(segment => {
+                if (segment.isFinal) {
+                    onTranscription({
+                        userId: segment.speakerIdentity,
+                        text: segment.text,
+                    });
+                }
+            });
+        };
+
+        // Listen for raw data messages (like end_session)
         room.on(RoomEvent.DataReceived, handleData);
+        // Listen for native SIP/Deepgram LiveKit STT transcriptions
+        room.on(RoomEvent.TranscriptionReceived, handleTranscription);
+        
         return () => {
             room.off(RoomEvent.DataReceived, handleData);
+            room.off(RoomEvent.TranscriptionReceived, handleTranscription);
         };
     }, [room, onTranscription, onEndSession]);
 
@@ -87,10 +105,8 @@ function AudioConference() {
     );
 }
 
-// ─── Mock Transcript Data ──────────────────────────────────
-const MOCK_TRANSCRIPT = [
-    { id: '1', speaker: 'partner', text: "Hi! I'm your co-learner. Ready to practice?", time: '0:01' },
-];
+// ─── Initial Transcript State ────────────────────────────────
+const INITIAL_TRANSCRIPT: any[] = [];
 
 // ─── Transcript Bubble ────────────────────────────────────
 function TranscriptBubble({ item, index, isPartnerBot }: { item: any; index: number; isPartnerBot?: boolean }) {
@@ -153,7 +169,7 @@ export default function InCallScreen({ navigation, route }: any) {
     const [duration, setDuration] = useState(0);
     const [isMuted, setIsMuted] = useState(false);
     const [isSpeaker, setIsSpeaker] = useState(false);
-    const [transcript, setTranscript] = useState<any[]>(MOCK_TRANSCRIPT);
+    const [transcript, setTranscript] = useState<any[]>(INITIAL_TRANSCRIPT);
     const scrollRef = useRef<ScrollView>(null);
     const roomRef = useRef<any>(null);
     const hasEndedRef = useRef(false);
@@ -233,60 +249,8 @@ export default function InCallScreen({ navigation, route }: any) {
         fetchToken();
     }, [user, sessionId]);
 
-    // Socket.io for transcription
-    useEffect(() => {
-        if (!user || !sessionId || !token) return;
-
-        // Connect to the audio namespace
-        const socketUrl = `${API_URL}/audio`;
-
-        socketRef.current = io(socketUrl, {
-            auth: { token },
-            transports: ['websocket'],
-        });
-
-        const socket = socketRef.current;
-
-        socket.on('connect', () => {
-            console.log('[Socket] Connected to audio namespace');
-            socket.emit('startStream', {
-                userId: user.id,
-                sessionId,
-                language: 'en-US'
-            });
-        });
-
-        socket.on('transcription', (data: { text: string; isFinal: boolean; timestamp: string }) => {
-            console.log('[Socket] Transcription received:', data.text);
-            if (data.isFinal) {
-                setTranscript(prev => [
-                    ...prev,
-                    {
-                        id: Date.now().toString(),
-                        speaker: 'user',
-                        text: data.text,
-                        time: formatTime(data.timestamp)
-                    }
-                ]);
-            }
-        });
-
-        socket.on('error', (err) => {
-            console.error('[Socket] Error:', err);
-        });
-
-        // NOTE: To send REAL audio data, we need a native bridge like react-native-live-audio-stream
-        // or to use a server-side LiveKit egress. Since LiveKit is already using the Mic,
-        // we can't easily record simultaneously with standard Expo APIs.
-        // socket.emit('audioData', pcmBuffer);
-
-        return () => {
-            if (socket.connected) {
-                socket.emit('stopStream');
-                socket.disconnect();
-            }
-        };
-    }, [user, sessionId, token]);
+    // The obsolete /audio WebSocket connection has been removed.
+    // Real-time transcription is now handled by LiveKit natively via DataListener (RoomEvent.TranscriptionReceived).
 
     const formatTime = (isoString?: string) => {
         const date = isoString ? new Date(isoString) : new Date();
