@@ -13,7 +13,7 @@ import { ClerkService } from '../../integrations/clerk.service';
 import { ChatService } from './chat.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { RedisService } from '../../database/redis/redis.service';
+import { RedisService } from '../../redis/redis.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
