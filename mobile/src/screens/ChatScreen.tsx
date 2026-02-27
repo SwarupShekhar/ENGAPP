@@ -412,7 +412,12 @@ export default function ChatScreen() {
         )}
 
         {/* Input */}
-        <View style={styles.inputContainer}>
+        <View
+          style={[
+            styles.inputContainer,
+            { paddingBottom: Math.max(insets.bottom, 10) },
+          ]}
+        >
           <TextInput
             style={styles.textInput}
             value={inputText}
