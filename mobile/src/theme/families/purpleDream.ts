@@ -24,6 +24,12 @@ export const paolumu: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#E2E8F0",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F59E0B",
+      fluency: "#10B981",
+      vocabulary: "#8B63DA",
+    },
   },
   gradients: {
     primary: ["#CB98ED", "#8B63DA"],
@@ -31,6 +37,9 @@ export const paolumu: Theme = {
     surface: ["#F8F7FF", "#FFFFFF"],
     premium: ["#8B63DA", "#3C21B7"],
     card: ["#FFFFFF", "#F1F5F9"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
   },
 };
 
@@ -57,6 +66,12 @@ export const paodana: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#334155",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F59E0B",
+      fluency: "#10B981",
+      vocabulary: "#8B5CF6",
+    },
   },
   gradients: {
     primary: ["#591DA9", "#3C21B7"],
@@ -64,6 +79,13 @@ export const paodana: Theme = {
     surface: ["#591DA9", "#3C21B7"],
     premium: ["#8B5CF6", "#D946EF"],
     card: ["#FFFFFF", "#F8FAFC"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#8B5CF6",
+    },
   },
 };
 
@@ -90,6 +112,12 @@ export const paoazur: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#E2E8F0",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#78A3EB",
+      fluency: "#10B981",
+      vocabulary: "#FBC2EB",
+    },
   },
   gradients: {
     primary: ["#FBC2EB", "#A6C1EE"],
@@ -97,5 +125,12 @@ export const paoazur: Theme = {
     surface: ["#FDF2F8", "#FFFFFF"],
     premium: ["#78A3EB", "#4A7AC2"],
     card: ["#FFFFFF", "#FDF2F8"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#78A3EB",
+    },
   },
 };

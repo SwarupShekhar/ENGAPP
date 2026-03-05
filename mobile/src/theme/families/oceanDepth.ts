@@ -24,6 +24,12 @@ export const aquasoft: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#B2EBF2",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F59E0B",
+      fluency: "#10B981",
+      vocabulary: "#26C6DA",
+    },
   },
   gradients: {
     primary: ["#E0F7FA", "#80DEEA"],
@@ -31,6 +37,9 @@ export const aquasoft: Theme = {
     surface: ["#F0FDFF", "#FFFFFF"],
     premium: ["#26C6DA", "#00ACC1"],
     card: ["#FFFFFF", "#E0F7FA"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
   },
 };
 
@@ -57,6 +66,12 @@ export const oceanic: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#B3E5FC",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F59E0B",
+      fluency: "#10B981",
+      vocabulary: "#039BE5",
+    },
   },
   gradients: {
     primary: ["#4FC3F7", "#29B6F6"],
@@ -64,6 +79,13 @@ export const oceanic: Theme = {
     surface: ["#E1F5FE", "#FFFFFF"],
     premium: ["#039BE5", "#01579B"],
     card: ["#FFFFFF", "#E1F5FE"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#039BE5",
+    },
   },
 };
 
@@ -90,6 +112,12 @@ export const abyss: Theme = {
     success: "#69F0AE",
     warning: "#FFD740",
     border: "#102A43",
+    skill: {
+      grammar: "#4FC3F7",
+      pronunciation: "#FFD740",
+      fluency: "#69F0AE",
+      vocabulary: "#B3E5FC",
+    },
   },
   gradients: {
     primary: ["#1E3A5F", "#0D47A1"],
@@ -97,5 +125,12 @@ export const abyss: Theme = {
     surface: ["#0A1929", "#1E3A5F"],
     premium: ["#01579B", "#4FC3F7"],
     card: ["#1E3A5F", "#0D47A1"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#4FC3F7",
+    },
   },
 };

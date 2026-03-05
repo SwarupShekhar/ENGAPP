@@ -24,6 +24,12 @@ export const atlatitudeLight: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#E2E8F0",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F59E0B",
+      fluency: "#10B981",
+      vocabulary: "#977DFF",
+    },
   },
   gradients: {
     primary: ["#F2E6EE", "#FFCCF2", "#977DFF", "#0033FF"],
@@ -31,6 +37,9 @@ export const atlatitudeLight: Theme = {
     surface: ["#F8F7FF", "#FFFFFF"],
     premium: ["#0033FF", "#0600AB", "#00033D"],
     card: ["#FFFFFF", "#F1F5F9"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
   },
 };
 
@@ -57,6 +66,12 @@ export const atlatitudeStandard: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#334155",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F59E0B",
+      fluency: "#10B981",
+      vocabulary: "#0033FF",
+    },
   },
   gradients: {
     primary: ["#FFCCF2", "#977DFF", "#0033FF", "#0600AB"],
@@ -64,5 +79,12 @@ export const atlatitudeStandard: Theme = {
     surface: ["#0033FF", "#0600AB"],
     premium: ["#977DFF", "#0033FF", "#0600AB", "#00033D"],
     card: ["#FFFFFF", "#F8FAFC"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#0033FF",
+    },
   },
 };

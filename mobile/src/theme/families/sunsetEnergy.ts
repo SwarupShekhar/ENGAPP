@@ -24,6 +24,12 @@ export const dawn: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#FFCCBC",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#FF7043",
+      fluency: "#10B981",
+      vocabulary: "#FFAB91",
+    },
   },
   gradients: {
     primary: ["#FFE0B2", "#FFAB91"],
@@ -31,6 +37,9 @@ export const dawn: Theme = {
     surface: ["#FFF8F1", "#FFFFFF"],
     premium: ["#FF7043", "#E64A19"],
     card: ["#FFFFFF", "#FFE0B2"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
   },
 };
 
@@ -57,6 +66,12 @@ export const ember: Theme = {
     success: "#10B981",
     warning: "#F59E0B",
     border: "#FFE0B2",
+    skill: {
+      grammar: "#3B82F6",
+      pronunciation: "#F57C00",
+      fluency: "#10B981",
+      vocabulary: "#FFAB40",
+    },
   },
   gradients: {
     primary: ["#FFAB40", "#FF6F00"],
@@ -64,6 +79,13 @@ export const ember: Theme = {
     surface: ["#FFF3E0", "#FFFFFF"],
     premium: ["#F57C00", "#E65100"],
     card: ["#FFFFFF", "#FFF3E0"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#F57C00",
+    },
   },
 };
 
@@ -90,6 +112,12 @@ export const inferno: Theme = {
     success: "#69F0AE",
     warning: "#FFD740",
     border: "#BF360C",
+    skill: {
+      grammar: "#FF7043",
+      pronunciation: "#FFD740",
+      fluency: "#69F0AE",
+      vocabulary: "#FFE0B2",
+    },
   },
   gradients: {
     primary: ["#D84315", "#BF360C"],
@@ -97,5 +125,12 @@ export const inferno: Theme = {
     surface: ["#4E0D06", "#D84315"],
     premium: ["#8D0E00", "#FF7043"],
     card: ["#D84315", "#BF360C"],
+  },
+  shadows: {
+    ...baseTheme.shadows,
+    xl: {
+      ...baseTheme.shadows.xl,
+      shadowColor: "#FF7043",
+    },
   },
 };

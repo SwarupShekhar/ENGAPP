@@ -15,6 +15,12 @@ export interface ThemeColors {
   success: string;
   warning: string;
   border: string;
+  skill: {
+    grammar: string;
+    pronunciation: string;
+    fluency: string;
+    vocabulary: string;
+  };
 }
 
 export interface ThemeGradients {
@@ -25,6 +31,13 @@ export interface ThemeGradients {
   card: string[];
 }
 
+export interface ThemeShadows {
+  sm: any;
+  md: any;
+  lg: any;
+  xl: any;
+}
+
 export interface Theme {
   id: string;
   name: string;
@@ -32,6 +45,7 @@ export interface Theme {
   variation: "light" | "standard" | "deep";
   colors: ThemeColors;
   gradients: ThemeGradients;
+  shadows: ThemeShadows;
   spacing: {
     xs: number;
     s: number;
@@ -59,7 +73,9 @@ export interface Theme {
     weights: {
       regular: string;
       medium: string;
+      semibold: string;
       bold: string;
+      heavy: string;
       black: string;
     };
   };

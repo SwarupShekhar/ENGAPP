@@ -14,7 +14,11 @@ export function useAppTheme() {
   return {
     id: t.id,
     name: t.name,
+    family: t.family,
+    variation: t.variation,
+    theme: t, // Expose raw theme for new components
     colors: {
+      ...t.colors,
       primary: t.colors.accent,
       primaryLight: t.colors.secondary,
       secondary: t.colors.success,
@@ -38,10 +42,10 @@ export function useAppTheme() {
         premium: t.gradients.premium as any,
       },
     },
-    spacing: baseTheme.spacing,
-    borderRadius: baseTheme.borderRadius,
+    spacing: t.spacing,
+    borderRadius: t.borderRadius,
     typography: {
-      ...baseTheme.typography,
+      ...t.typography,
       lineHeights: {
         s: 20,
         m: 24,
@@ -50,34 +54,11 @@ export function useAppTheme() {
       },
     },
     shadows: {
-      small: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-      },
-      medium: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 4,
-      },
-      large: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 10,
-      },
-      primaryGlow: {
-        shadowColor: t.colors.accent,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 8,
-      },
+      ...t.shadows, // Include new shadow system
+      small: t.shadows.sm,
+      medium: t.shadows.md,
+      large: t.shadows.lg,
+      primaryGlow: t.shadows.xl,
     },
   };
 }

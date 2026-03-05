@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, StyleSheet as RNStyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import HomeScreen from "../screens/HomeScreen";
 import AssessmentScreen from "../screens/AssessmentScreen";
 import ProgressScreen from "../screens/ProgressScreen";
 import ProfileScreen from "../screens/ProfileScreen";
@@ -22,6 +21,7 @@ import ChatScreen from "../screens/ChatScreen";
 import SocketDebugScreen from "../screens/SocketDebugScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
 import EBitesScreen from "../screens/EBitesScreen";
+import HomeScreen from "../screens/HomeScreenRedesigned";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.

@@ -8,7 +8,7 @@ const IS_PROD = !__DEV__;
 const FORCE_LOCAL = true; // Set to true to force LOCAL backend even in prod builds
 
 // Your Mac's local IP address on the Wi-Fi network
-const LOCAL_IP = "172.20.10.13";
+const LOCAL_IP = "192.168.1.34";
 
 // When FORCE_LOCAL is true, always connect to your Mac's IP directly.
 // This works for physical devices, emulators, and iOS simulators.

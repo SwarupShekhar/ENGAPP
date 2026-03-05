@@ -41,36 +41,38 @@ class CEFRClassifier:
             return 0.0
         return len(tokens) / len(sentences)
 
-    def classify(self, text: str, context: Dict = None) -> CEFRAssessment:
+    def classify(self, input_data, context: Dict = None) -> CEFRAssessment:
         """
-        Classifies the given text into a CEFR level.
+        Classifies the given text or metrics into a CEFR level.
         """
-        tokens = [word.lower() for word in word_tokenize(text) if word.isalpha()]
-        num_words = len(tokens)
-
-        if num_words < 5:
-            level = CEFRLevel.A1
-            score = 10
+        if hasattr(input_data, 'overall_score'):
+            score = input_data.overall_score
         else:
-            lexical_diversity = self._calculate_lexical_diversity(tokens)
-            sentence_complexity = self._calculate_sentence_complexity(text)
+            text = str(input_data)
+            tokens = [word.lower() for word in word_tokenize(text) if word.isalpha()]
+            num_words = len(tokens)
 
-            # This is a very basic scoring algorithm. A real system would use a
-            # weighted model trained on a labeled corpus.
-            score = (lexical_diversity * 200) + (sentence_complexity * 2)
-
-            if score <= settings.cefr_a1_max_score:
-                level = CEFRLevel.A1
-            elif score <= settings.cefr_a2_max_score:
-                level = CEFRLevel.A2
-            elif score <= settings.cefr_b1_max_score:
-                level = CEFRLevel.B1
-            elif score <= settings.cefr_b2_max_score:
-                level = CEFRLevel.B2
-            elif score <= settings.cefr_c1_max_score:
-                level = CEFRLevel.C1
+            if num_words < 5:
+                score = 10
             else:
-                level = CEFRLevel.C2
+                lexical_diversity = self._calculate_lexical_diversity(tokens)
+                sentence_complexity = self._calculate_sentence_complexity(text)
+
+                # This is a very basic scoring algorithm.
+                score = (lexical_diversity * 200) + (sentence_complexity * 2)
+
+        if score <= settings.cefr_a1_max_score:
+            level = CEFRLevel.A1
+        elif score <= settings.cefr_a2_max_score:
+            level = CEFRLevel.A2
+        elif score <= settings.cefr_b1_max_score:
+            level = CEFRLevel.B1
+        elif score <= settings.cefr_b2_max_score:
+            level = CEFRLevel.B2
+        elif score <= settings.cefr_c1_max_score:
+            level = CEFRLevel.C1
+        else:
+            level = CEFRLevel.C2
         
         # Placeholder for strengths, weaknesses, and next level requirements
         return CEFRAssessment(
