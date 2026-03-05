@@ -14,7 +14,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { chatApi } from "../api/connections";
 import SocketService from "../services/socketService";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 
 interface Conversation {
   conversationId: string;
@@ -37,6 +37,7 @@ interface Conversation {
 }
 
 export default function ConversationsScreen() {
+  const theme = useAppTheme();
   const navigation = useNavigation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());

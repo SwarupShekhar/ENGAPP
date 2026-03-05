@@ -10,6 +10,6 @@ import { RedisModule } from '../../redis/redis.module';
   imports: [PrismaModule, SessionsModule, RedisModule],
   controllers: [ChatController],
   providers: [ChatGateway, ChatService],
-  exports: [ChatService],
+  exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

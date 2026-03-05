@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Circle, Text as SvgText, Line } from 'react-native-svg';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface PerformanceTrendChartProps {
     data: number[]; // Array of last N scores (e.g. [65, 70, 68, 72...])
@@ -17,7 +17,9 @@ const PADDING_TOP = 20;
 const PADDING_BOTTOM = 30;
 
 export const PerformanceTrendChart: React.FC<PerformanceTrendChartProps> = ({ data, labels }) => {
-    // If no data, show placeholder
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+// If no data, show placeholder
     const chartData = data.length > 0 ? data : [0, 0, 0, 0, 0];
 
     // Scale calculations
@@ -121,7 +123,7 @@ export const PerformanceTrendChart: React.FC<PerformanceTrendChartProps> = ({ da
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         marginHorizontal: theme.spacing.m,
         marginBottom: theme.spacing.l,

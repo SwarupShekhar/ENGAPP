@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AnimatedRN, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useUser } from "@clerk/clerk-expo";
 import { useNavigation } from "@react-navigation/native";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 import { matchmakingApi } from "../api/matchmaking";
 import { ActivityIndicator } from "react-native";
 import { FeatureLock } from "../components/FeatureLock";
@@ -78,6 +78,8 @@ const MOCK_RECENT_CALLS = [
 
 // ─── Pulse Animation ──────────────────────────────────────
 function PulseRing({ delay }: { delay: number }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0.4)).current;
 
@@ -129,6 +131,8 @@ function PulseRing({ delay }: { delay: number }) {
 
 // ─── Score Badge ──────────────────────────────────────────
 function ScoreBadge({ score }: { score: number }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const color =
     score >= 80
       ? theme.colors.success
@@ -155,6 +159,8 @@ function TopicChip({
   selected: boolean;
   onPress: () => void;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -177,6 +183,8 @@ function RecentCallCard({
   item: (typeof MOCK_RECENT_CALLS)[0];
   onPress: () => void;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const minutes = Math.floor(item.duration / 60);
   return (
     <TouchableOpacity
@@ -205,6 +213,8 @@ function RecentCallCard({
 
 // ─── Main Component ───────────────────────────────────────
 export default function CallScreen() {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const { user } = useUser();
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -562,258 +572,259 @@ export default function CallScreen() {
 }
 
 // ─── Styles ────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  scrollContent: {
-    paddingBottom: theme.spacing.xl,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.l,
-    paddingTop: theme.spacing.m,
-    marginBottom: theme.spacing.l,
-  },
-  title: {
-    fontSize: theme.typography.sizes.xxl,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-  },
-  subtitle: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.secondary,
-    marginTop: 2,
-  },
-  levelBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: theme.colors.primary + "12",
-  },
-  levelText: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-    color: theme.colors.primary,
-  },
+const getStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      paddingBottom: theme.spacing.xl,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: theme.spacing.l,
+      paddingTop: theme.spacing.m,
+      marginBottom: theme.spacing.l,
+    },
+    title: {
+      fontSize: theme.typography.sizes.xxl,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+    },
+    subtitle: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      marginTop: 2,
+    },
+    levelBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: theme.spacing.m,
+      paddingVertical: theme.spacing.xs,
+      borderRadius: theme.borderRadius.circle,
+      backgroundColor: theme.colors.primary + "12",
+    },
+    levelText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      color: theme.colors.primary,
+    },
 
-  // Find Partner
-  findPartnerContainer: {
-    alignItems: "center",
-    marginBottom: theme.spacing.xl,
-    paddingHorizontal: theme.spacing.l,
-  },
-  pulseContainer: {
-    width: "100%",
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pulseRing: {
-    position: "absolute",
-    width: SCREEN_WIDTH - theme.spacing.l * 2,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    borderColor: theme.colors.primaryLight,
-  },
-  findButtonWrapper: {
-    width: "100%",
-    ...theme.shadows.primaryGlow,
-  },
-  findButton: {
-    flexDirection: "row",
-    width: "100%",
-    height: 64,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: theme.spacing.m,
-  },
-  findButtonText: {
-    color: "white",
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  callHintText: {
-    marginTop: 16,
-    color: theme.colors.text.secondary,
-    fontSize: theme.typography.sizes.s,
-  },
+    // Find Partner
+    findPartnerContainer: {
+      alignItems: "center",
+      marginBottom: theme.spacing.xl,
+      paddingHorizontal: theme.spacing.l,
+    },
+    pulseContainer: {
+      width: "100%",
+      height: 80,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pulseRing: {
+      position: "absolute",
+      width: SCREEN_WIDTH - theme.spacing.l * 2,
+      height: 64,
+      borderRadius: 32,
+      borderWidth: 2,
+      borderColor: theme.colors.primaryLight,
+    },
+    findButtonWrapper: {
+      width: "100%",
+      ...theme.shadows.primaryGlow,
+    },
+    findButton: {
+      flexDirection: "row",
+      width: "100%",
+      height: 64,
+      borderRadius: 32,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: theme.spacing.m,
+    },
+    findButtonText: {
+      color: "white",
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+    },
+    callHintText: {
+      marginTop: 16,
+      color: theme.colors.text.secondary,
+      fontSize: theme.typography.sizes.s,
+    },
 
-  // Topics
-  sectionTitle: {
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-    paddingHorizontal: theme.spacing.l,
-    marginBottom: theme.spacing.m,
-  },
-  topicsList: {
-    paddingHorizontal: theme.spacing.l,
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.xl,
-  },
-  topicChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: 10,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    gap: 6,
-    ...theme.shadows.small,
-  },
-  topicChipSelected: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary + "10",
-  },
-  topicIcon: {
-    fontSize: 16,
-  },
-  topicText: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "500",
-    color: theme.colors.text.secondary,
-  },
-  topicTextSelected: {
-    color: theme.colors.primary,
-    fontWeight: "600",
-  },
+    // Topics
+    sectionTitle: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.m,
+    },
+    topicsList: {
+      paddingHorizontal: theme.spacing.l,
+      gap: theme.spacing.s,
+      marginBottom: theme.spacing.xl,
+    },
+    topicChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: theme.spacing.m,
+      paddingVertical: 10,
+      borderRadius: theme.borderRadius.circle,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      gap: 6,
+      ...theme.shadows.small,
+    },
+    topicChipSelected: {
+      borderColor: theme.colors.primary,
+      backgroundColor: theme.colors.primary + "10",
+    },
+    topicIcon: {
+      fontSize: 16,
+    },
+    topicText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "500",
+      color: theme.colors.text.secondary,
+    },
+    topicTextSelected: {
+      color: theme.colors.primary,
+      fontWeight: "600",
+    },
 
-  // Recent Calls
-  callCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    marginHorizontal: theme.spacing.l,
-    marginBottom: theme.spacing.s,
-    padding: theme.spacing.m,
-    borderRadius: theme.borderRadius.l,
-    ...theme.shadows.small,
-  },
-  callCardAvatar: {
-    marginRight: theme.spacing.m,
-  },
-  avatarGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    color: "white",
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "bold",
-  },
-  callCardInfo: {
-    flex: 1,
-  },
-  callPartnerName: {
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "600",
-    color: theme.colors.text.primary,
-  },
-  callMeta: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    marginTop: 2,
-  },
-  scoreBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.circle,
-  },
-  scoreBadgeText: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-  },
+    // Recent Calls
+    callCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.surface,
+      marginHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+      padding: theme.spacing.m,
+      borderRadius: theme.borderRadius.l,
+      ...theme.shadows.small,
+    },
+    callCardAvatar: {
+      marginRight: theme.spacing.m,
+    },
+    avatarGradient: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarText: {
+      color: "white",
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "bold",
+    },
+    callCardInfo: {
+      flex: 1,
+    },
+    callPartnerName: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+    },
+    callMeta: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      marginTop: 2,
+    },
+    scoreBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: theme.borderRadius.circle,
+    },
+    scoreBadgeText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+    },
 
-  // Empty State
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: theme.spacing.xxl,
-    gap: theme.spacing.s,
-  },
-  emptyText: {
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "600",
-    color: theme.colors.text.primary,
-  },
-  emptySubtext: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.secondary,
-  },
-  retryTextButton: {
-    marginTop: theme.spacing.m,
-  },
-  retryText: {
-    color: theme.colors.primary,
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
-  cancelButton: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  cancelButtonText: {
-    color: theme.colors.text.secondary,
-    fontWeight: "600",
-    fontSize: theme.typography.sizes.s,
-  },
+    // Empty State
+    emptyState: {
+      alignItems: "center",
+      paddingVertical: theme.spacing.xxl,
+      gap: theme.spacing.s,
+    },
+    emptyText: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+    },
+    emptySubtext: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+    },
+    retryTextButton: {
+      marginTop: theme.spacing.m,
+    },
+    retryText: {
+      color: theme.colors.primary,
+      fontWeight: "600",
+      textDecorationLine: "underline",
+    },
+    cancelButton: {
+      marginTop: 20,
+      paddingHorizontal: 24,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    cancelButtonText: {
+      color: theme.colors.text.secondary,
+      fontWeight: "600",
+      fontSize: theme.typography.sizes.s,
+    },
 
-  // Mode Toggle
-  modeToggle: {
-    flexDirection: "row",
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.l,
-    padding: 4,
-    marginBottom: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  modeBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: theme.borderRadius.m,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  modeBtnActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  modeText: {
-    color: theme.colors.text.secondary,
-    fontWeight: "600",
-    fontSize: theme.typography.sizes.s,
-  },
-  modeTextActive: {
-    color: "white",
-  },
-  pulseContainerLocked: {
-    opacity: 0.8,
-  },
-  searchHint: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12,
-    marginTop: 4,
-  },
-});
+    // Mode Toggle
+    modeToggle: {
+      flexDirection: "row",
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.l,
+      padding: 4,
+      marginBottom: theme.spacing.xl,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    modeBtn: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: theme.borderRadius.m,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    modeBtnActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    modeText: {
+      color: theme.colors.text.secondary,
+      fontWeight: "600",
+      fontSize: theme.typography.sizes.s,
+    },
+    modeTextActive: {
+      color: "white",
+    },
+    pulseContainerLocked: {
+      opacity: 0.8,
+    },
+    searchHint: {
+      color: "rgba(255,255,255,0.8)",
+      fontSize: 12,
+      marginTop: 4,
+    },
+  });

@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { theme } from "../../theme/theme";
+import { useAppTheme } from "../../theme/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
@@ -19,7 +19,10 @@ interface Props {
 }
 
 export const BenchmarkCard: React.FC<Props> = ({ data }) => {
-  const isAboveAverage = data.currentScore >= data.peerGroup.average;
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const peerGroupAverage = data.peerGroup?.average || 0;
+  const isAboveAverage = data.currentScore >= peerGroupAverage;
 
   return (
     <View style={styles.container}>
@@ -40,8 +43,7 @@ export const BenchmarkCard: React.FC<Props> = ({ data }) => {
                 },
               ]}
             >
-              {isAboveAverage ? "+" : ""}
-              {data.currentScore - data.peerGroup.average}
+              {data.currentScore - peerGroupAverage}
             </Text>
             <MaterialCommunityIcons
               name={isAboveAverage ? "trending-up" : "trending-down"}
@@ -52,7 +54,7 @@ export const BenchmarkCard: React.FC<Props> = ({ data }) => {
             />
           </View>
           <Text style={styles.sublabel}>
-            Across {data.peerGroup.size} peers
+            Across {data.peerGroup?.size || 0} peers
           </Text>
         </View>
 
@@ -76,22 +78,28 @@ export const BenchmarkCard: React.FC<Props> = ({ data }) => {
             style={[styles.progressBarFill, { width: `${data.currentScore}%` }]}
           />
           {/* CEFR Markers */}
-          <View style={[styles.cefrMarker, { left: `${data.cefrRange.min}%` }]}>
-            <View style={styles.markerLine} />
-            <Text style={styles.markerLabel}>{data.cefr} Min</Text>
-          </View>
+          {data.cefrRange?.min !== undefined && (
+            <View
+              style={[styles.cefrMarker, { left: `${data.cefrRange.min}%` }]}
+            >
+              <View style={styles.markerLine} />
+              <Text style={styles.markerLabel}>{data.cefr} Min</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.sublabel}>
           Your performance is{" "}
-          {data.currentScore >= data.cefrRange.max ? "exceeding" : "within"} the
-          expected {data.cefr} band.
+          {data.currentScore >= (data.cefrRange?.max || 100)
+            ? "exceeding"
+            : "within"}{" "}
+          the expected {data.cefr} band.
         </Text>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.m,

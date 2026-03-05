@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface Milestone {
     id: string;
@@ -21,7 +21,9 @@ interface JourneyTimelineProps {
 }
 
 export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({ currentLevel, joinedDate, totalSessions }) => {
-    // Generate simple milestones based on props
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+// Generate simple milestones based on props
     const milestones: Milestone[] = [
         {
             id: '1',
@@ -114,7 +116,7 @@ export const JourneyTimeline: React.FC<JourneyTimelineProps> = ({ currentLevel, 
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         paddingHorizontal: theme.spacing.m,
         marginBottom: theme.spacing.xl,

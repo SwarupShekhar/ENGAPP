@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Keyboard, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignIn, useSignUp } from '@clerk/clerk-expo';
 
 export default function OTPScreen({ navigation, route }: any) {
-    const [otp, setOtp] = useState(['', '', '', '']);
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const [otp, setOtp] = useState(['', '', '', '']);
     const [timer, setTimer] = useState(30);
     const inputRefs = useRef<Array<TextInput | null>>([]);
 
@@ -149,7 +151,7 @@ export default function OTPScreen({ navigation, route }: any) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,

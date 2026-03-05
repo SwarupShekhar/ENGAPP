@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import { Ionicons } from '@expo/vector-icons';
 
 interface MiniStatsRowProps {
@@ -10,7 +10,9 @@ interface MiniStatsRowProps {
 }
 
 export function MiniStatsRow({ conversations, words, level }: MiniStatsRowProps) {
-    return (
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+return (
         <View style={styles.container}>
             <View style={styles.card}>
                 <Ionicons name="chatbubbles-outline" size={20} color={theme.colors.primary} style={styles.icon} />
@@ -31,7 +33,7 @@ export function MiniStatsRow({ conversations, words, level }: MiniStatsRowProps)
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         flexDirection: 'row',
         paddingHorizontal: theme.spacing.l,

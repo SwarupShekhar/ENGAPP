@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface Props {
     skillName: string;
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function WeakAreaCard({ skillName, score, onImprovePress }: Props) {
+  const theme = useAppTheme();
     return (
         <View style={styles.container}>
             <View style={styles.content}>

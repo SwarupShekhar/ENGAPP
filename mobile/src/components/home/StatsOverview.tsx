@@ -1,102 +1,124 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { GradientCard } from '../common/GradientCard';
-import { theme } from '../../theme/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { GradientCard } from "../common/GradientCard";
+import { useAppTheme } from "../../theme/useAppTheme";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { baseTheme } from "../../theme/base";
 
 interface StatsOverviewProps {
-    feedbackScore: number;
-    fluencyScore: number;
-    vocabScore: number;
+  feedbackScore: number;
+  fluencyScore: number;
+  vocabScore: number;
 }
 
 export const StatsOverview: React.FC<StatsOverviewProps> = ({
-    feedbackScore,
-    fluencyScore,
-    vocabScore,
+  feedbackScore,
+  fluencyScore,
+  vocabScore,
 }) => {
-    return (
-        <View style={styles.container}>
-            <Text style={styles.header}>Your Progress</Text>
-            <View style={styles.row}>
-                <GradientCard style={styles.mainCard} colors={theme.colors.gradients.primary}>
-                    <View style={styles.iconContainer}>
-                        <MaterialCommunityIcons name="trophy-outline" size={24} color={theme.colors.surface} />
-                    </View>
-                    <Text style={styles.scoreLarge}>{feedbackScore}</Text>
-                    <Text style={styles.labelLight}>Overall Score</Text>
-                </GradientCard>
+  const theme = useAppTheme();
 
-                <View style={styles.rightColumn}>
-                    <GradientCard style={styles.smallCard}>
-                        <Text style={styles.scoreSmall}>{fluencyScore}%</Text>
-                        <Text style={styles.labelDark}>Fluency</Text>
-                    </GradientCard>
-                    <GradientCard style={styles.smallCard}>
-                        <Text style={styles.scoreSmall}>{vocabScore}</Text>
-                        <Text style={styles.labelDark}>Vocab</Text>
-                    </GradientCard>
-                </View>
-            </View>
+  return (
+    <View style={styles.container}>
+      <Text style={[styles.header, { color: theme.colors.text.primary }]}>
+        Your Progress
+      </Text>
+      <View style={styles.row}>
+        <GradientCard
+          style={[styles.mainCard, theme.shadows.primaryGlow]}
+          colors={theme.colors.gradients.primary}
+        >
+          <View style={styles.iconContainer}>
+            <MaterialCommunityIcons
+              name="trophy-outline"
+              size={24}
+              color={theme.colors.surface}
+            />
+          </View>
+          <Text style={[styles.scoreLarge, { color: theme.colors.surface }]}>
+            {feedbackScore}
+          </Text>
+          <Text style={[styles.labelLight, { color: theme.colors.surface }]}>
+            Overall Score
+          </Text>
+        </GradientCard>
+
+        <View style={styles.rightColumn}>
+          <GradientCard style={styles.smallCard}>
+            <Text style={[styles.scoreSmall, { color: theme.colors.primary }]}>
+              {fluencyScore}%
+            </Text>
+            <Text
+              style={[styles.labelDark, { color: theme.colors.text.secondary }]}
+            >
+              Fluency
+            </Text>
+          </GradientCard>
+          <GradientCard style={styles.smallCard}>
+            <Text style={[styles.scoreSmall, { color: theme.colors.primary }]}>
+              {vocabScore}
+            </Text>
+            <Text
+              style={[styles.labelDark, { color: theme.colors.text.secondary }]}
+            >
+              Vocab
+            </Text>
+          </GradientCard>
         </View>
-    );
+      </View>
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        marginVertical: theme.spacing.m,
-    },
-    header: {
-        fontSize: theme.typography.sizes.l,
-        fontWeight: theme.typography.weights.bold as any,
-        color: theme.colors.text.primary,
-        marginBottom: theme.spacing.s,
-        paddingHorizontal: theme.spacing.m,
-    },
-    row: {
-        flexDirection: 'row',
-        paddingHorizontal: theme.spacing.m,
-        gap: theme.spacing.m,
-    },
-    mainCard: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 120,
-        ...theme.shadows.primaryGlow,
-    },
-    rightColumn: {
-        flex: 1,
-        gap: theme.spacing.m,
-    },
-    smallCard: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        flexDirection: 'row',
-        gap: theme.spacing.s,
-    },
-    iconContainer: {
-        marginBottom: theme.spacing.xs,
-        opacity: 0.9,
-    },
-    scoreLarge: {
-        fontSize: theme.typography.sizes.xxl,
-        fontWeight: theme.typography.weights.black as any,
-        color: theme.colors.surface,
-    },
-    labelLight: {
-        fontSize: theme.typography.sizes.s,
-        color: theme.colors.surface,
-        opacity: 0.8,
-    },
-    scoreSmall: {
-        fontSize: theme.typography.sizes.l,
-        fontWeight: theme.typography.weights.bold as any,
-        color: theme.colors.primary,
-    },
-    labelDark: {
-        fontSize: theme.typography.sizes.s,
-        color: theme.colors.text.secondary,
-    },
+  container: {
+    marginVertical: baseTheme.spacing.m,
+  },
+  header: {
+    fontSize: baseTheme.typography.sizes.l,
+    fontWeight: baseTheme.typography.weights.bold as any,
+    marginBottom: baseTheme.spacing.s,
+    paddingHorizontal: baseTheme.spacing.m,
+  },
+  row: {
+    flexDirection: "row",
+    paddingHorizontal: baseTheme.spacing.m,
+    gap: baseTheme.spacing.m,
+  },
+  mainCard: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 120,
+  },
+  rightColumn: {
+    flex: 1,
+    gap: baseTheme.spacing.m,
+  },
+  smallCard: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    gap: baseTheme.spacing.s,
+  },
+  iconContainer: {
+    marginBottom: baseTheme.spacing.xs,
+    opacity: 0.9,
+  },
+  scoreLarge: {
+    fontSize: baseTheme.typography.sizes.xxl,
+    fontWeight: baseTheme.typography.weights.black as any,
+  },
+  labelLight: {
+    fontSize: baseTheme.typography.sizes.s,
+    opacity: 0.8,
+  },
+  scoreSmall: {
+    fontSize: baseTheme.typography.sizes.l,
+    fontWeight: baseTheme.typography.weights.bold as any,
+  },
+  labelDark: {
+    fontSize: baseTheme.typography.sizes.s,
+  },
 });

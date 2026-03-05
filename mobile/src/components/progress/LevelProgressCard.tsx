@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface LevelProgressCardProps {
     currentLevel: string;
@@ -11,7 +11,9 @@ interface LevelProgressCardProps {
 }
 
 export function LevelProgressCard({ currentLevel, nextLevel, progress, pointsToNext }: LevelProgressCardProps) {
-    return (
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+return (
         <View style={styles.card}>
             <LinearGradient
                 colors={theme.colors.gradients.primary}
@@ -41,7 +43,7 @@ export function LevelProgressCard({ currentLevel, nextLevel, progress, pointsToN
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     card: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,

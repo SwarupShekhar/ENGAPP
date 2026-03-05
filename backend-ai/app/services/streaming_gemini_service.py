@@ -14,7 +14,7 @@ class StreamingGeminiService:
             logger.error("GOOGLE_API_KEY not found in settings")
         
         genai.configure(api_key=settings.google_api_key)
-        self.model_name = 'gemini-2.0-flash'
+        self.model_name = 'gemini-2.5-flash'
         self.model = genai.GenerativeModel(self.model_name)
     
     async def stream_response(
@@ -104,7 +104,7 @@ class StreamingGeminiService:
                     continue
                 
                 logger.error(f"Gemini stream failed: {e}")
-                yield "Arre, Maya ka dimaag thoda garam ho gaya! Ek second ruko, main abhi theek karke aati hoon. Phir se bolo?"
+                yield "I'm having a little trouble connecting right now. Could you please say that again in a moment?"
                 return
         
         if buffer.strip():

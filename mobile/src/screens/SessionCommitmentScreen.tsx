@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // import { sessionsApi } from '../api/sessions';
@@ -24,7 +24,9 @@ interface RouteParams {
 }
 
 export default function SessionCommitmentScreen() {
-  const navigation = useNavigation<any>();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const navigation = useNavigation<any>();
   const route = useRoute();
   const { sessionId, structure, partnerName } = route.params as RouteParams;
   const [agreedToObjectives, setAgreedToObjectives] = useState(false);
@@ -117,7 +119,7 @@ export default function SessionCommitmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   content: { padding: 20, paddingTop: 60 },
   title: {

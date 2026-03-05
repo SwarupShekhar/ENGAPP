@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../theme/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { useAppTheme } from "../../theme/useAppTheme";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface Props {
   data: {
@@ -17,26 +17,34 @@ interface Props {
 }
 
 export const ReadinessCard: React.FC<Props> = ({ data }) => {
-  return (
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+return (
     <View style={styles.container}>
       <Text style={styles.title}>Real-World Readiness</Text>
-      
+
       {/* Target Alignment */}
       <View style={styles.alignmentBox}>
         <View style={styles.alignmentHeader}>
-          <MaterialCommunityIcons name="briefcase-check" size={20} color={theme.colors.primary} />
+          <MaterialCommunityIcons
+            name="briefcase-check"
+            size={20}
+            color={theme.colors.primary}
+          />
           <Text style={styles.alignmentTitle}>Engineering Role Target</Text>
         </View>
         <View style={styles.alignmentStats}>
           <View>
             <Text style={styles.label}>Current State</Text>
-            <Text style={styles.statsValue}>{data.careerGoalAlignment.current}</Text>
+            <Text style={styles.statsValue}>
+              {data.careerGoalAlignment?.current || "A1"}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View>
             <Text style={styles.label}>Roadmap</Text>
             <Text style={[styles.statsValue, { color: theme.colors.primary }]}>
-              {data.careerGoalAlignment.estimatedTimeToTarget}
+              {data.careerGoalAlignment?.estimatedTimeToTarget || "3-6 months"}
             </Text>
           </View>
         </View>
@@ -47,7 +55,11 @@ export const ReadinessCard: React.FC<Props> = ({ data }) => {
         <Text style={styles.sectionTitle}>Global Capabilities</Text>
         {data.canDo.slice(0, 3).map((ability, idx) => (
           <View key={idx} style={styles.checkRow}>
-            <MaterialCommunityIcons name="check-circle" size={16} color={theme.colors.success} />
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={16}
+              color={theme.colors.success}
+            />
             <Text style={styles.abilityText}>{ability}</Text>
           </View>
         ))}
@@ -58,7 +70,11 @@ export const ReadinessCard: React.FC<Props> = ({ data }) => {
         <Text style={styles.sectionTitle}>High-Stress Constraints</Text>
         {data.mayStruggleWith.map((struggle, idx) => (
           <View key={idx} style={styles.struggleRow}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={theme.colors.warning} />
+            <MaterialCommunityIcons
+              name="alert-circle-outline"
+              size={16}
+              color={theme.colors.warning}
+            />
             <Text style={styles.struggleText}>{struggle}</Text>
           </View>
         ))}
@@ -67,19 +83,19 @@ export const ReadinessCard: React.FC<Props> = ({ data }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.m,
     padding: theme.spacing.m,
     marginVertical: theme.spacing.s,
     borderWidth: 1,
-    borderColor: theme.colors.primary + '20',
+    borderColor: theme.colors.primary + "20",
     ...theme.shadows.small,
   },
   title: {
     fontSize: theme.typography.sizes.m,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.m,
   },
@@ -89,38 +105,38 @@ const styles = StyleSheet.create({
     padding: theme.spacing.m,
     marginBottom: theme.spacing.l,
     borderWidth: 1,
-    borderColor: theme.colors.border + '10',
+    borderColor: theme.colors.border + "10",
   },
   alignmentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: theme.spacing.s,
   },
   alignmentTitle: {
     fontSize: theme.typography.sizes.s,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text.primary,
   },
   alignmentStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: theme.spacing.s,
   },
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: theme.colors.border + '20',
+    backgroundColor: theme.colors.border + "20",
   },
   label: {
     fontSize: 10,
     color: theme.colors.text.light,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   statsValue: {
     fontSize: theme.typography.sizes.s,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text.primary,
   },
   section: {
@@ -128,14 +144,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: theme.typography.sizes.xs,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text.secondary,
     marginBottom: theme.spacing.s,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: 6,
   },
@@ -144,8 +160,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
   },
   struggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginBottom: 6,
   },

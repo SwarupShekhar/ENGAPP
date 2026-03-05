@@ -1,19 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { ClerkProvider, SignedIn, SignedOut, useAuth, useUser } from "@clerk/clerk-expo";
+import {
+  ClerkProvider,
+  SignedIn,
+  SignedOut,
+  useAuth,
+  useUser,
+} from "@clerk/clerk-expo";
 import RootNavigator from "./navigation/RootNavigator";
 import { navigationRef, navigate } from "./navigation/navigationRef";
 import AuthNavigator from "./navigation/AuthNavigator";
 import { StatusBar } from "expo-status-bar";
 import { tokenCache } from "./utils/tokenCache";
 import { setAuthTokenFetcher } from "./api/client";
-import { View, ActivityIndicator, StyleSheet, AppState, Alert } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  StyleSheet,
+  AppState,
+  Alert,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SocketService from "./services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
+import { ThemeProvider } from "./theme/ThemeProvider";
 
 // Ideally this should be in an .env file, but for now hardcoding as retrieved
-const CLERK_PUBLISHABLE_KEY = "pk_test_ZGVzdGluZWQtc3VuZmlzaC03OS5jbGVyay5hY2NvdW50cy5kZXYk";
+const CLERK_PUBLISHABLE_KEY =
+  "pk_test_ZGVzdGluZWQtc3VuZmlzaC03OS5jbGVyay5hY2NvdW50cy5kZXYk";
 
 function AuthTokenInjector({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
@@ -48,16 +62,16 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
 
     connectSocket();
 
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState === 'active' && isSignedIn) {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active" && isSignedIn) {
         connectSocket();
       }
     });
 
     // Incoming Call Listener
-    const handleIncomingCall = (data: { 
-      initiatorName: string; 
-      sessionId: string; 
+    const handleIncomingCall = (data: {
+      initiatorName: string;
+      sessionId: string;
       callType: string;
       conversationId: string;
     }) => {
@@ -66,52 +80,55 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
         "Incoming Call",
         `${data.initiatorName} is calling you...`,
         [
-          { 
-            text: "Decline", 
+          {
+            text: "Decline",
             style: "cancel",
             onPress: () => {
-                console.log("[App] Declining call:", data.conversationId);
-                socketService.declineCall(data.conversationId);
-            }
+              console.log("[App] Declining call:", data.conversationId);
+              socketService.declineCall(data.conversationId);
+            },
           },
-          { 
-            text: "Accept", 
+          {
+            text: "Accept",
             onPress: () => {
               console.log("[App] Accepting call:", data.conversationId);
               socketService.acceptCall(data.conversationId, (res: any) => {
                 console.log("[App] Call accepted, response:", res);
                 const realId = res?.sessionId || data.sessionId;
-                navigate('InCall', { 
-                  sessionId: realId, 
+                navigate("InCall", {
+                  sessionId: realId,
                   partnerName: data.initiatorName,
                   isDirect: true,
-                  conversationId: data.conversationId
+                  conversationId: data.conversationId,
                 });
               });
-            }
-          }
+            },
+          },
         ],
-        { cancelable: false }
+        { cancelable: false },
       );
     };
 
     socketService.onIncomingCall(handleIncomingCall);
 
     // Friend Request Listener
-    const handleFriendRequest = (data: { senderName: string; requestId: string }) => {
+    const handleFriendRequest = (data: {
+      senderName: string;
+      requestId: string;
+    }) => {
       console.log("[App] Friend request received:", data);
       Alert.alert(
         "New Friend Request",
         `${data.senderName} sent you a friend request!`,
         [
           { text: "View Later", style: "cancel" },
-          { 
-            text: "View Now", 
+          {
+            text: "View Now",
             onPress: () => {
-              navigate('Notifications');
-            }
-          }
-        ]
+              navigate("Notifications");
+            },
+          },
+        ],
       );
     };
 
@@ -143,7 +160,8 @@ function OnboardingGate() {
     if (!isLoaded || !user) return;
 
     const hasProfile = !!(user.unsafeMetadata as any)?.profileCompleted;
-    const hasCompletedAssessment = !!(user.unsafeMetadata as any)?.assessmentCompleted;
+    const hasCompletedAssessment = !!(user.unsafeMetadata as any)
+      ?.assessmentCompleted;
 
     if (!hasProfile) {
       setInitialRoute("CreateProfile");
@@ -171,19 +189,24 @@ function OnboardingGate() {
 
 export default function App() {
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+    <ClerkProvider
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      tokenCache={tokenCache}
+    >
       <AuthTokenInjector>
         <AppSocketHandler>
           <SafeAreaProvider>
-            <NavigationContainer ref={navigationRef}>
-              <StatusBar style="auto" />
-              <SignedIn>
-                <OnboardingGate />
-              </SignedIn>
-              <SignedOut>
-                <AuthNavigator onLoginSuccess={() => { }} />
-              </SignedOut>
-            </NavigationContainer>
+            <ThemeProvider>
+              <NavigationContainer ref={navigationRef}>
+                <StatusBar style="auto" />
+                <SignedIn>
+                  <OnboardingGate />
+                </SignedIn>
+                <SignedOut>
+                  <AuthNavigator onLoginSuccess={() => {}} />
+                </SignedOut>
+              </NavigationContainer>
+            </ThemeProvider>
           </SafeAreaProvider>
         </AppSocketHandler>
       </AuthTokenInjector>
@@ -194,8 +217,8 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F6FA',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F6FA",
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -34,11 +34,15 @@ import {
 import { Track, RoomEvent } from "livekit-client";
 import { io, Socket } from "socket.io-client";
 import SocketService from "../services/socketService";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 import { livekitApi } from "../api/livekit";
 import { sessionsApi } from "../api/sessions";
 import { API_URL } from "../api/client";
 import { Buffer } from "buffer";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // In a real app, these would come from environment variables
@@ -52,6 +56,8 @@ function DataListener({
   onTranscription: (data: any) => void;
   onEndSession: () => void;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const room = useRoomContext();
 
   useEffect(() => {
@@ -63,9 +69,19 @@ function DataListener({
         if (data.type === "end_session") {
           console.log("[LiveKit] Received end_session signal");
           onEndSession();
+        } else if (data.type === "transcription") {
+          console.log(
+            `[LiveKit] Received remote transcription from ${data.userId}: ${data.text}`,
+          );
+          onTranscription({
+            userId: data.userId,
+            text: data.text,
+          });
+        } else {
+          console.log("[LiveKit] Received data packet:", data);
         }
       } catch (e) {
-        // Ignore parse errors (might be raw binary data)
+        // Ignore parse errors (might be raw binary data or malformed JSON)
       }
     };
 
@@ -108,6 +124,8 @@ function RoomHandler({ onRoomReady }: { onRoomReady: (room: any) => void }) {
 
 // ─── Audio Conference Component ────────────────────────────
 function AudioConference() {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const tracks = useTracks([Track.Source.Microphone]);
   return (
     <View style={{ display: "none" }}>
@@ -127,6 +145,8 @@ function TranscriptionStatus({
 }: {
   status: "idle" | "active" | "error" | "unavailable";
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.transcriptionStatus}>
       <View
@@ -162,6 +182,8 @@ function TranscriptBubble({
   index: number;
   isPartnerBot?: boolean;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const isUser = item.speaker === "user";
   return (
     <Animated.View
@@ -235,6 +257,8 @@ function ControlButton({
   active?: boolean;
   secondary?: boolean;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const iconColor =
     secondary && !active && !danger ? theme.colors.text.primary : "white";
   return (
@@ -260,6 +284,8 @@ function ControlButton({
 
 // ─── Main Component ───────────────────────────────────────
 export default function InCallScreen({ navigation, route }: any) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const { user } = useUser();
   const [token, setToken] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
@@ -279,17 +305,124 @@ export default function InCallScreen({ navigation, route }: any) {
   const topic = route?.params?.topic || "General Practice";
   const isDirect = route?.params?.isDirect;
   const isCaller = route?.params?.isCaller ?? false;
-  const conversationId = route?.params?.conversationId || sessionId;
-
-  const [transcriptionStatus, setTranscriptionStatus] = useState<
-    "idle" | "active" | "error" | "unavailable"
-  >("idle");
+  // Use route param directly for stability, or keep the initial sessionId
+  const conversationId = useRef(
+    route?.params?.conversationId || route?.params?.sessionId,
+  ).current;
 
   // Only the caller waits. The receiver has already accepted.
   const [isWaiting, setIsWaiting] = useState(isDirect && isCaller);
   const [callStatus, setCallStatus] = useState<
     "calling" | "connected" | "declined"
   >("calling");
+
+  const [transcriptionStatus, setTranscriptionStatus] = useState<
+    "idle" | "active" | "error" | "unavailable"
+  >("idle");
+  const localSttActiveRef = useRef(false);
+  const hasLiveKitSttRef = useRef(false);
+
+  // ─── On-device Speech Recognition (fallback when LiveKit STT is unavailable) ────
+  useSpeechRecognitionEvent("start", () => {
+    console.log("[LocalSTT] Speech recognition started");
+    localSttActiveRef.current = true;
+    if (!hasLiveKitSttRef.current) {
+      setTranscriptionStatus("active");
+    }
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    console.log("[LocalSTT] Speech recognition ended, restarting...");
+    localSttActiveRef.current = false;
+    // Auto-restart continuous recognition (iOS stops after silence)
+    if (!hasEndedRef.current && token && !isWaiting) {
+      setTimeout(() => {
+        if (!hasEndedRef.current) {
+          try {
+            ExpoSpeechRecognitionModule.start({
+              lang: "en-US",
+              interimResults: false,
+              continuous: true,
+              addsPunctuation: true,
+              iosCategory: {
+                category: "playAndRecord",
+                categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
+                mode: "voiceChat",
+              },
+            });
+          } catch (e) {
+            console.warn("[LocalSTT] Restart failed:", e);
+          }
+        }
+      }, 300);
+    }
+  });
+
+  useSpeechRecognitionEvent("result", (event) => {
+    if (event.isFinal && event.results?.[0]?.transcript) {
+      const text = event.results[0].transcript.trim();
+      if (text.length > 0) {
+        console.log(`[LocalSTT] Final result: "${text}"`);
+        setTranscript((prev) => [
+          ...prev,
+          {
+            id: `local-${Date.now()}`,
+            speaker: "user",
+            text,
+            time: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+        ]);
+      }
+    }
+  });
+
+  useSpeechRecognitionEvent("error", (event) => {
+    console.warn(`[LocalSTT] Error: ${event.error} - ${event.message}`);
+    // Don't set error status if LiveKit STT is working
+    if (!hasLiveKitSttRef.current) {
+      setTranscriptionStatus("error");
+    }
+  });
+
+  // Start local speech recognition when call connects
+  useEffect(() => {
+    if (!token || isWaiting || hasEndedRef.current) return;
+
+    const startLocalSTT = async () => {
+      try {
+        const perms =
+          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!perms.granted) {
+          console.warn("[LocalSTT] Permissions not granted");
+          setTranscriptionStatus("unavailable");
+          return;
+        }
+
+        console.log("[LocalSTT] Starting on-device speech recognition...");
+        ExpoSpeechRecognitionModule.start({
+          lang: "en-US",
+          interimResults: false,
+          continuous: true,
+          addsPunctuation: true,
+          iosCategory: {
+            category: "playAndRecord",
+            categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
+            mode: "voiceChat",
+          },
+        });
+      } catch (e) {
+        console.error("[LocalSTT] Failed to start:", e);
+        setTranscriptionStatus("unavailable");
+      }
+    };
+
+    // Small delay to let LiveKit audio session settle first
+    const timer = setTimeout(startLocalSTT, 2000);
+    return () => clearTimeout(timer);
+  }, [token, isWaiting]);
 
   const pulseScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(0.15);
@@ -349,10 +482,15 @@ export default function InCallScreen({ navigation, route }: any) {
       if (isWaiting) return;
 
       try {
-        // For direct calls, we prefix the room name to avoid matchmaking collisions
-        const roomSessionId = route.params?.isDirect
-          ? `direct_${sessionId}`
-          : sessionId;
+        // Matchmaking provides a roomName. Direct calls use direct_ prefix.
+        const roomSessionId =
+          route.params?.roomName ||
+          (route.params?.isDirect ? `direct_${sessionId}` : sessionId);
+
+        console.log(
+          `[InCall] Connecting to LiveKit room: ${roomSessionId} (sessionId: ${sessionId})`,
+        );
+
         const res = await livekitApi.getToken(user.id, roomSessionId);
         setToken(res.token);
       } catch (error) {
@@ -413,6 +551,13 @@ export default function InCallScreen({ navigation, route }: any) {
     if (hasEndedRef.current) return;
     hasEndedRef.current = true;
 
+    // Stop local speech recognition
+    try {
+      ExpoSpeechRecognitionModule.abort();
+    } catch (e) {
+      // ignore
+    }
+
     console.log(
       `[InCall] Ending session: ${sessionId} (remote: ${remoteTriggered})`,
     );
@@ -429,11 +574,14 @@ export default function InCallScreen({ navigation, route }: any) {
       }
 
       if (sessionId && sessionId !== "session-id") {
-        // Collect all user transcript text to help backend short-circuit if empty
+        // Collect full transcript history with speaker labels for AI analysis
         const fullTranscriptText = transcript
-          .filter((t) => t.speaker === "user")
-          .map((t) => t.text)
-          .join(" ");
+          .map((t) => `${t.speaker === "user" ? "User" : "Partner"}: ${t.text}`)
+          .join("\n");
+
+        console.log(
+          `[InCall] Submitting final transcript length: ${fullTranscriptText.length}`,
+        );
 
         // We only call the end API if we are the initiator, or if we want to be safe
         // In a P2P scenario, both calling is fine for idempotency
@@ -511,6 +659,7 @@ export default function InCallScreen({ navigation, route }: any) {
         />
         <DataListener
           onTranscription={(data) => {
+            hasLiveKitSttRef.current = true;
             setTranscriptionStatus("active");
             setTranscript((prev) => [
               ...prev,
@@ -669,312 +818,313 @@ export default function InCallScreen({ navigation, route }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  background: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: theme.spacing.m,
-  },
-  headerGlass: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.colors.border + "20",
-    ...theme.shadows.small,
-  },
-  topicPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  topicText: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  waitingOverlay: {
-    marginTop: 40,
-    alignItems: "center",
-    gap: 12,
-  },
-  waitingText: {
-    color: theme.colors.text.secondary,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  partnerSection: {
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  avatarGlowContainer: {
-    position: "relative",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  avatarPulse: {
-    position: "absolute",
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: theme.colors.primary,
-    opacity: 0.15,
-  },
-  partnerAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "white",
-    ...theme.shadows.medium,
-  },
-  partnerInitial: {
-    color: "white",
-    fontSize: 32,
-    fontWeight: "bold",
-  },
-  partnerName: {
-    color: theme.colors.text.primary,
-    fontSize: 22,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-  },
-  statusText: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  timerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: theme.colors.primary + "15",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 6,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.success,
-  },
-  timerText: {
-    color: theme.colors.primary,
-    fontSize: 12,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  transcriptContainer: {
-    flex: 1,
-    marginHorizontal: 16,
-    marginBottom: 100, // Room for dock
-    borderRadius: 24,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border + "20",
-    overflow: "hidden",
-    ...theme.shadows.small,
-  },
-  transcriptHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border + "15",
-    gap: 10,
-  },
-  transcriptIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-  },
-  transcriptLabel: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "700",
-    flex: 1,
-  },
-  activeLabel: {
-    backgroundColor: theme.colors.primary + "20",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  activeLabelText: {
-    color: theme.colors.primary,
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  transcriptScroll: {
-    flex: 1,
-  },
-  transcriptContent: {
-    padding: 16,
-    gap: 12,
-  },
-  bubbleRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-  },
-  bubbleRowLeft: {
-    justifyContent: "flex-start",
-  },
-  bubbleRowRight: {
-    justifyContent: "flex-end",
-  },
-  miniAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  miniAvatarText: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "white",
-  },
-  bubble: {
-    maxWidth: SCREEN_WIDTH * 0.65,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-  },
-  bubbleUser: {
-    backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: 4,
-    ...theme.shadows.primaryGlow,
-  },
-  bubblePartner: {
-    backgroundColor: "white",
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: theme.colors.border + "20",
-  },
-  bubbleText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  bubbleTextUser: {
-    color: "white",
-    fontWeight: "500",
-  },
-  bubbleTextPartner: {
-    color: theme.colors.text.primary,
-  },
-  bubbleTime: {
-    fontSize: 9,
-    color: theme.colors.text.light,
-    textAlign: "right",
-    marginTop: 4,
-  },
-  controlsWrapper: {
-    position: "absolute",
-    bottom: 30,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-  controlsDock: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 35,
-    borderWidth: 1,
-    borderColor: theme.colors.border + "20",
-    gap: 15,
-    ...theme.shadows.large,
-  },
-  controlDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: theme.colors.border + "20",
-    marginHorizontal: 5,
-  },
-  controlButton: {
-    alignItems: "center",
-    minWidth: 50,
-  },
-  controlIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  controlIconSecondary: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border + "15",
-  },
-  controlIconDanger: {
-    backgroundColor: theme.colors.error,
-  },
-  controlIconActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  controlLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  transcriptionStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  statusDotIdle: {
-    backgroundColor: "#94a3b8",
-  },
-  statusDotActive: {
-    backgroundColor: "#10b981",
-  },
-  statusDotError: {
-    backgroundColor: "#ef4444",
-  },
-  statusTextMini: {
-    fontSize: 10,
-    color: "#64748b",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-});
+const getStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    background: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    header: {
+      alignItems: "center",
+      paddingVertical: 12,
+      paddingHorizontal: theme.spacing.m,
+    },
+    headerGlass: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: "100%",
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.border + "20",
+      ...theme.shadows.small,
+    },
+    topicPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    topicText: {
+      color: theme.colors.text.primary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    waitingOverlay: {
+      marginTop: 40,
+      alignItems: "center",
+      gap: 12,
+    },
+    waitingText: {
+      color: theme.colors.text.secondary,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+    partnerSection: {
+      alignItems: "center",
+      paddingVertical: 20,
+    },
+    avatarGlowContainer: {
+      position: "relative",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    avatarPulse: {
+      position: "absolute",
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: theme.colors.primary,
+      opacity: 0.15,
+    },
+    partnerAvatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "white",
+      ...theme.shadows.medium,
+    },
+    partnerInitial: {
+      color: "white",
+      fontSize: 32,
+      fontWeight: "bold",
+    },
+    partnerName: {
+      color: theme.colors.text.primary,
+      fontSize: 22,
+      fontWeight: "bold",
+      letterSpacing: 0.5,
+    },
+    statusText: {
+      color: theme.colors.text.secondary,
+      fontSize: 12,
+      fontWeight: "600",
+      marginTop: 4,
+    },
+    timerContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.primary + "15",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 6,
+    },
+    liveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.colors.success,
+    },
+    timerText: {
+      color: theme.colors.primary,
+      fontSize: 12,
+      fontWeight: "700",
+      fontVariant: ["tabular-nums"],
+    },
+    transcriptContainer: {
+      flex: 1,
+      marginHorizontal: 16,
+      marginBottom: 100, // Room for dock
+      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border + "20",
+      overflow: "hidden",
+      ...theme.shadows.small,
+    },
+    transcriptHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border + "15",
+      gap: 10,
+    },
+    transcriptIndicator: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: theme.colors.primary,
+    },
+    transcriptLabel: {
+      color: theme.colors.text.primary,
+      fontSize: 14,
+      fontWeight: "700",
+      flex: 1,
+    },
+    activeLabel: {
+      backgroundColor: theme.colors.primary + "20",
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    activeLabelText: {
+      color: theme.colors.primary,
+      fontSize: 10,
+      fontWeight: "800",
+    },
+    transcriptScroll: {
+      flex: 1,
+    },
+    transcriptContent: {
+      padding: 16,
+      gap: 12,
+    },
+    bubbleRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 8,
+    },
+    bubbleRowLeft: {
+      justifyContent: "flex-start",
+    },
+    bubbleRowRight: {
+      justifyContent: "flex-end",
+    },
+    miniAvatar: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    miniAvatarText: {
+      fontSize: 10,
+      fontWeight: "bold",
+      color: "white",
+    },
+    bubble: {
+      maxWidth: SCREEN_WIDTH * 0.65,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 18,
+    },
+    bubbleUser: {
+      backgroundColor: theme.colors.primary,
+      borderBottomRightRadius: 4,
+      ...theme.shadows.primaryGlow,
+    },
+    bubblePartner: {
+      backgroundColor: "white",
+      borderBottomLeftRadius: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.border + "20",
+    },
+    bubbleText: {
+      fontSize: 15,
+      lineHeight: 20,
+    },
+    bubbleTextUser: {
+      color: "white",
+      fontWeight: "500",
+    },
+    bubbleTextPartner: {
+      color: theme.colors.text.primary,
+    },
+    bubbleTime: {
+      fontSize: 9,
+      color: theme.colors.text.light,
+      textAlign: "right",
+      marginTop: 4,
+    },
+    controlsWrapper: {
+      position: "absolute",
+      bottom: 30,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingHorizontal: 20,
+    },
+    controlsDock: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "white",
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 35,
+      borderWidth: 1,
+      borderColor: theme.colors.border + "20",
+      gap: 15,
+      ...theme.shadows.large,
+    },
+    controlDivider: {
+      width: 1,
+      height: 30,
+      backgroundColor: theme.colors.border + "20",
+      marginHorizontal: 5,
+    },
+    controlButton: {
+      alignItems: "center",
+      minWidth: 50,
+    },
+    controlIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    controlIconSecondary: {
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border + "15",
+    },
+    controlIconDanger: {
+      backgroundColor: theme.colors.error,
+    },
+    controlIconActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    controlLabel: {
+      color: theme.colors.text.secondary,
+      fontSize: 10,
+      fontWeight: "600",
+    },
+    transcriptionStatus: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 2,
+    },
+    statusDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginRight: 6,
+    },
+    statusDotIdle: {
+      backgroundColor: "#94a3b8",
+    },
+    statusDotActive: {
+      backgroundColor: "#10b981",
+    },
+    statusDotError: {
+      backgroundColor: "#ef4444",
+    },
+    statusTextMini: {
+      fontSize: 10,
+      color: "#64748b",
+      fontWeight: "600",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+  });

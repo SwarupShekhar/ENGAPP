@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -12,7 +12,9 @@ interface StreaksAndGoalsProps {
 }
 
 export function StreaksAndGoals({ currentStreak, longestStreak, sessionsCompleted, weeklyGoal }: StreaksAndGoalsProps) {
-    const goalProgress = Math.min(1, sessionsCompleted / Math.max(1, weeklyGoal));
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const goalProgress = Math.min(1, sessionsCompleted / Math.max(1, weeklyGoal));
 
     return (
         <View style={styles.container}>
@@ -43,7 +45,7 @@ export function StreaksAndGoals({ currentStreak, longestStreak, sessionsComplete
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.xl,

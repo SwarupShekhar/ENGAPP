@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import { Ionicons } from '@expo/vector-icons';
 
 interface DetailedStatsGridProps {
@@ -11,7 +11,9 @@ interface DetailedStatsGridProps {
 }
 
 export function DetailedStatsGrid({ grammar, pronunciation, fluency, vocabulary }: DetailedStatsGridProps) {
-    const renderStatItem = (label: string, value: number, icon: any, color: string) => (
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const renderStatItem = (label: string, value: number, icon: any, color: string) => (
         <View style={styles.statItem}>
             <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
                 <Ionicons name={icon} size={20} color={color} />
@@ -39,7 +41,7 @@ export function DetailedStatsGrid({ grammar, pronunciation, fluency, vocabulary 
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,

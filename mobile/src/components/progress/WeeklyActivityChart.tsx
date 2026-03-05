@@ -1,13 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface WeeklyActivityChartProps {
     data: { day: string; score: number }[];
 }
 
 export function WeeklyActivityChart({ data }: WeeklyActivityChartProps) {
-    const maxScore = 100; // Assuming scores are 0-100
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const maxScore = 100; // Assuming scores are 0-100
 
     return (
         <View style={styles.container}>
@@ -34,7 +36,7 @@ export function WeeklyActivityChart({ data }: WeeklyActivityChartProps) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,

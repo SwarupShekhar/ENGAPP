@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface CallOptionCardProps {
     title: string;
@@ -11,7 +11,9 @@ interface CallOptionCardProps {
 }
 
 export function CallOptionCard({ title, subtitle, type, onPress }: CallOptionCardProps) {
-    const iconName = type === '1on1' ? 'person' : 'people';
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const iconName = type === '1on1' ? 'person' : 'people';
     const color = type === '1on1' ? theme.colors.primary : theme.colors.secondary;
 
     return (
@@ -34,7 +36,7 @@ export function CallOptionCard({ title, subtitle, type, onPress }: CallOptionCar
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     card: {
         flexDirection: 'row',
         alignItems: 'center',

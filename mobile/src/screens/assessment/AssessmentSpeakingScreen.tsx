@@ -8,11 +8,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { assessmentApi } from '../../api/assessment';
 import { API_URL } from '../../api/client';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function AssessmentSpeakingScreen({ navigation, route }: any) {
-    const { user } = useUser();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const { user } = useUser();
     const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
     const insets = useSafeAreaInsets();
     const [phase, setPhase] = useState('PHASE_1');
@@ -260,7 +262,7 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.7)',

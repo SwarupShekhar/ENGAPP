@@ -13,11 +13,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { theme } from "../../theme/theme";
+import { useAppTheme } from "../../theme/useAppTheme";
 import { useAuth } from "@clerk/clerk-expo";
 
 export default function AssessmentIntroScreen({ navigation }: any) {
-  const { signOut } = useAuth();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const { signOut } = useAuth();
   const insets = useSafeAreaInsets();
 
   const handleSignOut = () => {
@@ -134,6 +136,8 @@ export default function AssessmentIntroScreen({ navigation }: any) {
 }
 
 function StepItem({ icon, title, description, delay }: any) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   return (
     <Animated.View
       entering={FadeInDown.delay(delay).springify()}
@@ -150,7 +154,7 @@ function StepItem({ icon, title, description, delay }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

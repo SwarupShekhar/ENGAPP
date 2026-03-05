@@ -1,471 +1,551 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from "react";
 import {
-    View, Text, StyleSheet, ScrollView, StatusBar, Dimensions,
-    TouchableOpacity, LayoutAnimation, Animated as RNAnimated, Platform, UIManager
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useUser } from '@clerk/clerk-expo';
-import Svg, { Circle, Polygon, Line, Text as SvgText, Polyline } from 'react-native-svg';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+  View,
+  ScrollView,
+  Text,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+  StatusBar,
+  TouchableOpacity,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { useTheme } from "../theme/ThemeProvider";
+import { MetricCard } from "../components/progress/MetricCard";
+import { ProgressRing } from "../components/progress/ProgressRing";
+import { TrendIndicator } from "../components/progress/TrendIndicator";
+import { MiniChart } from "../components/progress/MiniChart";
+import { Ionicons } from "@expo/vector-icons";
+import { client } from "../api/client";
+import { useNavigation } from "@react-navigation/native";
 
-import { sessionsApi, ConversationSession } from '../api/sessions';
-import { userApi, UserStats } from '../api/user';
-import { reliabilityApi } from '../api/reliability';
-
-// New Growth Components
-import ProfileHeader from '../components/growth/ProfileHeader';
-import SkillSummary from '../components/growth/SkillSummary';
-import WeakAreaCard from '../components/growth/WeakAreaCard';
-import RecentActivityAccordion from '../components/growth/RecentActivityAccordion';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 40;
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
+interface ProgressMetrics {
+  current: {
+    pronunciation: number;
+    fluency: number;
+    grammar: number;
+    vocabulary: number;
+    comprehension: number;
+    overallScore: number;
+    cefrLevel: string;
+  };
+  deltas: {
+    pronunciation: number;
+    fluency: number;
+    grammar: number;
+    vocabulary: number;
+    comprehension: number;
+    overallScore: number;
+  };
+  weeklyActivity: number[];
+  weaknesses: Array<{
+    skill: string;
+    severity: "HIGH" | "MEDIUM";
+    recommendation: string;
+  }>;
+  streak: number;
+  totalSessions: number;
 }
 
-// ─── Colors (Light Theme) ──────────────────────────────────
-const C = {
-    bg: '#F0F2F8',          // Light grayish blue background matching Home
-    cardBg: '#FFFFFF',
-    cardBorder: '#E2E8F0',
-    gold: '#F59E0B',
-    green: '#10B981',
-    red: '#EF4444',
-    purple: '#8B5CF6',
-    blue: '#3B82F6',
-    textPrimary: '#0F172A',
-    textSecondary: '#64748B',
-    textMuted: '#94A3B8',
-    indigo: '#6366F1',
-};
-
-const categoryColors: Record<string, string> = {
-    Grammar: C.purple,
-    Pronunciation: C.blue,
-    Fluency: C.gold,
-    Vocabulary: C.green,
-};
-
-// ─── Skeleton Placeholder ─────────────────────────────────
-function Skeleton({ width, height, style }: { width: number | string; height: number; style?: any }) {
-    return <View style={[{ width, height, borderRadius: 12, backgroundColor: '#E2E8F0' }, style]} />;
-}
-
-// ─── Mistake Card ──────────────────────────────────────────
-function MistakeCard({ mistake }: { mistake: any }) {
-    const [expanded, setExpanded] = useState(false);
-    const toggleExpanded = () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setExpanded(!expanded);
-    };
-    const catColor = categoryColors[mistake.category] || C.textSecondary;
-
-    return (
-        <TouchableOpacity activeOpacity={0.8} onPress={toggleExpanded} style={styles.mistakeCard}>
-            <View style={styles.mistakeTop}>
-                <View style={{ flex: 1 }}>
-                    <View style={[styles.catBadge, { backgroundColor: catColor + '15' }]}>
-                        <Text style={[styles.catBadgeText, { color: catColor }]}>{mistake.category}</Text>
-                    </View>
-                    <Text style={styles.mistakePattern}>{mistake.pattern}</Text>
-                </View>
-                <View style={[styles.occCount, { backgroundColor: C.bg }]}>
-                    <Text style={[styles.occNumber, { color: C.textPrimary }]}>{mistake.occurrences}</Text>
-                    <Text style={styles.occLabel}>times</Text>
-                </View>
-            </View>
-            {expanded && (
-                <View style={styles.mistakeDetail}>
-                    <View style={styles.exampleRow}>
-                        <Text style={styles.exWrong}>❌  You said:</Text>
-                        <Text style={styles.exWrongText}>"{mistake.example_wrong}"</Text>
-                    </View>
-                    <View style={styles.exampleRow}>
-                        <Text style={styles.exRight}>✓  Should be:</Text>
-                        <Text style={styles.exRightText}>"{mistake.example_right}"</Text>
-                    </View>
-                </View>
-            )}
-        </TouchableOpacity>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════
-// MAIN SCREEN
-// ═══════════════════════════════════════════════════════════
 export default function ProgressScreen() {
-    const { user } = useUser();
-    const navigation: any = useNavigation();
-    const insets = useSafeAreaInsets();
-    const [stats, setStats] = useState<UserStats | null>(null);
-    const [sessions, setSessions] = useState<ConversationSession[]>([]);
-    const [reliabilityScore, setReliabilityScore] = useState(85);
-    const [loading, setLoading] = useState(true);
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const [metrics, setMetrics] = useState<ProgressMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-    useFocusEffect(
-        useCallback(() => {
-            const fetchData = async () => {
-                try {
-                    // 1. Instant load from local cache
-                    const cachedStats = await AsyncStorage.getItem('@progress_stats_cache');
-                    const cachedSessions = await AsyncStorage.getItem('@progress_sessions_cache');
-                    const cachedReliability = await AsyncStorage.getItem('@progress_reliability_cache');
-                    
-                    if (cachedStats && cachedSessions) {
-                        setStats(JSON.parse(cachedStats));
-                        setSessions(JSON.parse(cachedSessions));
-                        if (cachedReliability) setReliabilityScore(JSON.parse(cachedReliability));
-                        setLoading(false); // Stop skeleton loaders immediately
-                    } else {
-                        // Only show loaders if we have no cache
-                        setLoading(true);
-                    }
-
-                    // 2. Fetch fresh data silently
-                    const [statsData, sessionsData] = await Promise.all([
-                        userApi.getStats(),
-                        sessionsApi.listSessions(),
-                    ]);
-                    
-                    let newReliability = reliabilityScore;
-                    if (user?.id) {
-                        const relData = await reliabilityApi.getUserReliability(user.id);
-                        if (relData) newReliability = relData.reliabilityScore;
-                    }
-                    
-                    // 3. Silently update UI & Cache
-                    setStats(statsData);
-                    setSessions(sessionsData);
-                    setReliabilityScore(newReliability);
-                    
-                    AsyncStorage.setItem('@progress_stats_cache', JSON.stringify(statsData));
-                    AsyncStorage.setItem('@progress_sessions_cache', JSON.stringify(sessionsData));
-                    AsyncStorage.setItem('@progress_reliability_cache', JSON.stringify(newReliability));
-                } catch (error) {
-                    console.error('Failed to fetch progress data:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchData();
-        }, [user?.id])
-    );
-
-    const validSessions = sessions.filter(s => s.analyses && s.analyses.length > 0 && s.analyses[0].scores);
-
-    const currentScores = {
-        grammar: Math.min(100, stats?.grammarScore ?? 0),
-        vocabulary: Math.min(100, stats?.vocabScore ?? 0),
-        fluency: Math.min(100, stats?.fluencyScore ?? 0),
-        pronunciation: Math.min(100, stats?.pronunciationScore ?? 0),
-        overall: stats?.feedbackScore ? Math.min(100, Math.round(stats.feedbackScore)) : 0,
-    };
-
-    const skillEntries = [
-        { name: 'Grammar', score: currentScores.grammar },
-        { name: 'Vocabulary', score: currentScores.vocabulary },
-        { name: 'Fluency', score: currentScores.fluency },
-        { name: 'Pronunciation', score: currentScores.pronunciation },
-    ];
-    const weakest = skillEntries.reduce((min, e) => e.score < min.score ? e : min, skillEntries[0]);
-
-    const trendSessions = validSessions.slice(0, 7).reverse();
-    const trendData = trendSessions.map(s => s.analyses![0].scores.overall);
-    const trendLabels = trendSessions.map(s => {
-        const d = new Date(s.startedAt);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    });
-
-    const mistakeMap = new Map<string, any>();
-    validSessions.forEach(s => {
-        (s.analyses?.[0]?.mistakes || []).forEach(m => {
-            const key = m.type || m.rule || 'Unknown';
-            if (mistakeMap.has(key)) {
-                mistakeMap.get(key).occurrences += 1;
-            } else {
-                mistakeMap.set(key, {
-                    id: mistakeMap.size + 1,
-                    category: m.type?.includes('Grammar') || m.rule ? 'Grammar' : m.type?.includes('Pronun') ? 'Pronunciation' : 'Vocabulary',
-                    pattern: key,
-                    occurrences: 1,
-                    example_wrong: m.original || '',
-                    example_right: m.corrected || '',
-                });
-            }
-        });
-    });
-    const topMistakes = Array.from(mistakeMap.values()).sort((a, b) => b.occurrences - a.occurrences).slice(0, 5);
-
-    if (loading) {
-        return (
-            <View style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#4F46E5" />
-                <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
-                    <View style={{ padding: 20, paddingTop: insets.top + 20 }}>
-                        <Skeleton width="100%" height={140} style={{ marginBottom: 20 }} />
-                        <Skeleton width="100%" height={80} style={{ marginBottom: 20 }} />
-                        <Skeleton width="100%" height={260} style={{ marginBottom: 20 }} />
-                    </View>
-                </SafeAreaView>
-            </View>
-        );
+  const fetchMetrics = async () => {
+    try {
+      setError(false);
+      const response = await client.get("/progress/detailed-metrics");
+      setMetrics(response.data);
+    } catch (err) {
+      console.error("Failed to fetch progress metrics:", err);
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  };
 
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchMetrics();
+  }, []);
+
+  if (loading) {
     return (
-        <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-            
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                
-                <ProfileHeader 
-                        user={user}
-                        stats={stats}
-                        reliabilityScore={reliabilityScore}
-                        onSettingsPress={() => navigation.navigate('Profile')}
-                    />
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.accent} />
+        <Text
+          style={{
+            color: theme.colors.text.secondary,
+            marginTop: 12,
+            fontSize: 14,
+          }}
+        >
+          Loading your progress...
+        </Text>
+      </View>
+    );
+  }
 
-                    <View style={{ paddingHorizontal: 20 }}>
-                        <Animated.View entering={FadeInDown.delay(100).springify()}>
-                            <WeakAreaCard 
-                                skillName={weakest.name}
-                                score={weakest.score}
-                                onImprovePress={() => navigation.navigate('CallPreference')}
-                            />
-                        </Animated.View>
+  if (error || !metrics) {
+    return (
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: theme.colors.background },
+        ]}
+      >
+        <Ionicons
+          name="cloud-offline-outline"
+          size={48}
+          color={theme.colors.text.secondary}
+        />
+        <Text
+          style={{
+            color: theme.colors.text.primary,
+            marginTop: 16,
+            fontSize: 18,
+            fontWeight: "700",
+          }}
+        >
+          Could not load progress
+        </Text>
+        <Text
+          style={{
+            color: theme.colors.text.secondary,
+            marginTop: 4,
+            fontSize: 14,
+          }}
+        >
+          Complete an assessment to see your dashboard
+        </Text>
+        <TouchableOpacity
+          onPress={fetchMetrics}
+          style={{
+            marginTop: 20,
+            backgroundColor: theme.colors.accent,
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 12,
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700" }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-                        <Animated.View entering={FadeInDown.delay(200).springify()}>
-                            <SkillSummary scores={currentScores} />
-                        </Animated.View>
-
-                        {trendData.length >= 2 && (
-                            <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.card}>
-                                <Text style={styles.cardTitle}>Score History</Text>
-                                <PerformanceTrendSVG data={trendData} labels={trendLabels} />
-                            </Animated.View>
-                        )}
-
-                        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.card}>
-                            <Text style={styles.cardTitle}>Skill Balance</Text>
-                            <SkillRadarSVG current={currentScores} />
-                        </Animated.View>
-
-                        <Animated.View entering={FadeInDown.delay(500).springify()}>
-                            <RecentActivityAccordion sessions={validSessions} />
-                        </Animated.View>
-
-                        {topMistakes.length > 0 && (
-                            <Animated.View entering={FadeInDown.delay(600).springify()} style={{ marginBottom: 40 }}>
-                                <Text style={styles.sectionLabel}>Learning Opportunities</Text>
-                                <Text style={styles.sectionSubtitle}>Focus on these patterns to improve your score</Text>
-                                {topMistakes.map(m => (
-                                    <MistakeCard key={m.id} mistake={m} />
-                                ))}
-                            </Animated.View>
-                        )}
-                    </View>
-                </ScrollView>
+  return (
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <StatusBar
+        barStyle={theme.variation === "deep" ? "light-content" : "dark-content"}
+      />
+      <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        {/* Header with Profile button */}
+        <View style={styles.headerBar}>
+          <View>
+            <Text
+              style={[styles.greeting, { color: theme.colors.text.primary }]}
+            >
+              Your Progress
+            </Text>
+            <Text
+              style={[styles.subtitle, { color: theme.colors.text.secondary }]}
+            >
+              Keep going, you're improving!
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => (navigation as any).navigate("Profile")}
+            style={[
+              styles.profileButton,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border + "30",
+              },
+            ]}
+          >
+            <Ionicons
+              name="person-outline"
+              size={22}
+              color={theme.colors.accent}
+            />
+          </TouchableOpacity>
         </View>
-    );
-}
 
-function PerformanceTrendSVG({ data, labels }: { data: number[]; labels: string[] }) {
-    const chartW = SCREEN_WIDTH - 80;
-    const chartH = 140; // Increased height to accommodate labels
-    const padL = 20;    // Left padding
-    const padR = 20;    // Right padding
-    const padT = 30;    // Top padding for the latest score text
-    const padB = 30;    // Bottom padding for the date labels
-    
-    const plotW = chartW - padL - padR;
-    const plotH = chartH - padT - padB;
-    
-    const minVal = Math.max(0, Math.min(...data) - 10);
-    const maxVal = Math.min(100, Math.max(...data) + 10);
-    const range = maxVal - minVal || 1;
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 100 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.accent}
+              colors={[theme.colors.accent]}
+            />
+          }
+        >
+          {/* Overall Progress Card */}
+          <View
+            style={[
+              styles.overallCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border + "20",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.colors.text.primary },
+              ]}
+            >
+              English Mastery
+            </Text>
+            <View style={styles.ringWrapper}>
+              <ProgressRing
+                score={Math.round(metrics.current.overallScore)}
+                cefrLevel={metrics.current.cefrLevel}
+              />
+            </View>
+            <TrendIndicator delta={metrics.deltas.overallScore} />
+          </View>
 
-    const points = data.map((val, i) => ({
-        x: padL + ((i / Math.max(1, data.length - 1)) * plotW),
-        y: padT + plotH - ((val - minVal) / range) * plotH,
-    }));
-    const polyline = points.map(p => `${p.x},${p.y}`).join(' ');
+          {/* Detailed Scores */}
+          <Text
+            style={[styles.sectionLabel, { color: theme.colors.text.primary }]}
+          >
+            Detailed Scores
+          </Text>
+          <View style={styles.gridRow}>
+            <MetricCard
+              title="Pronunciation"
+              score={metrics.current.pronunciation}
+              delta={metrics.deltas.pronunciation}
+            />
+            <MetricCard
+              title="Fluency"
+              score={metrics.current.fluency}
+              delta={metrics.deltas.fluency}
+            />
+          </View>
+          <View style={styles.gridRow}>
+            <MetricCard
+              title="Grammar"
+              score={metrics.current.grammar}
+              delta={metrics.deltas.grammar}
+            />
+            <MetricCard
+              title="Vocabulary"
+              score={metrics.current.vocabulary}
+              delta={metrics.deltas.vocabulary}
+            />
+          </View>
 
-    return (
-        <Svg width={chartW} height={chartH} style={{ alignSelf: 'center' }}>
-            {/* Grid lines */}
-            {[0, 0.5, 1].map((level, i) => {
-                const y = padT + (plotH * level);
-                return (
-                    <Line key={`grid-${i}`} x1={0} y1={y} x2={chartW} y2={y} stroke={C.cardBorder} strokeWidth={1} />
-                );
-            })}
-            
-            {/* Trend Line Background Shadow */}
-            <Polyline points={polyline} fill="none" stroke="rgba(16, 185, 129, 0.15)" strokeWidth={8} strokeLinejoin="round" />
-            {/* Main Trend Line */}
-            <Polyline points={polyline} fill="none" stroke={C.green} strokeWidth={3} strokeLinejoin="round" />
-            
-            {/* Data Points & Score Labels */}
-            {points.map((p, i) => (
-                <React.Fragment key={`point-${i}`}>
-                    <Circle cx={p.x} cy={p.y} r={4} fill={C.cardBg} stroke={C.green} strokeWidth={2} />
-                    {/* Only show label for the latest session (last point) or if there are very few sessions to avoid clutter */}
-                    {(i === points.length - 1 || data.length <= 3) && (
-                        <SvgText 
-                            x={p.x} 
-                            y={p.y - 12} 
-                            fill={C.green} 
-                            fontSize={12} 
-                            fontWeight="bold"
-                            textAnchor="middle"
-                        >
-                            {data[i]}
-                        </SvgText>
-                    )}
-                </React.Fragment>
-            ))}
-            
-            {/* X-Axis Labels (Dates) */}
-            {labels.map((label, i) => {
-                const p = points[i];
-                // Try to not overlap labels by only showing every other one if tracking 7 days
-                if (data.length > 5 && i % 2 !== 0 && i !== labels.length - 1) return null;
-                
-                return (
-                    <SvgText 
-                        key={`label-${i}`} 
-                        x={p.x} 
-                        y={chartH - 10} 
-                        fill={C.textSecondary} 
-                        fontSize={10} 
-                        textAnchor={i === 0 ? "start" : (i === labels.length - 1 ? "end" : "middle")}
-                    >
-                        {label}
-                    </SvgText>
-                );
-            })}
-        </Svg>
-    );
-}
+          {/* Weekly Activity */}
+          <MiniChart
+            title="Activity (Last 7 Days)"
+            data={metrics.weeklyActivity}
+            labels={["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}
+          />
 
-function SkillRadarSVG({ current }: { current: any }) {
-    const size = SCREEN_WIDTH - 80;
-    const center = size / 2;
-    const maxR = center - 45; // More room for labels
-    
-    const axes = [
-        { k: 'grammar', a: -90, label: 'Grammar' }, 
-        { k: 'vocabulary', a: 0, label: 'Vocab' }, 
-        { k: 'fluency', a: 90, label: 'Fluency' }, 
-        { k: 'pronunciation', a: 180, label: 'Pronunciation' }
-    ];
-    
-    const getPoint = (angleDeg: number, r: number) => {
-        const rad = (angleDeg * Math.PI) / 180;
-        return {
-            x: center + r * Math.cos(rad),
-            y: center + r * Math.sin(rad),
-        };
-    };
+          {/* Weakness Spotlight */}
+          {metrics.weaknesses.length > 0 && (
+            <View
+              style={[
+                styles.weaknessCard,
+                {
+                  backgroundColor: theme.colors.deep,
+                  borderColor: theme.colors.accent + "30",
+                },
+              ]}
+            >
+              <View style={styles.weaknessHeader}>
+                <View
+                  style={[
+                    styles.weaknessIconCircle,
+                    { backgroundColor: theme.colors.accent + "20" },
+                  ]}
+                >
+                  <Ionicons
+                    name="flash"
+                    size={18}
+                    color={theme.colors.accent}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.weaknessTitle,
+                    {
+                      color:
+                        theme.variation === "deep"
+                          ? "#FFFFFF"
+                          : theme.colors.text.primary,
+                    },
+                  ]}
+                >
+                  Focus Areas
+                </Text>
+              </View>
+              {metrics.weaknesses.map((w, i) => (
+                <View key={i} style={styles.weaknessItem}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "800",
+                      textTransform: "uppercase",
+                      letterSpacing: 1,
+                      color: theme.colors.accent,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {w.skill}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "500",
+                      lineHeight: 20,
+                      color:
+                        theme.variation === "deep"
+                          ? "rgba(255,255,255,0.8)"
+                          : theme.colors.text.secondary,
+                    }}
+                  >
+                    💡 {w.recommendation}
+                  </Text>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  { backgroundColor: theme.colors.accent },
+                ]}
+              >
+                <Text style={styles.actionButtonText}>Start Practice</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-    const pts = axes.map(ax => {
-        const r = (current[ax.k] / 100) * maxR;
-        return `${getPoint(ax.a, r).x},${getPoint(ax.a, r).y}`;
-    }).join(' ');
-
-    return (
-        <View style={{ height: size, alignItems: 'center', justifyContent: 'center' }}>
-            <Svg width={size} height={size}>
-                {/* Grid levels */}
-                {[0.25, 0.5, 0.75, 1.0].map((level, i) => {
-                    const polyPts = axes.map(a => {
-                        const p = getPoint(a.a, maxR * level);
-                        return `${p.x},${p.y}`;
-                    }).join(' ');
-                    return <Polygon key={`grid-${i}`} points={polyPts} fill="none" stroke={C.cardBorder} strokeWidth={1} strokeDasharray={[2, 2]} />;
-                })}
-                
-                {/* Axes lines */}
-                {axes.map((axis, i) => {
-                    const endPos = getPoint(axis.a, maxR);
-                    return <Line key={`axis-${i}`} x1={center} y1={center} x2={endPos.x} y2={endPos.y} stroke={C.cardBorder} strokeWidth={1} />;
-                })}
-                
-                {/* Current data polygon */}
-                <Polygon points={pts} fill="rgba(99, 102, 241, 0.15)" stroke={C.indigo} strokeWidth={3} />
-                
-                {/* Labels */}
-                {axes.map((axis, i) => {
-                    const labelPos = getPoint(axis.a, maxR + 25);
-                    let anchor: 'middle' | 'start' | 'end' = 'middle';
-                    if (axis.a === 0) anchor = 'start';
-                    if (axis.a === 180) anchor = 'end';
-                    return (
-                        <SvgText 
-                            key={`label-${i}`} 
-                            x={labelPos.x} 
-                            y={labelPos.y + 4} 
-                            fill={C.textSecondary} 
-                            fontSize={10} 
-                            fontWeight="700"
-                            textAnchor={anchor}
-                        >
-                            {axis.label.toUpperCase()}
-                        </SvgText>
-                    );
-                })}
-            </Svg>
-        </View>
-    );
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View
+              style={[
+                styles.statCard,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border + "20",
+                },
+              ]}
+            >
+              <Text style={{ fontSize: 28, marginBottom: 2 }}>🔥</Text>
+              <Text
+                style={[styles.statValue, { color: theme.colors.text.primary }]}
+              >
+                {metrics.streak}
+              </Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  { color: theme.colors.text.secondary },
+                ]}
+              >
+                Day Streak
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.statCard,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border + "20",
+                },
+              ]}
+            >
+              <Text style={{ fontSize: 28, marginBottom: 2 }}>📚</Text>
+              <Text
+                style={[styles.statValue, { color: theme.colors.text.primary }]}
+              >
+                {metrics.totalSessions}
+              </Text>
+              <Text
+                style={[
+                  styles.statLabel,
+                  { color: theme.colors.text.secondary },
+                ]}
+              >
+                Sessions
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.bg },
-    safeArea: { flex: 1 },
-    scrollContent: { paddingBottom: 120 },
-    card: {
-        backgroundColor: C.cardBg,
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 24,
-        borderWidth: 1,
-        borderColor: C.cardBorder,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
-    },
-    cardTitle: { color: C.textPrimary, fontSize: 16, fontWeight: 'bold', marginBottom: 16 },
-    sectionLabel: { fontSize: 18, fontWeight: '700', color: C.textPrimary, marginBottom: 4 },
-    sectionSubtitle: { fontSize: 13, color: C.textSecondary, marginBottom: 16 },
-    mistakeCard: { 
-        backgroundColor: C.cardBg, 
-        borderRadius: 16, 
-        padding: 16, 
-        marginBottom: 12, 
-        borderWidth: 1, 
-        borderColor: C.cardBorder,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    mistakeTop: { flexDirection: 'row', alignItems: 'center' },
-    catBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 8, alignSelf: 'flex-start' },
-    catBadgeText: { fontSize: 10, fontWeight: 'bold' },
-    mistakePattern: { color: C.textPrimary, fontSize: 15, fontWeight: '600' },
-    occCount: { borderRadius: 12, padding: 8, alignItems: 'center', marginLeft: 12 },
-    occNumber: { fontSize: 18, fontWeight: '800' },
-    occLabel: { fontSize: 9, color: C.textMuted },
-    mistakeDetail: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.cardBorder },
-    exampleRow: { marginBottom: 6 },
-    exWrong: { fontSize: 11, fontWeight: 'bold', color: C.red },
-    exWrongText: { fontSize: 13, color: C.textPrimary, fontStyle: 'italic', paddingLeft: 16 },
-    exRight: { fontSize: 11, fontWeight: 'bold', color: C.green },
-    exRightText: { fontSize: 13, color: C.textPrimary, fontWeight: '600', paddingLeft: 16 },
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  greeting: {
+    fontSize: 26,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    opacity: 0.7,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+  },
+  overallCard: {
+    borderRadius: 24,
+    padding: 28,
+    alignItems: "center",
+    borderWidth: 1,
+    marginBottom: 28,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 20,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  sectionLabel: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 14,
+    paddingHorizontal: 4,
+  },
+  ringWrapper: {
+    marginBottom: 12,
+  },
+  gridRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  weaknessCard: {
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 20,
+    marginTop: 8,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  weaknessHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 20,
+  },
+  weaknessIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  weaknessTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  weaknessItem: {
+    marginBottom: 14,
+  },
+  actionButton: {
+    marginTop: 4,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  actionButtonText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: "900",
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    opacity: 0.7,
+  },
 });

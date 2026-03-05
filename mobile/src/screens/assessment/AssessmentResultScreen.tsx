@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { theme } from "../../theme/theme";
+import { useAppTheme } from "../../theme/useAppTheme";
 import { useUser } from "@clerk/clerk-expo";
 import { BenchmarkCard } from "../../components/assessment/BenchmarkCard";
 import { RecurringErrorsCard } from "../../components/assessment/RecurringErrorsCard";
@@ -19,11 +19,18 @@ import { ReadinessCard } from "../../components/assessment/ReadinessCard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function AssessmentResultScreen({ navigation, route }: any) {
-  const { result } = route.params || {};
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const { result, mode = "onboarding" } = route.params || {};
+  const isReviewMode = mode === "review";
   const { user } = useUser();
   const insets = useSafeAreaInsets();
 
   const handleContinueToHome = async () => {
+    if (isReviewMode) {
+      navigation.goBack();
+      return;
+    }
     try {
       // Mark assessment as completed in Clerk metadata
       if (user) {
@@ -63,13 +70,24 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
         }}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Assessment Complete!</Text>
+          {isReviewMode && (
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{ position: "absolute", left: 20, top: 0, zIndex: 1 }}
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={theme.colors.text.primary}
+              />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerTitle}>
+            {isReviewMode ? "Your Assessment" : "Assessment Complete!"}
+          </Text>
         </View>
 
-        <Animated.View
-          entering={FadeInDown.delay(100).springify()}
-          style={styles.scoreCard}
-        >
+        <View style={styles.scoreCard}>
           <LinearGradient
             colors={theme.colors.gradients.primary}
             style={styles.scoreGradient}
@@ -98,7 +116,7 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
               </View>
             )}
           </LinearGradient>
-        </Animated.View>
+        </View>
 
         {/* Skill Breakdown Section */}
         <View style={styles.section}>
@@ -276,10 +294,7 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
         )}
 
         {/* Phase 4: Intelligence Layer */}
-        <Animated.View
-          entering={FadeInDown.delay(350).springify()}
-          style={styles.section}
-        >
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Deep Intelligence</Text>
 
           {result?.benchmarking && <BenchmarkCard data={result.benchmarking} />}
@@ -290,12 +305,9 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
           {result?.recurring_errors && (
             <RecurringErrorsCard patterns={result.recurring_errors} />
           )}
-        </Animated.View>
+        </View>
 
-        <Animated.View
-          entering={FadeInDown.delay(400).springify()}
-          style={styles.section}
-        >
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Personalized Path</Text>
           <View style={styles.planCard}>
             <View style={styles.planRow}>
@@ -320,7 +332,7 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
               </View>
             </View>
           </View>
-        </Animated.View>
+        </View>
 
         {/* Detailed Feedback Section */}
         <View style={styles.section}>
@@ -409,14 +421,16 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
         </View>
 
         <TouchableOpacity style={styles.button} onPress={handleContinueToHome}>
-          <Text style={styles.buttonText}>Continue to Home</Text>
+          <Text style={styles.buttonText}>
+            {isReviewMode ? "Back to Progress" : "Continue to Home"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

@@ -44,7 +44,8 @@
           "cameraPermission": "Allow EngR to access your camera",
           "microphonePermission": "Allow EngR to access your microphone"
         }
-      ]
+      ],
+      "expo-speech-recognition"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

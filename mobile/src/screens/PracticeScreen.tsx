@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 
-import { theme } from '../theme/theme';
+import { useAppTheme } from "../theme/useAppTheme";
 
 interface PracticeModeCardProps {
     title: string;
@@ -18,7 +18,9 @@ interface PracticeModeCardProps {
 }
 
 function PracticeModeCard({ title, description, icon, color, onPress, index }: PracticeModeCardProps) {
-    return (
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+return (
         <Animated.View entering={FadeInDown.delay(index * 100 + 200).springify()}>
             <TouchableOpacity
                 style={styles.card}
@@ -39,6 +41,8 @@ function PracticeModeCard({ title, description, icon, color, onPress, index }: P
 }
 
 export default function PracticeScreen() {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
     const navigation: any = useNavigation();
 
     const practiceModes = [
@@ -139,7 +143,7 @@ export default function PracticeScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.background,

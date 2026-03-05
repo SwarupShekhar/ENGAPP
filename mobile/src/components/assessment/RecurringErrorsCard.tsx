@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface ErrorPattern {
@@ -16,7 +16,9 @@ interface Props {
 }
 
 export const RecurringErrorsCard: React.FC<Props> = ({ patterns }) => {
-  if (!patterns || patterns.length === 0) return null;
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+if (!patterns || patterns.length === 0) return null;
 
   const renderItem = ({ item }: { item: ErrorPattern }) => {
     const isImproving = item.status === 'IMPROVING';
@@ -63,7 +65,7 @@ export const RecurringErrorsCard: React.FC<Props> = ({ patterns }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.m,

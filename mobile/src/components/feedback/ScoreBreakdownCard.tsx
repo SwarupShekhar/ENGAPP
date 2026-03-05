@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface ScoreBreakdownCardProps {
     scores: {
@@ -18,7 +18,9 @@ interface ScoreBreakdownCardProps {
 }
 
 export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({ scores, justifications }) => {
-    const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
 
     const metrics = [
         {
@@ -90,7 +92,7 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({ scores, 
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         backgroundColor: 'rgba(255, 255, 255, 0.85)',
         borderRadius: 16,

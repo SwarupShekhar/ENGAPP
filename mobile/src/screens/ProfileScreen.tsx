@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,10 +13,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { theme } from "../theme/theme";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { reliabilityApi, UserReliability } from "../api/reliability";
+import { useTheme } from "../theme/ThemeProvider";
+import { Theme } from "../theme/types";
 
 // ─── Setting Row ───────────────────────────────────────────
 function SettingRow({
@@ -26,6 +27,7 @@ function SettingRow({
   onPress,
   rightElement,
   danger,
+  theme,
 }: {
   icon: string;
   label: string;
@@ -33,28 +35,60 @@ function SettingRow({
   onPress?: () => void;
   rightElement?: React.ReactNode;
   danger?: boolean;
+  theme: Theme;
 }) {
   return (
     <TouchableOpacity
-      style={styles.settingRow}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        gap: 16,
+      }}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
     >
-      <View style={[styles.settingIcon, danger && styles.settingIconDanger]}>
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          backgroundColor: danger
+            ? theme.colors.error + "12"
+            : theme.colors.accent + "12",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         <Ionicons
           name={icon as any}
           size={20}
-          color={danger ? theme.colors.error : theme.colors.primary}
+          color={danger ? theme.colors.error : theme.colors.accent}
         />
       </View>
-      <View style={styles.settingTextContainer}>
+      <View style={{ flex: 1 }}>
         <Text
-          style={[styles.settingLabel, danger && styles.settingLabelDanger]}
+          style={{
+            fontSize: 16,
+            fontWeight: "500",
+            color: danger ? theme.colors.error : theme.colors.text.primary,
+          }}
         >
           {label}
         </Text>
-        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+        {subtitle && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.colors.text.secondary,
+              marginTop: 2,
+            }}
+          >
+            {subtitle}
+          </Text>
+        )}
       </View>
       {rightElement ||
         (onPress && (
@@ -69,43 +103,65 @@ function SettingRow({
 }
 
 // ─── Section Divider ───────────────────────────────────────
-function SectionHeader({ title }: { title: string }) {
-  return <Text style={styles.sectionTitle}>{title}</Text>;
+function SectionHeader({ title, theme }: { title: string; theme: Theme }) {
+  return (
+    <Text
+      style={{
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.text.secondary,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        marginBottom: 8,
+        marginTop: 16,
+        marginLeft: 4,
+      }}
+    >
+      {title}
+    </Text>
+  );
 }
 
 // ─── Reliability Badge ─────────────────────────────────────
 function ReliabilityBadge({ score }: { score: number }) {
-  let color = theme.colors.primary;
+  let color = "#6366F1";
   let label = "Reliable";
   let icon = "shield-checkmark";
 
   if (score >= 90) {
-    color = "#10b981"; // Green
+    color = "#10b981";
     label = "Excellent";
     icon = "star";
   } else if (score >= 75) {
-    color = "#3b82f6"; // Blue
+    color = "#3b82f6";
     label = "Good";
     icon = "shield-checkmark";
   } else if (score >= 60) {
-    color = "#f59e0b"; // Amber
+    color = "#f59e0b";
     label = "Fair";
     icon = "alert-circle";
   } else {
-    color = "#ef4444"; // Red
+    color = "#ef4444";
     label = "Low";
     icon = "warning";
   }
 
   return (
     <View
-      style={[
-        styles.reliabilityBadge,
-        { backgroundColor: color + "15", borderColor: color + "30" },
-      ]}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 9999,
+        borderWidth: 1,
+        gap: 4,
+        backgroundColor: color + "15",
+        borderColor: color + "30",
+      }}
     >
       <Ionicons name={icon as any} size={14} color={color} />
-      <Text style={[styles.reliabilityText, { color }]}>
+      <Text style={{ fontSize: 12, fontWeight: "600", color }}>
         {score}% {label}
       </Text>
     </View>
@@ -116,6 +172,7 @@ function ReliabilityBadge({ score }: { score: number }) {
 export default function ProfileScreen() {
   const { user } = useUser();
   const { signOut } = useAuth();
+  const { theme, setTheme, availableThemes } = useTheme();
   const navigation = useNavigation();
   const [signingOut, setSigningOut] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -178,8 +235,30 @@ export default function ProfileScreen() {
     );
   };
 
+  const cardStyle = {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+    overflow: "hidden" as const,
+    borderWidth: 1,
+    borderColor: theme.colors.border + "20",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  };
+
+  const separatorStyle = {
+    height: 1,
+    backgroundColor: theme.colors.border + "30",
+    marginLeft: 60,
+  };
+
   return (
-    <SafeAreaView edges={["top"]} style={styles.container}>
+    <SafeAreaView
+      edges={["top"]}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -188,7 +267,13 @@ export default function ProfileScreen() {
         <View style={styles.headerContainer}>
           <TouchableOpacity
             onPress={() => (navigation as any).goBack()}
-            style={styles.iconButton}
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border + "20",
+              },
+            ]}
           >
             <Ionicons
               name="arrow-back"
@@ -196,12 +281,22 @@ export default function ProfileScreen() {
               color={theme.colors.text.primary}
             />
           </TouchableOpacity>
-          <Text style={styles.screenTitle}>Profile</Text>
+          <Text
+            style={[styles.screenTitle, { color: theme.colors.text.primary }]}
+          >
+            Profile
+          </Text>
           <TouchableOpacity
             onPress={() =>
               (navigation as any).navigate("MainTabs", { screen: "Home" })
             }
-            style={styles.iconButton}
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border + "20",
+              },
+            ]}
           >
             <Ionicons
               name="home-outline"
@@ -212,9 +307,17 @@ export default function ProfileScreen() {
         </View>
 
         {/* User Card */}
-        <View style={styles.userCard}>
+        <View
+          style={[
+            styles.userCard,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border + "20",
+            },
+          ]}
+        >
           <LinearGradient
-            colors={theme.colors.gradients.primary}
+            colors={theme.gradients.primary as any}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.avatarCircle}
@@ -222,17 +325,42 @@ export default function ProfileScreen() {
             <Text style={styles.avatarText}>{initials}</Text>
           </LinearGradient>
           <View style={styles.userInfo}>
-            <Text style={styles.nameText}>{name}</Text>
-            {email ? <Text style={styles.emailText}>{email}</Text> : null}
+            <Text
+              style={[styles.nameText, { color: theme.colors.text.primary }]}
+            >
+              {name}
+            </Text>
+            {email ? (
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.colors.text.secondary,
+                  marginTop: 2,
+                }}
+              >
+                {email}
+              </Text>
+            ) : null}
 
             <View style={styles.badgesRow}>
-              <View style={styles.levelPill}>
+              <View
+                style={[
+                  styles.levelPill,
+                  { backgroundColor: theme.colors.accent + "12" },
+                ]}
+              >
                 <Ionicons
                   name="trophy-outline"
                   size={12}
-                  color={theme.colors.primary}
+                  color={theme.colors.accent}
                 />
-                <Text style={styles.levelPillText}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "600",
+                    color: theme.colors.accent,
+                  }}
+                >
                   {meta.assessmentCompleted
                     ? meta.assessmentLevel || "Assessed"
                     : "Not Assessed"}
@@ -245,13 +373,71 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Theme Selection Section */}
+        <SectionHeader title="Theme" theme={theme} />
+        <View style={cardStyle}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.themeSelectorScroll}
+          >
+            {availableThemes.map((t) => (
+              <TouchableOpacity
+                key={t.id}
+                onPress={() => setTheme(t.id)}
+                style={[
+                  styles.themeOption,
+                  {
+                    borderColor:
+                      theme.id === t.id ? t.colors.accent : "transparent",
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.themePreview,
+                    { backgroundColor: t.colors.background },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.themePreviewAccent,
+                      { backgroundColor: t.colors.accent },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.themePreviewDeep,
+                      { backgroundColor: t.colors.deep },
+                    ]}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.themeLabel,
+                    {
+                      color:
+                        theme.id === t.id
+                          ? t.colors.accent
+                          : theme.colors.text.secondary,
+                    },
+                  ]}
+                >
+                  {t.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Account Section */}
-        <SectionHeader title="Account" />
-        <View style={styles.settingCard}>
+        <SectionHeader title="Account" theme={theme} />
+        <View style={cardStyle}>
           <SettingRow
             icon="person-outline"
             label="Edit Profile"
             subtitle={`${meta.goal || "No goal set"}`}
+            theme={theme}
             onPress={() =>
               Alert.alert(
                 "Coming Soon",
@@ -259,11 +445,12 @@ export default function ProfileScreen() {
               )
             }
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="language-outline"
             label="Language"
             subtitle={meta.nativeLanguage || "Not set"}
+            theme={theme}
             onPress={() =>
               Alert.alert("Coming Soon", "Language settings coming soon.")
             }
@@ -271,35 +458,37 @@ export default function ProfileScreen() {
         </View>
 
         {/* Notifications Section */}
-        <SectionHeader title="Notifications" />
-        <View style={styles.settingCard}>
+        <SectionHeader title="Notifications" theme={theme} />
+        <View style={cardStyle}>
           <SettingRow
             icon="notifications-outline"
             label="Push Notifications"
             subtitle="Get notified about calls and matches"
+            theme={theme}
             rightElement={
               <Switch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
                 trackColor={{
-                  true: theme.colors.primary,
+                  true: theme.colors.accent,
                   false: theme.colors.border,
                 }}
                 thumbColor={theme.colors.surface}
               />
             }
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="alarm-outline"
             label="Practice Reminders"
             subtitle="Daily reminders to practice"
+            theme={theme}
             rightElement={
               <Switch
                 value={practiceReminders}
                 onValueChange={setPracticeReminders}
                 trackColor={{
-                  true: theme.colors.primary,
+                  true: theme.colors.accent,
                   false: theme.colors.border,
                 }}
                 thumbColor={theme.colors.surface}
@@ -308,36 +497,41 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Preferences Section */}
-        <SectionHeader title="App" />
-        <View style={styles.settingCard}>
+        {/* App Section */}
+        <SectionHeader title="App" theme={theme} />
+        <View style={cardStyle}>
           <SettingRow
             icon="shield-checkmark-outline"
             label="Privacy Policy"
+            theme={theme}
             onPress={() => Linking.openURL("https://engr.app/privacy")}
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="document-text-outline"
             label="Terms of Service"
+            theme={theme}
             onPress={() => Linking.openURL("https://engr.app/terms")}
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="help-circle-outline"
             label="Help & Support"
+            theme={theme}
             onPress={() => Linking.openURL("mailto:support@engr.app")}
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="construct-outline"
             label="Debug Socket"
+            theme={theme}
             onPress={() => (navigation as any).navigate("SocketDebug")}
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="star-outline"
             label="Rate the App"
+            theme={theme}
             onPress={() =>
               Alert.alert("Thank you!", "We appreciate your support.")
             }
@@ -345,12 +539,13 @@ export default function ProfileScreen() {
         </View>
 
         {/* Danger Zone */}
-        <SectionHeader title="Danger Zone" />
-        <View style={styles.settingCard}>
+        <SectionHeader title="Danger Zone" theme={theme} />
+        <View style={cardStyle}>
           <SettingRow
             icon="log-out-outline"
             label="Sign Out"
             danger
+            theme={theme}
             onPress={handleSignOut}
             rightElement={
               signingOut ? (
@@ -358,64 +553,66 @@ export default function ProfileScreen() {
               ) : undefined
             }
           />
-          <View style={styles.separator} />
+          <View style={separatorStyle} />
           <SettingRow
             icon="trash-outline"
             label="Delete Account"
             subtitle="Permanently delete your data"
             danger
+            theme={theme}
             onPress={handleDeleteAccount}
           />
         </View>
 
         {/* App Version */}
-        <Text style={styles.versionText}>EngR v1.0.0</Text>
+        <Text
+          style={[styles.versionText, { color: theme.colors.text.secondary }]}
+        >
+          EngR v1.0.0
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────
+// ─── Styles (layout-only, no theme colors) ─────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F0F2F8",
   },
   scrollContent: {
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl,
+    paddingTop: 32,
+    paddingBottom: 32,
+    paddingHorizontal: 16,
   },
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: theme.spacing.l,
-    marginBottom: theme.spacing.l,
+    marginBottom: 24,
   },
   iconButton: {
-    padding: theme.spacing.s,
+    padding: 8,
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border + "20",
   },
   screenTitle: {
     fontSize: 28,
     fontWeight: "bold",
-    color: theme.colors.text.primary,
   },
-  // User Card
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.l,
-    marginBottom: theme.spacing.l,
-    gap: theme.spacing.m,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    gap: 16,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    ...theme.shadows.medium,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   avatarCircle: {
     width: 64,
@@ -425,126 +622,72 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatarText: {
-    fontSize: theme.typography.sizes.xl,
+    fontSize: 24,
     fontWeight: "bold",
-    color: theme.colors.surface,
+    color: "#FFFFFF",
   },
   userInfo: {
     flex: 1,
   },
   nameText: {
-    fontSize: theme.typography.sizes.l,
+    fontSize: 20,
     fontWeight: "bold",
-    color: theme.colors.text.primary,
-  },
-  emailText: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    marginTop: 2,
   },
   levelPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: theme.spacing.s,
+    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: theme.colors.primary + "12",
+    borderRadius: 9999,
+    gap: 4,
   },
   badgesRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: theme.spacing.s,
+    marginTop: 8,
     gap: 8,
     flexWrap: "wrap",
   },
-  reliabilityBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.s,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.circle,
-    borderWidth: 1,
-    gap: 4,
-  },
-  reliabilityText: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: "600",
-  },
-  levelPillText: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: "600",
-    color: theme.colors.primary,
-  },
-
-  // Section
-  sectionTitle: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-    color: theme.colors.text.secondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    marginBottom: theme.spacing.s,
-    marginTop: theme.spacing.m,
-    marginLeft: theme.spacing.xs,
-  },
-
-  // Setting Card
-  settingCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderRadius: theme.borderRadius.l,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    ...theme.shadows.medium,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginLeft: 60,
-  },
-
-  // Setting Row
-  settingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: theme.spacing.m,
-    gap: theme.spacing.m,
-  },
-  settingIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: theme.colors.primary + "12",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  settingIconDanger: {
-    backgroundColor: theme.colors.error + "12",
-  },
-  settingTextContainer: {
-    flex: 1,
-  },
-  settingLabel: {
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "500",
-    color: theme.colors.text.primary,
-  },
-  settingLabelDanger: {
-    color: theme.colors.error,
-  },
-  settingSubtitle: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    marginTop: 2,
-  },
-
-  // Version
   versionText: {
     textAlign: "center",
-    color: theme.colors.text.secondary,
-    fontSize: theme.typography.sizes.xs,
-    marginTop: theme.spacing.xl,
+    fontSize: 12,
+    marginTop: 32,
     opacity: 0.6,
+  },
+  themeSelectorScroll: {
+    padding: 16,
+    gap: 12,
+  },
+  themeOption: {
+    width: 80,
+    alignItems: "center",
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  themePreview: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    overflow: "hidden",
+    padding: 6,
+    gap: 4,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
+  },
+  themePreviewAccent: {
+    width: "100%",
+    height: 12,
+    borderRadius: 4,
+  },
+  themePreviewDeep: {
+    width: "60%",
+    height: 12,
+    borderRadius: 4,
+  },
+  themeLabel: {
+    fontSize: 10,
+    fontWeight: "700",
   },
 });

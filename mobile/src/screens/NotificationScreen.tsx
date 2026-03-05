@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { connectionsApi } from "../api/connections";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface FriendRequest {
@@ -31,7 +31,9 @@ interface FriendRequest {
 }
 
 export default function NotificationScreen() {
-  const navigation = useNavigation();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const navigation = useNavigation();
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -179,7 +181,7 @@ export default function NotificationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F9FF",

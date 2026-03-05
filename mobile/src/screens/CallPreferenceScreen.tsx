@@ -14,14 +14,16 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useUser } from "@clerk/clerk-expo";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 import { matchmakingApi } from "../api/matchmaking";
 
 type CallType = "random" | "group";
 type Gender = "any" | "male" | "female";
 
 export default function CallPreferenceScreen() {
-  const navigation: any = useNavigation();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const navigation: any = useNavigation();
   const { user } = useUser();
   const [callType, setCallType] = useState<CallType>("random");
   const [gender, setGender] = useState<Gender>("any");
@@ -307,7 +309,7 @@ export default function CallPreferenceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "white",

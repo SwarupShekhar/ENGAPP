@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -10,7 +10,9 @@ interface StickyPromptProps {
 }
 
 export const StickyPrompt: React.FC<StickyPromptProps> = ({ onPress, mistakeCount }) => {
-    if (mistakeCount === 0) return null;
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+if (mistakeCount === 0) return null;
 
     return (
         <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.container}>
@@ -33,7 +35,7 @@ export const StickyPrompt: React.FC<StickyPromptProps> = ({ onPress, mistakeCoun
     );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         paddingHorizontal: theme.spacing.m,
         marginBottom: theme.spacing.l,

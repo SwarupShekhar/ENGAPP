@@ -13,34 +13,48 @@ export class MatchmakingService {
   ) {}
 
   async joinQueue(userId: string, level: string, topic: string = 'general') {
+    const dbUserId = await this.resolveToUuid(userId);
+    if (!dbUserId) {
+      this.logger.error(
+        `Failed to resolve user ${userId} to UUID for joinQueue`,
+      );
+      return { status: 'error', message: 'User not found' };
+    }
+
     const queueKey = `queue:${level}`;
     const timestamp = Date.now();
 
     // Store user join time to handle timeouts later
-    await this.redisService.getClient().hset(`user:${userId}:meta`, {
+    await this.redisService.getClient().hset(`user:${dbUserId}:meta`, {
       joinedAt: timestamp.toString(),
       level,
       topic,
+      clerkId: userId, // Keep clerkId for reference if needed
     });
 
-    await this.redisService.getClient().rpush(queueKey, userId);
+    await this.redisService.getClient().rpush(queueKey, dbUserId);
     this.logger.log(
-      `User ${userId} joined queue for level ${level} with topic ${topic}`,
+      `User ${dbUserId} (Clerk: ${userId}) joined queue for level ${level} with topic ${topic}`,
     );
     return { status: 'queued' };
   }
 
   async checkMatch(userId: string, level: string) {
+    const dbUserId = await this.resolveToUuid(userId);
+    if (!dbUserId) {
+      return { matched: false };
+    }
+
     const userMeta = await this.redisService
       .getClient()
-      .hgetall(`user:${userId}:meta`);
+      .hgetall(`user:${dbUserId}:meta`);
 
     // 1) Check if a match was already found by the partner
     if (userMeta && userMeta.matchResult) {
       const result = JSON.parse(userMeta.matchResult);
-      await this.redisService.getClient().del(`user:${userId}:meta`);
+      await this.redisService.getClient().del(`user:${dbUserId}:meta`);
       this.logger.log(
-        `User ${userId} retrieved stored match result: ${result.sessionId}`,
+        `User ${dbUserId} retrieved stored match result: ${result.sessionId}`,
       );
       return {
         matched: true,
@@ -53,8 +67,8 @@ export class MatchmakingService {
       const waitTime = (Date.now() - parseInt(userMeta.joinedAt)) / 1000;
       if (waitTime > this.TIMEOUT_SECONDS) {
         // Remove from queue
-        await this.redisService.getClient().lrem(`queue:${level}`, 0, userId);
-        await this.redisService.getClient().del(`user:${userId}:meta`);
+        await this.redisService.getClient().lrem(`queue:${level}`, 0, dbUserId);
+        await this.redisService.getClient().del(`user:${dbUserId}:meta`);
         return {
           matched: false,
           message: 'No partner found yet. Try again?',
@@ -68,11 +82,11 @@ export class MatchmakingService {
 
     if (queueLength >= 2) {
       const queue = await this.redisService.getClient().lrange(queueKey, 0, -1);
-      if (queue.includes(userId)) {
+      if (queue.includes(dbUserId)) {
         // Find blocked users
         const blocks = await this.prisma.blockedUser.findMany({
           where: {
-            OR: [{ blockerId: userId }, { blockedUserId: userId }],
+            OR: [{ blockerId: dbUserId }, { blockedUserId: dbUserId }],
           },
           select: { blockerId: true, blockedUserId: true },
         });
@@ -84,71 +98,64 @@ export class MatchmakingService {
 
         // Find a partner who isn't blocked AND is currently online
         let partnerId: string | null = null;
-        for (const potentialPartner of queue) {
-          if (potentialPartner === userId) continue;
+        for (const potentialPartnerId of queue) {
+          if (potentialPartnerId === dbUserId) continue;
 
-          if (!blockedIds.has(potentialPartner)) {
+          if (!blockedIds.has(potentialPartnerId)) {
+            // potentialPartnerId in queue IS already a UUID now
             // Check if partner is actually online right now via Redis
             const isOnline = await this.redisService
               .getClient()
-              .get(`online:${potentialPartner}`);
+              .get(`online:${potentialPartnerId}`);
             if (!isOnline) {
               // User is offline, remove them from queue to prevent ghost matching
               this.logger.log(
-                `Potential partner ${potentialPartner} is offline. Removing from queue.`,
+                `Potential partner ${potentialPartnerId} is offline. Removing from queue.`,
               );
               await this.redisService
                 .getClient()
-                .lrem(queueKey, 0, potentialPartner);
+                .lrem(queueKey, 0, potentialPartnerId);
               await this.redisService
                 .getClient()
-                .del(`user:${potentialPartner}:meta`);
+                .del(`user:${potentialPartnerId}:meta`);
               continue;
             }
 
-            partnerId = potentialPartner;
+            partnerId = potentialPartnerId;
             break;
           }
         }
 
         if (partnerId) {
-          // Specific user pops to avoid race conditions
+          // Both are UUIDs. Pop them to avoid race conditions.
           const removedU1 = await this.redisService
             .getClient()
-            .lrem(queueKey, 1, userId);
+            .lrem(queueKey, 1, dbUserId);
           const removedU2 = await this.redisService
             .getClient()
             .lrem(queueKey, 1, partnerId);
 
           if (removedU1 > 0 && removedU2 > 0) {
             this.logger.log(
-              `Match found between ${userId} and ${partnerId} for level ${level}`,
+              `Match found between ${dbUserId} and ${partnerId} for level ${level}`,
             );
 
-            const dbUserId = await this.resolveToUuid(userId);
-            const dbPartnerId = await this.resolveToUuid(partnerId);
-
-            if (!dbUserId || !dbPartnerId) {
-              this.logger.error(
-                `Failed to resolve users to UUIDs: ${userId}, ${partnerId}`,
-              );
-              await this.redisService.getClient().rpush(queueKey, userId);
-              await this.redisService.getClient().rpush(queueKey, partnerId);
-              return { matched: false };
-            }
+            // They are already UUIDs here.
+            const dbUserIdVal = dbUserId;
+            const dbPartnerId = partnerId;
 
             const session = await this.prisma.conversationSession.create({
               data: {
                 topic: userMeta.topic || 'general',
                 status: 'CREATED',
                 participants: {
-                  create: [{ userId: dbUserId }, { userId: dbPartnerId }],
+                  create: [{ userId: dbUserIdVal }, { userId: dbPartnerId }],
                 },
               },
             });
 
             const currentUser = await this.prisma.user.findUnique({
-              where: { id: dbUserId },
+              where: { id: dbUserIdVal },
               select: { fname: true, lname: true },
             });
 
@@ -160,7 +167,7 @@ export class MatchmakingService {
             const matchResultForInitiator = {
               sessionId: session.id,
               roomName: `room_${session.id}`,
-              partnerId: partnerId,
+              partnerId: dbPartnerId,
               partnerName: partnerUser
                 ? `${partnerUser.fname} ${partnerUser.lname}`
                 : 'Co-learner',
@@ -169,27 +176,30 @@ export class MatchmakingService {
             const matchResultForPartner = {
               sessionId: session.id,
               roomName: `room_${session.id}`,
-              partnerId: userId,
+              partnerId: dbUserIdVal,
               partnerName: currentUser
                 ? `${currentUser.fname} ${currentUser.lname}`
                 : 'Co-learner',
             };
 
             // Store for partner to pick up
-            await this.redisService.getClient().hset(`user:${partnerId}:meta`, {
-              matchResult: JSON.stringify(matchResultForPartner),
-            });
+            await this.redisService
+              .getClient()
+              .hset(`user:${dbPartnerId}:meta`, {
+                matchResult: JSON.stringify(matchResultForPartner),
+              });
 
             // Clear initiator's meta (returning directly)
-            await this.redisService.getClient().del(`user:${userId}:meta`);
+            await this.redisService.getClient().del(`user:${dbUserIdVal}:meta`);
 
             return {
               matched: true,
               ...matchResultForInitiator,
             };
           } else {
+            // If one was już popped by another concurrently, return them to queue
             if (removedU1 > 0)
-              await this.redisService.getClient().rpush(queueKey, userId);
+              await this.redisService.getClient().rpush(queueKey, dbUserId);
             if (removedU2 > 0)
               await this.redisService.getClient().rpush(queueKey, partnerId);
             return { matched: false };

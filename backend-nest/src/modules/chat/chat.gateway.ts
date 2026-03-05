@@ -305,8 +305,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('accept_call')
   async handleAcceptCall(
-    client: AuthenticatedSocket,
-    data: { conversationId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { conversationId: string },
   ) {
     this.logger.log(
       `[DirectCall] User ${client.userId} accepted call in ${data.conversationId}`,
@@ -349,8 +349,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('decline_call')
   async handleDeclineCall(
-    client: AuthenticatedSocket,
-    data: { conversationId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { conversationId: string },
   ) {
     this.logger.log(
       `[DirectCall] User ${client.userId} declined call in ${data.conversationId}`,

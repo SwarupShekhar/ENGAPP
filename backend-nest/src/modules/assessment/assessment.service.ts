@@ -60,6 +60,95 @@ export class AssessmentService {
     private readonly readinessService: ReadinessService,
   ) {}
 
+  private readonly COMPONENT_WEIGHTS = {
+    pronunciation: 0.18,
+    fluency: 0.27,
+    grammar: 0.22,
+    vocabulary: 0.18,
+    comprehension: 0.15,
+  };
+
+  /**
+   * Apply pronunciation-based gating
+   * If pronunciation is terrible, overall score cannot exceed certain levels
+   */
+  private applyPronunciationGating(
+    pronunciationScore: number,
+    overallScore: number,
+  ): number {
+    if (pronunciationScore < 35) return Math.min(overallScore, 37); // Max A1
+    if (pronunciationScore < 45) return Math.min(overallScore, 54); // Max A2
+    if (pronunciationScore < 55) return Math.min(overallScore, 71); // Max B1
+    if (pronunciationScore < 70) return Math.min(overallScore, 89); // Max C1
+    return overallScore;
+  }
+
+  /**
+   * Apply fluency-based gating
+   * If fluency is terrible (heavy hesitation), overall score cannot exceed certain levels
+   */
+  private applyFluencyGating(
+    fluencyScore: number,
+    overallScore: number,
+  ): number {
+    if (fluencyScore < 30) return Math.min(overallScore, 37); // Max A1
+    if (fluencyScore < 40) return Math.min(overallScore, 54); // Max A2
+    if (fluencyScore < 50) return Math.min(overallScore, 71); // Max B1
+    if (fluencyScore < 65) return Math.min(overallScore, 81); // Max B2
+    return overallScore;
+  }
+
+  /**
+   * Apply multi-factor gating rules
+   * When multiple components are weak, apply even stricter caps
+   */
+  private applyMultiFactorGating(
+    scores: {
+      pronunciation: number;
+      fluency: number;
+      grammar: number;
+      vocabulary: number;
+      comprehension: number;
+    },
+    overallScore: number,
+  ): number {
+    let cappedScore = overallScore;
+
+    // Rule 1: If BOTH pronunciation AND fluency are terrible, max A2
+    if (scores.pronunciation < 45 && scores.fluency < 45) {
+      cappedScore = Math.min(cappedScore, 44);
+    }
+
+    // Rule 2: If grammar is terrible (<35), cannot exceed A2
+    if (scores.grammar < 35) {
+      cappedScore = Math.min(cappedScore, 44);
+    }
+
+    // Rule 3: If 3+ components are below 50, max B1
+    const weakComponents = [
+      scores.pronunciation,
+      scores.fluency,
+      scores.grammar,
+      scores.vocabulary,
+      scores.comprehension,
+    ].filter((score) => score < 50).length;
+
+    if (weakComponents >= 3) {
+      cappedScore = Math.min(cappedScore, 60);
+    }
+
+    // Rule 4: If all core components (pronunciation, fluency, grammar) < 60, max B1
+    if (
+      scores.pronunciation < 60 &&
+      scores.fluency < 60 &&
+      scores.grammar < 60
+    ) {
+      cappedScore = Math.min(cappedScore, 71);
+    }
+
+    return cappedScore;
+  }
+
   async startAssessment(userId: string) {
     const lastAssessment = await this.prisma.assessmentSession.findFirst({
       where: { userId, status: 'COMPLETED' },
@@ -71,16 +160,17 @@ export class AssessmentService {
         new Date().getTime() - new Date(lastAssessment.completedAt).getTime();
       const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
 
-      if (diffInDays < 7) {
-        const nextAvailableAt = new Date(
-          new Date(lastAssessment.completedAt).getTime() +
-            7 * 24 * 60 * 60 * 1000,
-        );
-        throw new ForbiddenException({
-          message: 'Reassessment available after 7 days',
-          nextAvailableAt,
-        });
-      }
+      // TEMP BYPASS: Allow immediate reassessment for testing the new scoring system
+      // if (diffInDays < 7) {
+      //   const nextAvailableAt = new Date(
+      //     new Date(lastAssessment.completedAt).getTime() +
+      //       7 * 24 * 60 * 60 * 1000,
+      //   );
+      //   throw new ForbiddenException({
+      //     message: 'Reassessment available after 7 days',
+      //     nextAvailableAt,
+      //   });
+      // }
     }
 
     return this.prisma.assessmentSession.create({
@@ -141,6 +231,79 @@ export class AssessmentService {
         this.logger.debug('Audio data cleared from DTO after processing');
       }
     }
+  }
+
+  /**
+   * Enhanced fluency calculation with hesitation penalties
+   */
+  private calculateEnhancedFluency(azureResult: any, audioData: any): number {
+    // Get base fluency score from Azure
+    let fluencyScore = azureResult.fluencyScore || 0;
+
+    // Extract metrics
+    const duration = azureResult.duration || 0; // in seconds
+    const wordCount = azureResult.wordCount || 0;
+    const wordsPerMinute = duration > 0 ? (wordCount / duration) * 60 : 0;
+
+    // Penalty 1: Slow speech rate (Native ~150 WPM, B1+ should be >100)
+    if (wordsPerMinute > 0) {
+      // Only penalize valid speech
+      if (wordsPerMinute < 80) fluencyScore -= 15;
+      else if (wordsPerMinute < 100) fluencyScore -= 10;
+      else if (wordsPerMinute < 120) fluencyScore -= 5;
+    }
+
+    // Penalty 2: Long pauses detected by Azure word timings
+    if (azureResult.azureRawData?.NBest?.[0]?.Words?.length > 0) {
+      const words = azureResult.azureRawData.NBest[0].Words;
+      let pauseCount = 0;
+      let totalPauseDuration = 0;
+
+      for (let i = 1; i < words.length; i++) {
+        const prevWord = words[i - 1];
+        const currWord = words[i];
+
+        if (prevWord.Offset && currWord.Offset) {
+          // Azure Offset & Duration are in 100-nanosecond units (1s = 10,000,000)
+          const prevEnd = prevWord.Offset + prevWord.Duration;
+          const gapInSeconds = (currWord.Offset - prevEnd) / 10000000;
+
+          if (gapInSeconds > 0.5) {
+            // Pause longer than 0.5s is unnatural mid-sentence
+            pauseCount++;
+            totalPauseDuration += gapInSeconds;
+          }
+        }
+      }
+
+      if (pauseCount > 3) fluencyScore -= (pauseCount - 3) * 3;
+      if (totalPauseDuration > 2.0)
+        fluencyScore -= Math.floor((totalPauseDuration - 2.0) * 5);
+    }
+
+    // Penalty 3: Detect filler words in transcription
+    const transcription = (azureResult.transcript || '').toLowerCase();
+    const fillerWords = [
+      'um',
+      'uh',
+      'er',
+      'ah',
+      'like',
+      'you know',
+      'basically',
+      'actually',
+    ];
+    let fillerCount = 0;
+
+    fillerWords.forEach((filler) => {
+      const regex = new RegExp(`\\b${filler}\\b`, 'g');
+      const matches = transcription.match(regex);
+      if (matches) fillerCount += matches.length;
+    });
+
+    if (fillerCount > 2) fluencyScore -= (fillerCount - 2) * 2;
+
+    return Math.max(0, Math.min(100, fluencyScore));
   }
 
   private async handlePhase1(
@@ -216,9 +379,11 @@ export class AssessmentService {
       audioBase64,
     );
 
+    const enhancedFluency = this.calculateEnhancedFluency(result, audioBase64);
+
     const attemptData = {
       accuracyScore: result.accuracyScore,
-      fluencyScore: result.fluencyScore,
+      fluencyScore: enhancedFluency,
       audioUrl,
       referenceText,
       detailedFeedback: result.detailedFeedback,
@@ -232,8 +397,13 @@ export class AssessmentService {
     if (attempt === 1) {
       phase2Data.attempt1 = attemptData;
 
-      // Adaptive Selection for Attempt 2
-      const currentLevel = result.accuracyScore >= 70 ? 'C1' : 'A2';
+      // Adaptive Selection for Attempt 2 (stricter thresholds)
+      const currentLevel =
+        result.accuracyScore >= 80
+          ? 'C1'
+          : result.accuracyScore >= 60
+            ? 'B1'
+            : 'A2';
       const nextQuestion = this.questionSelector.selectNextQuestion(
         currentLevel as UserLevel,
         { accuracy: result.accuracyScore, fluency: result.fluencyScore || 0 },
@@ -377,12 +547,44 @@ export class AssessmentService {
     audioBase64: string,
   ) {
     const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
-    const compScore =
-      result.wordCount > 15 ? 80 : result.wordCount > 8 ? 65 : 50;
+
+    // Stricter comprehension scoring: word count + content quality
+    let baseScore = 35; // Base score
+    if (result.wordCount > 30) baseScore = 70;
+    else if (result.wordCount > 20) baseScore = 60;
+    else if (result.wordCount > 12) baseScore = 50;
+    else if (result.wordCount > 6) baseScore = 40;
+
+    // AI Quality Check (Relevance, Coherence, Content Depth)
+    const question = 'What is your biggest challenge in learning English?';
+    const qualityResult = await this.brain.analyzeComprehensionQuality(
+      result.transcript || '',
+      question,
+    );
+
+    // Convert quality score to a multiplier (0.5 to 1.0) to avoid completely zeroing out effort
+    // unless the AI gives a very low score (<20)
+    const qualityMultiplier = Math.max(0.2, qualityResult.qualityScore / 100);
+    let compScore = baseScore * qualityMultiplier;
+
+    // Penalize repetitive/incoherent speech
+    const transcriptWords = (result.transcript || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w: string) => w.length > 2);
+    const uniqueWords = new Set(transcriptWords);
+    const uniqueRatio =
+      result.wordCount > 0 ? uniqueWords.size / result.wordCount : 0;
+    if (uniqueRatio < 0.4) compScore = Math.max(30, compScore - 15);
+
+    // Round and cap final score
+    compScore = Math.max(0, Math.min(100, Math.round(compScore)));
 
     const phase4Data = {
       wordCount: result.wordCount,
       comprehensionScore: compScore,
+      qualityScore: qualityResult.qualityScore,
+      qualityFeedback: qualityResult.feedback,
       transcript: result.transcript,
       audioUrl,
       detailedFeedback: result.detailedFeedback,
@@ -417,18 +619,67 @@ export class AssessmentService {
     const grammar = p3.grammarScore || 0;
     const comp = p4.comprehensionScore || 0;
 
-    const cefrMap = { A1: 20, A2: 40, B1: 60, B2: 80, C1: 90, C2: 100 };
-    const vocabScore = cefrMap[p3.vocabularyCEFR] || 40;
+    // Recalibrated vocabulary CEFR-to-score mapping (stricter)
+    const cefrMap = { A1: 10, A2: 30, B1: 50, B2: 70, C1: 85, C2: 95 };
+    const vocabScore = cefrMap[p3.vocabularyCEFR] || 30;
 
-    const overallScore =
-      pron * 0.2 + flu * 0.2 + grammar * 0.25 + vocabScore * 0.2 + comp * 0.15;
+    const scores = {
+      pronunciation: pron,
+      fluency: flu,
+      grammar: grammar,
+      vocabulary: vocabScore,
+      comprehension: comp,
+    };
 
+    const rawScore =
+      scores.pronunciation * this.COMPONENT_WEIGHTS.pronunciation +
+      scores.fluency * this.COMPONENT_WEIGHTS.fluency +
+      scores.grammar * this.COMPONENT_WEIGHTS.grammar +
+      scores.vocabulary * this.COMPONENT_WEIGHTS.vocabulary +
+      scores.comprehension * this.COMPONENT_WEIGHTS.comprehension;
+
+    let overallScore = rawScore;
+    this.logger.log(`[ASSESSMENT] Raw weighted score: ${rawScore}`);
+
+    const afterPronunciation = this.applyPronunciationGating(
+      scores.pronunciation,
+      overallScore,
+    );
+    if (afterPronunciation < overallScore) {
+      this.logger.log(
+        `[ASSESSMENT] Pronunciation gating applied: ${overallScore} -> ${afterPronunciation}`,
+      );
+      overallScore = afterPronunciation;
+    }
+
+    const afterFluency = this.applyFluencyGating(scores.fluency, overallScore);
+    if (afterFluency < overallScore) {
+      this.logger.log(
+        `[ASSESSMENT] Fluency gating applied: ${overallScore} -> ${afterFluency}`,
+      );
+      overallScore = afterFluency;
+    }
+
+    const afterMultiFactor = this.applyMultiFactorGating(scores, overallScore);
+    if (afterMultiFactor < overallScore) {
+      this.logger.log(
+        `[ASSESSMENT] Multi-factor gating applied: ${overallScore} -> ${afterMultiFactor}`,
+      );
+      overallScore = afterMultiFactor;
+    }
+
+    overallScore = Math.round(overallScore);
+    this.logger.log(
+      `[ASSESSMENT] Final score after all gating: ${overallScore}`,
+    );
+
+    // Recalibrated CEFR thresholds (stricter)
     let overallLevel = 'A1';
-    if (overallScore > 88) overallLevel = 'C2';
-    else if (overallScore > 75) overallLevel = 'C1';
-    else if (overallScore > 60) overallLevel = 'B2';
-    else if (overallScore > 45) overallLevel = 'B1';
-    else if (overallScore > 30) overallLevel = 'A2';
+    if (overallScore > 90) overallLevel = 'C2';
+    else if (overallScore > 82) overallLevel = 'C1';
+    else if (overallScore > 72) overallLevel = 'B2';
+    else if (overallScore > 55) overallLevel = 'B1';
+    else if (overallScore > 35) overallLevel = 'A2';
 
     // Recalibrated Fluency Breakdown Synthesis
     const fluencyBreakdown =
@@ -550,10 +801,12 @@ export class AssessmentService {
     }
 
     // Confidence calculation: std dev approx
-    const scores = [pron, flu, grammar, vocabScore, comp];
-    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const rawScoresArray = [pron, flu, grammar, vocabScore, comp];
+    const mean =
+      rawScoresArray.reduce((a, b) => a + b, 0) / rawScoresArray.length;
     const variance =
-      scores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / scores.length;
+      rawScoresArray.reduce((a, b) => a + Math.pow(b - mean, 2), 0) /
+      rawScoresArray.length;
     const stdDev = Math.sqrt(variance);
     const confidence = Math.max(0.6, 0.9 - stdDev / 100);
 
@@ -794,18 +1047,17 @@ export class AssessmentService {
         segments.push({
           speaker_id: participant.userId,
           text: evidence.transcript,
-          timestamp: 0, // Simplified for now
+          timestamp: 0,
           context: (feedback: any) => feedback.pronunciationTip,
         });
-      } else if (transcript) {
-        // Fallback for LiveKit calls where we don't upload audio files yet
-        // InCallScreen sends the transcript of the initiator. We use it for them.
+      } else if (transcript && transcript.trim()) {
+        // Use the provided transcript (which now contains full dialogue from the mobile client)
         this.logger.log(
-          `No audio URL for ${participant.userId}, using provided transcript.`,
+          `Using provided transcript for participant ${participant.userId} (Session: ${sessionId})`,
         );
         segments.push({
           speaker_id: participant.userId,
-          text: transcript,
+          text: transcript, // Pass full transcript history; AI analyzeJoint will diarize it
           timestamp: 0,
           context: (feedback: any) => feedback.pronunciationTip,
         });

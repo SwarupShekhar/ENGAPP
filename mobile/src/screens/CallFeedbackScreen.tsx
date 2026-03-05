@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
-import { theme } from "../theme/theme";
+import { useAppTheme } from "../theme/useAppTheme";
 import { sessionsApi, ConversationSession } from "../api/sessions";
 
 // Feedback Components
@@ -41,6 +41,8 @@ function SkillBar({
   color: string;
   delay: number;
 }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const clampedScore = Math.min(100, Math.max(0, score));
   return (
     <Animated.View
@@ -68,12 +70,14 @@ function SkillBar({
 
 // ─── Severity Badge ───────────────────────────────────────
 function SeverityBadge({ severity }: { severity: string }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const colors: Record<string, { bg: string; text: string }> = {
     critical: { bg: theme.colors.error + "15", text: theme.colors.error },
     major: { bg: theme.colors.warning + "15", text: theme.colors.warning },
     high: { bg: theme.colors.error + "15", text: theme.colors.error },
     medium: { bg: theme.colors.warning + "15", text: theme.colors.warning },
-    minor: { bg: "#10B98115", text: "#10B981" },
+    minor: { bg: theme.colors.success + "15", text: theme.colors.success },
     low: { bg: theme.colors.success + "15", text: theme.colors.success },
     suggestion: { bg: theme.colors.primary + "15", text: theme.colors.primary },
   };
@@ -89,6 +93,8 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 // ─── Mistake Card ─────────────────────────────────────────
 function MistakeCard({ item, index }: { item: any; index: number }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const [expanded, setExpanded] = useState(false);
   return (
     <Animated.View entering={FadeInDown.delay(600 + index * 100).springify()}>
@@ -150,15 +156,17 @@ function MistakeCard({ item, index }: { item: any; index: number }) {
 }
 
 // ─── Score Color Helper ───────────────────────────────────
-function getScoreColor(score: number) {
+function getScoreColor(score: number, theme: any) {
   if (score >= 80) return theme.colors.success;
   if (score >= 60) return theme.colors.warning;
-  if (score >= 40) return "#F59E0B";
+  if (score >= 40) return theme.colors.warning;
   return theme.colors.error;
 }
 
 // ─── Main Component ───────────────────────────────────────
 export default function CallFeedbackScreen({ navigation, route }: any) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState<ConversationSession | null>(
     null,
@@ -293,7 +301,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
           <TouchableOpacity
             style={{ marginTop: 20 }}
-            onPress={() => navigation.navigate("Home")}
+            onPress={() => navigation.navigate("MainTabs")}
           >
             <Text style={{ color: theme.colors.primary, fontWeight: "600" }}>
               Cancel and Go Home
@@ -339,7 +347,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Text>
           <TouchableOpacity
             style={[styles.primaryAction, { marginTop: 32, width: "100%" }]}
-            onPress={() => navigation.navigate("Home")}
+            onPress={() => navigation.navigate("MainTabs")}
           >
             <Text style={{ color: "white", fontWeight: "bold" }}>
               Back to Home
@@ -372,7 +380,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     pronunciationTip: rawData?.pronunciationTip || null,
   };
 
-  const overallColor = getScoreColor(data.overallScore);
+  const overallColor = getScoreColor(data.overallScore, theme);
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.container}>
@@ -524,7 +532,11 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             <View style={styles.glassCard}>
               <View style={styles.accentHeader}>
                 <View style={styles.accentIconContainer}>
-                  <Ionicons name="globe-outline" size={20} color="#6366F1" />
+                  <Ionicons
+                    name="globe-outline"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <Text style={styles.accentTitle}>Accent Analysis</Text>
               </View>
@@ -684,7 +696,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           <TouchableOpacity
             style={styles.secondaryAction}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate("Home")}
+            onPress={() => navigation.navigate("MainTabs")}
           >
             <Ionicons
               name="home-outline"
@@ -701,381 +713,382 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F0F2F8",
-  },
-  scrollContent: {
-    paddingBottom: theme.spacing.xl,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.s,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-  },
-  metaRow: {
-    flexDirection: "row",
-    paddingHorizontal: theme.spacing.l,
-    gap: theme.spacing.s,
-    marginBottom: theme.spacing.m,
-    flexWrap: "wrap",
-  },
-  metaPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-  },
-  metaText: {
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    fontWeight: "500",
-  },
-  scoreCard: {
-    marginHorizontal: theme.spacing.l,
-    marginBottom: theme.spacing.l,
-    borderRadius: theme.borderRadius.xl,
-    ...theme.shadows.medium,
-  },
-  scoreGradient: {
-    borderRadius: theme.borderRadius.xl,
-    paddingVertical: theme.spacing.xl,
-    alignItems: "center",
-  },
-  scoreLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "500",
-    marginBottom: theme.spacing.s,
-  },
-  scoreRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-  },
-  scoreValue: {
-    color: "white",
-    fontSize: 64,
-    fontWeight: "bold",
-  },
-  scoreMax: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: theme.typography.sizes.xl,
-    fontWeight: "500",
-    marginLeft: 4,
-  },
-  levelChip: {
-    marginTop: theme.spacing.m,
-    paddingHorizontal: theme.spacing.m,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  levelChipText: {
-    color: "white",
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "700",
-  },
-  sectionTitle: {
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-    paddingHorizontal: theme.spacing.l,
-    marginBottom: theme.spacing.m,
-    marginTop: theme.spacing.m,
-  },
-  // Glassmorphism card used for all sections
-  glassCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    marginHorizontal: theme.spacing.l,
-    borderRadius: 16,
-    padding: theme.spacing.m,
-    gap: theme.spacing.m,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    ...theme.shadows.medium,
-  },
-  skillRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.s,
-  },
-  skillInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    width: 130,
-  },
-  skillIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  skillLabel: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "500",
-    color: theme.colors.text.primary,
-  },
-  barContainer: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.border,
-    overflow: "hidden",
-  },
-  barFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  skillScore: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-    width: 40,
-    textAlign: "right",
-  },
-  // Accent section
-  accentHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  accentIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#6366F115",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  accentTitle: {
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "700",
-    color: theme.colors.text.primary,
-  },
-  accentText: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-  },
-  tipRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    backgroundColor: theme.colors.warning + "08",
-    padding: theme.spacing.s,
-    borderRadius: 10,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    lineHeight: 18,
-  },
-  // Strengths & Improvements
-  strengthsRow: {
-    paddingHorizontal: theme.spacing.l,
-    gap: theme.spacing.s,
-  },
-  strengthCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderRadius: 16,
-    padding: theme.spacing.m,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    borderLeftWidth: 3,
-    ...theme.shadows.medium,
-  },
-  strengthHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  strengthTitle: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-  },
-  strengthItem: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-    paddingLeft: 4,
-  },
-  // Mistake cards
-  mistakeCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    marginHorizontal: theme.spacing.l,
-    marginBottom: theme.spacing.s,
-    borderRadius: 16,
-    padding: theme.spacing.m,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    ...theme.shadows.medium,
-  },
-  mistakeHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.s,
-  },
-  mistakeTypeRow: {
-    flexDirection: "row",
-    gap: theme.spacing.s,
-    alignItems: "center",
-  },
-  mistakeTypePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.circle,
-    backgroundColor: theme.colors.primary + "12",
-  },
-  mistakeTypeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: theme.colors.primary,
-  },
-  severityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: theme.borderRadius.circle,
-  },
-  severityText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  mistakeContent: {
-    gap: 6,
-  },
-  mistakeLine: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  mistakeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 7,
-  },
-  originalText: {
-    flex: 1,
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.error,
-    textDecorationLine: "line-through",
-    lineHeight: 20,
-  },
-  correctedText: {
-    flex: 1,
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.success,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  explanationContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: theme.spacing.m,
-    paddingTop: theme.spacing.s,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    alignItems: "flex-start",
-  },
-  explanationText: {
-    flex: 1,
-    fontSize: theme.typography.sizes.xs,
-    color: theme.colors.text.secondary,
-    lineHeight: 18,
-  },
-  // AI Summary
-  summaryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  aiIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  aiLabel: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-    color: theme.colors.text.primary,
-  },
-  summaryText: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.secondary,
-    lineHeight: 22,
-  },
-  // Actions
-  actions: {
-    paddingHorizontal: theme.spacing.l,
-    marginTop: theme.spacing.l,
-    gap: theme.spacing.m,
-  },
-  primaryAction: {
-    borderRadius: theme.borderRadius.l,
-    overflow: "hidden",
-    ...theme.shadows.primaryGlow,
-  },
-  actionGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: theme.spacing.m,
-    gap: theme.spacing.s,
-  },
-  primaryActionText: {
-    color: "white",
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "bold",
-  },
-  secondaryAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: theme.spacing.m,
-    borderRadius: theme.borderRadius.l,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-    gap: theme.spacing.s,
-  },
-  secondaryActionText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "600",
-  },
-  detailToggle: {
-    alignSelf: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginBottom: 8,
-  },
-  detailToggleText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "600",
-  },
-});
+const getStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      paddingBottom: theme.spacing.xl,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: theme.spacing.m,
+      paddingVertical: theme.spacing.s,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+    },
+    metaRow: {
+      flexDirection: "row",
+      paddingHorizontal: theme.spacing.l,
+      gap: theme.spacing.s,
+      marginBottom: theme.spacing.m,
+      flexWrap: "wrap",
+    },
+    metaPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: theme.borderRadius.circle,
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.6)",
+    },
+    metaText: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      fontWeight: "500",
+    },
+    scoreCard: {
+      marginHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.l,
+      borderRadius: theme.borderRadius.xl,
+      ...theme.shadows.medium,
+    },
+    scoreGradient: {
+      borderRadius: theme.borderRadius.xl,
+      paddingVertical: theme.spacing.xl,
+      alignItems: "center",
+    },
+    scoreLabel: {
+      color: "rgba(255,255,255,0.8)",
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "500",
+      marginBottom: theme.spacing.s,
+    },
+    scoreRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+    },
+    scoreValue: {
+      color: "white",
+      fontSize: 64,
+      fontWeight: "bold",
+    },
+    scoreMax: {
+      color: "rgba(255,255,255,0.6)",
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: "500",
+      marginLeft: 4,
+    },
+    levelChip: {
+      marginTop: theme.spacing.m,
+      paddingHorizontal: theme.spacing.m,
+      paddingVertical: theme.spacing.xs,
+      borderRadius: theme.borderRadius.circle,
+      backgroundColor: "rgba(255,255,255,0.2)",
+    },
+    levelChipText: {
+      color: "white",
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "700",
+    },
+    sectionTitle: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.m,
+      marginTop: theme.spacing.m,
+    },
+    // Glassmorphism card used for all sections
+    glassCard: {
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      marginHorizontal: theme.spacing.l,
+      borderRadius: 16,
+      padding: theme.spacing.m,
+      gap: theme.spacing.m,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.6)",
+      ...theme.shadows.medium,
+    },
+    skillRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing.s,
+    },
+    skillInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      width: 130,
+    },
+    skillIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    skillLabel: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "500",
+      color: theme.colors.text.primary,
+    },
+    barContainer: {
+      flex: 1,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.border,
+      overflow: "hidden",
+    },
+    barFill: {
+      height: "100%",
+      borderRadius: 4,
+    },
+    skillScore: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      width: 40,
+      textAlign: "right",
+    },
+    // Accent section
+    accentHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    accentIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: theme.colors.primary + "15",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    accentTitle: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    accentText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+    },
+    tipRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      backgroundColor: theme.colors.warning + "08",
+      padding: theme.spacing.s,
+      borderRadius: 10,
+    },
+    tipText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      lineHeight: 18,
+    },
+    // Strengths & Improvements
+    strengthsRow: {
+      paddingHorizontal: theme.spacing.l,
+      gap: theme.spacing.s,
+    },
+    strengthCard: {
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      borderRadius: 16,
+      padding: theme.spacing.m,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderLeftWidth: 3,
+      ...theme.shadows.medium,
+    },
+    strengthHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 8,
+    },
+    strengthTitle: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+    },
+    strengthItem: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+      paddingLeft: 4,
+    },
+    // Mistake cards
+    mistakeCard: {
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      marginHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+      borderRadius: 16,
+      padding: theme.spacing.m,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.6)",
+      ...theme.shadows.medium,
+    },
+    mistakeHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: theme.spacing.s,
+    },
+    mistakeTypeRow: {
+      flexDirection: "row",
+      gap: theme.spacing.s,
+      alignItems: "center",
+    },
+    mistakeTypePill: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: theme.borderRadius.circle,
+      backgroundColor: theme.colors.primary + "12",
+    },
+    mistakeTypeText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: theme.colors.primary,
+    },
+    severityBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: theme.borderRadius.circle,
+    },
+    severityText: {
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    mistakeContent: {
+      gap: 6,
+    },
+    mistakeLine: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+    },
+    mistakeDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginTop: 7,
+    },
+    originalText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.error,
+      textDecorationLine: "line-through",
+      lineHeight: 20,
+    },
+    correctedText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.success,
+      fontWeight: "500",
+      lineHeight: 20,
+    },
+    explanationContainer: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: theme.spacing.m,
+      paddingTop: theme.spacing.s,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      alignItems: "flex-start",
+    },
+    explanationText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      lineHeight: 18,
+    },
+    // AI Summary
+    summaryHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    aiIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    aiLabel: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    summaryText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+    },
+    // Actions
+    actions: {
+      paddingHorizontal: theme.spacing.l,
+      marginTop: theme.spacing.l,
+      gap: theme.spacing.m,
+    },
+    primaryAction: {
+      borderRadius: theme.borderRadius.l,
+      overflow: "hidden",
+      ...theme.shadows.primaryGlow,
+    },
+    actionGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: theme.spacing.m,
+      gap: theme.spacing.s,
+    },
+    primaryActionText: {
+      color: "white",
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "bold",
+    },
+    secondaryAction: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: theme.spacing.m,
+      borderRadius: theme.borderRadius.l,
+      borderWidth: 1.5,
+      borderColor: theme.colors.primary,
+      gap: theme.spacing.s,
+    },
+    secondaryActionText: {
+      color: theme.colors.primary,
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "600",
+    },
+    detailToggle: {
+      alignSelf: "center",
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      marginBottom: 8,
+    },
+    detailToggleText: {
+      color: theme.colors.primary,
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "600",
+    },
+  });

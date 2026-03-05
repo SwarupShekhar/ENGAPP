@@ -60,6 +60,19 @@ model User {
   reelHistory     UserReelHistory[]
   recurringErrors RecurringErrorPattern[]
 
+  // Home Screen Evolution
+  totalSessions       Int       @default(0)
+  currentStreak       Int       @default(0)
+  lastSessionAt       DateTime?
+  lastResolvedStage   Int?
+  assessmentScore     Int?      @default(0)
+  assessmentLevel     String?
+  lastAssessmentAt    DateTime?
+  initialAssessmentScore Int?   @default(0)
+  
+  achievements        UserAchievement[]
+  streakHistory       StreakHistory[]
+
   // Privacy & GDPR Compliance
   shareDataForResearch Boolean   @default(false)
   allowBenchmarking    Boolean   @default(true)
@@ -68,6 +81,27 @@ model User {
 
   @@index([clerkId])
 }
+
+model UserAchievement {
+  id          String   @id @default(uuid())
+  userId      String
+  badgeType   String   // 'streak_20', 'sessions_50', 'points_20', 'p2p_10'
+  unlockedAt  DateTime @default(now())
+  displayed   Boolean  @default(false)
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StreakHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  streakDays  Int
+  endedAt     DateTime?
+  reason      String   // 'active', 'broken', 'shield_used'
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 
 model UserReliability {
   id               String   @id @default(uuid())

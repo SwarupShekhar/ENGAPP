@@ -2,14 +2,16 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme/theme';
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface PremiumStreakCardProps {
     streak: number;
 }
 
 export function PremiumStreakCard({ streak }: PremiumStreakCardProps) {
-    return (
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+return (
         <LinearGradient
             colors={theme.colors.gradients.primary}
             start={{ x: 0, y: 0 }}
@@ -46,7 +48,7 @@ export function PremiumStreakCard({ streak }: PremiumStreakCardProps) {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     card: {
         marginHorizontal: theme.spacing.l,
         marginBottom: theme.spacing.l,

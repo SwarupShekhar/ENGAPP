@@ -5,10 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { theme } from '../theme/theme';
+import { useAppTheme } from "../theme/useAppTheme";
 
 export default function DashboardScreen() {
-    const navigation: any = useNavigation();
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+const navigation: any = useNavigation();
 
     return (
         <View style={styles.container}>
@@ -46,7 +48,7 @@ export default function DashboardScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F0F2F8',

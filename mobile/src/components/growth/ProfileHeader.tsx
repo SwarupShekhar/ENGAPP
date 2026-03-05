@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { theme } from "../../theme/theme";
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface Props {
   user: any;
@@ -18,6 +18,7 @@ export default function ProfileHeader({
   reliabilityScore,
   onSettingsPress,
 }: Props) {
+  const theme = useAppTheme();
   const insets = useSafeAreaInsets();
   const initials =
     (user?.firstName?.substring(0, 1) || "") +

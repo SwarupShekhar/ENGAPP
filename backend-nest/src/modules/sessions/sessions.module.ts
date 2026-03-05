@@ -8,21 +8,25 @@ import { TasksModule } from '../tasks/tasks.module';
 import { IntegrationsModule } from '../../integrations/integrations.module';
 import { AssessmentModule } from '../assessment/assessment.module';
 import { ReliabilityModule } from '../reliability/reliability.module';
+import { HomeModule } from '../home/home.module';
+import { BrainModule } from '../brain/brain.module';
 
 @Module({
-    imports: [
-        PrismaModule,
-        TasksModule,
-        IntegrationsModule,
-        forwardRef(() => AssessmentModule),
-        BullModule.registerQueue({
-            name: 'sessions',
-        }),
-        ReliabilityModule,
-    ],
-    controllers: [SessionsController],
-    providers: [SessionsService, SessionsProcessor],
-    exports: [SessionsService],
+  imports: [
+    PrismaModule,
+    TasksModule,
+    IntegrationsModule,
+    forwardRef(() => AssessmentModule),
+    BullModule.registerQueue({
+      name: 'sessions',
+    }),
+    ReliabilityModule,
+    HomeModule,
+    BrainModule,
+  ],
+  controllers: [SessionsController],
+  providers: [SessionsService, SessionsProcessor],
+  exports: [SessionsService],
 })
-export class SessionsModule { }
+export class SessionsModule {}
 // forced reload

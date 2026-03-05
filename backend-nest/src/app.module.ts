@@ -25,6 +25,9 @@ import livekitConfig from './config/livekit.config';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { ReliabilityModule } from './modules/reliability/reliability.module';
 import { ReelsModule } from './modules/reels/reels.module';
+import { ProgressModule } from './modules/progress/progress.module';
+import { HomeModule } from './modules/home/home.module';
+import { BrainModule } from './modules/brain/brain.module';
 
 @Module({
   imports: [
@@ -62,6 +65,9 @@ import { ReelsModule } from './modules/reels/reels.module';
     ConversationalTutorModule,
     ReliabilityModule,
     ReelsModule,
+    ProgressModule,
+    HomeModule,
+    BrainModule,
   ],
   controllers: [AppController],
   providers: [AppService],
