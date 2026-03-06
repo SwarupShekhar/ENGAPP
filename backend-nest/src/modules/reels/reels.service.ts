@@ -46,6 +46,14 @@ export class ReelsService {
     this.logger.debug(`Feed cache invalidated for user ${userId}`);
   }
 
+  /** Fisher–Yates shuffle so feed order is randomized per request (different sequence per account/session). */
+  private shuffleArray<T>(arr: T[]): void {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
   /**
    * Main engine for the eBites feed — Smart English Coach.
    *
@@ -149,10 +157,11 @@ export class ReelsService {
         allReels.set(id, { ...reel, _relevanceScore: relevanceScore });
       }
 
-      // 6. Sort by relevance score and apply the 50/20/30 mix
+      // 6. Sort by relevance score, then shuffle so order varies per user/request
       const sortedReels = Array.from(allReels.values()).sort(
         (a, b) => b._relevanceScore - a._relevanceScore,
       );
+      this.shuffleArray(sortedReels);
 
       // Apply pagination cursor
       const pageSize = 10;

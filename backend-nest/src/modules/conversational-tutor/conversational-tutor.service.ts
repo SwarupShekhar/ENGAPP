@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { WeaknessService } from '../reels/weakness.service';
 import * as FormData from 'form-data';
+import { Response } from 'express';
 
 interface ConversationTurn {
   speaker: 'user' | 'ai';
@@ -100,12 +101,23 @@ User just said: "{user_utterance}"
 Respond naturally as Maya. Always use JSON format (no markdown blocks around json).
 `;
 
+/** Maya's common short phrases — cache TTS at startup to save ~1–2s per turn when matched. */
+const TTS_CACHE_PHRASES = [
+  'Arre waah!',
+  'Shabash!',
+  'Koi baat nahi.',
+  'Arre waah! That was actually really good!',
+  'Hi there!',
+  "You're welcome!",
+];
+
 @Injectable()
-export class ConversationalTutorService {
+export class ConversationalTutorService implements OnModuleInit {
   private readonly logger = new Logger(ConversationalTutorService.name);
   private genAI: GoogleGenerativeAI;
   private conversations: Map<string, ConversationSession> = new Map();
   private aiBackendUrl: string;
+  private readonly ttsCache = new Map<string, string>();
 
   constructor(
     private configService: ConfigService,
@@ -121,6 +133,28 @@ export class ConversationalTutorService {
       'http://localhost:8001';
   }
 
+  async onModuleInit() {
+    for (const phrase of TTS_CACHE_PHRASES) {
+      try {
+        const response = await firstValueFrom(
+          this.httpService.post(`${this.aiBackendUrl}/api/tutor/tts`, {
+            text: phrase,
+            gender: 'female',
+          }),
+        );
+        const base64 = response.data?.data?.audio_base64;
+        if (base64) {
+          this.ttsCache.set(phrase.trim(), base64);
+        }
+      } catch (e) {
+        this.logger.warn(`TTS cache skip "${phrase}": ${(e as Error).message}`);
+      }
+    }
+    if (this.ttsCache.size > 0) {
+      this.logger.log(`TTS cache warmed: ${this.ttsCache.size} phrases`);
+    }
+  }
+
   // ─── Existing: Process user utterance with Gemini ──────────
 
   async processUserUtterance(
@@ -132,11 +166,11 @@ export class ConversationalTutorService {
 
     // Build conversation history for context
     const historyStr = session.history
-      .slice(-10) // last 10 turns
+      .slice(-6) // last 6 turns — enough context, fewer tokens = faster
       .map((t) => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
       .join('\n');
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
     const prompt = CONVERSATIONAL_TUTOR_PROMPT.replace(
       '{user_utterance}',
       userUtterance,
@@ -205,6 +239,9 @@ export class ConversationalTutorService {
   // ─── Existing: Synthesize Hinglish via AI Engine ───────────
 
   async synthesizeHinglish(text: string): Promise<string> {
+    const key = text.trim();
+    const cached = this.ttsCache.get(key);
+    if (cached) return cached;
     try {
       const response = await firstValueFrom(
         this.httpService.post(`${this.aiBackendUrl}/api/tutor/tts`, {
@@ -431,7 +468,7 @@ export class ConversationalTutorService {
     Respond STRICTLY in JSON.
     `;
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
@@ -528,28 +565,73 @@ export class ConversationalTutorService {
     }
   }
 
-  // ─── Feature 2: Process speech with intent detection ───────
+  /**
+   * Stream tutor response via SSE: pipe backend-ai /stream-response to client.
+   * Caller must set res headers (Content-Type: text/event-stream) before calling.
+   */
+  async pipeStreamSpeechResponse(
+    audioBuffer: Buffer,
+    userId: string,
+    sessionId: string,
+    res: Response,
+  ): Promise<void> {
+    const session = this.getOrCreateSession(sessionId);
+    const history = session.history
+      .slice(-6)
+      .map((t) => ({ role: t.speaker, content: t.text }));
+
+    const form = new FormData();
+    form.append('audio', audioBuffer, { filename: 'audio.wav' });
+    form.append('session_id', sessionId);
+    form.append('user_id', userId);
+    form.append('conversation_history', JSON.stringify(history));
+
+    const url = `${this.aiBackendUrl}/api/tutor/stream-response`;
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(url, form, {
+          responseType: 'stream',
+          headers: form.getHeaders(),
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        }),
+      );
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      (response.data as NodeJS.ReadableStream).pipe(res);
+    } catch (err: any) {
+      this.logger.error(`stream-speech upstream error: ${err.message}`);
+      res.status(err.response?.status || 500).json({
+        error: err.response?.data?.message || err.message,
+      });
+    }
+  }
+
+  // ─── Feature 2: Process speech with intent detection (blocking fallback) ───────
 
   async processSpeechWithIntent(
     audioBuffer: Buffer,
     userId: string,
     sessionId: string,
   ): Promise<any> {
-    // Step 1: Transcribe with intent detection via AI Engine
+    // Step 1: STT and session in parallel (session ready when STT returns)
     const audioBase64 = audioBuffer.toString('base64');
-    const sttResponse = await firstValueFrom(
-      this.httpService.post(`${this.aiBackendUrl}/api/tutor/stt`, {
-        audio_base64: audioBase64,
-        user_id: userId,
-      }),
-    );
+    const [sttResponse, session] = await Promise.all([
+      firstValueFrom(
+        this.httpService.post(`${this.aiBackendUrl}/api/tutor/stt`, {
+          audio_base64: audioBase64,
+          user_id: userId,
+        }),
+      ),
+      Promise.resolve(this.getOrCreateSession(sessionId)),
+    ]);
 
     const sttResult = sttResponse.data.data; // unwrap StandardResponse
 
     // Step 2: If it's a voice command, return immediately
     if (sttResult.is_command && sttResult.intent !== 'none') {
       // Store in history
-      const session = this.getOrCreateSession(sessionId);
       session.history.push({
         speaker: 'user',
         text: sttResult.text,
@@ -607,6 +689,21 @@ export class ConversationalTutorService {
     const audioBase64 = await this.synthesizeHinglish(message);
 
     return { message, audioBase64 };
+  }
+
+  /**
+   * Append a turn to in-memory session history after SSE stream completes.
+   * Ensures the next stream-speech request has correct context.
+   */
+  appendTurn(
+    sessionId: string,
+    userText: string,
+    aiText: string,
+  ): void {
+    const session = this.getOrCreateSession(sessionId);
+    session.history.push({ speaker: 'user', text: userText, timestamp: new Date() });
+    session.history.push({ speaker: 'ai', text: aiText, timestamp: new Date(), corrections: [] });
+    this.conversations.set(sessionId, session);
   }
 
   // ─── Helper: get or create session ─────────────────────────

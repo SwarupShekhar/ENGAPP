@@ -703,6 +703,15 @@ Analyze the following multi-speaker transcript of an English practice session.
 3. **Individual Feedback**: Provide granular feedback for EACH participant (scores, errors, confidence, vocabulary).
 4. **Learning Synergy**: Identify what participants can learn from each other.
 
+**CRITICAL SCORING CALIBRATION (you MUST follow these rules):**
+- Count the number of MEANINGFUL words each participant spoke (exclude greetings, "hello", "hi", "am I audible", "can you hear me", "yes", "no", "okay").
+- If a participant spoke fewer than 10 meaningful words: cap ALL their scores at 20 maximum, set cefr_level to "A1".
+- If a participant spoke fewer than 25 meaningful words: cap ALL their scores at 40 maximum.
+- If a participant spoke fewer than 50 meaningful words: cap ALL their scores at 60 maximum.
+- Greetings-only or connectivity-check speech ("hello", "am I audible?", "can you hear me?") = A1 level, all scores 10-15.
+- Score based on BOTH quality AND quantity of language produced. Short, trivial utterances must NEVER receive high scores.
+- A score of 80+ requires substantial, complex speech with varied vocabulary and grammar structures.
+
 **Respond with ONLY this JSON structure:**
 {{
     "interaction_metrics": {{

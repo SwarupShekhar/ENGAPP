@@ -834,6 +834,7 @@ export class AssessmentService {
         where: { id: session.userId },
         data: {
           overallLevel,
+          assessmentScore: overallScore,
           talkStyle: session.talkStyle,
           levelUpdatedAt: new Date(),
         },
@@ -929,7 +930,40 @@ export class AssessmentService {
       where: { id },
     });
     if (!session) throw new NotFoundException('Assessment not found');
-    return session;
+
+    const detailedReport = {
+      phase1: (session.phase1Data as any)?.detailedFeedback,
+      phase2: {
+        attempt1: ((session.phase2Data as any)?.attempt1 as any)
+          ?.detailedFeedback,
+        attempt2: ((session.phase2Data as any)?.attempt2 as any)
+          ?.detailedFeedback,
+      },
+      phase3: (session.phase3Data as any)?.detailedFeedback,
+      phase4: (session.phase4Data as any)?.detailedFeedback,
+    };
+
+    return {
+      assessmentId: session.id,
+      status: session.status,
+      overallLevel: session.overallLevel,
+      overallScore: session.overallScore,
+      talkStyle: session.talkStyle,
+      confidence: session.confidence,
+      skillBreakdown: session.skillBreakdown,
+      fluencyBreakdown: session.fluencyBreakdown,
+      weaknessMap: session.weaknessMap,
+      improvementDelta: session.improvementDelta,
+      personalizedPlan: session.personalizedPlan,
+      benchmarking: session.benchmarking,
+      readiness: session.readiness,
+      confidence_metrics: session.confidence_metrics,
+      detailedReport,
+      nextAssessmentAvailableAt: new Date(
+        new Date(session.completedAt || new Date()).getTime() +
+          7 * 24 * 60 * 60 * 1000,
+      ),
+    };
   }
 
   async getDashboardData(userId: string) {
@@ -1038,8 +1072,27 @@ export class AssessmentService {
     const participantEvidence: Record<string, any> = {};
 
     // 1. STT for each participant (or fallback to provided transcript)
-    for (const participant of session.participants) {
+    // Parse the labelled transcript into per-speaker lines
+    const participantLines: Record<string, string[]> = {};
+    if (transcript && transcript.trim()) {
+      const lines = transcript.split('\n').filter((l) => l.trim());
+      for (const line of lines) {
+        const match = line.match(/^(User|Partner):\s*(.+)$/i);
+        if (match) {
+          const role = match[1].toLowerCase(); // 'user' or 'partner'
+          const text = match[2].trim();
+          if (!participantLines[role]) participantLines[role] = [];
+          participantLines[role].push(text);
+        }
+      }
+    }
+
+    // Map participants to roles: first participant = "user", second = "partner"
+    // (The transcript is always from the perspective of the user who submitted it)
+    for (let i = 0; i < session.participants.length; i++) {
+      const participant = session.participants[i];
       const url = audioUrls[participant.userId];
+
       if (url) {
         const evidence = await this.azure.analyzeSpeech(url, '');
         participantEvidence[participant.userId] = evidence;
@@ -1048,18 +1101,22 @@ export class AssessmentService {
           speaker_id: participant.userId,
           text: evidence.transcript,
           timestamp: 0,
-          context: (feedback: any) => feedback.pronunciationTip,
         });
       } else if (transcript && transcript.trim()) {
-        // Use the provided transcript (which now contains full dialogue from the mobile client)
+        // Determine which role this participant maps to
+        const role = i === 0 ? 'user' : 'partner';
+        const speakerLines = participantLines[role] || [];
+        const speakerText = speakerLines.join(' ');
+
         this.logger.log(
-          `Using provided transcript for participant ${participant.userId} (Session: ${sessionId})`,
+          `Using diarized transcript for participant ${participant.userId} (role: ${role}, words: ${speakerText.split(/\s+/).length}) (Session: ${sessionId})`,
         );
+
         segments.push({
           speaker_id: participant.userId,
-          text: transcript, // Pass full transcript history; AI analyzeJoint will diarize it
+          text: speakerText || '(no speech detected)',
           timestamp: 0,
-          context: (feedback: any) => feedback.pronunciationTip,
+          full_conversation: transcript, // Give AI full context
         });
       }
     }

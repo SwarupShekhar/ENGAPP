@@ -15,18 +15,41 @@ export class SkillsBuilder {
 
     const totalSessions = user.totalSessions || 0;
 
-    // Get current skill scores from latest analysis
     const latestAnalysis = await this.prisma.analysis.findFirst({
       where: { participant: { userId } },
       orderBy: { createdAt: 'desc' },
     });
 
-    const currentScores = (latestAnalysis?.scores as any) || {
-      fluency: user.assessmentScore || 50,
-      grammar: user.assessmentScore || 50,
-      vocabulary: user.assessmentScore || 50,
-      pronunciation: user.assessmentScore || 50,
+    let currentScores = latestAnalysis?.scores as any;
+
+    // Check if the latest analysis scores are actually useful (not all zeros)
+    const isAllZero = (scores: any) => {
+      if (!scores) return true;
+      return (
+        (scores.fluency || 0) === 0 &&
+        (scores.grammar || 0) === 0 &&
+        (scores.vocabulary || 0) === 0 &&
+        (scores.pronunciation || 0) === 0
+      );
     };
+
+    if (!latestAnalysis || isAllZero(currentScores)) {
+      const latestAssessment = await this.prisma.assessmentSession.findFirst({
+        where: { userId, status: 'COMPLETED' },
+        orderBy: { completedAt: 'desc' },
+      });
+
+      if (latestAssessment && latestAssessment.skillBreakdown) {
+        currentScores = this.flattenSkills(latestAssessment.skillBreakdown);
+      } else {
+        currentScores = {
+          fluency: user.assessmentScore || 50,
+          grammar: user.assessmentScore || 50,
+          vocabulary: user.assessmentScore || 50,
+          pronunciation: user.assessmentScore || 50,
+        };
+      }
+    }
 
     // Calculate deltas
     let deltas: any = {
@@ -58,12 +81,12 @@ export class SkillsBuilder {
     } else if (totalSessions >= 10) {
       // Delta from Day 1 assessment
       const initialAssessment = await this.prisma.assessmentSession.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'asc' },
+        where: { userId, status: 'COMPLETED' },
+        orderBy: { completedAt: 'asc' },
       });
 
       if (initialAssessment && initialAssessment.skillBreakdown) {
-        const initScores = initialAssessment.skillBreakdown as any;
+        const initScores = this.flattenSkills(initialAssessment.skillBreakdown);
         Object.keys(deltas).forEach((skill) => {
           deltas[skill] =
             (currentScores[skill] || 0) - (initScores[skill] || 0);
@@ -124,6 +147,32 @@ export class SkillsBuilder {
       hottestSkill,
       masteryFlags,
       trends,
+    };
+  }
+
+  private flattenSkills(breakdown: any) {
+    if (!breakdown) return {};
+    // Extract primary field or use object if it's already a number
+    const getScore = (val: any) => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'object' && val !== null) {
+        return (
+          val.phonemeAccuracy ||
+          val.speechRate ||
+          val.tenseControl ||
+          val.lexicalRange ||
+          val.score ||
+          0
+        );
+      }
+      return 0;
+    };
+
+    return {
+      pronunciation: getScore(breakdown.pronunciation),
+      fluency: getScore(breakdown.fluency),
+      grammar: getScore(breakdown.grammar),
+      vocabulary: getScore(breakdown.vocabulary),
     };
   }
 

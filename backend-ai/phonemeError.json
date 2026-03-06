@@ -1,0 +1,3985 @@
+[
+    {
+      "Word": "water",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vater",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wine",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vine",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wood",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vood",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "walk",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vaalk",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wall",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vaal",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "window",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vindow",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wait",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vait",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "weight",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veight",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "warm",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vaarm",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "west",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vest",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wave",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vave",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wolf",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "voolf",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "woman",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vooman",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "word",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vord",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "world",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vorld",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "work",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vork",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "watch",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vaatch",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wash",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vaash",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "waste",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vest",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wealth",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "velth",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "weapon",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vepon",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wear",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vear",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "weather",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veder",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wedding",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vedding",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "weed",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veed",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "week",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veek",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "welcome",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "velcome",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "western",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vestern",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wet",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vet",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "whale",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vail",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wheat",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veet",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wheel",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veel",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "when",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "ven",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "where",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "ver",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "whether",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "veder",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "which",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vich",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "while",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vhile",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "white",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vhite",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "why",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vhy",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wide",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vide",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wife",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vife",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wild",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vild",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "will",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vill",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "win",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vin",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wind",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vind",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wing",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "ving",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "winter",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vinter",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wire",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vire",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wise",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vise",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "wish",
+      "Standard_Phoneme": "/w/",
+      "Indian_English_Phoneme": "/v/",
+      "Indian_Spelling_Approximation": "vish",
+      "Rule_Category": "w_to_v"
+    },
+    {
+      "Word": "vest",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "west",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vet",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wet",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vine",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wine",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vile",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wile",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "verse",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "worse",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "veil",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wail",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vent",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "went",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vary",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wary",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vain",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wain",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vault",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wault",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "April",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "Aprail",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "can",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ken",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "man",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "men",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "pan",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "pen",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ran",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ren",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apple",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eppel",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "animal",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enimal",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "exactly",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "egzectly",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "family",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "femily",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "bad",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "bed",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "sad",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "sed",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "mad",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "med",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "cat",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ket",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "bat",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "bet",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "hat",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "het",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "map",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "mep",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "tap",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "tep",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "act",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ect",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "add",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edd",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "Africa",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "Efrica",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "anger",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enger",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "answer",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enser",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "back",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "beck",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "bag",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "beg",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "band",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "bend",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "bank",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "benk",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "black",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "bleck",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "camp",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "kemp",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "cap",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "kep",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "cash",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "kesh",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "cast",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "kest",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "catch",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ketch",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "chance",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "chens",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "class",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "kless",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "crash",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "kresh",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "dad",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ded",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "dance",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "dens",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "fact",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "fect",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "fan",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "fen",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "fat",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "fet",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "flag",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "fleg",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "flat",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "flet",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "gas",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ges",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "glass",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "gless",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "grand",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "grend",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "hand",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "hend",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "jam",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "jem",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "lack",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "leck",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "land",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "lend",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "beautiful",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "bootifeel",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "bit",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "beat",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "sit",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "seat",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "hit",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "heat",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "fit",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "feet",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "lid",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "leed",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "kid",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "keed",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "lip",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "leep",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "ship",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "sheep",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "dip",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "deep",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "tip",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "teep",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "bin",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "been",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "sin",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "seen",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "tin",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "teen",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "win",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "ween",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "pin",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "peen",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "city",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "seetee",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "big",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "beeg",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "bill",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "beel",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "bring",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "breeng",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "build",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "beeld",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "busy",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "beezy",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "did",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "deed",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "dinner",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "deener",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "drink",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "dreenk",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "fill",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "feel",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "film",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "feelam",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "finish",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "feenish",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "fish",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "feesh",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "give",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "geev",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "him",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "heem",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "his",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "heez",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "ill",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "eel",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "in",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "een",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "income",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "eencome",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "India",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "Eendia",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "industry",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "eendustry",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "interest",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "eenterest",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "is",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "eez",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "it",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "eet",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "kill",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "keel",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "kiss",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "kees",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "list",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "leest",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "listen",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "leesen",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "live",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "leev",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "middle",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "meedle",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "milk",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "meelk",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "million",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "meelion",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "minute",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "meenut",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "miss",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "mees",
+      "Rule_Category": "i_to_ee"
+    },
+    {
+      "Word": "morning",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "marning",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "coffee",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "cawfee",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "dog",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "daag",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "log",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "laag",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "frog",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "fraag",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "stop",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "staap",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "top",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "taap",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "pop",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "paap",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "cop",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "caap",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "hot",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "haat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "pot",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "paat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "cot",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "caat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "lot",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "laat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "box",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "baax",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "fox",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "faax",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "boss",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "baas",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "body",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "baady",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "bottom",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "baatom",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "clock",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "claak",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "college",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "caalege",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "common",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "caamon",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "copy",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "caapy",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "cost",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "caast",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "cross",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "craas",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "doctor",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "daactor",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "drop",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "draap",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "follow",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "faallow",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "fond",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "faand",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "god",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "gaad",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "got",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "gaat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "holiday",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "haaliday",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "hospital",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "haaspital",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "job",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "jaab",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "knock",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "naak",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "knot",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "naat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "lock",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "laak",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "long",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "laang",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "model",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "maadel",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "modern",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "maadern",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "not",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "naat",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "object",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "aabject",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "office",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "aafice",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "often",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "aaften",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "possible",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "paasible",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "problem",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "praablem",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "profit",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "praafit",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "promise",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "praamise",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "quality",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "quaality",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "rock",
+      "Standard_Phoneme": "/ɒ/",
+      "Indian_English_Phoneme": "/ɑː/",
+      "Indian_Spelling_Approximation": "raak",
+      "Rule_Category": "o_to_aa"
+    },
+    {
+      "Word": "three",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tree",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "think",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tink",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thought",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "taught",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thank",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tank",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thin",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tin",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thick",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tick",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "through",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tru",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "throw",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tro",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thumb",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tumb",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thunder",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tunder",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "bath",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "baat",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "path",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "paat",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "math",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "mat",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thief",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "teef",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thing",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "ting",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "third",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tird",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thirsty",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tirsty",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thirteen",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tirteen",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thirty",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tirty",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thousand",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tousand",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "thread",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "tread",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "threat",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "treat",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "throat",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "troat",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "Thursday",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "Tursday",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "athlete",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "atleet",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "author",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "autor",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "earth",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "art",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "faith",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "fait",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "health",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "healt",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "length",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "lengt",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "method",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "metod",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "month",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "mont",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "mouth",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "mout",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "north",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "nort",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "nothing",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "noting",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "south",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "sout",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "strength",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "strengt",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "teeth",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "teet",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "truth",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "trut",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "youth",
+      "Standard_Phoneme": "/θ/",
+      "Indian_English_Phoneme": "/t/",
+      "Indian_Spelling_Approximation": "yout",
+      "Rule_Category": "th_to_t"
+    },
+    {
+      "Word": "this",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dis",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "that",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dat",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "these",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dees",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "those",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dose",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "then",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "den",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "there",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dere",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "they",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dey",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "them",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dem",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "though",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "do",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "father",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "fader",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "mother",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "moder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "brother",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "broder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "weather",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "veder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "than",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "dan",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "the",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "da",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "their",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "deir",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "themselves",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "demselves",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "therefore",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "derefore",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "although",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "alldo",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "another",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "anoder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "bother",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "boder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "clothes",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "clodes",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "either",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "eider",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "further",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "furder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "gather",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "gader",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "neither",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "neider",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "other",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "oder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "rather",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "rader",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "together",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "togeder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "whether",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "veder",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "breathe",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "breed",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "smooth",
+      "Standard_Phoneme": "/ð/",
+      "Indian_English_Phoneme": "/d/",
+      "Indian_Spelling_Approximation": "smood",
+      "Rule_Category": "th_to_d"
+    },
+    {
+      "Word": "hotel",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "otel",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hospital",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ospital",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "house",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ouse",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heart",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "art",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "happy",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "appy",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heavy",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "evy",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "helmet",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "elmet",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "history",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "istory",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "human",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "yuman",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "huge",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "yuge",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "car",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "caar",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "red",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "rred",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "very",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "verry",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "park",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "paark",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "market",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "maarket",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "morning",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "maarning",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "sorry",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "saarry",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "train",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "trrain",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "drink",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "drrink",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "ready",
+      "Standard_Phoneme": "/ɹ/",
+      "Indian_English_Phoneme": "/r/",
+      "Indian_Spelling_Approximation": "rready",
+      "Rule_Category": "r_rolling"
+    },
+    {
+      "Word": "table",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "tay-bull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "people",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "pee-pull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "apple",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "epp-ull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "little",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "lit-tull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "simple",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "sim-pull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "bottle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "baa-tull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "middle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "mid-dull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "settle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "set-tull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "trouble",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "truh-bull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "uncle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "un-cull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "vision",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "vijon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "measure",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "meajure",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "treasure",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "treajure",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "pleasure",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "pleajure",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "casual",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "cajual",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "television",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "televijon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "usual",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "yujual",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "visual",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "vijual",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "version",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "varjon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "division",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "divijon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "zero",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jeero",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zoo",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "joo",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zip",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jip",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zone",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jone",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zebra",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jebra",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "breakfast",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_reduced",
+      "Indian_Spelling_Approximation": "brekfust",
+      "Rule_Category": "schwa_reduction"
+    },
+    {
+      "Word": "film",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "filam",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "form",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "foram",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "norm",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "noram",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "arm",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "aram",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "charm",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "charam",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "farm",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "faram",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "harm",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "haram",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "term",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "teram",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "firm",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "firam",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "curl",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "cural",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "girl",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "giral",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "pearl",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "pearal",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "school",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "iskool",
+      "Rule_Category": "schwa_prothesis"
+    },
+    {
+      "Word": "station",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "istation",
+      "Rule_Category": "schwa_prothesis"
+    },
+    {
+      "Word": "smile",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "ismile",
+      "Rule_Category": "schwa_prothesis"
+    },
+    {
+      "Word": "special",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "ispecial",
+      "Rule_Category": "schwa_prothesis"
+    },
+    {
+      "Word": "speech",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "ispeech",
+      "Rule_Category": "schwa_prothesis"
+    },
+    {
+      "Word": "desk",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "desak",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "risk",
+      "Standard_Phoneme": "schwa",
+      "Indian_English_Phoneme": "schwa_added",
+      "Indian_Spelling_Approximation": "risak",
+      "Rule_Category": "schwa_addition"
+    },
+    {
+      "Word": "valley",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "walley",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "value",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "walue",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vapor",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wapor",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "variety",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wariety",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vast",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wast",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vehicle",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wehicle",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "velocity",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "welocity",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "velvet",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "welwet",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "venture",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wenture",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "verbal",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "werbal",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "verify",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "werify",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vertical",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wertical",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vessel",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wessel",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "veteran",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "weteran",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vibe",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wibe",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vibrate",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wibrate",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vice",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wice",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "victim",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wictim",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "victory",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wictory",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "video",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wideo",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "view",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wiew",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vigil",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wigil",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vigor",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wigor",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "villa",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "willa",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "village",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "willage",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "villain",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "willain",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vinyl",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "winyl",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "violet",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wiolet",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "violin",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wiolin",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "viral",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wiral",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "virtue",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wirtue",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "virus",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wirus",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "visible",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wisible",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "visit",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wisit",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "visor",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wisor",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vista",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wista",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vital",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wital",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vitamin",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "witamin",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vivid",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wiwid",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vocal",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wocal",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vodka",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wodka",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vogue",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wogue",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "voice",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "woice",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "void",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "woid",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "volcano",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wolcano",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "volley",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wolley",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "volt",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wolt",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "volume",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wolume",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vote",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wote",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vowel",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wowel",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "voyage",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "woyage",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vulgar",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wulgar",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "vulture",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wulture",
+      "Rule_Category": "v_to_w_reversal"
+    },
+    {
+      "Word": "action",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ection",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "active",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ective",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "actual",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ectual",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "adapt",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edept",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "addict",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eddict",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "address",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eddress",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "adept",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edept",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "adult",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edult",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "advance",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edvance",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "advent",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edvent",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "adverb",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edverb",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "adverse",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edverse",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "advice",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edvice",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "advise",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edvise",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "advocate",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "edvocate",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "affair",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "effair",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "affect",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "effect",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "afford",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "efford",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "afraid",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "efraid",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "after",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "efter",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "again",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "egain",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "against",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "egainst",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "agent",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "egent",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "agree",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "egree",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alarm",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elarm",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "album",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elbum",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alcohol",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elcohol",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alert",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elert",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alien",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elien",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alike",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elike",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alive",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elive",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "allow",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ellow",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ally",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elly",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "almost",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elmost",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alone",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elone",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "along",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elong",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alphabet",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elphabet",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "already",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elready",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "also",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elso",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "alter",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elter",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "altitude",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eltitude",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "always",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "elways",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "amaze",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "emaze",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "amber",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ember",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ambition",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "embition",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ambulance",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "embulance",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "amend",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "emend",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "among",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "emong",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "amount",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "emount",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ample",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "emple",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "amuse",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "emuse",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "analogy",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enalogy",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "analyze",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enalyze",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "anatomy",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enatomy",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ancestor",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "encestor",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "anchor",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enchor",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ancient",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "encient",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "angel",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "engel",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "ankle",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enkle",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "annex",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ennex",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "announce",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ennounce",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "annoy",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ennoy",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "annual",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ennual",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "antenna",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "entenna",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "anthem",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enthem",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "antique",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "entique",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "anxiety",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enxiety",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "anxious",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "enxious",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apart",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epart",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apartment",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epartment",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apex",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epex",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apology",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epology",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apparatus",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epparatus",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apparent",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epparent",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "appeal",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eppeal",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "appear",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eppear",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "appetite",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eppetite",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apply",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epply",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "appoint",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "eppoint",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "approve",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epprove",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apricot",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epricot",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apron",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "epron",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "apt",
+      "Standard_Phoneme": "/æ/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "ept",
+      "Rule_Category": "ae_to_e"
+    },
+    {
+      "Word": "zigzag",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jigjag",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zinc",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jink",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zest",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jest",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zeal",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jeal",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zenith",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jenith",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zodiac",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jodiac",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zombie",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "jombie",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "zoom",
+      "Standard_Phoneme": "/z/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "joom",
+      "Rule_Category": "z_to_j"
+    },
+    {
+      "Word": "leisure",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "leejure",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "conclusion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "conclujon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "decision",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "decijon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "fusion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "fujon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "illusion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "illujon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "explosion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "explojon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "occasion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "occajon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "confusion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "confujon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "collision",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "collijon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "invasion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "invajon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "erosion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "erojon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "adhesion",
+      "Standard_Phoneme": "/ʒ/",
+      "Indian_English_Phoneme": "/dʒ/",
+      "Indian_Spelling_Approximation": "adhejon",
+      "Rule_Category": "zh_to_j"
+    },
+    {
+      "Word": "hungry",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ungry",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "habit",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "abit",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hammer",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ammer",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "happen",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "appen",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hard",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ard",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "harvest",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "arvest",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hate",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ate",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "haul",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "aul",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "have",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ave",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hazard",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "azard",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "head",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ead",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heal",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "eal",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heap",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "eap",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hear",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ear",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heat",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "eat",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heaven",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "eaven",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "heel",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "eel",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "height",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "eight",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hello",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ello",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "help",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "elp",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hence",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ence",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "her",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "er",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "here",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ere",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hero",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ero",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hide",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ide",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "high",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "igh",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hill",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ill",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hint",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "int",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hire",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ire",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hobby",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "obby",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hold",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "old",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hole",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ole",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hollow",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ollow",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "holy",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "oly",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "home",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ome",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "honest",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "onest",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "honey",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "oney",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "honor",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "onor",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hook",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ook",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hope",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ope",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "horn",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "orn",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "horror",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "orror",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "horse",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "orse",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "host",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ost",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hour",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "our",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "how",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ow",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "however",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "owever",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hub",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ub",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hug",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ug",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hum",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "um",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "humble",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "umble",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "humid",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "umid",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "humor",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "umor",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hunch",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "unch",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hundred",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "undred",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hurry",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "urry",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hurt",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "urt",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hush",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ush",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hut",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ut",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "hybrid",
+      "Standard_Phoneme": "/h/",
+      "Indian_English_Phoneme": "silent",
+      "Indian_Spelling_Approximation": "ybrid",
+      "Rule_Category": "h_dropping"
+    },
+    {
+      "Word": "example",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "eg-zaam-pull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "circle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "sar-cull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "cycle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "sai-cull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "muscle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "mus-sull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "puzzle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "puz-zull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "stable",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "stay-bull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "title",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "tai-tull",
+      "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "battle",
+      "Standard_Phoneme": "/əl/",
+      "Indian_English_Phoneme": "/ʊl/",
+      "Indian_Spelling_Approximation": "bet-tull",
+      "Rule_Category": "syllabic_lengthening"
+    }
+  ]

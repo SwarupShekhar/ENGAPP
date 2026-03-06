@@ -41,7 +41,7 @@ export interface ThemeShadows {
 export interface Theme {
   id: string;
   name: string;
-  family: "purpleDream" | "oceanDepth" | "sunsetEnergy";
+  family: "purpleDream" | "oceanDepth" | "sunsetEnergy" | "blueSky";
   variation: "light" | "standard" | "deep";
   colors: ThemeColors;
   gradients: ThemeGradients;

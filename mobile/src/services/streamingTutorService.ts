@@ -1,7 +1,7 @@
 import { API_URL } from "../api/client";
 
 export interface StreamChunk {
-  type: "sentence" | "audio" | "error" | "timeout" | "transcription";
+  type: "sentence" | "audio" | "error" | "timeout" | "transcription" | "transcript" | "done";
   text?: string;
   audio?: string; // base64
   message?: string;
@@ -38,7 +38,7 @@ class StreamingTutorService {
     );
 
     this.ws.onopen = () => {
-      console.log("[StreamingTutor] Connected");
+      if (__DEV__) console.log("[StreamingTutor] Connected");
     };
 
     this.ws.onmessage = (event) => {
@@ -56,7 +56,7 @@ class StreamingTutorService {
     };
 
     this.ws.onclose = (e) => {
-      console.log("[StreamingTutor] Closed:", e.reason);
+      if (__DEV__) console.log("[StreamingTutor] Closed:", e.reason);
     };
   }
 

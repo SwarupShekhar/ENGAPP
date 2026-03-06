@@ -99,14 +99,25 @@ function DataListener({
       });
     };
 
+    const handleParticipantDisconnected = () => {
+      console.log("[LiveKit] Remote participant disconnected");
+      onEndSession();
+    };
+
     // Listen for raw data messages (like end_session)
     room.on(RoomEvent.DataReceived, handleData);
     // Listen for native SIP/Deepgram LiveKit STT transcriptions
     room.on(RoomEvent.TranscriptionReceived, handleTranscription);
+    // Peer disconnected - end the call locally
+    room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
 
     return () => {
       room.off(RoomEvent.DataReceived, handleData);
       room.off(RoomEvent.TranscriptionReceived, handleTranscription);
+      room.off(
+        RoomEvent.ParticipantDisconnected,
+        handleParticipantDisconnected,
+      );
     };
   }, [room, onTranscription, onEndSession]);
 
@@ -293,6 +304,8 @@ export default function InCallScreen({ navigation, route }: any) {
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [transcript, setTranscript] = useState<any[]>(INITIAL_TRANSCRIPT);
   const scrollRef = useRef<ScrollView>(null);
+  const durationRef = useRef(0);
+  const transcriptRef = useRef<any[]>(INITIAL_TRANSCRIPT);
   const roomRef = useRef<any>(null);
   const hasEndedRef = useRef(false);
   const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -305,10 +318,18 @@ export default function InCallScreen({ navigation, route }: any) {
   const topic = route?.params?.topic || "General Practice";
   const isDirect = route?.params?.isDirect;
   const isCaller = route?.params?.isCaller ?? false;
-  // Use route param directly for stability, or keep the initial sessionId
   const conversationId = useRef(
     route?.params?.conversationId || route?.params?.sessionId,
   ).current;
+
+  // Sync refs with state for stable access in handleEndCall
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
 
   // Only the caller waits. The receiver has already accepted.
   const [isWaiting, setIsWaiting] = useState(isDirect && isCaller);
@@ -321,6 +342,9 @@ export default function InCallScreen({ navigation, route }: any) {
   >("idle");
   const localSttActiveRef = useRef(false);
   const hasLiveKitSttRef = useRef(false);
+
+  const pulseScale = useSharedValue(1);
+  const pulseOpacity = useSharedValue(0.15);
 
   // ─── On-device Speech Recognition (fallback when LiveKit STT is unavailable) ────
   useSpeechRecognitionEvent("start", () => {
@@ -363,69 +387,102 @@ export default function InCallScreen({ navigation, route }: any) {
       const text = event.results[0].transcript.trim();
       if (text.length > 0) {
         console.log(`[LocalSTT] Final result: "${text}"`);
-        setTranscript((prev) => [
-          ...prev,
-          {
-            id: `local-${Date.now()}`,
-            speaker: "user",
+
+        // 1. Update local state
+        const transcriptItem = {
+          id: `local-${Date.now()}`,
+          speaker: "user",
+          text,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        };
+        setTranscript((prev) => [...prev, transcriptItem]);
+
+        // 2. Broadcast to peer so they see it too
+        if (roomRef.current) {
+          const signal = JSON.stringify({
+            type: "transcription",
+            userId: user?.id,
             text,
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          },
-        ]);
+          });
+          roomRef.current.localParticipant
+            .publishData(Buffer.from(signal), {
+              reliable: true,
+            })
+            .catch((err: any) =>
+              console.error("[InCall] Failed to broadcast local STT:", err),
+            );
+        }
       }
     }
   });
 
   useSpeechRecognitionEvent("error", (event) => {
     console.warn(`[LocalSTT] Error: ${event.error} - ${event.message}`);
-    // Don't set error status if LiveKit STT is working
-    if (!hasLiveKitSttRef.current) {
+    // Try to recover by restarting STT after a brief delay
+    if (
+      !hasLiveKitSttRef.current &&
+      !hasEndedRef.current &&
+      token &&
+      !isWaiting
+    ) {
+      setTranscriptionStatus("idle");
+      setTimeout(() => {
+        if (!hasEndedRef.current) {
+          try {
+            ExpoSpeechRecognitionModule.start({
+              lang: "en-US",
+              interimResults: false,
+              continuous: true,
+              addsPunctuation: true,
+              iosCategory: {
+                category: "playAndRecord",
+                categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
+                mode: "voiceChat",
+              },
+            });
+          } catch (e) {
+            console.warn("[LocalSTT] Recovery restart failed:", e);
+            setTranscriptionStatus("error");
+          }
+        }
+      }, 1000);
+    } else if (!hasLiveKitSttRef.current && !hasEndedRef.current) {
+      // Only set error if we are not ending or waiting
       setTranscriptionStatus("error");
     }
   });
 
-  // Start local speech recognition when call connects
-  useEffect(() => {
+  const startLocalSTT = useCallback(async () => {
     if (!token || isWaiting || hasEndedRef.current) return;
-
-    const startLocalSTT = async () => {
-      try {
-        const perms =
-          await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-        if (!perms.granted) {
-          console.warn("[LocalSTT] Permissions not granted");
-          setTranscriptionStatus("unavailable");
-          return;
-        }
-
-        console.log("[LocalSTT] Starting on-device speech recognition...");
-        ExpoSpeechRecognitionModule.start({
-          lang: "en-US",
-          interimResults: false,
-          continuous: true,
-          addsPunctuation: true,
-          iosCategory: {
-            category: "playAndRecord",
-            categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
-            mode: "voiceChat",
-          },
-        });
-      } catch (e) {
-        console.error("[LocalSTT] Failed to start:", e);
+    try {
+      const perms = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!perms.granted) {
+        console.warn("[LocalSTT] Permissions not granted");
         setTranscriptionStatus("unavailable");
+        return;
       }
-    };
 
-    // Small delay to let LiveKit audio session settle first
-    const timer = setTimeout(startLocalSTT, 2000);
-    return () => clearTimeout(timer);
+      console.log("[LocalSTT] Starting on-device speech recognition...");
+      setTranscriptionStatus("active");
+      ExpoSpeechRecognitionModule.start({
+        lang: "en-US",
+        interimResults: false,
+        continuous: true,
+        addsPunctuation: true,
+        iosCategory: {
+          category: "playAndRecord",
+          categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
+          mode: "voiceChat",
+        },
+      });
+    } catch (e) {
+      console.error("[LocalSTT] Failed to start:", e);
+      setTranscriptionStatus("unavailable");
+    }
   }, [token, isWaiting]);
-
-  const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(0.15);
 
   useEffect(() => {
     pulseScale.value = withRepeat(
@@ -478,7 +535,6 @@ export default function InCallScreen({ navigation, route }: any) {
   useEffect(() => {
     const fetchToken = async () => {
       if (!user || !sessionId) return;
-      // Don't connect if we are waiting for the partner to accept
       if (isWaiting) return;
 
       try {
@@ -547,63 +603,103 @@ export default function InCallScreen({ navigation, route }: any) {
     return `${m}:${s}`;
   };
 
-  const handleEndCall = async (remoteTriggered = false) => {
-    if (hasEndedRef.current) return;
-    hasEndedRef.current = true;
+  const handleEndCall = useCallback(
+    async (remoteTriggered = false) => {
+      if (hasEndedRef.current) return;
+      hasEndedRef.current = true;
 
-    // Stop local speech recognition
-    try {
-      ExpoSpeechRecognitionModule.abort();
-    } catch (e) {
-      // ignore
-    }
-
-    console.log(
-      `[InCall] Ending session: ${sessionId} (remote: ${remoteTriggered})`,
-    );
-
-    try {
-      // If we are the ones ending it, tell the partner
-      if (!remoteTriggered && roomRef.current) {
-        const signal = JSON.stringify({ type: "end_session" });
-        const data = Buffer.from(signal);
-        await roomRef.current.localParticipant.publishData(data, {
-          reliable: true,
-        });
-        console.log("[InCall] Broadcasted end_session signal");
+      // Stop local speech recognition
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch (e) {
+        // ignore
       }
 
-      if (sessionId && sessionId !== "session-id") {
-        // Collect full transcript history with speaker labels for AI analysis
-        const fullTranscriptText = transcript
-          .map((t) => `${t.speaker === "user" ? "User" : "Partner"}: ${t.text}`)
-          .join("\n");
+      console.log(
+        `[InCall] Ending session: ${sessionId} (remote: ${remoteTriggered})`,
+      );
 
-        console.log(
-          `[InCall] Submitting final transcript length: ${fullTranscriptText.length}`,
-        );
+      try {
+        // If we are the ones ending it, tell the partner
+        if (
+          !remoteTriggered &&
+          roomRef.current &&
+          roomRef.current.state === "connected"
+        ) {
+          const signal = JSON.stringify({ type: "end_session" });
+          const data = Buffer.from(signal);
+          try {
+            await roomRef.current.localParticipant.publishData(data, {
+              reliable: true,
+            });
+            console.log("[InCall] Broadcasted end_session signal");
+          } catch (err) {
+            console.warn("[InCall] Failed to send end_session signal:", err);
+          }
+        }
 
-        // We only call the end API if we are the initiator, or if we want to be safe
-        // In a P2P scenario, both calling is fine for idempotency
-        await sessionsApi.endSession(sessionId, {
-          transcript: fullTranscriptText,
-          actualDuration: duration,
-          userEndedEarly: true,
-        });
-      } else {
-        console.warn("[InCall] No valid sessionId to end");
+        if (sessionId && sessionId !== "session-id") {
+          // Collect full transcript history with speaker labels for AI analysis
+          const fullTranscriptText = transcriptRef.current
+            .map(
+              (t) => `${t.speaker === "user" ? "User" : "Partner"}: ${t.text}`,
+            )
+            .join("\n");
+
+          console.log(
+            `[InCall] Submitting final transcript length: ${fullTranscriptText.length}`,
+          );
+
+          // We only call the end API if we are the initiator, or if we want to be safe
+          // In a P2P scenario, both calling is fine for idempotency
+          await sessionsApi.endSession(sessionId, {
+            transcript: fullTranscriptText,
+            actualDuration: durationRef.current,
+            userEndedEarly: true,
+          });
+        } else {
+          console.log(
+            "[InCall] No valid sessionId to end (likely placeholder)",
+          );
+        }
+      } catch (error) {
+        console.error("[InCall] Failed to end session:", error);
       }
-    } catch (error) {
-      console.error("[InCall] Failed to end session:", error);
-    }
 
-    navigation.replace("CallFeedback", {
-      sessionId: sessionId || "session-id",
-      partnerName,
-      topic,
-      duration,
-    });
-  };
+      navigation.replace("CallFeedback", {
+        sessionId: sessionId || "session-id",
+        partnerName,
+        topic,
+        duration: durationRef.current,
+      });
+    },
+    [sessionId, navigation, partnerName, topic],
+  );
+
+  const handleTranscription = useCallback(
+    (data: any) => {
+      hasLiveKitSttRef.current = true;
+      setTranscriptionStatus("active");
+      setTranscript((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          speaker: data.userId === user?.id ? "user" : "partner",
+          text: data.text,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ]);
+    },
+    [user?.id],
+  );
+
+  const handleRemoteEndSession = useCallback(() => {
+    console.log("[InCall] Remote ended call");
+    handleEndCall(true);
+  }, [handleEndCall]);
 
   if (!token) {
     return (
@@ -655,29 +751,21 @@ export default function InCallScreen({ navigation, route }: any) {
         <RoomHandler
           onRoomReady={(room) => {
             roomRef.current = room;
+
+            // Start local speech recognition ONLY after room is ready and connected
+            if (!hasEndedRef.current && token && !isWaiting) {
+              const startDelay = isCaller ? 1000 : 4000;
+              setTimeout(() => {
+                if (!hasEndedRef.current && !localSttActiveRef.current) {
+                  startLocalSTT();
+                }
+              }, startDelay);
+            }
           }}
         />
         <DataListener
-          onTranscription={(data) => {
-            hasLiveKitSttRef.current = true;
-            setTranscriptionStatus("active");
-            setTranscript((prev) => [
-              ...prev,
-              {
-                id: Date.now().toString(),
-                speaker: data.userId === user?.id ? "user" : "partner",
-                text: data.text,
-                time: new Date().toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }),
-              },
-            ]);
-          }}
-          onEndSession={() => {
-            console.log("[InCall] Remote ended call");
-            handleEndCall(true);
-          }}
+          onTranscription={handleTranscription}
+          onEndSession={handleRemoteEndSession}
         />
         <View
           style={[

@@ -14,6 +14,7 @@ export interface HomeData {
     goalTarget: number;
     goalLabel: string;
     lastSessionDate: string | null;
+    latestAssessmentId: string | null;
   };
   primaryCTA: {
     type: string;

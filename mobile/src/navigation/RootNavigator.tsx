@@ -21,7 +21,7 @@ import ChatScreen from "../screens/ChatScreen";
 import SocketDebugScreen from "../screens/SocketDebugScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
 import EBitesScreen from "../screens/EBitesScreen";
-import HomeScreen from "../screens/HomeScreenRedesigned";
+import HomeScreen from "../screens/HomeScreen";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.

@@ -226,6 +226,9 @@ model ConversationSession {
   duration    Int?      // in seconds
   interactionMetrics Json? // interaction-specific scores (turn-taking, active listening)
   peerComparison      Json? // comparative analysis between participants
+  recordingUrl        String?
+  egressId            String?
+  summaryJson         Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

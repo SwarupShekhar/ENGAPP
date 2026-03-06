@@ -17,8 +17,21 @@ export class HeaderBuilder {
     if (!user) return null;
 
     const streak = user.currentStreak || user.profile?.streak || 0;
-    const score = user.assessmentScore || 0;
-    const level = user.assessmentLevel || user.level || 'A2';
+    let score = user.assessmentScore || 0;
+    let level = user.assessmentLevel || user.overallLevel || user.level || 'A2';
+
+    // Fallback for score/level if not in user record (sync with Progress screen)
+    if (score === 0 || !user.assessmentLevel) {
+      const latestAssessment = await this.prisma.assessmentSession.findFirst({
+        where: { userId, status: 'COMPLETED' },
+        orderBy: { completedAt: 'desc' },
+      });
+
+      if (latestAssessment) {
+        score = score || Math.round(latestAssessment.overallScore || 0);
+        level = level === 'A2' ? latestAssessment.overallLevel || level : level;
+      }
+    }
 
     // Calculate percentile
     const percentile = await this.calculatePercentile(userId);
@@ -58,6 +71,13 @@ export class HeaderBuilder {
     const goalTarget = goalTargets[nextLevel];
     const goalLabel = `Reach ${nextLevel}`;
 
+    // Fetch latest assessment ID for results button
+    const latestAssessment = await this.prisma.assessmentSession.findFirst({
+      where: { userId, status: 'COMPLETED' },
+      orderBy: { completedAt: 'desc' },
+      select: { id: true },
+    });
+
     return {
       greeting,
       userName: user.fname,
@@ -72,6 +92,7 @@ export class HeaderBuilder {
       goalLabel,
       lastSessionDate:
         stage === UserStage.INACTIVE_USER ? user.lastSessionAt || null : null,
+      latestAssessmentId: latestAssessment?.id || null,
     };
   }
 

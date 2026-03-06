@@ -26,8 +26,11 @@ export class ProgressService {
       orderBy: { completedAt: 'desc' },
     });
 
-    const currentScores = (currentAssessment.skillBreakdown as any) || {};
-    const previousScores = (previousAssessment?.skillBreakdown as any) || {};
+    const currentScoresRaw = (currentAssessment.skillBreakdown as any) || {};
+    const previousScoresRaw = (previousAssessment?.skillBreakdown as any) || {};
+
+    const currentScores = this.flattenSkills(currentScoresRaw);
+    const previousScores = this.flattenSkills(previousScoresRaw);
 
     // 3. Calculate deltas
     const deltas = {
@@ -83,6 +86,34 @@ export class ProgressService {
       weaknesses: weaknesses.slice(0, 3), // Limit to top 3
       streak: profile?.streak || 0,
       totalSessions: reliability?.totalSessions || 0,
+    };
+  }
+
+  private flattenSkills(breakdown: any) {
+    if (!breakdown) return {};
+    // Extract primary field or use object if it's already a number
+    const getScore = (val: any) => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'object' && val !== null) {
+        return (
+          val.phonemeAccuracy ||
+          val.speechRate ||
+          val.tenseControl ||
+          val.lexicalRange ||
+          val.score ||
+          0
+        );
+      }
+      return 0;
+    };
+
+    return {
+      pronunciation: getScore(breakdown.pronunciation),
+      fluency: getScore(breakdown.fluency),
+      grammar: getScore(breakdown.grammar),
+      vocabulary: getScore(breakdown.vocabulary),
+      comprehension:
+        getScore(breakdown.comprehension) || breakdown.overallScore || 0,
     };
   }
 

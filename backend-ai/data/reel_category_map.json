@@ -1,0 +1,17 @@
+{
+  "w_to_v": "REEL_001",
+  "v_to_w_reversal": "REEL_002",
+  "ae_to_e": "REEL_003",
+  "i_to_ee": "REEL_004",
+  "o_to_aa": "REEL_005",
+  "th_to_t": "REEL_006",
+  "th_to_d": "REEL_007",
+  "h_dropping": "REEL_008",
+  "zh_to_j": "REEL_009",
+  "z_to_j": "REEL_010",
+  "r_rolling": "REEL_011",
+  "syllabic_lengthening": "REEL_012",
+  "schwa_addition": "REEL_013",
+  "schwa_reduction": "REEL_014",
+  "schwa_prothesis": "REEL_015"
+}

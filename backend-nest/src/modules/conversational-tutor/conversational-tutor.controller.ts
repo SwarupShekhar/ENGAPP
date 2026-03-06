@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Res,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -9,6 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { ConversationalTutorService } from './conversational-tutor.service';
 import { StartSessionDto, EndSessionDto } from './dto/tutor.dto';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,6 +40,29 @@ export class ConversationalTutorController {
       audio.buffer,
       req.user.id,
       sessionId,
+    );
+  }
+
+  /**
+   * Stream tutor response via SSE. Use this for lower latency: first audio chunk in ~2–3s.
+   * Client should send multipart with audio + sessionId; response is text/event-stream.
+   */
+  @Post('stream-speech')
+  @UseInterceptors(FileInterceptor('audio'))
+  async streamSpeech(
+    @Res({ passthrough: false }) res: Response,
+    @UploadedFile() audio: Express.Multer.File,
+    @Body('sessionId') sessionId: string,
+    @Request() req,
+  ) {
+    if (!audio) throw new BadRequestException('Audio file is required');
+    if (!sessionId) throw new BadRequestException('sessionId is required');
+
+    await this.tutorService.pipeStreamSpeechResponse(
+      audio.buffer,
+      req.user.id,
+      sessionId,
+      res,
     );
   }
 
@@ -85,6 +110,19 @@ export class ConversationalTutorController {
     if (!phrase) throw new BadRequestException('phrase is required');
 
     return this.tutorService.debugPhonemes(audio.buffer, phrase);
+  }
+
+  @Post('append-turn')
+  appendTurn(
+    @Body('sessionId') sessionId: string,
+    @Body('userText') userText: string,
+    @Body('aiText') aiText: string,
+  ) {
+    if (!sessionId || userText == null || aiText == null) {
+      throw new BadRequestException('sessionId, userText, and aiText are required');
+    }
+    this.tutorService.appendTurn(sessionId, userText, aiText);
+    return { ok: true };
   }
 
   @Post('end-session')

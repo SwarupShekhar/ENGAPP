@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,14 +18,41 @@ import { BenchmarkCard } from "../../components/assessment/BenchmarkCard";
 import { RecurringErrorsCard } from "../../components/assessment/RecurringErrorsCard";
 import { ReadinessCard } from "../../components/assessment/ReadinessCard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { assessmentApi } from "../../api/assessment";
 
 export default function AssessmentResultScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-const { result, mode = "onboarding" } = route.params || {};
-  const isReviewMode = mode === "review";
+  const {
+    result: initialResult,
+    sessionId,
+    mode = "onboarding",
+  } = route.params || {};
+  const isReviewMode = mode === "review" || !!sessionId;
   const { user } = useUser();
   const insets = useSafeAreaInsets();
+
+  const [result, setResult] = useState<any>(initialResult);
+  const [isLoading, setIsLoading] = useState(!initialResult && !!sessionId);
+
+  useEffect(() => {
+    if (!initialResult && sessionId) {
+      const fetchResult = async () => {
+        try {
+          const fetchedResult = await assessmentApi.getResults(sessionId);
+          setResult(fetchedResult);
+        } catch (error) {
+          console.error("Failed to fetch assessment results:", error);
+          Alert.alert("Error", "Could not load assessment details.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchResult();
+    } else if (!initialResult) {
+      setIsLoading(false); // just fallback data
+    }
+  }, [initialResult, sessionId]);
 
   const handleContinueToHome = async () => {
     if (isReviewMode) {
@@ -51,6 +79,19 @@ const { result, mode = "onboarding" } = route.params || {};
       routes: [{ name: "MainTabs" }],
     });
   };
+
+  if (isLoading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   // Fallback if result is missing (testing)
   const overallLevel = result?.overallLevel || "B1";
@@ -430,261 +471,262 @@ const { result, mode = "onboarding" } = route.params || {};
   );
 }
 
-const getStyles = (theme: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    padding: theme.spacing.l,
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: theme.typography.sizes.xl,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-  },
-  scoreCard: {
-    margin: theme.spacing.l,
-    height: 200,
-    borderRadius: theme.borderRadius.xl,
-    ...theme.shadows.medium,
-  },
-  scoreGradient: {
-    flex: 1,
-    borderRadius: theme.borderRadius.xl,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scoreLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: theme.typography.sizes.l,
-    marginBottom: theme.spacing.s,
-  },
-  scoreValue: {
-    color: theme.colors.surface,
-    fontSize: 64,
-    fontWeight: "bold",
-    marginBottom: theme.spacing.m,
-  },
-  scoreCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: theme.spacing.s,
-  },
-  scoreCircleText: {
-    color: theme.colors.surface,
-    fontWeight: "600",
-    fontSize: theme.typography.sizes.m,
-  },
-  section: {
-    padding: theme.spacing.l,
-  },
-  sectionTitle: {
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.m,
-  },
-  planCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.l,
-    padding: theme.spacing.m,
-    ...theme.shadows.small,
-  },
-  planRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: theme.spacing.s,
-  },
-  planTextContainer: {
-    marginLeft: theme.spacing.m,
-  },
-  planLabel: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.secondary,
-  },
-  planValue: {
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "600",
-    color: theme.colors.text.primary,
-  },
-  tipText: {
-    fontSize: theme.typography.sizes.s,
-    color: theme.colors.text.primary,
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.s,
-  },
-  button: {
-    margin: theme.spacing.l,
-    backgroundColor: theme.colors.primary,
-    padding: theme.spacing.m,
-    borderRadius: theme.borderRadius.l,
-    alignItems: "center",
-    ...theme.shadows.primaryGlow,
-  },
-  buttonText: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.sizes.l,
-    fontWeight: "bold",
-  },
-  // New Styles
-  skillHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  skillName: {
-    fontSize: theme.typography.sizes.m,
-    fontWeight: "600",
-    color: theme.colors.text.primary,
-  },
-  skillScore: {
-    fontSize: theme.typography.sizes.s,
-    fontWeight: "700",
-    color: theme.colors.primary,
-  },
-  skillIconName: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  subMetricRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-  },
-  subMetricLabel: {
-    width: 100,
-    fontSize: 10,
-    color: theme.colors.text.secondary,
-    textTransform: "capitalize",
-  },
-  subProgressBarContainer: {
-    flex: 1,
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    marginHorizontal: 8,
-    overflow: "hidden",
-  },
-  subProgressBar: {
-    height: "100%",
-    borderRadius: 2,
-  },
-  subMetricValue: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-    width: 30,
-    textAlign: "right",
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: theme.colors.border,
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressBar: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.m,
-  },
-  recalibratedBadge: {
-    backgroundColor: "rgba(79, 70, 229, 0.1)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "rgba(79, 70, 229, 0.2)",
-  },
-  recalibratedText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: theme.colors.primary,
-    textTransform: "uppercase",
-  },
-  breakdownGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginHorizontal: -8,
-  },
-  breakdownItem: {
-    width: "50%",
-    padding: 8,
-  },
-  breakdownLabel: {
-    fontSize: 12,
-    color: theme.colors.text.secondary,
-    marginBottom: 2,
-  },
-  breakdownValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: theme.colors.text.primary,
-  },
-  azureComparison: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 4,
-  },
-  azureComparisonText: {
-    fontSize: 11,
-    color: theme.colors.text.secondary,
-    fontStyle: "italic",
-    flex: 1,
-  },
-  examplesContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  examplesTitle: {
-    fontSize: 11,
-    fontWeight: "bold",
-    color: theme.colors.text.primary,
-    marginBottom: 6,
-  },
-  exampleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  exampleText: {
-    fontSize: 10,
-    color: theme.colors.text.secondary,
-    marginLeft: 6,
-    fontStyle: "italic",
-  },
-  confidenceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  confidenceText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-});
+const getStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      padding: theme.spacing.l,
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: theme.typography.sizes.xl,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+    },
+    scoreCard: {
+      margin: theme.spacing.l,
+      height: 200,
+      borderRadius: theme.borderRadius.xl,
+      ...theme.shadows.medium,
+    },
+    scoreGradient: {
+      flex: 1,
+      borderRadius: theme.borderRadius.xl,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    scoreLabel: {
+      color: "rgba(255,255,255,0.8)",
+      fontSize: theme.typography.sizes.l,
+      marginBottom: theme.spacing.s,
+    },
+    scoreValue: {
+      color: theme.colors.surface,
+      fontSize: 64,
+      fontWeight: "bold",
+      marginBottom: theme.spacing.m,
+    },
+    scoreCircle: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: theme.spacing.s,
+    },
+    scoreCircleText: {
+      color: theme.colors.surface,
+      fontWeight: "600",
+      fontSize: theme.typography.sizes.m,
+    },
+    section: {
+      padding: theme.spacing.l,
+    },
+    sectionTitle: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.m,
+    },
+    planCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.l,
+      padding: theme.spacing.m,
+      ...theme.shadows.small,
+    },
+    planRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: theme.spacing.s,
+    },
+    planTextContainer: {
+      marginLeft: theme.spacing.m,
+    },
+    planLabel: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+    },
+    planValue: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+    },
+    tipText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.primary,
+      marginBottom: 4,
+      lineHeight: 20,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      marginVertical: theme.spacing.s,
+    },
+    button: {
+      margin: theme.spacing.l,
+      backgroundColor: theme.colors.primary,
+      padding: theme.spacing.m,
+      borderRadius: theme.borderRadius.l,
+      alignItems: "center",
+      ...theme.shadows.primaryGlow,
+    },
+    buttonText: {
+      color: theme.colors.surface,
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "bold",
+    },
+    // New Styles
+    skillHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    skillName: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+    },
+    skillScore: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      color: theme.colors.primary,
+    },
+    skillIconName: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    subMetricRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 6,
+    },
+    subMetricLabel: {
+      width: 100,
+      fontSize: 10,
+      color: theme.colors.text.secondary,
+      textTransform: "capitalize",
+    },
+    subProgressBarContainer: {
+      flex: 1,
+      height: 4,
+      backgroundColor: theme.colors.border,
+      borderRadius: 2,
+      marginHorizontal: 8,
+      overflow: "hidden",
+    },
+    subProgressBar: {
+      height: "100%",
+      borderRadius: 2,
+    },
+    subMetricValue: {
+      fontSize: 10,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+      width: 30,
+      textAlign: "right",
+    },
+    progressBarContainer: {
+      height: 8,
+      backgroundColor: theme.colors.border,
+      borderRadius: 4,
+      overflow: "hidden",
+    },
+    progressBar: {
+      height: "100%",
+      borderRadius: 4,
+    },
+    rowBetween: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: theme.spacing.m,
+    },
+    recalibratedBadge: {
+      backgroundColor: "rgba(79, 70, 229, 0.1)",
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: "rgba(79, 70, 229, 0.2)",
+    },
+    recalibratedText: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: theme.colors.primary,
+      textTransform: "uppercase",
+    },
+    breakdownGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginHorizontal: -8,
+    },
+    breakdownItem: {
+      width: "50%",
+      padding: 8,
+    },
+    breakdownLabel: {
+      fontSize: 12,
+      color: theme.colors.text.secondary,
+      marginBottom: 2,
+    },
+    breakdownValue: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    azureComparison: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 4,
+    },
+    azureComparisonText: {
+      fontSize: 11,
+      color: theme.colors.text.secondary,
+      fontStyle: "italic",
+      flex: 1,
+    },
+    examplesContainer: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    examplesTitle: {
+      fontSize: 11,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+      marginBottom: 6,
+    },
+    exampleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    exampleText: {
+      fontSize: 10,
+      color: theme.colors.text.secondary,
+      marginLeft: 6,
+      fontStyle: "italic",
+    },
+    confidenceContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 12,
+      backgroundColor: "rgba(255, 255, 255, 0.2)",
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    confidenceText: {
+      color: "white",
+      fontSize: 12,
+      fontWeight: "600",
+    },
+  });

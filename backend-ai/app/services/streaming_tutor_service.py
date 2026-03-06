@@ -1,5 +1,6 @@
 import azure.cognitiveservices.speech as speechsdk
 import asyncio
+import io
 from typing import AsyncGenerator
 import logging
 import os
@@ -41,6 +42,52 @@ class StreamingTutorService:
             "1000"  # Respond after 1 sec silence
         )
 
+    def _convert_to_wav(self, audio_bytes: bytes) -> bytes:
+        """Convert to 16kHz mono 16-bit WAV for Azure. Reuses same logic as HinglishSTTService."""
+        try:
+            from pydub import AudioSegment
+        except ImportError:
+            return audio_bytes
+        audio = None
+        for fmt in ["m4a", "mp3", "wav", "ogg", "webm", "flac"]:
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=fmt)
+                break
+            except Exception:
+                continue
+        if audio is None:
+            return audio_bytes
+        audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+        wav_buf = io.BytesIO()
+        audio.export(wav_buf, format="wav")
+        return wav_buf.getvalue()
+
+    async def recognize_audio_bytes(self, audio_bytes: bytes) -> str:
+        """
+        Run STT in-process via Azure push stream. Saves a full HTTP round-trip vs calling /stt.
+        Returns recognized text or empty string on failure.
+        """
+        if not getattr(self, "speech_config", None):
+            logger.warning("Azure Speech not configured, cannot recognize audio")
+            return ""
+        wav_bytes = self._convert_to_wav(audio_bytes)
+
+        def _sync_recognize() -> str:
+            stream = speechsdk.audio.PushAudioInputStream()
+            audio_config = speechsdk.audio.AudioConfig(stream=stream)
+            recognizer = speechsdk.SpeechRecognizer(
+                speech_config=self.speech_config,
+                audio_config=audio_config,
+            )
+            stream.write(wav_bytes)
+            stream.close()
+            result = recognizer.recognize_once()
+            if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                return result.text or ""
+            return ""
+
+        return await asyncio.to_thread(_sync_recognize)
+
     async def stream_recognition(
         self,
         audio_stream,
@@ -48,13 +95,10 @@ class StreamingTutorService:
         on_final: callable
     ):
         """
-        Stream STT with callbacks:
-        - on_partial(text): fires during speech (realtime transcription)
-        - on_final(text): fires when user stops speaking
+        Stream STT with callbacks (optional future use).
+        For single-shot transcript use recognize_audio_bytes instead.
         """
-        
-        # Note: audio_stream needs to be a compatible stream format for Azure SDK
-        # This implementation requires strict stream handling which depends on the input source
+        # Real-time streaming would require continuous recognition; use recognize_audio_bytes for request/response.
         pass
 
     async def generate_chunked_response(
@@ -66,31 +110,34 @@ class StreamingTutorService:
         audio_base64: str | None = None
     ) -> AsyncGenerator[dict, None]:
         """
-        Generate AI response in chunks with optional audio for pronunciation analysis.
+        Generate AI response in chunks. Emits transcript first so mobile can show it immediately.
         """
-        
-        # STREAM SENTENCES FROM GEMINI
+        # Emit transcript immediately — mobile can show it while audio loads
+        yield {
+            "type": "transcript",
+            "text": user_utterance,
+            "is_final": True,
+        }
+
+        # Stream Gemini + TTS sentence by sentence
         async for sentence in self.gemini_service.stream_response(
             user_utterance,
             conversation_history,
             phonetic_context,
-            audio_base64
+            audio_base64,
         ):
-            # Generate TTS for this sentence
             audio_bytes = None
             if self.tts_service:
                 try:
                     audio_bytes = await self.tts_service.synthesize_sentence(sentence)
                 except Exception as e:
-                    logger.error(f"TTS Synthesis failed for sentence '{sentence}': {e}")
-            
+                    logger.error("TTS synthesis failed for sentence: %s", e)
             yield {
-                'type': 'sentence',
-                'text': sentence,
-                'audio': audio_bytes,
-                'is_final': False,
+                "type": "sentence",
+                "text": sentence,
+                "audio": audio_bytes,
+                "is_final": False,
             }
-            
             await asyncio.sleep(0.01)
 
     def get_quick_acknowledgment(self, text: str) -> str:

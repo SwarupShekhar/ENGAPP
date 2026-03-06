@@ -1,0 +1,139 @@
+{
+  "test_01.wav.m4a": [
+    {
+      "spoken": "vater",
+      "correct": "water",
+      "rule_category": "w_to_v",
+      "reel_id": "REEL_001",
+      "confidence": 73.0
+    },
+    {
+      "spoken": "maarning",
+      "correct": "morning",
+      "rule_category": "o_to_aa",
+      "reel_id": "REEL_005",
+      "confidence": 82.0
+    }
+  ],
+  "test_02.wav.m4a": [
+    {
+      "spoken": "da",
+      "correct": "the",
+      "rule_category": "th_to_d",
+      "reel_id": "REEL_007",
+      "confidence": 73.0
+    },
+    {
+      "spoken": "ket",
+      "correct": "cat",
+      "rule_category": "ae_to_e",
+      "reel_id": "REEL_003",
+      "confidence": 56.0
+    }
+  ],
+  "test_03.wav.m4a": [
+    {
+      "spoken": "maarning",
+      "correct": "morning",
+      "rule_category": "o_to_aa",
+      "reel_id": "REEL_005",
+      "confidence": 23.0
+    },
+    {
+      "spoken": "dis",
+      "correct": "this",
+      "rule_category": "th_to_d",
+      "reel_id": "REEL_007",
+      "confidence": 100.0
+    }
+  ],
+  "test_04.wav.m4a": [
+    {
+      "spoken": "dis",
+      "correct": "this",
+      "rule_category": "th_to_d",
+      "reel_id": "REEL_007",
+      "confidence": 36.0
+    },
+    {
+      "spoken": "eez",
+      "correct": "is",
+      "rule_category": "i_to_ee",
+      "reel_id": "REEL_004",
+      "confidence": 100.0
+    },
+    {
+      "spoken": "eet",
+      "correct": "it",
+      "rule_category": "i_to_ee",
+      "reel_id": "REEL_004",
+      "confidence": 79.0
+    }
+  ],
+  "test_05.wav.m4a": [
+    {
+      "spoken": "ken",
+      "correct": "can",
+      "rule_category": "ae_to_e",
+      "reel_id": "REEL_003",
+      "confidence": 100.0
+    },
+    {
+      "spoken": "ear",
+      "correct": "hear",
+      "rule_category": "h_dropping",
+      "reel_id": "REEL_008",
+      "confidence": 6.0
+    }
+  ],
+  "test_06.wav.m4a": [
+    {
+      "spoken": "da",
+      "correct": "the",
+      "rule_category": "th_to_d",
+      "reel_id": "REEL_007",
+      "confidence": 100.0
+    },
+    {
+      "spoken": "faax",
+      "correct": "fox",
+      "rule_category": "o_to_aa",
+      "reel_id": "REEL_005",
+      "confidence": 100.0
+    },
+    {
+      "spoken": "daag",
+      "correct": "dog",
+      "rule_category": "o_to_aa",
+      "reel_id": "REEL_005",
+      "confidence": 3.0
+    }
+  ],
+  "test_07.wav.m4a": [],
+  "test_08.wav.m4a": [],
+  "test_09.wav.m4a": [
+    {
+      "spoken": "dat",
+      "correct": "that",
+      "rule_category": "th_to_d",
+      "reel_id": "REEL_007",
+      "confidence": 23.0
+    },
+    {
+      "spoken": "eez",
+      "correct": "is",
+      "rule_category": "i_to_ee",
+      "reel_id": "REEL_004",
+      "confidence": 100.0
+    }
+  ],
+  "test_10.wav.m4a": [
+    {
+      "spoken": "vill",
+      "correct": "will",
+      "rule_category": "w_to_v",
+      "reel_id": "REEL_001",
+      "confidence": 76.0
+    }
+  ]
+}

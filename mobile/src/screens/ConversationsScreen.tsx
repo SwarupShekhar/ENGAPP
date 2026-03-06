@@ -81,6 +81,15 @@ export default function ConversationsScreen() {
 
       socketService.onPresenceUpdate(handlePresence);
 
+      // New message listener for real-time list updates
+      const handleNewMessage = (data: any) => {
+        console.log(
+          "[ConversationsScreen] Real-time message received, re-fetching list",
+        );
+        fetchConversations();
+      };
+      socketService.onNewMessage(handleNewMessage);
+
       // Fetch initial presence
       socketService.getOnlineUsers((data) => {
         setOnlineUsers(new Set(data.onlineUserIds));
@@ -88,6 +97,7 @@ export default function ConversationsScreen() {
 
       return () => {
         socketService.offPresenceUpdate(handlePresence);
+        socketService.offNewMessage(handleNewMessage);
       };
     }, []),
   );

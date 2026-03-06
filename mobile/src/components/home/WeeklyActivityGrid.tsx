@@ -38,6 +38,7 @@ export default function WeeklyActivityGrid({ activity }: Props) {
   });
 
   const totalSessions = activity.reduce((a, b) => a + b, 0);
+  const styles = getStyles(theme);
 
   return (
     <View style={styles.container}>
@@ -68,67 +69,71 @@ export default function WeeklyActivityGrid({ activity }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 12,
-  },
-  grid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  dayColumn: {
-    alignItems: "center",
-  },
-  dayDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  dayDone: {
-    backgroundColor: "#10B981",
-  },
-  dayMissed: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#EF4444",
-  },
-  dayEmpty: {
-    backgroundColor: "#F3F4F6",
-  },
-  checkmark: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  dayLabel: {
-    fontSize: 11,
-    color: "#6B7280",
-    fontWeight: "600",
-  },
-  stats: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  statText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "600",
-  },
-});
+const getStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 20,
+      padding: 16,
+      marginBottom: 16,
+      marginHorizontal: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadows.medium,
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+      marginBottom: 12,
+    },
+    grid: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 12,
+    },
+    dayColumn: {
+      alignItems: "center",
+    },
+    dayDot: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    dayDone: {
+      backgroundColor: theme.colors.success,
+    },
+    dayMissed: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 2,
+      borderColor: theme.colors.error,
+    },
+    dayEmpty: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    checkmark: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    dayLabel: {
+      fontSize: 11,
+      color: theme.colors.text.secondary,
+      fontWeight: "600",
+    },
+    stats: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    statText: {
+      fontSize: 13,
+      color: theme.colors.text.secondary,
+      fontWeight: "600",
+    },
+  });

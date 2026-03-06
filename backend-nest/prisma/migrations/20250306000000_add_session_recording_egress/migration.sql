@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Session" ADD COLUMN IF NOT EXISTS "recordingUrl" TEXT;
+ALTER TABLE "Session" ADD COLUMN IF NOT EXISTS "egressId" TEXT;

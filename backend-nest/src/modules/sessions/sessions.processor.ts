@@ -6,6 +6,8 @@ import { AssessmentService } from '../assessment/assessment.service';
 import { TasksService } from '../tasks/tasks.service';
 import { SessionHandlerService } from '../home/services/session-handler.service';
 import { BrainService } from '../brain/brain.service';
+import { PronunciationService } from '../pronunciation/pronunciation.service';
+import { PronunciationScorerService } from '../pronunciation/pronunciation-scorer.service';
 
 @Processor('sessions')
 export class SessionsProcessor {
@@ -17,6 +19,8 @@ export class SessionsProcessor {
     private tasksService: TasksService,
     private sessionHandlerService: SessionHandlerService,
     private brainService: BrainService,
+    private pronunciationService: PronunciationService,
+    private pronunciationScorerService: PronunciationScorerService,
   ) {}
 
   @Process('process-session')
@@ -26,6 +30,9 @@ export class SessionsProcessor {
       `Processing session ${sessionId} in background (started)...`,
     );
 
+    // Wait 5 seconds to allow partner's endSession call to potentially provide a merged transcript
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     try {
       // 1) Update session status to PROCESSING
       await this.prisma.conversationSession.update({
@@ -33,23 +40,30 @@ export class SessionsProcessor {
         data: { status: 'PROCESSING' },
       });
 
-      // Try to get transcript: first from job data, then from Feedback table
-      let transcript = (job.data.transcript || '').trim();
+      // Try to get transcript: favor Feedback table over job data
+      const feedback = await this.prisma.feedback.findUnique({
+        where: { sessionId },
+        select: { transcript: true },
+      });
 
-      if (!transcript) {
+      let transcript = (
+        feedback?.transcript ||
+        job.data.transcript ||
+        ''
+      ).trim();
+
+      if (feedback?.transcript) {
         this.logger.log(
-          `[SessionsProcessor] Job transcript empty for ${sessionId}, checking Feedback table...`,
+          `[SessionsProcessor] Using transcript from Feedback table (${transcript.length} chars)`,
         );
-        const feedback = await this.prisma.feedback.findUnique({
-          where: { sessionId },
-          select: { transcript: true },
-        });
-        transcript = (feedback?.transcript || '').trim();
-        if (transcript) {
-          this.logger.log(
-            `[SessionsProcessor] Retrieved transcript from Feedback table (${transcript.length} chars)`,
-          );
-        }
+      } else if (job.data.transcript) {
+        this.logger.log(
+          `[SessionsProcessor] Using transcript from job data (${transcript.length} chars)`,
+        );
+      } else {
+        this.logger.warn(
+          `[SessionsProcessor] No transcript found for session ${sessionId}`,
+        );
       }
 
       // Only short-circuit if truly no transcript exists anywhere
@@ -143,6 +157,95 @@ export class SessionsProcessor {
         },
       });
 
+      if (sessionData && sessionData.recordingUrl) {
+        const firstParticipant = sessionData.participants?.[0];
+        if (firstParticipant) {
+          try {
+            this.logger.log(
+              `[SessionsProcessor] Running pronunciation assessment for session ${sessionId} on ${sessionData.recordingUrl}`,
+            );
+            const { flagged_errors: flaggedErrors, pronunciation_score: pronScore } =
+              await this.pronunciationService.assessFromRecordingUrl(
+                firstParticipant.userId,
+                sessionData.recordingUrl,
+                transcript,
+              );
+
+            const firstAnalysis = firstParticipant.analysis;
+            let grammar = 0,
+              vocabulary = 0,
+              fluency = 0,
+              overallScore = 0;
+            if (firstAnalysis?.scores && typeof firstAnalysis.scores === 'object') {
+              const s = firstAnalysis.scores as Record<string, number>;
+              grammar = s.grammar ?? s.grammar_score ?? 0;
+              vocabulary = s.vocabulary ?? s.vocabulary_score ?? 0;
+              fluency = s.fluency ?? s.fluency_score ?? 0;
+            }
+            const pronFromAi = pronScore?.score ?? 0;
+            overallScore = this.pronunciationScorerService.applyPronunciationScore(
+              { grammar, vocabulary, fluency, pronunciation: pronFromAi },
+              pronFromAi,
+            );
+            if (pronScore?.cefr_cap) {
+              overallScore = this.pronunciationScorerService.applyCEFRCap(
+                overallScore,
+                pronScore.cefr_cap,
+              );
+            }
+
+            const cefrFromScore =
+              overallScore > 72 ? 'B2' : overallScore > 55 ? 'B1' : overallScore > 35 ? 'A2' : 'A1';
+
+            const roundedOverall = Math.round(overallScore * 10) / 10;
+            await this.prisma.conversationSession.update({
+              where: { id: sessionId },
+              data: {
+                summaryJson: {
+                  transcript,
+                  pronunciation_flagged: flaggedErrors,
+                  cefr_score: cefrFromScore,
+                  overall_score: roundedOverall,
+                  grammar_score: grammar,
+                  vocabulary_score: vocabulary,
+                  fluency_score: fluency,
+                  pronunciation_score: pronFromAi,
+                  pronunciation_cefr_cap: pronScore?.cefr_cap ?? null,
+                  pronunciation_cap_reason: pronScore?.cap_reason ?? null,
+                  dominant_pronunciation_errors: pronScore?.dominant_errors ?? [],
+                  grammar_errors: (firstAnalysis?.rawData as any)?.aiFeedback
+                    ? []
+                    : undefined,
+                },
+              },
+            });
+
+            if (firstAnalysis?.id) {
+              const existingScores =
+                (firstAnalysis.scores as Record<string, number>) || {};
+              await this.prisma.analysis.update({
+                where: { id: firstAnalysis.id },
+                data: {
+                  scores: {
+                    ...existingScores,
+                    grammar,
+                    vocabulary,
+                    fluency,
+                    pronunciation: pronFromAi,
+                    overall: roundedOverall,
+                  },
+                  cefrLevel: cefrFromScore,
+                },
+              });
+            }
+          } catch (pronunErr) {
+            this.logger.error(
+              `[SessionsProcessor] Pronunciation assessment failed for session ${sessionId}: ${pronunErr.message}`,
+            );
+          }
+        }
+      }
+
       if (sessionData && sessionData.participants) {
         for (const sp of sessionData.participants) {
           const analysis = sp.analysis;
@@ -156,10 +259,11 @@ export class SessionsProcessor {
             typeof analysis.scores === 'object'
           ) {
             const scores = analysis.scores as any;
-            fluency = scores.fluency || 0;
-            grammar = scores.grammar || 0;
-            vocabulary = scores.vocabulary || 0;
-            pronunciation = scores.pronunciation || 0;
+            fluency = scores.fluency || scores.fluency_score || 0;
+            grammar = scores.grammar || scores.grammar_score || 0;
+            vocabulary = scores.vocabulary || scores.vocabulary_score || 0;
+            pronunciation =
+              scores.pronunciation || scores.pronunciation_score || 0;
           }
           await this.sessionHandlerService.handleSessionComplete(sp.userId, {
             type: 'p2p',
@@ -174,7 +278,7 @@ export class SessionsProcessor {
         }
       }
 
-      // 3) Mark session as COMPLETED (analyzeAndStoreJoint already updates status, but ensure idempotency)
+      // 4) Mark session as COMPLETED (analyzeAndStoreJoint already updates status, but ensure idempotency)
       await this.prisma.conversationSession.update({
         where: { id: sessionId },
         data: { status: 'COMPLETED' },

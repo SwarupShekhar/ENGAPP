@@ -87,7 +87,8 @@ async def global_exception_handler(request: Request, exc: Exception):
                 message=message
             ),
             meta=Meta(
-                request_id=getattr(request.state, "request_id", None)
+                request_id=getattr(request.state, "request_id", None),
+                processing_time_ms=0
             )
         ).model_dump()
     )
@@ -104,7 +105,8 @@ async def value_error_handler(request: Request, exc: ValueError):
                 message=str(exc)
             ),
             meta=Meta(
-                request_id=getattr(request.state, "request_id", None)
+                request_id=getattr(request.state, "request_id", None),
+                processing_time_ms=0
             )
         ).model_dump()
     )

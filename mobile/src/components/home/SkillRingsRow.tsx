@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../../theme/useAppTheme";
+import { BlurView } from "expo-blur";
 
 interface SkillBarProps {
   label: string;
@@ -96,145 +97,175 @@ export function SkillRingsRow({
 }: SkillRingsRowProps) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
+  const isDeep = theme.variation === "deep";
   const avgScore = Math.round(
     (grammar + pronunciation + fluency + vocabulary) / 4,
   );
 
   return (
-    <View style={styles.container}>
-      {/* Header row */}
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.sectionTitle}>Your Skills</Text>
-          {deltaLabel && <Text style={styles.deltaLabel}>{deltaLabel}</Text>}
-        </View>
-        <View style={styles.avgBadge}>
-          <Text style={styles.avgText}>Avg: {avgScore}</Text>
-        </View>
-      </View>
+    <View style={[styles.containerOuter, theme.shadows.medium]}>
+      <BlurView
+        intensity={isDeep ? 40 : 60}
+        tint={isDeep ? "dark" : "light"}
+        style={styles.blurContainer}
+      >
+        <View
+          style={[
+            styles.cardContent,
+            { backgroundColor: theme.colors.surface + (isDeep ? "60" : "A0") },
+          ]}
+        >
+          {/* Header row */}
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.sectionTitle}>Your Skills</Text>
+              {deltaLabel && (
+                <Text style={styles.deltaLabel}>{deltaLabel}</Text>
+              )}
+            </View>
+            <View style={styles.avgBadge}>
+              <Text style={styles.avgText}>Avg: {avgScore}</Text>
+            </View>
+          </View>
 
-      {/* Skill bars */}
-      <SkillBar
-        label="Grammar"
-        score={grammar}
-        delta={deltas?.grammar}
-        isMastered={masteryFlags?.grammar}
-        icon="text"
-        gradientColors={theme.colors.gradients.primary}
-        bgColor={theme.colors.primary + "15"}
-      />
-      <SkillBar
-        label="Pronunciation"
-        score={pronunciation}
-        delta={deltas?.pronunciation}
-        isMastered={masteryFlags?.pronunciation}
-        icon="mic"
-        gradientColors={[theme.colors.warning, theme.colors.warning + "dd"]}
-        bgColor={theme.colors.warning + "15"}
-      />
-      <SkillBar
-        label="Fluency"
-        score={fluency}
-        delta={deltas?.fluency}
-        isMastered={masteryFlags?.fluency}
-        icon="water"
-        gradientColors={[theme.colors.success, theme.colors.success + "dd"]}
-        bgColor={theme.colors.success + "15"}
-      />
-      <SkillBar
-        label="Vocabulary"
-        score={vocabulary}
-        delta={deltas?.vocabulary}
-        isMastered={masteryFlags?.vocabulary}
-        icon="book"
-        gradientColors={[
-          theme.colors.text.accent,
-          theme.colors.text.accent + "dd",
-        ]}
-        bgColor={theme.colors.text.accent + "15"}
-      />
+          {/* Skill bars */}
+          <SkillBar
+            label="Grammar"
+            score={grammar}
+            delta={deltas?.grammar}
+            isMastered={masteryFlags?.grammar}
+            icon="text"
+            gradientColors={[
+              theme.colors.skill.grammar,
+              theme.colors.skill.grammar + "dd",
+            ]}
+            bgColor={theme.colors.skill.grammar + "15"}
+          />
+          <SkillBar
+            label="Pronunciation"
+            score={pronunciation}
+            delta={deltas?.pronunciation}
+            isMastered={masteryFlags?.pronunciation}
+            icon="mic"
+            gradientColors={[
+              theme.colors.skill.pronunciation,
+              theme.colors.skill.pronunciation + "dd",
+            ]}
+            bgColor={theme.colors.skill.pronunciation + "15"}
+          />
+          <SkillBar
+            label="Fluency"
+            score={fluency}
+            delta={deltas?.fluency}
+            isMastered={masteryFlags?.fluency}
+            icon="water"
+            gradientColors={[
+              theme.colors.skill.fluency,
+              theme.colors.skill.fluency + "dd",
+            ]}
+            bgColor={theme.colors.skill.fluency + "15"}
+          />
+          <SkillBar
+            label="Vocabulary"
+            score={vocabulary}
+            delta={deltas?.vocabulary}
+            isMastered={masteryFlags?.vocabulary}
+            icon="book"
+            gradientColors={[
+              theme.colors.skill.vocabulary,
+              theme.colors.skill.vocabulary + "dd",
+            ]}
+            bgColor={theme.colors.skill.vocabulary + "15"}
+          />
+        </View>
+      </BlurView>
     </View>
   );
 }
 
 const getStyles = (theme: any) =>
   StyleSheet.create({
-    container: {
+    containerOuter: {
       marginHorizontal: theme.spacing.l,
       marginBottom: theme.spacing.l,
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
       borderRadius: 20,
-      padding: theme.spacing.l,
-      // Glassmorphism effect
+      overflow: "hidden",
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
-      ...theme.shadows.medium,
+      borderColor: "rgba(255, 255, 255, 0.2)",
+    },
+    blurContainer: {
+      width: "100%",
+    },
+    cardContent: {
+      padding: theme.spacing.l,
     },
     headerRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 16,
+      marginBottom: 20,
     },
     sectionTitle: {
-      fontSize: 17,
+      fontSize: 18,
       fontWeight: "700",
       color: theme.colors.text.primary,
     },
     deltaLabel: {
-      fontSize: 11,
+      fontSize: 12,
       color: theme.colors.text.secondary,
       marginTop: 2,
     },
     avgBadge: {
       backgroundColor: theme.colors.primary + "15",
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "30",
     },
     avgText: {
-      fontSize: 12,
-      fontWeight: "700",
+      fontSize: 13,
+      fontWeight: "800",
       color: theme.colors.primary,
     },
     skillItem: {
-      marginBottom: 14,
+      marginBottom: 16,
     },
     skillHeader: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 6,
+      marginBottom: 8,
     },
     skillIcon: {
-      width: 24,
-      height: 24,
-      borderRadius: 8,
+      width: 28,
+      height: 28,
+      borderRadius: 10,
       justifyContent: "center",
       alignItems: "center",
-      marginRight: 8,
+      marginRight: 10,
     },
     skillLabel: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: "600",
       color: theme.colors.text.primary,
     },
     deltaText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: "700",
-      marginTop: 1,
+      marginTop: 2,
     },
     skillScore: {
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: "800",
     },
     barTrack: {
-      height: 8,
+      height: 6,
       backgroundColor: theme.colors.border,
-      borderRadius: 4,
+      borderRadius: 3,
       overflow: "hidden",
     },
     barFill: {
       height: "100%",
-      borderRadius: 4,
+      borderRadius: 3,
     },
   });

@@ -182,12 +182,14 @@ export const ContextualCard = ({
 const getStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: "white",
-      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 20,
       marginHorizontal: theme.spacing.l,
       marginBottom: theme.spacing.m,
-      padding: theme.spacing.m,
-      ...theme.shadows.small,
+      padding: theme.spacing.l,
+      ...theme.shadows.medium,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.05)",
     },
     cardContent: {
       flexDirection: "row",

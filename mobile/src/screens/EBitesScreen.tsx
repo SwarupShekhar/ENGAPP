@@ -19,6 +19,18 @@ import FeedPrefetchService from "../services/feedPrefetchService";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
+const UNLOCKED_REELS_KEY = "@ebites_unlocked_reels";
+
+async function loadUnlockedReelIds(): Promise<Set<string>> {
+  try {
+    const stored = await AsyncStorage.getItem(UNLOCKED_REELS_KEY);
+    const ids: string[] = stored ? JSON.parse(stored) : [];
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+}
+
 // ─── TYPES ──────────────────────────────────────────────────
 type FeedItem = {
   id: string;
@@ -33,9 +45,10 @@ export default function EBitesScreen() {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unlockedReelIds, setUnlockedReelIds] = useState<Set<string>>(new Set());
 
   const flatListRef = useRef<FlatList>(null);
-  const baseFeedRef = useRef<FeedItem[]>([]); // Store original feed for looping
+  const reelsRef = useRef<Reel[]>([]);
 
   const fetchFeed = useCallback(async () => {
     try {
@@ -69,16 +82,20 @@ export default function EBitesScreen() {
 
       // If we found cached data, render immediately
       if (reels && reels.length > 0) {
-        buildAndSetFeed(reels);
+        const unlocked = await loadUnlockedReelIds();
+        setUnlockedReelIds(unlocked);
+        buildAndSetFeed(reels, unlocked);
         setLoading(false);
 
         // Background refresh: silently fetch latest data
         reelsApi
           .getFeed()
-          .then((response) => {
+          .then(async (response) => {
             if (response.items && response.items.length > 0) {
               console.log("[eBites] Background refresh complete");
-              buildAndSetFeed(response.items);
+              const unlocked = await loadUnlockedReelIds();
+              setUnlockedReelIds(unlocked);
+              buildAndSetFeed(response.items, unlocked);
               // Update caches
               AsyncStorage.setItem(
                 "@ebites_feed_cache",
@@ -100,7 +117,9 @@ export default function EBitesScreen() {
       console.log("[eBites] Full cache miss, fetching from API...");
       const response = await reelsApi.getFeed();
       reels = response.items || [];
-      buildAndSetFeed(reels);
+      const unlocked = await loadUnlockedReelIds();
+      setUnlockedReelIds(unlocked);
+      buildAndSetFeed(reels, unlocked);
 
       // Save to AsyncStorage for next time
       AsyncStorage.setItem(
@@ -118,43 +137,63 @@ export default function EBitesScreen() {
     }
   }, []);
 
-  const buildAndSetFeed = useCallback((reels: Reel[]) => {
-    const baseFeed: FeedItem[] = [];
-    reels.forEach((reel) => {
-      baseFeed.push({
-        id: `video-${reel.id}`,
-        type: "video",
-        data: reel,
+  const buildAndSetFeed = useCallback(
+    (reels: Reel[], unlockedIds: Set<string>) => {
+      reelsRef.current = reels;
+      const baseFeed: FeedItem[] = [];
+      reels.forEach((reel) => {
+        baseFeed.push({
+          id: `video-${reel.id}`,
+          type: "video",
+          data: reel,
+        });
+        // Only show activity after user has watched 80%+ of the reel
+        if (
+          reel.activity &&
+          unlockedIds.has(String(reel.id))
+        ) {
+          baseFeed.push({
+            id: `activity-${reel.id}`,
+            type: "activity",
+            data: {
+              ...reel.activity,
+              reelId: reel.id,
+              topic_tag: reel.topic_tag,
+              title: reel.activity.question,
+              activityType: reel.activity.type,
+            },
+          });
+        }
       });
 
-      if (reel.activity) {
-        baseFeed.push({
-          id: `activity-${reel.id}`,
-          type: "activity",
-          data: {
-            ...reel.activity,
-            reelId: reel.id,
-            topic_tag: reel.topic_tag,
-            title: reel.activity.question,
-            activityType: reel.activity.type,
-          },
+      const loopedFeed: FeedItem[] = [];
+      for (let i = 0; i < 10; i++) {
+        baseFeed.forEach((item) => {
+          loopedFeed.push({ ...item, id: `${item.id}-loop${i}` });
         });
       }
-    });
 
-    baseFeedRef.current = baseFeed;
+      setFeedItems(loopedFeed);
+      setError(null);
+    },
+    [],
+  );
 
-    // Repeat the feed 10x for infinite-scroll feel
-    const loopedFeed: FeedItem[] = [];
-    for (let i = 0; i < 10; i++) {
-      baseFeed.forEach((item) => {
-        loopedFeed.push({ ...item, id: `${item.id}-loop${i}` });
+  const handleWatchProgress = useCallback(
+    async (reelId: string, _progressPercent: number) => {
+      setUnlockedReelIds((prev) => {
+        const next = new Set(prev);
+        next.add(reelId);
+        AsyncStorage.setItem(
+          UNLOCKED_REELS_KEY,
+          JSON.stringify([...next]),
+        ).catch(() => {});
+        buildAndSetFeed(reelsRef.current, next);
+        return next;
       });
-    }
-
-    setFeedItems(loopedFeed);
-    setError(null);
-  }, []);
+    },
+    [buildAndSetFeed],
+  );
 
   useEffect(() => {
     fetchFeed();
@@ -202,6 +241,7 @@ export default function EBitesScreen() {
             videoUrl: item.data.playback_url, // Map backend playback_url to component videoUrl
           }}
           isActive={isActive}
+          onWatchProgress={handleWatchProgress}
         />
       );
     } else if (item.type === "activity") {

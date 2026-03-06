@@ -285,6 +285,46 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
     return `Azure Evidence: ${JSON.stringify(evidence).substring(0, 500)}`;
   }
 
+  async assessPronunciation(azureResult: Record<string, unknown>) {
+    try {
+      // Create url-encoded form data or send as JSON. The fastAPI endpoint expects Form(None) for azure_result.
+      // Wait, let's look at pronunciation.py: `azure_result: str | None = Form(None)`
+      const formData = new URLSearchParams();
+      formData.append('azure_result', JSON.stringify(azureResult));
+
+      const response = await lastValueFrom(
+        this.httpService.post(
+          `${this.aiEngineUrl}/pronunciation/assess`,
+          formData,
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          },
+        ),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('BrainService Pronunciation Error:', error);
+      return { flagged_errors: [] };
+    }
+  }
+
+  async analyzeSession(sessionId: string, transcript: string, userId: string) {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
+          text: transcript,
+          user_id: userId,
+          session_id: sessionId,
+          context: 'Analyze this conversation transcript.',
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('BrainService Analyze Session Error:', error);
+      throw error;
+    }
+  }
+
   async analyzeJoint(sessionId: string, segments: any[]) {
     try {
       const response = await lastValueFrom(
@@ -294,7 +334,7 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
         }),
       );
 
-      return response.data;
+      return response.data.data;
     } catch (error) {
       this.logger.error('BrainService Joint Analysis Error:', error);
       throw error;

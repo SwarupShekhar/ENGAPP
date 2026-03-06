@@ -10,6 +10,7 @@ import { AssessmentModule } from '../assessment/assessment.module';
 import { ReliabilityModule } from '../reliability/reliability.module';
 import { HomeModule } from '../home/home.module';
 import { BrainModule } from '../brain/brain.module';
+import { PronunciationModule } from '../pronunciation/pronunciation.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { BrainModule } from '../brain/brain.module';
     ReliabilityModule,
     HomeModule,
     BrainModule,
+    PronunciationModule,
   ],
   controllers: [SessionsController],
   providers: [SessionsService, SessionsProcessor],

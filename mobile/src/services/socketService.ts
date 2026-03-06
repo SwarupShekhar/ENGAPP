@@ -12,6 +12,8 @@ class SocketService {
   private tokenFetcher: (() => Promise<string | null>) | null = null;
   private localUserId: string | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private joinedRooms = new Set<string>();
+  private isConnecting = false;
   private NOTIFICATION_SOUND_URL =
     "https://res.cloudinary.com/de8vvmpip/video/upload/v1771405321/preview_uxlib8.mp3";
 
@@ -28,7 +30,8 @@ class SocketService {
    * connection and reconnection attempt (Clerk tokens expire every ~60s).
    */
   connect(getToken: (() => Promise<string | null>) | string, userId?: string) {
-    if (this.socket?.connected) return;
+    if (this.socket?.connected || this.isConnecting) return;
+    this.isConnecting = true;
 
     if (userId) {
       this.localUserId = userId;
@@ -63,6 +66,11 @@ class SocketService {
       reconnectionAttempts: Infinity,
     });
 
+    this.socket.on("me", (data: { id: string }) => {
+      console.log("[Socket] Received internal db userId from server:", data.id);
+      this.localUserId = data.id;
+    });
+
     this.socket.on("new_message", (data) => {
       // Only play sound if the message was sent by someone else
       if (
@@ -74,8 +82,10 @@ class SocketService {
     });
 
     this.socket.on("connect", () => {
+      this.isConnecting = false;
       console.log("[Socket] Connected with fresh token:", this.socket?.id);
       this.startHeartbeat();
+      this.rejoinRooms();
     });
 
     this.socket.on("disconnect", (reason) => {
@@ -84,6 +94,7 @@ class SocketService {
     });
 
     this.socket.on("connect_error", (err) => {
+      this.isConnecting = false;
       console.warn("[Socket] Connection error:", err.message);
       this.stopHeartbeat();
     });
@@ -102,7 +113,9 @@ class SocketService {
     this.stopHeartbeat();
     this.socket?.disconnect();
     this.socket = null;
+    this.isConnecting = false;
     this.listeners.clear();
+    this.joinedRooms.clear();
   }
 
   private startHeartbeat() {
@@ -118,6 +131,15 @@ class SocketService {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
+    }
+  }
+
+  private rejoinRooms() {
+    if (this.joinedRooms.size > 0 && this.socket?.connected) {
+      console.log("[Socket] Re-joining rooms:", Array.from(this.joinedRooms));
+      this.joinedRooms.forEach((roomId) => {
+        this.socket?.emit("join_conversation", { conversationId: roomId });
+      });
     }
   }
 
@@ -148,6 +170,7 @@ class SocketService {
   // ── Emitters ────────────────────────────────────────
 
   joinConversation(conversationId: string) {
+    this.joinedRooms.add(conversationId);
     this.socket?.emit("join_conversation", { conversationId });
   }
 

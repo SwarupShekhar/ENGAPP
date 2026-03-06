@@ -20,10 +20,6 @@ export class SessionsService {
     this.logger.log(
       `[SessionsService] Requesting analysis for session: ${sessionId}, user: ${userId}`,
     );
-    const sessionCount = await this.prisma.conversationSession.count();
-    this.logger.log(
-      `[SessionsService] DB check: Total sessions = ${sessionCount}`,
-    );
 
     const session = await this.prisma.conversationSession.findUnique({
       where: { id: sessionId },
@@ -43,6 +39,7 @@ export class SessionsService {
     });
 
     if (!session) {
+      const sessionCount = await this.prisma.conversationSession.count();
       const latestSession = await this.prisma.conversationSession.findFirst({
         orderBy: { createdAt: 'desc' },
       });
@@ -55,6 +52,23 @@ export class SessionsService {
           latestSessionId: latestSession?.id || 'none',
         },
       });
+    }
+
+    // Find the participant record for the requesting user
+    const myParticipant = session.participants.find((p) => p.userId === userId);
+
+    // Filter analyses to show the current user's analysis first
+    if (myParticipant && session.analyses?.length > 0) {
+      const myAnalysis = session.analyses.find(
+        (a) => a.participantId === myParticipant.id,
+      );
+      if (myAnalysis) {
+        // Put the user's own analysis first
+        const otherAnalyses = session.analyses.filter(
+          (a) => a.participantId !== myParticipant.id,
+        );
+        session.analyses = [myAnalysis, ...otherAnalyses];
+      }
     }
 
     return session;

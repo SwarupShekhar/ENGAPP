@@ -1,0 +1,5083 @@
+{
+  "by_approximation": {
+    "vater": {
+      "correct_word": "water",
+      "rule_category": "w_to_v"
+    },
+    "vine": {
+      "correct_word": "wine",
+      "rule_category": "w_to_v"
+    },
+    "vood": {
+      "correct_word": "wood",
+      "rule_category": "w_to_v"
+    },
+    "bill": {
+      "correct_word": "will",
+      "rule_category": "w_to_v"
+    },
+    "been": {
+      "correct_word": "win",
+      "rule_category": "w_to_v"
+    },
+    "bijan": {
+      "correct_word": "vision",
+      "rule_category": "zh_to_j"
+    },
+    "vaalk": {
+      "correct_word": "walk",
+      "rule_category": "w_to_v"
+    },
+    "vaal": {
+      "correct_word": "wall",
+      "rule_category": "w_to_v"
+    },
+    "vindow": {
+      "correct_word": "window",
+      "rule_category": "w_to_v"
+    },
+    "vait": {
+      "correct_word": "wait",
+      "rule_category": "w_to_v"
+    },
+    "veight": {
+      "correct_word": "weight",
+      "rule_category": "w_to_v"
+    },
+    "vaarm": {
+      "correct_word": "warm",
+      "rule_category": "w_to_v"
+    },
+    "vest": {
+      "correct_word": "waste",
+      "rule_category": "w_to_v"
+    },
+    "vave": {
+      "correct_word": "wave",
+      "rule_category": "w_to_v"
+    },
+    "voolf": {
+      "correct_word": "wolf",
+      "rule_category": "w_to_v"
+    },
+    "vooman": {
+      "correct_word": "woman",
+      "rule_category": "w_to_v"
+    },
+    "vord": {
+      "correct_word": "word",
+      "rule_category": "w_to_v"
+    },
+    "vorld": {
+      "correct_word": "world",
+      "rule_category": "w_to_v"
+    },
+    "vork": {
+      "correct_word": "work",
+      "rule_category": "w_to_v"
+    },
+    "vaatch": {
+      "correct_word": "watch",
+      "rule_category": "w_to_v"
+    },
+    "vaash": {
+      "correct_word": "wash",
+      "rule_category": "w_to_v"
+    },
+    "velth": {
+      "correct_word": "wealth",
+      "rule_category": "w_to_v"
+    },
+    "vepon": {
+      "correct_word": "weapon",
+      "rule_category": "w_to_v"
+    },
+    "vear": {
+      "correct_word": "wear",
+      "rule_category": "w_to_v"
+    },
+    "veder": {
+      "correct_word": "whether",
+      "rule_category": "th_to_d"
+    },
+    "vedding": {
+      "correct_word": "wedding",
+      "rule_category": "w_to_v"
+    },
+    "veed": {
+      "correct_word": "weed",
+      "rule_category": "w_to_v"
+    },
+    "veek": {
+      "correct_word": "week",
+      "rule_category": "w_to_v"
+    },
+    "velcome": {
+      "correct_word": "welcome",
+      "rule_category": "w_to_v"
+    },
+    "vestern": {
+      "correct_word": "western",
+      "rule_category": "w_to_v"
+    },
+    "vet": {
+      "correct_word": "wet",
+      "rule_category": "w_to_v"
+    },
+    "vail": {
+      "correct_word": "whale",
+      "rule_category": "w_to_v"
+    },
+    "veet": {
+      "correct_word": "wheat",
+      "rule_category": "w_to_v"
+    },
+    "veel": {
+      "correct_word": "wheel",
+      "rule_category": "w_to_v"
+    },
+    "ven": {
+      "correct_word": "when",
+      "rule_category": "w_to_v"
+    },
+    "ver": {
+      "correct_word": "where",
+      "rule_category": "w_to_v"
+    },
+    "vich": {
+      "correct_word": "which",
+      "rule_category": "w_to_v"
+    },
+    "vhile": {
+      "correct_word": "while",
+      "rule_category": "w_to_v"
+    },
+    "vhite": {
+      "correct_word": "white",
+      "rule_category": "w_to_v"
+    },
+    "vhy": {
+      "correct_word": "why",
+      "rule_category": "w_to_v"
+    },
+    "vide": {
+      "correct_word": "wide",
+      "rule_category": "w_to_v"
+    },
+    "vife": {
+      "correct_word": "wife",
+      "rule_category": "w_to_v"
+    },
+    "vild": {
+      "correct_word": "wild",
+      "rule_category": "w_to_v"
+    },
+    "vill": {
+      "correct_word": "will",
+      "rule_category": "w_to_v"
+    },
+    "vin": {
+      "correct_word": "win",
+      "rule_category": "w_to_v"
+    },
+    "vind": {
+      "correct_word": "wind",
+      "rule_category": "w_to_v"
+    },
+    "ving": {
+      "correct_word": "wing",
+      "rule_category": "w_to_v"
+    },
+    "vinter": {
+      "correct_word": "winter",
+      "rule_category": "w_to_v"
+    },
+    "vire": {
+      "correct_word": "wire",
+      "rule_category": "w_to_v"
+    },
+    "vise": {
+      "correct_word": "wise",
+      "rule_category": "w_to_v"
+    },
+    "vish": {
+      "correct_word": "wish",
+      "rule_category": "w_to_v"
+    },
+    "west": {
+      "correct_word": "vest",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wet": {
+      "correct_word": "vet",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wine": {
+      "correct_word": "vine",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wile": {
+      "correct_word": "vile",
+      "rule_category": "v_to_w_reversal"
+    },
+    "worse": {
+      "correct_word": "verse",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wail": {
+      "correct_word": "veil",
+      "rule_category": "v_to_w_reversal"
+    },
+    "went": {
+      "correct_word": "vent",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wary": {
+      "correct_word": "vary",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wain": {
+      "correct_word": "vain",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wault": {
+      "correct_word": "vault",
+      "rule_category": "v_to_w_reversal"
+    },
+    "aprail": {
+      "correct_word": "april",
+      "rule_category": "ae_to_e"
+    },
+    "ken": {
+      "correct_word": "can",
+      "rule_category": "ae_to_e"
+    },
+    "men": {
+      "correct_word": "man",
+      "rule_category": "ae_to_e"
+    },
+    "pen": {
+      "correct_word": "pan",
+      "rule_category": "ae_to_e"
+    },
+    "ren": {
+      "correct_word": "ran",
+      "rule_category": "ae_to_e"
+    },
+    "eppel": {
+      "correct_word": "apple",
+      "rule_category": "ae_to_e"
+    },
+    "enimal": {
+      "correct_word": "animal",
+      "rule_category": "ae_to_e"
+    },
+    "egzectly": {
+      "correct_word": "exactly",
+      "rule_category": "ae_to_e"
+    },
+    "femily": {
+      "correct_word": "family",
+      "rule_category": "ae_to_e"
+    },
+    "bed": {
+      "correct_word": "bad",
+      "rule_category": "ae_to_e"
+    },
+    "sed": {
+      "correct_word": "sad",
+      "rule_category": "ae_to_e"
+    },
+    "med": {
+      "correct_word": "mad",
+      "rule_category": "ae_to_e"
+    },
+    "ket": {
+      "correct_word": "cat",
+      "rule_category": "ae_to_e"
+    },
+    "bet": {
+      "correct_word": "bat",
+      "rule_category": "ae_to_e"
+    },
+    "het": {
+      "correct_word": "hat",
+      "rule_category": "ae_to_e"
+    },
+    "mep": {
+      "correct_word": "map",
+      "rule_category": "ae_to_e"
+    },
+    "tep": {
+      "correct_word": "tap",
+      "rule_category": "ae_to_e"
+    },
+    "ect": {
+      "correct_word": "act",
+      "rule_category": "ae_to_e"
+    },
+    "edd": {
+      "correct_word": "add",
+      "rule_category": "ae_to_e"
+    },
+    "efrica": {
+      "correct_word": "africa",
+      "rule_category": "ae_to_e"
+    },
+    "enger": {
+      "correct_word": "anger",
+      "rule_category": "ae_to_e"
+    },
+    "enser": {
+      "correct_word": "answer",
+      "rule_category": "ae_to_e"
+    },
+    "beck": {
+      "correct_word": "back",
+      "rule_category": "ae_to_e"
+    },
+    "beg": {
+      "correct_word": "bag",
+      "rule_category": "ae_to_e"
+    },
+    "bend": {
+      "correct_word": "band",
+      "rule_category": "ae_to_e"
+    },
+    "benk": {
+      "correct_word": "bank",
+      "rule_category": "ae_to_e"
+    },
+    "bleck": {
+      "correct_word": "black",
+      "rule_category": "ae_to_e"
+    },
+    "kemp": {
+      "correct_word": "camp",
+      "rule_category": "ae_to_e"
+    },
+    "kep": {
+      "correct_word": "cap",
+      "rule_category": "ae_to_e"
+    },
+    "kesh": {
+      "correct_word": "cash",
+      "rule_category": "ae_to_e"
+    },
+    "kest": {
+      "correct_word": "cast",
+      "rule_category": "ae_to_e"
+    },
+    "ketch": {
+      "correct_word": "catch",
+      "rule_category": "ae_to_e"
+    },
+    "chens": {
+      "correct_word": "chance",
+      "rule_category": "ae_to_e"
+    },
+    "kless": {
+      "correct_word": "class",
+      "rule_category": "ae_to_e"
+    },
+    "kresh": {
+      "correct_word": "crash",
+      "rule_category": "ae_to_e"
+    },
+    "ded": {
+      "correct_word": "dad",
+      "rule_category": "ae_to_e"
+    },
+    "dens": {
+      "correct_word": "dance",
+      "rule_category": "ae_to_e"
+    },
+    "fect": {
+      "correct_word": "fact",
+      "rule_category": "ae_to_e"
+    },
+    "fen": {
+      "correct_word": "fan",
+      "rule_category": "ae_to_e"
+    },
+    "fet": {
+      "correct_word": "fat",
+      "rule_category": "ae_to_e"
+    },
+    "fleg": {
+      "correct_word": "flag",
+      "rule_category": "ae_to_e"
+    },
+    "flet": {
+      "correct_word": "flat",
+      "rule_category": "ae_to_e"
+    },
+    "ges": {
+      "correct_word": "gas",
+      "rule_category": "ae_to_e"
+    },
+    "gless": {
+      "correct_word": "glass",
+      "rule_category": "ae_to_e"
+    },
+    "grend": {
+      "correct_word": "grand",
+      "rule_category": "ae_to_e"
+    },
+    "hend": {
+      "correct_word": "hand",
+      "rule_category": "ae_to_e"
+    },
+    "jem": {
+      "correct_word": "jam",
+      "rule_category": "ae_to_e"
+    },
+    "leck": {
+      "correct_word": "lack",
+      "rule_category": "ae_to_e"
+    },
+    "lend": {
+      "correct_word": "land",
+      "rule_category": "ae_to_e"
+    },
+    "bootifeel": {
+      "correct_word": "beautiful",
+      "rule_category": "i_to_ee"
+    },
+    "beat": {
+      "correct_word": "bit",
+      "rule_category": "i_to_ee"
+    },
+    "seat": {
+      "correct_word": "sit",
+      "rule_category": "i_to_ee"
+    },
+    "heat": {
+      "correct_word": "hit",
+      "rule_category": "i_to_ee"
+    },
+    "feet": {
+      "correct_word": "fit",
+      "rule_category": "i_to_ee"
+    },
+    "leed": {
+      "correct_word": "lid",
+      "rule_category": "i_to_ee"
+    },
+    "keed": {
+      "correct_word": "kid",
+      "rule_category": "i_to_ee"
+    },
+    "leep": {
+      "correct_word": "lip",
+      "rule_category": "i_to_ee"
+    },
+    "sheep": {
+      "correct_word": "ship",
+      "rule_category": "i_to_ee"
+    },
+    "deep": {
+      "correct_word": "dip",
+      "rule_category": "i_to_ee"
+    },
+    "teep": {
+      "correct_word": "tip",
+      "rule_category": "i_to_ee"
+    },
+    "seen": {
+      "correct_word": "sin",
+      "rule_category": "i_to_ee"
+    },
+    "teen": {
+      "correct_word": "tin",
+      "rule_category": "i_to_ee"
+    },
+    "ween": {
+      "correct_word": "win",
+      "rule_category": "i_to_ee"
+    },
+    "peen": {
+      "correct_word": "pin",
+      "rule_category": "i_to_ee"
+    },
+    "seetee": {
+      "correct_word": "city",
+      "rule_category": "i_to_ee"
+    },
+    "beeg": {
+      "correct_word": "big",
+      "rule_category": "i_to_ee"
+    },
+    "beel": {
+      "correct_word": "bill",
+      "rule_category": "i_to_ee"
+    },
+    "breeng": {
+      "correct_word": "bring",
+      "rule_category": "i_to_ee"
+    },
+    "beeld": {
+      "correct_word": "build",
+      "rule_category": "i_to_ee"
+    },
+    "beezy": {
+      "correct_word": "busy",
+      "rule_category": "i_to_ee"
+    },
+    "deed": {
+      "correct_word": "did",
+      "rule_category": "i_to_ee"
+    },
+    "deener": {
+      "correct_word": "dinner",
+      "rule_category": "i_to_ee"
+    },
+    "dreenk": {
+      "correct_word": "drink",
+      "rule_category": "i_to_ee"
+    },
+    "feel": {
+      "correct_word": "fill",
+      "rule_category": "i_to_ee"
+    },
+    "feelam": {
+      "correct_word": "film",
+      "rule_category": "i_to_ee"
+    },
+    "feenish": {
+      "correct_word": "finish",
+      "rule_category": "i_to_ee"
+    },
+    "feesh": {
+      "correct_word": "fish",
+      "rule_category": "i_to_ee"
+    },
+    "geev": {
+      "correct_word": "give",
+      "rule_category": "i_to_ee"
+    },
+    "heem": {
+      "correct_word": "him",
+      "rule_category": "i_to_ee"
+    },
+    "heez": {
+      "correct_word": "his",
+      "rule_category": "i_to_ee"
+    },
+    "eel": {
+      "correct_word": "heel",
+      "rule_category": "h_dropping"
+    },
+    "een": {
+      "correct_word": "in",
+      "rule_category": "i_to_ee"
+    },
+    "eencome": {
+      "correct_word": "income",
+      "rule_category": "i_to_ee"
+    },
+    "eendia": {
+      "correct_word": "india",
+      "rule_category": "i_to_ee"
+    },
+    "eendustry": {
+      "correct_word": "industry",
+      "rule_category": "i_to_ee"
+    },
+    "eenterest": {
+      "correct_word": "interest",
+      "rule_category": "i_to_ee"
+    },
+    "eez": {
+      "correct_word": "is",
+      "rule_category": "i_to_ee"
+    },
+    "eet": {
+      "correct_word": "it",
+      "rule_category": "i_to_ee"
+    },
+    "keel": {
+      "correct_word": "kill",
+      "rule_category": "i_to_ee"
+    },
+    "kees": {
+      "correct_word": "kiss",
+      "rule_category": "i_to_ee"
+    },
+    "leest": {
+      "correct_word": "list",
+      "rule_category": "i_to_ee"
+    },
+    "leesen": {
+      "correct_word": "listen",
+      "rule_category": "i_to_ee"
+    },
+    "leev": {
+      "correct_word": "live",
+      "rule_category": "i_to_ee"
+    },
+    "meedle": {
+      "correct_word": "middle",
+      "rule_category": "i_to_ee"
+    },
+    "meelk": {
+      "correct_word": "milk",
+      "rule_category": "i_to_ee"
+    },
+    "meelion": {
+      "correct_word": "million",
+      "rule_category": "i_to_ee"
+    },
+    "meenut": {
+      "correct_word": "minute",
+      "rule_category": "i_to_ee"
+    },
+    "mees": {
+      "correct_word": "miss",
+      "rule_category": "i_to_ee"
+    },
+    "marning": {
+      "correct_word": "morning",
+      "rule_category": "o_to_aa"
+    },
+    "cawfee": {
+      "correct_word": "coffee",
+      "rule_category": "o_to_aa"
+    },
+    "daag": {
+      "correct_word": "dog",
+      "rule_category": "o_to_aa"
+    },
+    "laag": {
+      "correct_word": "log",
+      "rule_category": "o_to_aa"
+    },
+    "fraag": {
+      "correct_word": "frog",
+      "rule_category": "o_to_aa"
+    },
+    "staap": {
+      "correct_word": "stop",
+      "rule_category": "o_to_aa"
+    },
+    "taap": {
+      "correct_word": "top",
+      "rule_category": "o_to_aa"
+    },
+    "paap": {
+      "correct_word": "pop",
+      "rule_category": "o_to_aa"
+    },
+    "caap": {
+      "correct_word": "cop",
+      "rule_category": "o_to_aa"
+    },
+    "haat": {
+      "correct_word": "hot",
+      "rule_category": "o_to_aa"
+    },
+    "paat": {
+      "correct_word": "path",
+      "rule_category": "th_to_t"
+    },
+    "caat": {
+      "correct_word": "cot",
+      "rule_category": "o_to_aa"
+    },
+    "laat": {
+      "correct_word": "lot",
+      "rule_category": "o_to_aa"
+    },
+    "baax": {
+      "correct_word": "box",
+      "rule_category": "o_to_aa"
+    },
+    "faax": {
+      "correct_word": "fox",
+      "rule_category": "o_to_aa"
+    },
+    "baas": {
+      "correct_word": "boss",
+      "rule_category": "o_to_aa"
+    },
+    "baady": {
+      "correct_word": "body",
+      "rule_category": "o_to_aa"
+    },
+    "baatom": {
+      "correct_word": "bottom",
+      "rule_category": "o_to_aa"
+    },
+    "claak": {
+      "correct_word": "clock",
+      "rule_category": "o_to_aa"
+    },
+    "caalege": {
+      "correct_word": "college",
+      "rule_category": "o_to_aa"
+    },
+    "caamon": {
+      "correct_word": "common",
+      "rule_category": "o_to_aa"
+    },
+    "caapy": {
+      "correct_word": "copy",
+      "rule_category": "o_to_aa"
+    },
+    "caast": {
+      "correct_word": "cost",
+      "rule_category": "o_to_aa"
+    },
+    "craas": {
+      "correct_word": "cross",
+      "rule_category": "o_to_aa"
+    },
+    "daactor": {
+      "correct_word": "doctor",
+      "rule_category": "o_to_aa"
+    },
+    "draap": {
+      "correct_word": "drop",
+      "rule_category": "o_to_aa"
+    },
+    "faallow": {
+      "correct_word": "follow",
+      "rule_category": "o_to_aa"
+    },
+    "faand": {
+      "correct_word": "fond",
+      "rule_category": "o_to_aa"
+    },
+    "gaad": {
+      "correct_word": "god",
+      "rule_category": "o_to_aa"
+    },
+    "gaat": {
+      "correct_word": "got",
+      "rule_category": "o_to_aa"
+    },
+    "haaliday": {
+      "correct_word": "holiday",
+      "rule_category": "o_to_aa"
+    },
+    "haaspital": {
+      "correct_word": "hospital",
+      "rule_category": "o_to_aa"
+    },
+    "jaab": {
+      "correct_word": "job",
+      "rule_category": "o_to_aa"
+    },
+    "naak": {
+      "correct_word": "knock",
+      "rule_category": "o_to_aa"
+    },
+    "naat": {
+      "correct_word": "not",
+      "rule_category": "o_to_aa"
+    },
+    "laak": {
+      "correct_word": "lock",
+      "rule_category": "o_to_aa"
+    },
+    "laang": {
+      "correct_word": "long",
+      "rule_category": "o_to_aa"
+    },
+    "maadel": {
+      "correct_word": "model",
+      "rule_category": "o_to_aa"
+    },
+    "maadern": {
+      "correct_word": "modern",
+      "rule_category": "o_to_aa"
+    },
+    "aabject": {
+      "correct_word": "object",
+      "rule_category": "o_to_aa"
+    },
+    "aafice": {
+      "correct_word": "office",
+      "rule_category": "o_to_aa"
+    },
+    "aaften": {
+      "correct_word": "often",
+      "rule_category": "o_to_aa"
+    },
+    "paasible": {
+      "correct_word": "possible",
+      "rule_category": "o_to_aa"
+    },
+    "praablem": {
+      "correct_word": "problem",
+      "rule_category": "o_to_aa"
+    },
+    "praafit": {
+      "correct_word": "profit",
+      "rule_category": "o_to_aa"
+    },
+    "praamise": {
+      "correct_word": "promise",
+      "rule_category": "o_to_aa"
+    },
+    "quaality": {
+      "correct_word": "quality",
+      "rule_category": "o_to_aa"
+    },
+    "raak": {
+      "correct_word": "rock",
+      "rule_category": "o_to_aa"
+    },
+    "tree": {
+      "correct_word": "three",
+      "rule_category": "th_to_t"
+    },
+    "tink": {
+      "correct_word": "think",
+      "rule_category": "th_to_t"
+    },
+    "taught": {
+      "correct_word": "thought",
+      "rule_category": "th_to_t"
+    },
+    "tank": {
+      "correct_word": "thank",
+      "rule_category": "th_to_t"
+    },
+    "tin": {
+      "correct_word": "thin",
+      "rule_category": "th_to_t"
+    },
+    "tick": {
+      "correct_word": "thick",
+      "rule_category": "th_to_t"
+    },
+    "tru": {
+      "correct_word": "through",
+      "rule_category": "th_to_t"
+    },
+    "tro": {
+      "correct_word": "throw",
+      "rule_category": "th_to_t"
+    },
+    "tumb": {
+      "correct_word": "thumb",
+      "rule_category": "th_to_t"
+    },
+    "tunder": {
+      "correct_word": "thunder",
+      "rule_category": "th_to_t"
+    },
+    "baat": {
+      "correct_word": "bath",
+      "rule_category": "th_to_t"
+    },
+    "mat": {
+      "correct_word": "math",
+      "rule_category": "th_to_t"
+    },
+    "teef": {
+      "correct_word": "thief",
+      "rule_category": "th_to_t"
+    },
+    "ting": {
+      "correct_word": "thing",
+      "rule_category": "th_to_t"
+    },
+    "tird": {
+      "correct_word": "third",
+      "rule_category": "th_to_t"
+    },
+    "tirsty": {
+      "correct_word": "thirsty",
+      "rule_category": "th_to_t"
+    },
+    "tirteen": {
+      "correct_word": "thirteen",
+      "rule_category": "th_to_t"
+    },
+    "tirty": {
+      "correct_word": "thirty",
+      "rule_category": "th_to_t"
+    },
+    "tousand": {
+      "correct_word": "thousand",
+      "rule_category": "th_to_t"
+    },
+    "tread": {
+      "correct_word": "thread",
+      "rule_category": "th_to_t"
+    },
+    "treat": {
+      "correct_word": "threat",
+      "rule_category": "th_to_t"
+    },
+    "troat": {
+      "correct_word": "throat",
+      "rule_category": "th_to_t"
+    },
+    "tursday": {
+      "correct_word": "thursday",
+      "rule_category": "th_to_t"
+    },
+    "atleet": {
+      "correct_word": "athlete",
+      "rule_category": "th_to_t"
+    },
+    "autor": {
+      "correct_word": "author",
+      "rule_category": "th_to_t"
+    },
+    "art": {
+      "correct_word": "heart",
+      "rule_category": "h_dropping"
+    },
+    "fait": {
+      "correct_word": "faith",
+      "rule_category": "th_to_t"
+    },
+    "healt": {
+      "correct_word": "health",
+      "rule_category": "th_to_t"
+    },
+    "lengt": {
+      "correct_word": "length",
+      "rule_category": "th_to_t"
+    },
+    "metod": {
+      "correct_word": "method",
+      "rule_category": "th_to_t"
+    },
+    "mont": {
+      "correct_word": "month",
+      "rule_category": "th_to_t"
+    },
+    "mout": {
+      "correct_word": "mouth",
+      "rule_category": "th_to_t"
+    },
+    "nort": {
+      "correct_word": "north",
+      "rule_category": "th_to_t"
+    },
+    "noting": {
+      "correct_word": "nothing",
+      "rule_category": "th_to_t"
+    },
+    "sout": {
+      "correct_word": "south",
+      "rule_category": "th_to_t"
+    },
+    "strengt": {
+      "correct_word": "strength",
+      "rule_category": "th_to_t"
+    },
+    "teet": {
+      "correct_word": "teeth",
+      "rule_category": "th_to_t"
+    },
+    "trut": {
+      "correct_word": "truth",
+      "rule_category": "th_to_t"
+    },
+    "yout": {
+      "correct_word": "youth",
+      "rule_category": "th_to_t"
+    },
+    "dis": {
+      "correct_word": "this",
+      "rule_category": "th_to_d"
+    },
+    "dat": {
+      "correct_word": "that",
+      "rule_category": "th_to_d"
+    },
+    "dees": {
+      "correct_word": "these",
+      "rule_category": "th_to_d"
+    },
+    "dose": {
+      "correct_word": "those",
+      "rule_category": "th_to_d"
+    },
+    "den": {
+      "correct_word": "then",
+      "rule_category": "th_to_d"
+    },
+    "dere": {
+      "correct_word": "there",
+      "rule_category": "th_to_d"
+    },
+    "dey": {
+      "correct_word": "they",
+      "rule_category": "th_to_d"
+    },
+    "dem": {
+      "correct_word": "them",
+      "rule_category": "th_to_d"
+    },
+    "do": {
+      "correct_word": "though",
+      "rule_category": "th_to_d"
+    },
+    "fader": {
+      "correct_word": "father",
+      "rule_category": "th_to_d"
+    },
+    "moder": {
+      "correct_word": "mother",
+      "rule_category": "th_to_d"
+    },
+    "broder": {
+      "correct_word": "brother",
+      "rule_category": "th_to_d"
+    },
+    "dan": {
+      "correct_word": "than",
+      "rule_category": "th_to_d"
+    },
+    "da": {
+      "correct_word": "the",
+      "rule_category": "th_to_d"
+    },
+    "deir": {
+      "correct_word": "their",
+      "rule_category": "th_to_d"
+    },
+    "demselves": {
+      "correct_word": "themselves",
+      "rule_category": "th_to_d"
+    },
+    "derefore": {
+      "correct_word": "therefore",
+      "rule_category": "th_to_d"
+    },
+    "alldo": {
+      "correct_word": "although",
+      "rule_category": "th_to_d"
+    },
+    "anoder": {
+      "correct_word": "another",
+      "rule_category": "th_to_d"
+    },
+    "boder": {
+      "correct_word": "bother",
+      "rule_category": "th_to_d"
+    },
+    "clodes": {
+      "correct_word": "clothes",
+      "rule_category": "th_to_d"
+    },
+    "eider": {
+      "correct_word": "either",
+      "rule_category": "th_to_d"
+    },
+    "furder": {
+      "correct_word": "further",
+      "rule_category": "th_to_d"
+    },
+    "gader": {
+      "correct_word": "gather",
+      "rule_category": "th_to_d"
+    },
+    "neider": {
+      "correct_word": "neither",
+      "rule_category": "th_to_d"
+    },
+    "oder": {
+      "correct_word": "other",
+      "rule_category": "th_to_d"
+    },
+    "rader": {
+      "correct_word": "rather",
+      "rule_category": "th_to_d"
+    },
+    "togeder": {
+      "correct_word": "together",
+      "rule_category": "th_to_d"
+    },
+    "breed": {
+      "correct_word": "breathe",
+      "rule_category": "th_to_d"
+    },
+    "smood": {
+      "correct_word": "smooth",
+      "rule_category": "th_to_d"
+    },
+    "otel": {
+      "correct_word": "hotel",
+      "rule_category": "h_dropping"
+    },
+    "ospital": {
+      "correct_word": "hospital",
+      "rule_category": "h_dropping"
+    },
+    "ouse": {
+      "correct_word": "house",
+      "rule_category": "h_dropping"
+    },
+    "appy": {
+      "correct_word": "happy",
+      "rule_category": "h_dropping"
+    },
+    "evy": {
+      "correct_word": "heavy",
+      "rule_category": "h_dropping"
+    },
+    "elmet": {
+      "correct_word": "helmet",
+      "rule_category": "h_dropping"
+    },
+    "istory": {
+      "correct_word": "history",
+      "rule_category": "h_dropping"
+    },
+    "yuman": {
+      "correct_word": "human",
+      "rule_category": "h_dropping"
+    },
+    "yuge": {
+      "correct_word": "huge",
+      "rule_category": "h_dropping"
+    },
+    "caar": {
+      "correct_word": "car",
+      "rule_category": "r_rolling"
+    },
+    "rred": {
+      "correct_word": "red",
+      "rule_category": "r_rolling"
+    },
+    "verry": {
+      "correct_word": "very",
+      "rule_category": "r_rolling"
+    },
+    "paark": {
+      "correct_word": "park",
+      "rule_category": "r_rolling"
+    },
+    "maarket": {
+      "correct_word": "market",
+      "rule_category": "r_rolling"
+    },
+    "maarning": {
+      "correct_word": "morning",
+      "rule_category": "r_rolling"
+    },
+    "saarry": {
+      "correct_word": "sorry",
+      "rule_category": "r_rolling"
+    },
+    "trrain": {
+      "correct_word": "train",
+      "rule_category": "r_rolling"
+    },
+    "drrink": {
+      "correct_word": "drink",
+      "rule_category": "r_rolling"
+    },
+    "rready": {
+      "correct_word": "ready",
+      "rule_category": "r_rolling"
+    },
+    "tay-bull": {
+      "correct_word": "table",
+      "rule_category": "syllabic_lengthening"
+    },
+    "pee-pull": {
+      "correct_word": "people",
+      "rule_category": "syllabic_lengthening"
+    },
+    "epp-ull": {
+      "correct_word": "apple",
+      "rule_category": "syllabic_lengthening"
+    },
+    "lit-tull": {
+      "correct_word": "little",
+      "rule_category": "syllabic_lengthening"
+    },
+    "sim-pull": {
+      "correct_word": "simple",
+      "rule_category": "syllabic_lengthening"
+    },
+    "baa-tull": {
+      "correct_word": "bottle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "mid-dull": {
+      "correct_word": "middle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "set-tull": {
+      "correct_word": "settle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "truh-bull": {
+      "correct_word": "trouble",
+      "rule_category": "syllabic_lengthening"
+    },
+    "un-cull": {
+      "correct_word": "uncle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "vijon": {
+      "correct_word": "vision",
+      "rule_category": "zh_to_j"
+    },
+    "meajure": {
+      "correct_word": "measure",
+      "rule_category": "zh_to_j"
+    },
+    "treajure": {
+      "correct_word": "treasure",
+      "rule_category": "zh_to_j"
+    },
+    "pleajure": {
+      "correct_word": "pleasure",
+      "rule_category": "zh_to_j"
+    },
+    "cajual": {
+      "correct_word": "casual",
+      "rule_category": "zh_to_j"
+    },
+    "televijon": {
+      "correct_word": "television",
+      "rule_category": "zh_to_j"
+    },
+    "yujual": {
+      "correct_word": "usual",
+      "rule_category": "zh_to_j"
+    },
+    "vijual": {
+      "correct_word": "visual",
+      "rule_category": "zh_to_j"
+    },
+    "varjon": {
+      "correct_word": "version",
+      "rule_category": "zh_to_j"
+    },
+    "divijon": {
+      "correct_word": "division",
+      "rule_category": "zh_to_j"
+    },
+    "jeero": {
+      "correct_word": "zero",
+      "rule_category": "z_to_j"
+    },
+    "joo": {
+      "correct_word": "zoo",
+      "rule_category": "z_to_j"
+    },
+    "jip": {
+      "correct_word": "zip",
+      "rule_category": "z_to_j"
+    },
+    "jone": {
+      "correct_word": "zone",
+      "rule_category": "z_to_j"
+    },
+    "jebra": {
+      "correct_word": "zebra",
+      "rule_category": "z_to_j"
+    },
+    "brekfust": {
+      "correct_word": "breakfast",
+      "rule_category": "schwa_reduction"
+    },
+    "filam": {
+      "correct_word": "film",
+      "rule_category": "schwa_addition"
+    },
+    "foram": {
+      "correct_word": "form",
+      "rule_category": "schwa_addition"
+    },
+    "noram": {
+      "correct_word": "norm",
+      "rule_category": "schwa_addition"
+    },
+    "aram": {
+      "correct_word": "arm",
+      "rule_category": "schwa_addition"
+    },
+    "charam": {
+      "correct_word": "charm",
+      "rule_category": "schwa_addition"
+    },
+    "faram": {
+      "correct_word": "farm",
+      "rule_category": "schwa_addition"
+    },
+    "haram": {
+      "correct_word": "harm",
+      "rule_category": "schwa_addition"
+    },
+    "teram": {
+      "correct_word": "term",
+      "rule_category": "schwa_addition"
+    },
+    "firam": {
+      "correct_word": "firm",
+      "rule_category": "schwa_addition"
+    },
+    "cural": {
+      "correct_word": "curl",
+      "rule_category": "schwa_addition"
+    },
+    "giral": {
+      "correct_word": "girl",
+      "rule_category": "schwa_addition"
+    },
+    "pearal": {
+      "correct_word": "pearl",
+      "rule_category": "schwa_addition"
+    },
+    "iskool": {
+      "correct_word": "school",
+      "rule_category": "schwa_prothesis"
+    },
+    "istation": {
+      "correct_word": "station",
+      "rule_category": "schwa_prothesis"
+    },
+    "ismile": {
+      "correct_word": "smile",
+      "rule_category": "schwa_prothesis"
+    },
+    "ispecial": {
+      "correct_word": "special",
+      "rule_category": "schwa_prothesis"
+    },
+    "ispeech": {
+      "correct_word": "speech",
+      "rule_category": "schwa_prothesis"
+    },
+    "desak": {
+      "correct_word": "desk",
+      "rule_category": "schwa_addition"
+    },
+    "risak": {
+      "correct_word": "risk",
+      "rule_category": "schwa_addition"
+    },
+    "walley": {
+      "correct_word": "valley",
+      "rule_category": "v_to_w_reversal"
+    },
+    "walue": {
+      "correct_word": "value",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wapor": {
+      "correct_word": "vapor",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wariety": {
+      "correct_word": "variety",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wast": {
+      "correct_word": "vast",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wehicle": {
+      "correct_word": "vehicle",
+      "rule_category": "v_to_w_reversal"
+    },
+    "welocity": {
+      "correct_word": "velocity",
+      "rule_category": "v_to_w_reversal"
+    },
+    "welwet": {
+      "correct_word": "velvet",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wenture": {
+      "correct_word": "venture",
+      "rule_category": "v_to_w_reversal"
+    },
+    "werbal": {
+      "correct_word": "verbal",
+      "rule_category": "v_to_w_reversal"
+    },
+    "werify": {
+      "correct_word": "verify",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wertical": {
+      "correct_word": "vertical",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wessel": {
+      "correct_word": "vessel",
+      "rule_category": "v_to_w_reversal"
+    },
+    "weteran": {
+      "correct_word": "veteran",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wibe": {
+      "correct_word": "vibe",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wibrate": {
+      "correct_word": "vibrate",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wice": {
+      "correct_word": "vice",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wictim": {
+      "correct_word": "victim",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wictory": {
+      "correct_word": "victory",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wideo": {
+      "correct_word": "video",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wiew": {
+      "correct_word": "view",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wigil": {
+      "correct_word": "vigil",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wigor": {
+      "correct_word": "vigor",
+      "rule_category": "v_to_w_reversal"
+    },
+    "willa": {
+      "correct_word": "villa",
+      "rule_category": "v_to_w_reversal"
+    },
+    "willage": {
+      "correct_word": "village",
+      "rule_category": "v_to_w_reversal"
+    },
+    "willain": {
+      "correct_word": "villain",
+      "rule_category": "v_to_w_reversal"
+    },
+    "winyl": {
+      "correct_word": "vinyl",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wiolet": {
+      "correct_word": "violet",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wiolin": {
+      "correct_word": "violin",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wiral": {
+      "correct_word": "viral",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wirtue": {
+      "correct_word": "virtue",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wirus": {
+      "correct_word": "virus",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wisible": {
+      "correct_word": "visible",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wisit": {
+      "correct_word": "visit",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wisor": {
+      "correct_word": "visor",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wista": {
+      "correct_word": "vista",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wital": {
+      "correct_word": "vital",
+      "rule_category": "v_to_w_reversal"
+    },
+    "witamin": {
+      "correct_word": "vitamin",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wiwid": {
+      "correct_word": "vivid",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wocal": {
+      "correct_word": "vocal",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wodka": {
+      "correct_word": "vodka",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wogue": {
+      "correct_word": "vogue",
+      "rule_category": "v_to_w_reversal"
+    },
+    "woice": {
+      "correct_word": "voice",
+      "rule_category": "v_to_w_reversal"
+    },
+    "woid": {
+      "correct_word": "void",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wolcano": {
+      "correct_word": "volcano",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wolley": {
+      "correct_word": "volley",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wolt": {
+      "correct_word": "volt",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wolume": {
+      "correct_word": "volume",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wote": {
+      "correct_word": "vote",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wowel": {
+      "correct_word": "vowel",
+      "rule_category": "v_to_w_reversal"
+    },
+    "woyage": {
+      "correct_word": "voyage",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wulgar": {
+      "correct_word": "vulgar",
+      "rule_category": "v_to_w_reversal"
+    },
+    "wulture": {
+      "correct_word": "vulture",
+      "rule_category": "v_to_w_reversal"
+    },
+    "ection": {
+      "correct_word": "action",
+      "rule_category": "ae_to_e"
+    },
+    "ective": {
+      "correct_word": "active",
+      "rule_category": "ae_to_e"
+    },
+    "ectual": {
+      "correct_word": "actual",
+      "rule_category": "ae_to_e"
+    },
+    "edept": {
+      "correct_word": "adept",
+      "rule_category": "ae_to_e"
+    },
+    "eddict": {
+      "correct_word": "addict",
+      "rule_category": "ae_to_e"
+    },
+    "eddress": {
+      "correct_word": "address",
+      "rule_category": "ae_to_e"
+    },
+    "edult": {
+      "correct_word": "adult",
+      "rule_category": "ae_to_e"
+    },
+    "edvance": {
+      "correct_word": "advance",
+      "rule_category": "ae_to_e"
+    },
+    "edvent": {
+      "correct_word": "advent",
+      "rule_category": "ae_to_e"
+    },
+    "edverb": {
+      "correct_word": "adverb",
+      "rule_category": "ae_to_e"
+    },
+    "edverse": {
+      "correct_word": "adverse",
+      "rule_category": "ae_to_e"
+    },
+    "edvice": {
+      "correct_word": "advice",
+      "rule_category": "ae_to_e"
+    },
+    "edvise": {
+      "correct_word": "advise",
+      "rule_category": "ae_to_e"
+    },
+    "edvocate": {
+      "correct_word": "advocate",
+      "rule_category": "ae_to_e"
+    },
+    "effair": {
+      "correct_word": "affair",
+      "rule_category": "ae_to_e"
+    },
+    "effect": {
+      "correct_word": "affect",
+      "rule_category": "ae_to_e"
+    },
+    "efford": {
+      "correct_word": "afford",
+      "rule_category": "ae_to_e"
+    },
+    "efraid": {
+      "correct_word": "afraid",
+      "rule_category": "ae_to_e"
+    },
+    "efter": {
+      "correct_word": "after",
+      "rule_category": "ae_to_e"
+    },
+    "egain": {
+      "correct_word": "again",
+      "rule_category": "ae_to_e"
+    },
+    "egainst": {
+      "correct_word": "against",
+      "rule_category": "ae_to_e"
+    },
+    "egent": {
+      "correct_word": "agent",
+      "rule_category": "ae_to_e"
+    },
+    "egree": {
+      "correct_word": "agree",
+      "rule_category": "ae_to_e"
+    },
+    "elarm": {
+      "correct_word": "alarm",
+      "rule_category": "ae_to_e"
+    },
+    "elbum": {
+      "correct_word": "album",
+      "rule_category": "ae_to_e"
+    },
+    "elcohol": {
+      "correct_word": "alcohol",
+      "rule_category": "ae_to_e"
+    },
+    "elert": {
+      "correct_word": "alert",
+      "rule_category": "ae_to_e"
+    },
+    "elien": {
+      "correct_word": "alien",
+      "rule_category": "ae_to_e"
+    },
+    "elike": {
+      "correct_word": "alike",
+      "rule_category": "ae_to_e"
+    },
+    "elive": {
+      "correct_word": "alive",
+      "rule_category": "ae_to_e"
+    },
+    "ellow": {
+      "correct_word": "allow",
+      "rule_category": "ae_to_e"
+    },
+    "elly": {
+      "correct_word": "ally",
+      "rule_category": "ae_to_e"
+    },
+    "elmost": {
+      "correct_word": "almost",
+      "rule_category": "ae_to_e"
+    },
+    "elone": {
+      "correct_word": "alone",
+      "rule_category": "ae_to_e"
+    },
+    "elong": {
+      "correct_word": "along",
+      "rule_category": "ae_to_e"
+    },
+    "elphabet": {
+      "correct_word": "alphabet",
+      "rule_category": "ae_to_e"
+    },
+    "elready": {
+      "correct_word": "already",
+      "rule_category": "ae_to_e"
+    },
+    "elso": {
+      "correct_word": "also",
+      "rule_category": "ae_to_e"
+    },
+    "elter": {
+      "correct_word": "alter",
+      "rule_category": "ae_to_e"
+    },
+    "eltitude": {
+      "correct_word": "altitude",
+      "rule_category": "ae_to_e"
+    },
+    "elways": {
+      "correct_word": "always",
+      "rule_category": "ae_to_e"
+    },
+    "emaze": {
+      "correct_word": "amaze",
+      "rule_category": "ae_to_e"
+    },
+    "ember": {
+      "correct_word": "amber",
+      "rule_category": "ae_to_e"
+    },
+    "embition": {
+      "correct_word": "ambition",
+      "rule_category": "ae_to_e"
+    },
+    "embulance": {
+      "correct_word": "ambulance",
+      "rule_category": "ae_to_e"
+    },
+    "emend": {
+      "correct_word": "amend",
+      "rule_category": "ae_to_e"
+    },
+    "emong": {
+      "correct_word": "among",
+      "rule_category": "ae_to_e"
+    },
+    "emount": {
+      "correct_word": "amount",
+      "rule_category": "ae_to_e"
+    },
+    "emple": {
+      "correct_word": "ample",
+      "rule_category": "ae_to_e"
+    },
+    "emuse": {
+      "correct_word": "amuse",
+      "rule_category": "ae_to_e"
+    },
+    "enalogy": {
+      "correct_word": "analogy",
+      "rule_category": "ae_to_e"
+    },
+    "enalyze": {
+      "correct_word": "analyze",
+      "rule_category": "ae_to_e"
+    },
+    "enatomy": {
+      "correct_word": "anatomy",
+      "rule_category": "ae_to_e"
+    },
+    "encestor": {
+      "correct_word": "ancestor",
+      "rule_category": "ae_to_e"
+    },
+    "enchor": {
+      "correct_word": "anchor",
+      "rule_category": "ae_to_e"
+    },
+    "encient": {
+      "correct_word": "ancient",
+      "rule_category": "ae_to_e"
+    },
+    "engel": {
+      "correct_word": "angel",
+      "rule_category": "ae_to_e"
+    },
+    "enkle": {
+      "correct_word": "ankle",
+      "rule_category": "ae_to_e"
+    },
+    "ennex": {
+      "correct_word": "annex",
+      "rule_category": "ae_to_e"
+    },
+    "ennounce": {
+      "correct_word": "announce",
+      "rule_category": "ae_to_e"
+    },
+    "ennoy": {
+      "correct_word": "annoy",
+      "rule_category": "ae_to_e"
+    },
+    "ennual": {
+      "correct_word": "annual",
+      "rule_category": "ae_to_e"
+    },
+    "entenna": {
+      "correct_word": "antenna",
+      "rule_category": "ae_to_e"
+    },
+    "enthem": {
+      "correct_word": "anthem",
+      "rule_category": "ae_to_e"
+    },
+    "entique": {
+      "correct_word": "antique",
+      "rule_category": "ae_to_e"
+    },
+    "enxiety": {
+      "correct_word": "anxiety",
+      "rule_category": "ae_to_e"
+    },
+    "enxious": {
+      "correct_word": "anxious",
+      "rule_category": "ae_to_e"
+    },
+    "epart": {
+      "correct_word": "apart",
+      "rule_category": "ae_to_e"
+    },
+    "epartment": {
+      "correct_word": "apartment",
+      "rule_category": "ae_to_e"
+    },
+    "epex": {
+      "correct_word": "apex",
+      "rule_category": "ae_to_e"
+    },
+    "epology": {
+      "correct_word": "apology",
+      "rule_category": "ae_to_e"
+    },
+    "epparatus": {
+      "correct_word": "apparatus",
+      "rule_category": "ae_to_e"
+    },
+    "epparent": {
+      "correct_word": "apparent",
+      "rule_category": "ae_to_e"
+    },
+    "eppeal": {
+      "correct_word": "appeal",
+      "rule_category": "ae_to_e"
+    },
+    "eppear": {
+      "correct_word": "appear",
+      "rule_category": "ae_to_e"
+    },
+    "eppetite": {
+      "correct_word": "appetite",
+      "rule_category": "ae_to_e"
+    },
+    "epply": {
+      "correct_word": "apply",
+      "rule_category": "ae_to_e"
+    },
+    "eppoint": {
+      "correct_word": "appoint",
+      "rule_category": "ae_to_e"
+    },
+    "epprove": {
+      "correct_word": "approve",
+      "rule_category": "ae_to_e"
+    },
+    "epricot": {
+      "correct_word": "apricot",
+      "rule_category": "ae_to_e"
+    },
+    "epron": {
+      "correct_word": "apron",
+      "rule_category": "ae_to_e"
+    },
+    "ept": {
+      "correct_word": "apt",
+      "rule_category": "ae_to_e"
+    },
+    "jigjag": {
+      "correct_word": "zigzag",
+      "rule_category": "z_to_j"
+    },
+    "jink": {
+      "correct_word": "zinc",
+      "rule_category": "z_to_j"
+    },
+    "jest": {
+      "correct_word": "zest",
+      "rule_category": "z_to_j"
+    },
+    "jeal": {
+      "correct_word": "zeal",
+      "rule_category": "z_to_j"
+    },
+    "jenith": {
+      "correct_word": "zenith",
+      "rule_category": "z_to_j"
+    },
+    "jodiac": {
+      "correct_word": "zodiac",
+      "rule_category": "z_to_j"
+    },
+    "jombie": {
+      "correct_word": "zombie",
+      "rule_category": "z_to_j"
+    },
+    "joom": {
+      "correct_word": "zoom",
+      "rule_category": "z_to_j"
+    },
+    "leejure": {
+      "correct_word": "leisure",
+      "rule_category": "zh_to_j"
+    },
+    "conclujon": {
+      "correct_word": "conclusion",
+      "rule_category": "zh_to_j"
+    },
+    "decijon": {
+      "correct_word": "decision",
+      "rule_category": "zh_to_j"
+    },
+    "fujon": {
+      "correct_word": "fusion",
+      "rule_category": "zh_to_j"
+    },
+    "illujon": {
+      "correct_word": "illusion",
+      "rule_category": "zh_to_j"
+    },
+    "explojon": {
+      "correct_word": "explosion",
+      "rule_category": "zh_to_j"
+    },
+    "occajon": {
+      "correct_word": "occasion",
+      "rule_category": "zh_to_j"
+    },
+    "confujon": {
+      "correct_word": "confusion",
+      "rule_category": "zh_to_j"
+    },
+    "collijon": {
+      "correct_word": "collision",
+      "rule_category": "zh_to_j"
+    },
+    "invajon": {
+      "correct_word": "invasion",
+      "rule_category": "zh_to_j"
+    },
+    "erojon": {
+      "correct_word": "erosion",
+      "rule_category": "zh_to_j"
+    },
+    "adhejon": {
+      "correct_word": "adhesion",
+      "rule_category": "zh_to_j"
+    },
+    "ungry": {
+      "correct_word": "hungry",
+      "rule_category": "h_dropping"
+    },
+    "abit": {
+      "correct_word": "habit",
+      "rule_category": "h_dropping"
+    },
+    "ammer": {
+      "correct_word": "hammer",
+      "rule_category": "h_dropping"
+    },
+    "appen": {
+      "correct_word": "happen",
+      "rule_category": "h_dropping"
+    },
+    "ard": {
+      "correct_word": "hard",
+      "rule_category": "h_dropping"
+    },
+    "arvest": {
+      "correct_word": "harvest",
+      "rule_category": "h_dropping"
+    },
+    "ate": {
+      "correct_word": "hate",
+      "rule_category": "h_dropping"
+    },
+    "aul": {
+      "correct_word": "haul",
+      "rule_category": "h_dropping"
+    },
+    "ave": {
+      "correct_word": "have",
+      "rule_category": "h_dropping"
+    },
+    "azard": {
+      "correct_word": "hazard",
+      "rule_category": "h_dropping"
+    },
+    "ead": {
+      "correct_word": "head",
+      "rule_category": "h_dropping"
+    },
+    "eal": {
+      "correct_word": "heal",
+      "rule_category": "h_dropping"
+    },
+    "eap": {
+      "correct_word": "heap",
+      "rule_category": "h_dropping"
+    },
+    "ear": {
+      "correct_word": "hear",
+      "rule_category": "h_dropping"
+    },
+    "eat": {
+      "correct_word": "heat",
+      "rule_category": "h_dropping"
+    },
+    "eaven": {
+      "correct_word": "heaven",
+      "rule_category": "h_dropping"
+    },
+    "eight": {
+      "correct_word": "height",
+      "rule_category": "h_dropping"
+    },
+    "ello": {
+      "correct_word": "hello",
+      "rule_category": "h_dropping"
+    },
+    "elp": {
+      "correct_word": "help",
+      "rule_category": "h_dropping"
+    },
+    "ence": {
+      "correct_word": "hence",
+      "rule_category": "h_dropping"
+    },
+    "er": {
+      "correct_word": "her",
+      "rule_category": "h_dropping"
+    },
+    "ere": {
+      "correct_word": "here",
+      "rule_category": "h_dropping"
+    },
+    "ero": {
+      "correct_word": "hero",
+      "rule_category": "h_dropping"
+    },
+    "ide": {
+      "correct_word": "hide",
+      "rule_category": "h_dropping"
+    },
+    "igh": {
+      "correct_word": "high",
+      "rule_category": "h_dropping"
+    },
+    "ill": {
+      "correct_word": "hill",
+      "rule_category": "h_dropping"
+    },
+    "int": {
+      "correct_word": "hint",
+      "rule_category": "h_dropping"
+    },
+    "ire": {
+      "correct_word": "hire",
+      "rule_category": "h_dropping"
+    },
+    "obby": {
+      "correct_word": "hobby",
+      "rule_category": "h_dropping"
+    },
+    "old": {
+      "correct_word": "hold",
+      "rule_category": "h_dropping"
+    },
+    "ole": {
+      "correct_word": "hole",
+      "rule_category": "h_dropping"
+    },
+    "ollow": {
+      "correct_word": "hollow",
+      "rule_category": "h_dropping"
+    },
+    "oly": {
+      "correct_word": "holy",
+      "rule_category": "h_dropping"
+    },
+    "ome": {
+      "correct_word": "home",
+      "rule_category": "h_dropping"
+    },
+    "onest": {
+      "correct_word": "honest",
+      "rule_category": "h_dropping"
+    },
+    "oney": {
+      "correct_word": "honey",
+      "rule_category": "h_dropping"
+    },
+    "onor": {
+      "correct_word": "honor",
+      "rule_category": "h_dropping"
+    },
+    "ook": {
+      "correct_word": "hook",
+      "rule_category": "h_dropping"
+    },
+    "ope": {
+      "correct_word": "hope",
+      "rule_category": "h_dropping"
+    },
+    "orn": {
+      "correct_word": "horn",
+      "rule_category": "h_dropping"
+    },
+    "orror": {
+      "correct_word": "horror",
+      "rule_category": "h_dropping"
+    },
+    "orse": {
+      "correct_word": "horse",
+      "rule_category": "h_dropping"
+    },
+    "ost": {
+      "correct_word": "host",
+      "rule_category": "h_dropping"
+    },
+    "our": {
+      "correct_word": "hour",
+      "rule_category": "h_dropping"
+    },
+    "ow": {
+      "correct_word": "how",
+      "rule_category": "h_dropping"
+    },
+    "owever": {
+      "correct_word": "however",
+      "rule_category": "h_dropping"
+    },
+    "ub": {
+      "correct_word": "hub",
+      "rule_category": "h_dropping"
+    },
+    "ug": {
+      "correct_word": "hug",
+      "rule_category": "h_dropping"
+    },
+    "um": {
+      "correct_word": "hum",
+      "rule_category": "h_dropping"
+    },
+    "umble": {
+      "correct_word": "humble",
+      "rule_category": "h_dropping"
+    },
+    "umid": {
+      "correct_word": "humid",
+      "rule_category": "h_dropping"
+    },
+    "umor": {
+      "correct_word": "humor",
+      "rule_category": "h_dropping"
+    },
+    "unch": {
+      "correct_word": "hunch",
+      "rule_category": "h_dropping"
+    },
+    "undred": {
+      "correct_word": "hundred",
+      "rule_category": "h_dropping"
+    },
+    "urry": {
+      "correct_word": "hurry",
+      "rule_category": "h_dropping"
+    },
+    "urt": {
+      "correct_word": "hurt",
+      "rule_category": "h_dropping"
+    },
+    "ush": {
+      "correct_word": "hush",
+      "rule_category": "h_dropping"
+    },
+    "ut": {
+      "correct_word": "hut",
+      "rule_category": "h_dropping"
+    },
+    "ybrid": {
+      "correct_word": "hybrid",
+      "rule_category": "h_dropping"
+    },
+    "eg-zaam-pull": {
+      "correct_word": "example",
+      "rule_category": "syllabic_lengthening"
+    },
+    "sar-cull": {
+      "correct_word": "circle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "sai-cull": {
+      "correct_word": "cycle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "mus-sull": {
+      "correct_word": "muscle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "puz-zull": {
+      "correct_word": "puzzle",
+      "rule_category": "syllabic_lengthening"
+    },
+    "stay-bull": {
+      "correct_word": "stable",
+      "rule_category": "syllabic_lengthening"
+    },
+    "tai-tull": {
+      "correct_word": "title",
+      "rule_category": "syllabic_lengthening"
+    },
+    "bet-tull": {
+      "correct_word": "battle",
+      "rule_category": "syllabic_lengthening"
+    }
+  },
+  "by_correct_word": {
+    "water": {
+      "approximation": "vater",
+      "rule_category": "w_to_v"
+    },
+    "wine": {
+      "approximation": "vine",
+      "rule_category": "w_to_v"
+    },
+    "wood": {
+      "approximation": "vood",
+      "rule_category": "w_to_v"
+    },
+    "walk": {
+      "approximation": "vaalk",
+      "rule_category": "w_to_v"
+    },
+    "wall": {
+      "approximation": "vaal",
+      "rule_category": "w_to_v"
+    },
+    "window": {
+      "approximation": "vindow",
+      "rule_category": "w_to_v"
+    },
+    "wait": {
+      "approximation": "vait",
+      "rule_category": "w_to_v"
+    },
+    "weight": {
+      "approximation": "veight",
+      "rule_category": "w_to_v"
+    },
+    "warm": {
+      "approximation": "vaarm",
+      "rule_category": "w_to_v"
+    },
+    "west": {
+      "approximation": "vest",
+      "rule_category": "w_to_v"
+    },
+    "wave": {
+      "approximation": "vave",
+      "rule_category": "w_to_v"
+    },
+    "wolf": {
+      "approximation": "voolf",
+      "rule_category": "w_to_v"
+    },
+    "woman": {
+      "approximation": "vooman",
+      "rule_category": "w_to_v"
+    },
+    "word": {
+      "approximation": "vord",
+      "rule_category": "w_to_v"
+    },
+    "world": {
+      "approximation": "vorld",
+      "rule_category": "w_to_v"
+    },
+    "work": {
+      "approximation": "vork",
+      "rule_category": "w_to_v"
+    },
+    "watch": {
+      "approximation": "vaatch",
+      "rule_category": "w_to_v"
+    },
+    "wash": {
+      "approximation": "vaash",
+      "rule_category": "w_to_v"
+    },
+    "waste": {
+      "approximation": "vest",
+      "rule_category": "w_to_v"
+    },
+    "wealth": {
+      "approximation": "velth",
+      "rule_category": "w_to_v"
+    },
+    "weapon": {
+      "approximation": "vepon",
+      "rule_category": "w_to_v"
+    },
+    "wear": {
+      "approximation": "vear",
+      "rule_category": "w_to_v"
+    },
+    "weather": {
+      "approximation": "veder",
+      "rule_category": "th_to_d"
+    },
+    "wedding": {
+      "approximation": "vedding",
+      "rule_category": "w_to_v"
+    },
+    "weed": {
+      "approximation": "veed",
+      "rule_category": "w_to_v"
+    },
+    "week": {
+      "approximation": "veek",
+      "rule_category": "w_to_v"
+    },
+    "welcome": {
+      "approximation": "velcome",
+      "rule_category": "w_to_v"
+    },
+    "western": {
+      "approximation": "vestern",
+      "rule_category": "w_to_v"
+    },
+    "wet": {
+      "approximation": "vet",
+      "rule_category": "w_to_v"
+    },
+    "whale": {
+      "approximation": "vail",
+      "rule_category": "w_to_v"
+    },
+    "wheat": {
+      "approximation": "veet",
+      "rule_category": "w_to_v"
+    },
+    "wheel": {
+      "approximation": "veel",
+      "rule_category": "w_to_v"
+    },
+    "when": {
+      "approximation": "ven",
+      "rule_category": "w_to_v"
+    },
+    "where": {
+      "approximation": "ver",
+      "rule_category": "w_to_v"
+    },
+    "whether": {
+      "approximation": "veder",
+      "rule_category": "th_to_d"
+    },
+    "which": {
+      "approximation": "vich",
+      "rule_category": "w_to_v"
+    },
+    "while": {
+      "approximation": "vhile",
+      "rule_category": "w_to_v"
+    },
+    "white": {
+      "approximation": "vhite",
+      "rule_category": "w_to_v"
+    },
+    "why": {
+      "approximation": "vhy",
+      "rule_category": "w_to_v"
+    },
+    "wide": {
+      "approximation": "vide",
+      "rule_category": "w_to_v"
+    },
+    "wife": {
+      "approximation": "vife",
+      "rule_category": "w_to_v"
+    },
+    "wild": {
+      "approximation": "vild",
+      "rule_category": "w_to_v"
+    },
+    "will": {
+      "approximation": "vill",
+      "rule_category": "w_to_v"
+    },
+    "win": {
+      "approximation": "ween",
+      "rule_category": "i_to_ee"
+    },
+    "wind": {
+      "approximation": "vind",
+      "rule_category": "w_to_v"
+    },
+    "wing": {
+      "approximation": "ving",
+      "rule_category": "w_to_v"
+    },
+    "winter": {
+      "approximation": "vinter",
+      "rule_category": "w_to_v"
+    },
+    "wire": {
+      "approximation": "vire",
+      "rule_category": "w_to_v"
+    },
+    "wise": {
+      "approximation": "vise",
+      "rule_category": "w_to_v"
+    },
+    "wish": {
+      "approximation": "vish",
+      "rule_category": "w_to_v"
+    },
+    "vest": {
+      "approximation": "west",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vet": {
+      "approximation": "wet",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vine": {
+      "approximation": "wine",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vile": {
+      "approximation": "wile",
+      "rule_category": "v_to_w_reversal"
+    },
+    "verse": {
+      "approximation": "worse",
+      "rule_category": "v_to_w_reversal"
+    },
+    "veil": {
+      "approximation": "wail",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vent": {
+      "approximation": "went",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vary": {
+      "approximation": "wary",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vain": {
+      "approximation": "wain",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vault": {
+      "approximation": "wault",
+      "rule_category": "v_to_w_reversal"
+    },
+    "april": {
+      "approximation": "aprail",
+      "rule_category": "ae_to_e"
+    },
+    "can": {
+      "approximation": "ken",
+      "rule_category": "ae_to_e"
+    },
+    "man": {
+      "approximation": "men",
+      "rule_category": "ae_to_e"
+    },
+    "pan": {
+      "approximation": "pen",
+      "rule_category": "ae_to_e"
+    },
+    "ran": {
+      "approximation": "ren",
+      "rule_category": "ae_to_e"
+    },
+    "apple": {
+      "approximation": "epp-ull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "animal": {
+      "approximation": "enimal",
+      "rule_category": "ae_to_e"
+    },
+    "exactly": {
+      "approximation": "egzectly",
+      "rule_category": "ae_to_e"
+    },
+    "family": {
+      "approximation": "femily",
+      "rule_category": "ae_to_e"
+    },
+    "bad": {
+      "approximation": "bed",
+      "rule_category": "ae_to_e"
+    },
+    "sad": {
+      "approximation": "sed",
+      "rule_category": "ae_to_e"
+    },
+    "mad": {
+      "approximation": "med",
+      "rule_category": "ae_to_e"
+    },
+    "cat": {
+      "approximation": "ket",
+      "rule_category": "ae_to_e"
+    },
+    "bat": {
+      "approximation": "bet",
+      "rule_category": "ae_to_e"
+    },
+    "hat": {
+      "approximation": "het",
+      "rule_category": "ae_to_e"
+    },
+    "map": {
+      "approximation": "mep",
+      "rule_category": "ae_to_e"
+    },
+    "tap": {
+      "approximation": "tep",
+      "rule_category": "ae_to_e"
+    },
+    "act": {
+      "approximation": "ect",
+      "rule_category": "ae_to_e"
+    },
+    "add": {
+      "approximation": "edd",
+      "rule_category": "ae_to_e"
+    },
+    "africa": {
+      "approximation": "efrica",
+      "rule_category": "ae_to_e"
+    },
+    "anger": {
+      "approximation": "enger",
+      "rule_category": "ae_to_e"
+    },
+    "answer": {
+      "approximation": "enser",
+      "rule_category": "ae_to_e"
+    },
+    "back": {
+      "approximation": "beck",
+      "rule_category": "ae_to_e"
+    },
+    "bag": {
+      "approximation": "beg",
+      "rule_category": "ae_to_e"
+    },
+    "band": {
+      "approximation": "bend",
+      "rule_category": "ae_to_e"
+    },
+    "bank": {
+      "approximation": "benk",
+      "rule_category": "ae_to_e"
+    },
+    "black": {
+      "approximation": "bleck",
+      "rule_category": "ae_to_e"
+    },
+    "camp": {
+      "approximation": "kemp",
+      "rule_category": "ae_to_e"
+    },
+    "cap": {
+      "approximation": "kep",
+      "rule_category": "ae_to_e"
+    },
+    "cash": {
+      "approximation": "kesh",
+      "rule_category": "ae_to_e"
+    },
+    "cast": {
+      "approximation": "kest",
+      "rule_category": "ae_to_e"
+    },
+    "catch": {
+      "approximation": "ketch",
+      "rule_category": "ae_to_e"
+    },
+    "chance": {
+      "approximation": "chens",
+      "rule_category": "ae_to_e"
+    },
+    "class": {
+      "approximation": "kless",
+      "rule_category": "ae_to_e"
+    },
+    "crash": {
+      "approximation": "kresh",
+      "rule_category": "ae_to_e"
+    },
+    "dad": {
+      "approximation": "ded",
+      "rule_category": "ae_to_e"
+    },
+    "dance": {
+      "approximation": "dens",
+      "rule_category": "ae_to_e"
+    },
+    "fact": {
+      "approximation": "fect",
+      "rule_category": "ae_to_e"
+    },
+    "fan": {
+      "approximation": "fen",
+      "rule_category": "ae_to_e"
+    },
+    "fat": {
+      "approximation": "fet",
+      "rule_category": "ae_to_e"
+    },
+    "flag": {
+      "approximation": "fleg",
+      "rule_category": "ae_to_e"
+    },
+    "flat": {
+      "approximation": "flet",
+      "rule_category": "ae_to_e"
+    },
+    "gas": {
+      "approximation": "ges",
+      "rule_category": "ae_to_e"
+    },
+    "glass": {
+      "approximation": "gless",
+      "rule_category": "ae_to_e"
+    },
+    "grand": {
+      "approximation": "grend",
+      "rule_category": "ae_to_e"
+    },
+    "hand": {
+      "approximation": "hend",
+      "rule_category": "ae_to_e"
+    },
+    "jam": {
+      "approximation": "jem",
+      "rule_category": "ae_to_e"
+    },
+    "lack": {
+      "approximation": "leck",
+      "rule_category": "ae_to_e"
+    },
+    "land": {
+      "approximation": "lend",
+      "rule_category": "ae_to_e"
+    },
+    "beautiful": {
+      "approximation": "bootifeel",
+      "rule_category": "i_to_ee"
+    },
+    "bit": {
+      "approximation": "beat",
+      "rule_category": "i_to_ee"
+    },
+    "sit": {
+      "approximation": "seat",
+      "rule_category": "i_to_ee"
+    },
+    "hit": {
+      "approximation": "heat",
+      "rule_category": "i_to_ee"
+    },
+    "fit": {
+      "approximation": "feet",
+      "rule_category": "i_to_ee"
+    },
+    "lid": {
+      "approximation": "leed",
+      "rule_category": "i_to_ee"
+    },
+    "kid": {
+      "approximation": "keed",
+      "rule_category": "i_to_ee"
+    },
+    "lip": {
+      "approximation": "leep",
+      "rule_category": "i_to_ee"
+    },
+    "ship": {
+      "approximation": "sheep",
+      "rule_category": "i_to_ee"
+    },
+    "dip": {
+      "approximation": "deep",
+      "rule_category": "i_to_ee"
+    },
+    "tip": {
+      "approximation": "teep",
+      "rule_category": "i_to_ee"
+    },
+    "bin": {
+      "approximation": "been",
+      "rule_category": "i_to_ee"
+    },
+    "sin": {
+      "approximation": "seen",
+      "rule_category": "i_to_ee"
+    },
+    "tin": {
+      "approximation": "teen",
+      "rule_category": "i_to_ee"
+    },
+    "pin": {
+      "approximation": "peen",
+      "rule_category": "i_to_ee"
+    },
+    "city": {
+      "approximation": "seetee",
+      "rule_category": "i_to_ee"
+    },
+    "big": {
+      "approximation": "beeg",
+      "rule_category": "i_to_ee"
+    },
+    "bring": {
+      "approximation": "breeng",
+      "rule_category": "i_to_ee"
+    },
+    "build": {
+      "approximation": "beeld",
+      "rule_category": "i_to_ee"
+    },
+    "busy": {
+      "approximation": "beezy",
+      "rule_category": "i_to_ee"
+    },
+    "did": {
+      "approximation": "deed",
+      "rule_category": "i_to_ee"
+    },
+    "dinner": {
+      "approximation": "deener",
+      "rule_category": "i_to_ee"
+    },
+    "drink": {
+      "approximation": "drrink",
+      "rule_category": "r_rolling"
+    },
+    "fill": {
+      "approximation": "feel",
+      "rule_category": "i_to_ee"
+    },
+    "film": {
+      "approximation": "filam",
+      "rule_category": "schwa_addition"
+    },
+    "finish": {
+      "approximation": "feenish",
+      "rule_category": "i_to_ee"
+    },
+    "fish": {
+      "approximation": "feesh",
+      "rule_category": "i_to_ee"
+    },
+    "give": {
+      "approximation": "geev",
+      "rule_category": "i_to_ee"
+    },
+    "him": {
+      "approximation": "heem",
+      "rule_category": "i_to_ee"
+    },
+    "his": {
+      "approximation": "heez",
+      "rule_category": "i_to_ee"
+    },
+    "ill": {
+      "approximation": "eel",
+      "rule_category": "i_to_ee"
+    },
+    "in": {
+      "approximation": "een",
+      "rule_category": "i_to_ee"
+    },
+    "income": {
+      "approximation": "eencome",
+      "rule_category": "i_to_ee"
+    },
+    "india": {
+      "approximation": "eendia",
+      "rule_category": "i_to_ee"
+    },
+    "industry": {
+      "approximation": "eendustry",
+      "rule_category": "i_to_ee"
+    },
+    "interest": {
+      "approximation": "eenterest",
+      "rule_category": "i_to_ee"
+    },
+    "is": {
+      "approximation": "eez",
+      "rule_category": "i_to_ee"
+    },
+    "it": {
+      "approximation": "eet",
+      "rule_category": "i_to_ee"
+    },
+    "kill": {
+      "approximation": "keel",
+      "rule_category": "i_to_ee"
+    },
+    "kiss": {
+      "approximation": "kees",
+      "rule_category": "i_to_ee"
+    },
+    "list": {
+      "approximation": "leest",
+      "rule_category": "i_to_ee"
+    },
+    "listen": {
+      "approximation": "leesen",
+      "rule_category": "i_to_ee"
+    },
+    "live": {
+      "approximation": "leev",
+      "rule_category": "i_to_ee"
+    },
+    "middle": {
+      "approximation": "mid-dull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "milk": {
+      "approximation": "meelk",
+      "rule_category": "i_to_ee"
+    },
+    "million": {
+      "approximation": "meelion",
+      "rule_category": "i_to_ee"
+    },
+    "minute": {
+      "approximation": "meenut",
+      "rule_category": "i_to_ee"
+    },
+    "miss": {
+      "approximation": "mees",
+      "rule_category": "i_to_ee"
+    },
+    "morning": {
+      "approximation": "maarning",
+      "rule_category": "o_to_aa"
+    },
+    "coffee": {
+      "approximation": "cawfee",
+      "rule_category": "o_to_aa"
+    },
+    "dog": {
+      "approximation": "daag",
+      "rule_category": "o_to_aa"
+    },
+    "log": {
+      "approximation": "laag",
+      "rule_category": "o_to_aa"
+    },
+    "frog": {
+      "approximation": "fraag",
+      "rule_category": "o_to_aa"
+    },
+    "stop": {
+      "approximation": "staap",
+      "rule_category": "o_to_aa"
+    },
+    "top": {
+      "approximation": "taap",
+      "rule_category": "o_to_aa"
+    },
+    "pop": {
+      "approximation": "paap",
+      "rule_category": "o_to_aa"
+    },
+    "cop": {
+      "approximation": "caap",
+      "rule_category": "o_to_aa"
+    },
+    "hot": {
+      "approximation": "haat",
+      "rule_category": "o_to_aa"
+    },
+    "pot": {
+      "approximation": "paat",
+      "rule_category": "o_to_aa"
+    },
+    "cot": {
+      "approximation": "caat",
+      "rule_category": "o_to_aa"
+    },
+    "lot": {
+      "approximation": "laat",
+      "rule_category": "o_to_aa"
+    },
+    "box": {
+      "approximation": "baax",
+      "rule_category": "o_to_aa"
+    },
+    "fox": {
+      "approximation": "faax",
+      "rule_category": "o_to_aa"
+    },
+    "boss": {
+      "approximation": "baas",
+      "rule_category": "o_to_aa"
+    },
+    "body": {
+      "approximation": "baady",
+      "rule_category": "o_to_aa"
+    },
+    "bottom": {
+      "approximation": "baatom",
+      "rule_category": "o_to_aa"
+    },
+    "clock": {
+      "approximation": "claak",
+      "rule_category": "o_to_aa"
+    },
+    "college": {
+      "approximation": "caalege",
+      "rule_category": "o_to_aa"
+    },
+    "common": {
+      "approximation": "caamon",
+      "rule_category": "o_to_aa"
+    },
+    "copy": {
+      "approximation": "caapy",
+      "rule_category": "o_to_aa"
+    },
+    "cost": {
+      "approximation": "caast",
+      "rule_category": "o_to_aa"
+    },
+    "cross": {
+      "approximation": "craas",
+      "rule_category": "o_to_aa"
+    },
+    "doctor": {
+      "approximation": "daactor",
+      "rule_category": "o_to_aa"
+    },
+    "drop": {
+      "approximation": "draap",
+      "rule_category": "o_to_aa"
+    },
+    "follow": {
+      "approximation": "faallow",
+      "rule_category": "o_to_aa"
+    },
+    "fond": {
+      "approximation": "faand",
+      "rule_category": "o_to_aa"
+    },
+    "god": {
+      "approximation": "gaad",
+      "rule_category": "o_to_aa"
+    },
+    "got": {
+      "approximation": "gaat",
+      "rule_category": "o_to_aa"
+    },
+    "holiday": {
+      "approximation": "haaliday",
+      "rule_category": "o_to_aa"
+    },
+    "hospital": {
+      "approximation": "ospital",
+      "rule_category": "h_dropping"
+    },
+    "job": {
+      "approximation": "jaab",
+      "rule_category": "o_to_aa"
+    },
+    "knock": {
+      "approximation": "naak",
+      "rule_category": "o_to_aa"
+    },
+    "knot": {
+      "approximation": "naat",
+      "rule_category": "o_to_aa"
+    },
+    "lock": {
+      "approximation": "laak",
+      "rule_category": "o_to_aa"
+    },
+    "long": {
+      "approximation": "laang",
+      "rule_category": "o_to_aa"
+    },
+    "model": {
+      "approximation": "maadel",
+      "rule_category": "o_to_aa"
+    },
+    "modern": {
+      "approximation": "maadern",
+      "rule_category": "o_to_aa"
+    },
+    "not": {
+      "approximation": "naat",
+      "rule_category": "o_to_aa"
+    },
+    "object": {
+      "approximation": "aabject",
+      "rule_category": "o_to_aa"
+    },
+    "office": {
+      "approximation": "aafice",
+      "rule_category": "o_to_aa"
+    },
+    "often": {
+      "approximation": "aaften",
+      "rule_category": "o_to_aa"
+    },
+    "possible": {
+      "approximation": "paasible",
+      "rule_category": "o_to_aa"
+    },
+    "problem": {
+      "approximation": "praablem",
+      "rule_category": "o_to_aa"
+    },
+    "profit": {
+      "approximation": "praafit",
+      "rule_category": "o_to_aa"
+    },
+    "promise": {
+      "approximation": "praamise",
+      "rule_category": "o_to_aa"
+    },
+    "quality": {
+      "approximation": "quaality",
+      "rule_category": "o_to_aa"
+    },
+    "rock": {
+      "approximation": "raak",
+      "rule_category": "o_to_aa"
+    },
+    "three": {
+      "approximation": "tree",
+      "rule_category": "th_to_t"
+    },
+    "think": {
+      "approximation": "tink",
+      "rule_category": "th_to_t"
+    },
+    "thought": {
+      "approximation": "taught",
+      "rule_category": "th_to_t"
+    },
+    "thank": {
+      "approximation": "tank",
+      "rule_category": "th_to_t"
+    },
+    "thin": {
+      "approximation": "tin",
+      "rule_category": "th_to_t"
+    },
+    "thick": {
+      "approximation": "tick",
+      "rule_category": "th_to_t"
+    },
+    "through": {
+      "approximation": "tru",
+      "rule_category": "th_to_t"
+    },
+    "throw": {
+      "approximation": "tro",
+      "rule_category": "th_to_t"
+    },
+    "thumb": {
+      "approximation": "tumb",
+      "rule_category": "th_to_t"
+    },
+    "thunder": {
+      "approximation": "tunder",
+      "rule_category": "th_to_t"
+    },
+    "bath": {
+      "approximation": "baat",
+      "rule_category": "th_to_t"
+    },
+    "path": {
+      "approximation": "paat",
+      "rule_category": "th_to_t"
+    },
+    "math": {
+      "approximation": "mat",
+      "rule_category": "th_to_t"
+    },
+    "thief": {
+      "approximation": "teef",
+      "rule_category": "th_to_t"
+    },
+    "thing": {
+      "approximation": "ting",
+      "rule_category": "th_to_t"
+    },
+    "third": {
+      "approximation": "tird",
+      "rule_category": "th_to_t"
+    },
+    "thirsty": {
+      "approximation": "tirsty",
+      "rule_category": "th_to_t"
+    },
+    "thirteen": {
+      "approximation": "tirteen",
+      "rule_category": "th_to_t"
+    },
+    "thirty": {
+      "approximation": "tirty",
+      "rule_category": "th_to_t"
+    },
+    "thousand": {
+      "approximation": "tousand",
+      "rule_category": "th_to_t"
+    },
+    "thread": {
+      "approximation": "tread",
+      "rule_category": "th_to_t"
+    },
+    "threat": {
+      "approximation": "treat",
+      "rule_category": "th_to_t"
+    },
+    "throat": {
+      "approximation": "troat",
+      "rule_category": "th_to_t"
+    },
+    "thursday": {
+      "approximation": "tursday",
+      "rule_category": "th_to_t"
+    },
+    "athlete": {
+      "approximation": "atleet",
+      "rule_category": "th_to_t"
+    },
+    "author": {
+      "approximation": "autor",
+      "rule_category": "th_to_t"
+    },
+    "earth": {
+      "approximation": "art",
+      "rule_category": "th_to_t"
+    },
+    "faith": {
+      "approximation": "fait",
+      "rule_category": "th_to_t"
+    },
+    "health": {
+      "approximation": "healt",
+      "rule_category": "th_to_t"
+    },
+    "length": {
+      "approximation": "lengt",
+      "rule_category": "th_to_t"
+    },
+    "method": {
+      "approximation": "metod",
+      "rule_category": "th_to_t"
+    },
+    "month": {
+      "approximation": "mont",
+      "rule_category": "th_to_t"
+    },
+    "mouth": {
+      "approximation": "mout",
+      "rule_category": "th_to_t"
+    },
+    "north": {
+      "approximation": "nort",
+      "rule_category": "th_to_t"
+    },
+    "nothing": {
+      "approximation": "noting",
+      "rule_category": "th_to_t"
+    },
+    "south": {
+      "approximation": "sout",
+      "rule_category": "th_to_t"
+    },
+    "strength": {
+      "approximation": "strengt",
+      "rule_category": "th_to_t"
+    },
+    "teeth": {
+      "approximation": "teet",
+      "rule_category": "th_to_t"
+    },
+    "truth": {
+      "approximation": "trut",
+      "rule_category": "th_to_t"
+    },
+    "youth": {
+      "approximation": "yout",
+      "rule_category": "th_to_t"
+    },
+    "this": {
+      "approximation": "dis",
+      "rule_category": "th_to_d"
+    },
+    "that": {
+      "approximation": "dat",
+      "rule_category": "th_to_d"
+    },
+    "these": {
+      "approximation": "dees",
+      "rule_category": "th_to_d"
+    },
+    "those": {
+      "approximation": "dose",
+      "rule_category": "th_to_d"
+    },
+    "then": {
+      "approximation": "den",
+      "rule_category": "th_to_d"
+    },
+    "there": {
+      "approximation": "dere",
+      "rule_category": "th_to_d"
+    },
+    "they": {
+      "approximation": "dey",
+      "rule_category": "th_to_d"
+    },
+    "them": {
+      "approximation": "dem",
+      "rule_category": "th_to_d"
+    },
+    "though": {
+      "approximation": "do",
+      "rule_category": "th_to_d"
+    },
+    "father": {
+      "approximation": "fader",
+      "rule_category": "th_to_d"
+    },
+    "mother": {
+      "approximation": "moder",
+      "rule_category": "th_to_d"
+    },
+    "brother": {
+      "approximation": "broder",
+      "rule_category": "th_to_d"
+    },
+    "than": {
+      "approximation": "dan",
+      "rule_category": "th_to_d"
+    },
+    "the": {
+      "approximation": "da",
+      "rule_category": "th_to_d"
+    },
+    "their": {
+      "approximation": "deir",
+      "rule_category": "th_to_d"
+    },
+    "themselves": {
+      "approximation": "demselves",
+      "rule_category": "th_to_d"
+    },
+    "therefore": {
+      "approximation": "derefore",
+      "rule_category": "th_to_d"
+    },
+    "although": {
+      "approximation": "alldo",
+      "rule_category": "th_to_d"
+    },
+    "another": {
+      "approximation": "anoder",
+      "rule_category": "th_to_d"
+    },
+    "bother": {
+      "approximation": "boder",
+      "rule_category": "th_to_d"
+    },
+    "clothes": {
+      "approximation": "clodes",
+      "rule_category": "th_to_d"
+    },
+    "either": {
+      "approximation": "eider",
+      "rule_category": "th_to_d"
+    },
+    "further": {
+      "approximation": "furder",
+      "rule_category": "th_to_d"
+    },
+    "gather": {
+      "approximation": "gader",
+      "rule_category": "th_to_d"
+    },
+    "neither": {
+      "approximation": "neider",
+      "rule_category": "th_to_d"
+    },
+    "other": {
+      "approximation": "oder",
+      "rule_category": "th_to_d"
+    },
+    "rather": {
+      "approximation": "rader",
+      "rule_category": "th_to_d"
+    },
+    "together": {
+      "approximation": "togeder",
+      "rule_category": "th_to_d"
+    },
+    "breathe": {
+      "approximation": "breed",
+      "rule_category": "th_to_d"
+    },
+    "smooth": {
+      "approximation": "smood",
+      "rule_category": "th_to_d"
+    },
+    "hotel": {
+      "approximation": "otel",
+      "rule_category": "h_dropping"
+    },
+    "house": {
+      "approximation": "ouse",
+      "rule_category": "h_dropping"
+    },
+    "heart": {
+      "approximation": "art",
+      "rule_category": "h_dropping"
+    },
+    "happy": {
+      "approximation": "appy",
+      "rule_category": "h_dropping"
+    },
+    "heavy": {
+      "approximation": "evy",
+      "rule_category": "h_dropping"
+    },
+    "helmet": {
+      "approximation": "elmet",
+      "rule_category": "h_dropping"
+    },
+    "history": {
+      "approximation": "istory",
+      "rule_category": "h_dropping"
+    },
+    "human": {
+      "approximation": "yuman",
+      "rule_category": "h_dropping"
+    },
+    "huge": {
+      "approximation": "yuge",
+      "rule_category": "h_dropping"
+    },
+    "car": {
+      "approximation": "caar",
+      "rule_category": "r_rolling"
+    },
+    "red": {
+      "approximation": "rred",
+      "rule_category": "r_rolling"
+    },
+    "very": {
+      "approximation": "verry",
+      "rule_category": "r_rolling"
+    },
+    "park": {
+      "approximation": "paark",
+      "rule_category": "r_rolling"
+    },
+    "market": {
+      "approximation": "maarket",
+      "rule_category": "r_rolling"
+    },
+    "sorry": {
+      "approximation": "saarry",
+      "rule_category": "r_rolling"
+    },
+    "train": {
+      "approximation": "trrain",
+      "rule_category": "r_rolling"
+    },
+    "ready": {
+      "approximation": "rready",
+      "rule_category": "r_rolling"
+    },
+    "table": {
+      "approximation": "tay-bull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "people": {
+      "approximation": "pee-pull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "little": {
+      "approximation": "lit-tull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "simple": {
+      "approximation": "sim-pull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "bottle": {
+      "approximation": "baa-tull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "settle": {
+      "approximation": "set-tull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "trouble": {
+      "approximation": "truh-bull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "uncle": {
+      "approximation": "un-cull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "vision": {
+      "approximation": "vijon",
+      "rule_category": "zh_to_j"
+    },
+    "measure": {
+      "approximation": "meajure",
+      "rule_category": "zh_to_j"
+    },
+    "treasure": {
+      "approximation": "treajure",
+      "rule_category": "zh_to_j"
+    },
+    "pleasure": {
+      "approximation": "pleajure",
+      "rule_category": "zh_to_j"
+    },
+    "casual": {
+      "approximation": "cajual",
+      "rule_category": "zh_to_j"
+    },
+    "television": {
+      "approximation": "televijon",
+      "rule_category": "zh_to_j"
+    },
+    "usual": {
+      "approximation": "yujual",
+      "rule_category": "zh_to_j"
+    },
+    "visual": {
+      "approximation": "vijual",
+      "rule_category": "zh_to_j"
+    },
+    "version": {
+      "approximation": "varjon",
+      "rule_category": "zh_to_j"
+    },
+    "division": {
+      "approximation": "divijon",
+      "rule_category": "zh_to_j"
+    },
+    "zero": {
+      "approximation": "jeero",
+      "rule_category": "z_to_j"
+    },
+    "zoo": {
+      "approximation": "joo",
+      "rule_category": "z_to_j"
+    },
+    "zip": {
+      "approximation": "jip",
+      "rule_category": "z_to_j"
+    },
+    "zone": {
+      "approximation": "jone",
+      "rule_category": "z_to_j"
+    },
+    "zebra": {
+      "approximation": "jebra",
+      "rule_category": "z_to_j"
+    },
+    "breakfast": {
+      "approximation": "brekfust",
+      "rule_category": "schwa_reduction"
+    },
+    "form": {
+      "approximation": "foram",
+      "rule_category": "schwa_addition"
+    },
+    "norm": {
+      "approximation": "noram",
+      "rule_category": "schwa_addition"
+    },
+    "arm": {
+      "approximation": "aram",
+      "rule_category": "schwa_addition"
+    },
+    "charm": {
+      "approximation": "charam",
+      "rule_category": "schwa_addition"
+    },
+    "farm": {
+      "approximation": "faram",
+      "rule_category": "schwa_addition"
+    },
+    "harm": {
+      "approximation": "haram",
+      "rule_category": "schwa_addition"
+    },
+    "term": {
+      "approximation": "teram",
+      "rule_category": "schwa_addition"
+    },
+    "firm": {
+      "approximation": "firam",
+      "rule_category": "schwa_addition"
+    },
+    "curl": {
+      "approximation": "cural",
+      "rule_category": "schwa_addition"
+    },
+    "girl": {
+      "approximation": "giral",
+      "rule_category": "schwa_addition"
+    },
+    "pearl": {
+      "approximation": "pearal",
+      "rule_category": "schwa_addition"
+    },
+    "school": {
+      "approximation": "iskool",
+      "rule_category": "schwa_prothesis"
+    },
+    "station": {
+      "approximation": "istation",
+      "rule_category": "schwa_prothesis"
+    },
+    "smile": {
+      "approximation": "ismile",
+      "rule_category": "schwa_prothesis"
+    },
+    "special": {
+      "approximation": "ispecial",
+      "rule_category": "schwa_prothesis"
+    },
+    "speech": {
+      "approximation": "ispeech",
+      "rule_category": "schwa_prothesis"
+    },
+    "desk": {
+      "approximation": "desak",
+      "rule_category": "schwa_addition"
+    },
+    "risk": {
+      "approximation": "risak",
+      "rule_category": "schwa_addition"
+    },
+    "valley": {
+      "approximation": "walley",
+      "rule_category": "v_to_w_reversal"
+    },
+    "value": {
+      "approximation": "walue",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vapor": {
+      "approximation": "wapor",
+      "rule_category": "v_to_w_reversal"
+    },
+    "variety": {
+      "approximation": "wariety",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vast": {
+      "approximation": "wast",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vehicle": {
+      "approximation": "wehicle",
+      "rule_category": "v_to_w_reversal"
+    },
+    "velocity": {
+      "approximation": "welocity",
+      "rule_category": "v_to_w_reversal"
+    },
+    "velvet": {
+      "approximation": "welwet",
+      "rule_category": "v_to_w_reversal"
+    },
+    "venture": {
+      "approximation": "wenture",
+      "rule_category": "v_to_w_reversal"
+    },
+    "verbal": {
+      "approximation": "werbal",
+      "rule_category": "v_to_w_reversal"
+    },
+    "verify": {
+      "approximation": "werify",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vertical": {
+      "approximation": "wertical",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vessel": {
+      "approximation": "wessel",
+      "rule_category": "v_to_w_reversal"
+    },
+    "veteran": {
+      "approximation": "weteran",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vibe": {
+      "approximation": "wibe",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vibrate": {
+      "approximation": "wibrate",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vice": {
+      "approximation": "wice",
+      "rule_category": "v_to_w_reversal"
+    },
+    "victim": {
+      "approximation": "wictim",
+      "rule_category": "v_to_w_reversal"
+    },
+    "victory": {
+      "approximation": "wictory",
+      "rule_category": "v_to_w_reversal"
+    },
+    "video": {
+      "approximation": "wideo",
+      "rule_category": "v_to_w_reversal"
+    },
+    "view": {
+      "approximation": "wiew",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vigil": {
+      "approximation": "wigil",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vigor": {
+      "approximation": "wigor",
+      "rule_category": "v_to_w_reversal"
+    },
+    "villa": {
+      "approximation": "willa",
+      "rule_category": "v_to_w_reversal"
+    },
+    "village": {
+      "approximation": "willage",
+      "rule_category": "v_to_w_reversal"
+    },
+    "villain": {
+      "approximation": "willain",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vinyl": {
+      "approximation": "winyl",
+      "rule_category": "v_to_w_reversal"
+    },
+    "violet": {
+      "approximation": "wiolet",
+      "rule_category": "v_to_w_reversal"
+    },
+    "violin": {
+      "approximation": "wiolin",
+      "rule_category": "v_to_w_reversal"
+    },
+    "viral": {
+      "approximation": "wiral",
+      "rule_category": "v_to_w_reversal"
+    },
+    "virtue": {
+      "approximation": "wirtue",
+      "rule_category": "v_to_w_reversal"
+    },
+    "virus": {
+      "approximation": "wirus",
+      "rule_category": "v_to_w_reversal"
+    },
+    "visible": {
+      "approximation": "wisible",
+      "rule_category": "v_to_w_reversal"
+    },
+    "visit": {
+      "approximation": "wisit",
+      "rule_category": "v_to_w_reversal"
+    },
+    "visor": {
+      "approximation": "wisor",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vista": {
+      "approximation": "wista",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vital": {
+      "approximation": "wital",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vitamin": {
+      "approximation": "witamin",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vivid": {
+      "approximation": "wiwid",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vocal": {
+      "approximation": "wocal",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vodka": {
+      "approximation": "wodka",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vogue": {
+      "approximation": "wogue",
+      "rule_category": "v_to_w_reversal"
+    },
+    "voice": {
+      "approximation": "woice",
+      "rule_category": "v_to_w_reversal"
+    },
+    "void": {
+      "approximation": "woid",
+      "rule_category": "v_to_w_reversal"
+    },
+    "volcano": {
+      "approximation": "wolcano",
+      "rule_category": "v_to_w_reversal"
+    },
+    "volley": {
+      "approximation": "wolley",
+      "rule_category": "v_to_w_reversal"
+    },
+    "volt": {
+      "approximation": "wolt",
+      "rule_category": "v_to_w_reversal"
+    },
+    "volume": {
+      "approximation": "wolume",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vote": {
+      "approximation": "wote",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vowel": {
+      "approximation": "wowel",
+      "rule_category": "v_to_w_reversal"
+    },
+    "voyage": {
+      "approximation": "woyage",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vulgar": {
+      "approximation": "wulgar",
+      "rule_category": "v_to_w_reversal"
+    },
+    "vulture": {
+      "approximation": "wulture",
+      "rule_category": "v_to_w_reversal"
+    },
+    "action": {
+      "approximation": "ection",
+      "rule_category": "ae_to_e"
+    },
+    "active": {
+      "approximation": "ective",
+      "rule_category": "ae_to_e"
+    },
+    "actual": {
+      "approximation": "ectual",
+      "rule_category": "ae_to_e"
+    },
+    "adapt": {
+      "approximation": "edept",
+      "rule_category": "ae_to_e"
+    },
+    "addict": {
+      "approximation": "eddict",
+      "rule_category": "ae_to_e"
+    },
+    "address": {
+      "approximation": "eddress",
+      "rule_category": "ae_to_e"
+    },
+    "adept": {
+      "approximation": "edept",
+      "rule_category": "ae_to_e"
+    },
+    "adult": {
+      "approximation": "edult",
+      "rule_category": "ae_to_e"
+    },
+    "advance": {
+      "approximation": "edvance",
+      "rule_category": "ae_to_e"
+    },
+    "advent": {
+      "approximation": "edvent",
+      "rule_category": "ae_to_e"
+    },
+    "adverb": {
+      "approximation": "edverb",
+      "rule_category": "ae_to_e"
+    },
+    "adverse": {
+      "approximation": "edverse",
+      "rule_category": "ae_to_e"
+    },
+    "advice": {
+      "approximation": "edvice",
+      "rule_category": "ae_to_e"
+    },
+    "advise": {
+      "approximation": "edvise",
+      "rule_category": "ae_to_e"
+    },
+    "advocate": {
+      "approximation": "edvocate",
+      "rule_category": "ae_to_e"
+    },
+    "affair": {
+      "approximation": "effair",
+      "rule_category": "ae_to_e"
+    },
+    "affect": {
+      "approximation": "effect",
+      "rule_category": "ae_to_e"
+    },
+    "afford": {
+      "approximation": "efford",
+      "rule_category": "ae_to_e"
+    },
+    "afraid": {
+      "approximation": "efraid",
+      "rule_category": "ae_to_e"
+    },
+    "after": {
+      "approximation": "efter",
+      "rule_category": "ae_to_e"
+    },
+    "again": {
+      "approximation": "egain",
+      "rule_category": "ae_to_e"
+    },
+    "against": {
+      "approximation": "egainst",
+      "rule_category": "ae_to_e"
+    },
+    "agent": {
+      "approximation": "egent",
+      "rule_category": "ae_to_e"
+    },
+    "agree": {
+      "approximation": "egree",
+      "rule_category": "ae_to_e"
+    },
+    "alarm": {
+      "approximation": "elarm",
+      "rule_category": "ae_to_e"
+    },
+    "album": {
+      "approximation": "elbum",
+      "rule_category": "ae_to_e"
+    },
+    "alcohol": {
+      "approximation": "elcohol",
+      "rule_category": "ae_to_e"
+    },
+    "alert": {
+      "approximation": "elert",
+      "rule_category": "ae_to_e"
+    },
+    "alien": {
+      "approximation": "elien",
+      "rule_category": "ae_to_e"
+    },
+    "alike": {
+      "approximation": "elike",
+      "rule_category": "ae_to_e"
+    },
+    "alive": {
+      "approximation": "elive",
+      "rule_category": "ae_to_e"
+    },
+    "allow": {
+      "approximation": "ellow",
+      "rule_category": "ae_to_e"
+    },
+    "ally": {
+      "approximation": "elly",
+      "rule_category": "ae_to_e"
+    },
+    "almost": {
+      "approximation": "elmost",
+      "rule_category": "ae_to_e"
+    },
+    "alone": {
+      "approximation": "elone",
+      "rule_category": "ae_to_e"
+    },
+    "along": {
+      "approximation": "elong",
+      "rule_category": "ae_to_e"
+    },
+    "alphabet": {
+      "approximation": "elphabet",
+      "rule_category": "ae_to_e"
+    },
+    "already": {
+      "approximation": "elready",
+      "rule_category": "ae_to_e"
+    },
+    "also": {
+      "approximation": "elso",
+      "rule_category": "ae_to_e"
+    },
+    "alter": {
+      "approximation": "elter",
+      "rule_category": "ae_to_e"
+    },
+    "altitude": {
+      "approximation": "eltitude",
+      "rule_category": "ae_to_e"
+    },
+    "always": {
+      "approximation": "elways",
+      "rule_category": "ae_to_e"
+    },
+    "amaze": {
+      "approximation": "emaze",
+      "rule_category": "ae_to_e"
+    },
+    "amber": {
+      "approximation": "ember",
+      "rule_category": "ae_to_e"
+    },
+    "ambition": {
+      "approximation": "embition",
+      "rule_category": "ae_to_e"
+    },
+    "ambulance": {
+      "approximation": "embulance",
+      "rule_category": "ae_to_e"
+    },
+    "amend": {
+      "approximation": "emend",
+      "rule_category": "ae_to_e"
+    },
+    "among": {
+      "approximation": "emong",
+      "rule_category": "ae_to_e"
+    },
+    "amount": {
+      "approximation": "emount",
+      "rule_category": "ae_to_e"
+    },
+    "ample": {
+      "approximation": "emple",
+      "rule_category": "ae_to_e"
+    },
+    "amuse": {
+      "approximation": "emuse",
+      "rule_category": "ae_to_e"
+    },
+    "analogy": {
+      "approximation": "enalogy",
+      "rule_category": "ae_to_e"
+    },
+    "analyze": {
+      "approximation": "enalyze",
+      "rule_category": "ae_to_e"
+    },
+    "anatomy": {
+      "approximation": "enatomy",
+      "rule_category": "ae_to_e"
+    },
+    "ancestor": {
+      "approximation": "encestor",
+      "rule_category": "ae_to_e"
+    },
+    "anchor": {
+      "approximation": "enchor",
+      "rule_category": "ae_to_e"
+    },
+    "ancient": {
+      "approximation": "encient",
+      "rule_category": "ae_to_e"
+    },
+    "angel": {
+      "approximation": "engel",
+      "rule_category": "ae_to_e"
+    },
+    "ankle": {
+      "approximation": "enkle",
+      "rule_category": "ae_to_e"
+    },
+    "annex": {
+      "approximation": "ennex",
+      "rule_category": "ae_to_e"
+    },
+    "announce": {
+      "approximation": "ennounce",
+      "rule_category": "ae_to_e"
+    },
+    "annoy": {
+      "approximation": "ennoy",
+      "rule_category": "ae_to_e"
+    },
+    "annual": {
+      "approximation": "ennual",
+      "rule_category": "ae_to_e"
+    },
+    "antenna": {
+      "approximation": "entenna",
+      "rule_category": "ae_to_e"
+    },
+    "anthem": {
+      "approximation": "enthem",
+      "rule_category": "ae_to_e"
+    },
+    "antique": {
+      "approximation": "entique",
+      "rule_category": "ae_to_e"
+    },
+    "anxiety": {
+      "approximation": "enxiety",
+      "rule_category": "ae_to_e"
+    },
+    "anxious": {
+      "approximation": "enxious",
+      "rule_category": "ae_to_e"
+    },
+    "apart": {
+      "approximation": "epart",
+      "rule_category": "ae_to_e"
+    },
+    "apartment": {
+      "approximation": "epartment",
+      "rule_category": "ae_to_e"
+    },
+    "apex": {
+      "approximation": "epex",
+      "rule_category": "ae_to_e"
+    },
+    "apology": {
+      "approximation": "epology",
+      "rule_category": "ae_to_e"
+    },
+    "apparatus": {
+      "approximation": "epparatus",
+      "rule_category": "ae_to_e"
+    },
+    "apparent": {
+      "approximation": "epparent",
+      "rule_category": "ae_to_e"
+    },
+    "appeal": {
+      "approximation": "eppeal",
+      "rule_category": "ae_to_e"
+    },
+    "appear": {
+      "approximation": "eppear",
+      "rule_category": "ae_to_e"
+    },
+    "appetite": {
+      "approximation": "eppetite",
+      "rule_category": "ae_to_e"
+    },
+    "apply": {
+      "approximation": "epply",
+      "rule_category": "ae_to_e"
+    },
+    "appoint": {
+      "approximation": "eppoint",
+      "rule_category": "ae_to_e"
+    },
+    "approve": {
+      "approximation": "epprove",
+      "rule_category": "ae_to_e"
+    },
+    "apricot": {
+      "approximation": "epricot",
+      "rule_category": "ae_to_e"
+    },
+    "apron": {
+      "approximation": "epron",
+      "rule_category": "ae_to_e"
+    },
+    "apt": {
+      "approximation": "ept",
+      "rule_category": "ae_to_e"
+    },
+    "zigzag": {
+      "approximation": "jigjag",
+      "rule_category": "z_to_j"
+    },
+    "zinc": {
+      "approximation": "jink",
+      "rule_category": "z_to_j"
+    },
+    "zest": {
+      "approximation": "jest",
+      "rule_category": "z_to_j"
+    },
+    "zeal": {
+      "approximation": "jeal",
+      "rule_category": "z_to_j"
+    },
+    "zenith": {
+      "approximation": "jenith",
+      "rule_category": "z_to_j"
+    },
+    "zodiac": {
+      "approximation": "jodiac",
+      "rule_category": "z_to_j"
+    },
+    "zombie": {
+      "approximation": "jombie",
+      "rule_category": "z_to_j"
+    },
+    "zoom": {
+      "approximation": "joom",
+      "rule_category": "z_to_j"
+    },
+    "leisure": {
+      "approximation": "leejure",
+      "rule_category": "zh_to_j"
+    },
+    "conclusion": {
+      "approximation": "conclujon",
+      "rule_category": "zh_to_j"
+    },
+    "decision": {
+      "approximation": "decijon",
+      "rule_category": "zh_to_j"
+    },
+    "fusion": {
+      "approximation": "fujon",
+      "rule_category": "zh_to_j"
+    },
+    "illusion": {
+      "approximation": "illujon",
+      "rule_category": "zh_to_j"
+    },
+    "explosion": {
+      "approximation": "explojon",
+      "rule_category": "zh_to_j"
+    },
+    "occasion": {
+      "approximation": "occajon",
+      "rule_category": "zh_to_j"
+    },
+    "confusion": {
+      "approximation": "confujon",
+      "rule_category": "zh_to_j"
+    },
+    "collision": {
+      "approximation": "collijon",
+      "rule_category": "zh_to_j"
+    },
+    "invasion": {
+      "approximation": "invajon",
+      "rule_category": "zh_to_j"
+    },
+    "erosion": {
+      "approximation": "erojon",
+      "rule_category": "zh_to_j"
+    },
+    "adhesion": {
+      "approximation": "adhejon",
+      "rule_category": "zh_to_j"
+    },
+    "hungry": {
+      "approximation": "ungry",
+      "rule_category": "h_dropping"
+    },
+    "habit": {
+      "approximation": "abit",
+      "rule_category": "h_dropping"
+    },
+    "hammer": {
+      "approximation": "ammer",
+      "rule_category": "h_dropping"
+    },
+    "happen": {
+      "approximation": "appen",
+      "rule_category": "h_dropping"
+    },
+    "hard": {
+      "approximation": "ard",
+      "rule_category": "h_dropping"
+    },
+    "harvest": {
+      "approximation": "arvest",
+      "rule_category": "h_dropping"
+    },
+    "hate": {
+      "approximation": "ate",
+      "rule_category": "h_dropping"
+    },
+    "haul": {
+      "approximation": "aul",
+      "rule_category": "h_dropping"
+    },
+    "have": {
+      "approximation": "ave",
+      "rule_category": "h_dropping"
+    },
+    "hazard": {
+      "approximation": "azard",
+      "rule_category": "h_dropping"
+    },
+    "head": {
+      "approximation": "ead",
+      "rule_category": "h_dropping"
+    },
+    "heal": {
+      "approximation": "eal",
+      "rule_category": "h_dropping"
+    },
+    "heap": {
+      "approximation": "eap",
+      "rule_category": "h_dropping"
+    },
+    "hear": {
+      "approximation": "ear",
+      "rule_category": "h_dropping"
+    },
+    "heat": {
+      "approximation": "eat",
+      "rule_category": "h_dropping"
+    },
+    "heaven": {
+      "approximation": "eaven",
+      "rule_category": "h_dropping"
+    },
+    "heel": {
+      "approximation": "eel",
+      "rule_category": "h_dropping"
+    },
+    "height": {
+      "approximation": "eight",
+      "rule_category": "h_dropping"
+    },
+    "hello": {
+      "approximation": "ello",
+      "rule_category": "h_dropping"
+    },
+    "help": {
+      "approximation": "elp",
+      "rule_category": "h_dropping"
+    },
+    "hence": {
+      "approximation": "ence",
+      "rule_category": "h_dropping"
+    },
+    "her": {
+      "approximation": "er",
+      "rule_category": "h_dropping"
+    },
+    "here": {
+      "approximation": "ere",
+      "rule_category": "h_dropping"
+    },
+    "hero": {
+      "approximation": "ero",
+      "rule_category": "h_dropping"
+    },
+    "hide": {
+      "approximation": "ide",
+      "rule_category": "h_dropping"
+    },
+    "high": {
+      "approximation": "igh",
+      "rule_category": "h_dropping"
+    },
+    "hill": {
+      "approximation": "ill",
+      "rule_category": "h_dropping"
+    },
+    "hint": {
+      "approximation": "int",
+      "rule_category": "h_dropping"
+    },
+    "hire": {
+      "approximation": "ire",
+      "rule_category": "h_dropping"
+    },
+    "hobby": {
+      "approximation": "obby",
+      "rule_category": "h_dropping"
+    },
+    "hold": {
+      "approximation": "old",
+      "rule_category": "h_dropping"
+    },
+    "hole": {
+      "approximation": "ole",
+      "rule_category": "h_dropping"
+    },
+    "hollow": {
+      "approximation": "ollow",
+      "rule_category": "h_dropping"
+    },
+    "holy": {
+      "approximation": "oly",
+      "rule_category": "h_dropping"
+    },
+    "home": {
+      "approximation": "ome",
+      "rule_category": "h_dropping"
+    },
+    "honest": {
+      "approximation": "onest",
+      "rule_category": "h_dropping"
+    },
+    "honey": {
+      "approximation": "oney",
+      "rule_category": "h_dropping"
+    },
+    "honor": {
+      "approximation": "onor",
+      "rule_category": "h_dropping"
+    },
+    "hook": {
+      "approximation": "ook",
+      "rule_category": "h_dropping"
+    },
+    "hope": {
+      "approximation": "ope",
+      "rule_category": "h_dropping"
+    },
+    "horn": {
+      "approximation": "orn",
+      "rule_category": "h_dropping"
+    },
+    "horror": {
+      "approximation": "orror",
+      "rule_category": "h_dropping"
+    },
+    "horse": {
+      "approximation": "orse",
+      "rule_category": "h_dropping"
+    },
+    "host": {
+      "approximation": "ost",
+      "rule_category": "h_dropping"
+    },
+    "hour": {
+      "approximation": "our",
+      "rule_category": "h_dropping"
+    },
+    "how": {
+      "approximation": "ow",
+      "rule_category": "h_dropping"
+    },
+    "however": {
+      "approximation": "owever",
+      "rule_category": "h_dropping"
+    },
+    "hub": {
+      "approximation": "ub",
+      "rule_category": "h_dropping"
+    },
+    "hug": {
+      "approximation": "ug",
+      "rule_category": "h_dropping"
+    },
+    "hum": {
+      "approximation": "um",
+      "rule_category": "h_dropping"
+    },
+    "humble": {
+      "approximation": "umble",
+      "rule_category": "h_dropping"
+    },
+    "humid": {
+      "approximation": "umid",
+      "rule_category": "h_dropping"
+    },
+    "humor": {
+      "approximation": "umor",
+      "rule_category": "h_dropping"
+    },
+    "hunch": {
+      "approximation": "unch",
+      "rule_category": "h_dropping"
+    },
+    "hundred": {
+      "approximation": "undred",
+      "rule_category": "h_dropping"
+    },
+    "hurry": {
+      "approximation": "urry",
+      "rule_category": "h_dropping"
+    },
+    "hurt": {
+      "approximation": "urt",
+      "rule_category": "h_dropping"
+    },
+    "hush": {
+      "approximation": "ush",
+      "rule_category": "h_dropping"
+    },
+    "hut": {
+      "approximation": "ut",
+      "rule_category": "h_dropping"
+    },
+    "hybrid": {
+      "approximation": "ybrid",
+      "rule_category": "h_dropping"
+    },
+    "example": {
+      "approximation": "eg-zaam-pull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "circle": {
+      "approximation": "sar-cull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "cycle": {
+      "approximation": "sai-cull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "muscle": {
+      "approximation": "mus-sull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "puzzle": {
+      "approximation": "puz-zull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "stable": {
+      "approximation": "stay-bull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "title": {
+      "approximation": "tai-tull",
+      "rule_category": "syllabic_lengthening"
+    },
+    "battle": {
+      "approximation": "bet-tull",
+      "rule_category": "syllabic_lengthening"
+    }
+  },
+  "by_category": {
+    "w_to_v": [
+      "wait",
+      "walk",
+      "wall",
+      "warm",
+      "wash",
+      "waste",
+      "watch",
+      "water",
+      "wave",
+      "wealth",
+      "weapon",
+      "wear",
+      "weather",
+      "wedding",
+      "weed",
+      "week",
+      "weight",
+      "welcome",
+      "west",
+      "western",
+      "wet",
+      "whale",
+      "wheat",
+      "wheel",
+      "when",
+      "where",
+      "whether",
+      "which",
+      "while",
+      "white",
+      "why",
+      "wide",
+      "wife",
+      "wild",
+      "will",
+      "win",
+      "wind",
+      "window",
+      "wine",
+      "wing",
+      "winter",
+      "wire",
+      "wise",
+      "wish",
+      "wolf",
+      "woman",
+      "wood",
+      "word",
+      "work",
+      "world"
+    ],
+    "v_to_w_reversal": [
+      "vain",
+      "valley",
+      "value",
+      "vapor",
+      "variety",
+      "vary",
+      "vast",
+      "vault",
+      "vehicle",
+      "veil",
+      "velocity",
+      "velvet",
+      "vent",
+      "venture",
+      "verbal",
+      "verify",
+      "verse",
+      "vertical",
+      "vessel",
+      "vest",
+      "vet",
+      "veteran",
+      "vibe",
+      "vibrate",
+      "vice",
+      "victim",
+      "victory",
+      "video",
+      "view",
+      "vigil",
+      "vigor",
+      "vile",
+      "villa",
+      "village",
+      "villain",
+      "vine",
+      "vinyl",
+      "violet",
+      "violin",
+      "viral",
+      "virtue",
+      "virus",
+      "visible",
+      "visit",
+      "visor",
+      "vista",
+      "vital",
+      "vitamin",
+      "vivid",
+      "vocal",
+      "vodka",
+      "vogue",
+      "voice",
+      "void",
+      "volcano",
+      "volley",
+      "volt",
+      "volume",
+      "vote",
+      "vowel",
+      "voyage",
+      "vulgar",
+      "vulture"
+    ],
+    "ae_to_e": [
+      "act",
+      "action",
+      "active",
+      "actual",
+      "adapt",
+      "add",
+      "addict",
+      "address",
+      "adept",
+      "adult",
+      "advance",
+      "advent",
+      "adverb",
+      "adverse",
+      "advice",
+      "advise",
+      "advocate",
+      "affair",
+      "affect",
+      "afford",
+      "afraid",
+      "africa",
+      "after",
+      "again",
+      "against",
+      "agent",
+      "agree",
+      "alarm",
+      "album",
+      "alcohol",
+      "alert",
+      "alien",
+      "alike",
+      "alive",
+      "allow",
+      "ally",
+      "almost",
+      "alone",
+      "along",
+      "alphabet",
+      "already",
+      "also",
+      "alter",
+      "altitude",
+      "always",
+      "amaze",
+      "amber",
+      "ambition",
+      "ambulance",
+      "amend",
+      "among",
+      "amount",
+      "ample",
+      "amuse",
+      "analogy",
+      "analyze",
+      "anatomy",
+      "ancestor",
+      "anchor",
+      "ancient",
+      "angel",
+      "anger",
+      "animal",
+      "ankle",
+      "annex",
+      "announce",
+      "annoy",
+      "annual",
+      "answer",
+      "antenna",
+      "anthem",
+      "antique",
+      "anxiety",
+      "anxious",
+      "apart",
+      "apartment",
+      "apex",
+      "apology",
+      "apparatus",
+      "apparent",
+      "appeal",
+      "appear",
+      "appetite",
+      "apple",
+      "apply",
+      "appoint",
+      "approve",
+      "apricot",
+      "april",
+      "apron",
+      "apt",
+      "back",
+      "bad",
+      "bag",
+      "band",
+      "bank",
+      "bat",
+      "black",
+      "camp",
+      "can",
+      "cap",
+      "cash",
+      "cast",
+      "cat",
+      "catch",
+      "chance",
+      "class",
+      "crash",
+      "dad",
+      "dance",
+      "exactly",
+      "fact",
+      "family",
+      "fan",
+      "fat",
+      "flag",
+      "flat",
+      "gas",
+      "glass",
+      "grand",
+      "hand",
+      "hat",
+      "jam",
+      "lack",
+      "land",
+      "mad",
+      "man",
+      "map",
+      "pan",
+      "ran",
+      "sad",
+      "tap"
+    ],
+    "i_to_ee": [
+      "beautiful",
+      "big",
+      "bill",
+      "bin",
+      "bit",
+      "bring",
+      "build",
+      "busy",
+      "city",
+      "did",
+      "dinner",
+      "dip",
+      "drink",
+      "fill",
+      "film",
+      "finish",
+      "fish",
+      "fit",
+      "give",
+      "him",
+      "his",
+      "hit",
+      "ill",
+      "in",
+      "income",
+      "india",
+      "industry",
+      "interest",
+      "is",
+      "it",
+      "kid",
+      "kill",
+      "kiss",
+      "lid",
+      "lip",
+      "list",
+      "listen",
+      "live",
+      "middle",
+      "milk",
+      "million",
+      "minute",
+      "miss",
+      "pin",
+      "ship",
+      "sin",
+      "sit",
+      "tin",
+      "tip",
+      "win"
+    ],
+    "o_to_aa": [
+      "body",
+      "boss",
+      "bottom",
+      "box",
+      "clock",
+      "coffee",
+      "college",
+      "common",
+      "cop",
+      "copy",
+      "cost",
+      "cot",
+      "cross",
+      "doctor",
+      "dog",
+      "drop",
+      "follow",
+      "fond",
+      "fox",
+      "frog",
+      "god",
+      "got",
+      "holiday",
+      "hospital",
+      "hot",
+      "job",
+      "knock",
+      "knot",
+      "lock",
+      "log",
+      "long",
+      "lot",
+      "model",
+      "modern",
+      "morning",
+      "not",
+      "object",
+      "office",
+      "often",
+      "pop",
+      "possible",
+      "pot",
+      "problem",
+      "profit",
+      "promise",
+      "quality",
+      "rock",
+      "stop",
+      "top"
+    ],
+    "th_to_t": [
+      "athlete",
+      "author",
+      "bath",
+      "earth",
+      "faith",
+      "health",
+      "length",
+      "math",
+      "method",
+      "month",
+      "mouth",
+      "north",
+      "nothing",
+      "path",
+      "south",
+      "strength",
+      "teeth",
+      "thank",
+      "thick",
+      "thief",
+      "thin",
+      "thing",
+      "think",
+      "third",
+      "thirsty",
+      "thirteen",
+      "thirty",
+      "thought",
+      "thousand",
+      "thread",
+      "threat",
+      "three",
+      "throat",
+      "through",
+      "throw",
+      "thumb",
+      "thunder",
+      "thursday",
+      "truth",
+      "youth"
+    ],
+    "th_to_d": [
+      "although",
+      "another",
+      "bother",
+      "breathe",
+      "brother",
+      "clothes",
+      "either",
+      "father",
+      "further",
+      "gather",
+      "mother",
+      "neither",
+      "other",
+      "rather",
+      "smooth",
+      "than",
+      "that",
+      "the",
+      "their",
+      "them",
+      "themselves",
+      "then",
+      "there",
+      "therefore",
+      "these",
+      "they",
+      "this",
+      "those",
+      "though",
+      "together",
+      "weather",
+      "whether"
+    ],
+    "h_dropping": [
+      "habit",
+      "hammer",
+      "happen",
+      "happy",
+      "hard",
+      "harvest",
+      "hate",
+      "haul",
+      "have",
+      "hazard",
+      "head",
+      "heal",
+      "heap",
+      "hear",
+      "heart",
+      "heat",
+      "heaven",
+      "heavy",
+      "heel",
+      "height",
+      "hello",
+      "helmet",
+      "help",
+      "hence",
+      "her",
+      "here",
+      "hero",
+      "hide",
+      "high",
+      "hill",
+      "hint",
+      "hire",
+      "history",
+      "hobby",
+      "hold",
+      "hole",
+      "hollow",
+      "holy",
+      "home",
+      "honest",
+      "honey",
+      "honor",
+      "hook",
+      "hope",
+      "horn",
+      "horror",
+      "horse",
+      "hospital",
+      "host",
+      "hotel",
+      "hour",
+      "house",
+      "how",
+      "however",
+      "hub",
+      "hug",
+      "huge",
+      "hum",
+      "human",
+      "humble",
+      "humid",
+      "humor",
+      "hunch",
+      "hundred",
+      "hungry",
+      "hurry",
+      "hurt",
+      "hush",
+      "hut",
+      "hybrid"
+    ],
+    "r_rolling": [
+      "car",
+      "drink",
+      "market",
+      "morning",
+      "park",
+      "ready",
+      "red",
+      "sorry",
+      "train",
+      "very"
+    ],
+    "syllabic_lengthening": [
+      "apple",
+      "battle",
+      "bottle",
+      "circle",
+      "cycle",
+      "example",
+      "little",
+      "middle",
+      "muscle",
+      "people",
+      "puzzle",
+      "settle",
+      "simple",
+      "stable",
+      "table",
+      "title",
+      "trouble",
+      "uncle"
+    ],
+    "zh_to_j": [
+      "adhesion",
+      "casual",
+      "collision",
+      "conclusion",
+      "confusion",
+      "decision",
+      "division",
+      "erosion",
+      "explosion",
+      "fusion",
+      "illusion",
+      "invasion",
+      "leisure",
+      "measure",
+      "occasion",
+      "pleasure",
+      "television",
+      "treasure",
+      "usual",
+      "version",
+      "vision",
+      "visual"
+    ],
+    "z_to_j": [
+      "zeal",
+      "zebra",
+      "zenith",
+      "zero",
+      "zest",
+      "zigzag",
+      "zinc",
+      "zip",
+      "zodiac",
+      "zombie",
+      "zone",
+      "zoo",
+      "zoom"
+    ],
+    "schwa_reduction": ["breakfast"],
+    "schwa_addition": [
+      "arm",
+      "charm",
+      "curl",
+      "desk",
+      "farm",
+      "film",
+      "firm",
+      "form",
+      "girl",
+      "harm",
+      "norm",
+      "pearl",
+      "risk",
+      "term"
+    ],
+    "schwa_prothesis": ["school", "smile", "special", "speech", "station"]
+  }
+}

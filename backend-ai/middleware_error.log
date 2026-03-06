@@ -2450,3 +2450,517 @@ Traceback (most recent call last):
     for match in self._lang_vars.period_context_re().finditer(text):
                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
 TypeError: expected string or bytes-like object, got 'AnalysisMetrics'
+
+--- MIDDLEWARE ERROR at 1772708017.6548748 ---
+Path: /api/analyze-joint
+Error: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 86, in __await__
+    response = yield from self._call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_interceptor.py", line 474, in __await__
+    response = yield from call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_call.py", line 327, in __await__
+    raise _create_rpc_error(
+    ...<2 lines>...
+    )
+grpc.aio._call.AioRpcError: <AioRpcError of RPC that terminated with:
+	status = StatusCode.RESOURCE_EXHAUSTED
+	details = "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details."
+	debug_error_string = "UNKNOWN:Error received from peer ipv6:%5B2001:4860:4802:36::223%5D:443 {grpc_message:"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.", grpc_status:8}"
+>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/analyze.py", line 44, in analyze_joint_text
+    result = await service.analyze_joint(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 782, in analyze_joint
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 774, in analyze_joint
+    response = await asyncio.wait_for(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 385, in generate_content_async
+    response = await self._async_client.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/async_client.py", line 440, in generate_content
+    response = await rpc(
+               ^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 231, in retry_wrapped_func
+    return await retry_target(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 163, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 158, in retry_target
+    return await target()
+           ^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 89, in __await__
+    raise exceptions.from_grpc_error(rpc_error) from rpc_error
+google.api_core.exceptions.ResourceExhausted: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+
+--- MIDDLEWARE ERROR at 1772711769.243071 ---
+Path: /api/analyze-joint
+Error: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 86, in __await__
+    response = yield from self._call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_interceptor.py", line 474, in __await__
+    response = yield from call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_call.py", line 327, in __await__
+    raise _create_rpc_error(
+    ...<2 lines>...
+    )
+grpc.aio._call.AioRpcError: <AioRpcError of RPC that terminated with:
+	status = StatusCode.RESOURCE_EXHAUSTED
+	details = "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details."
+	debug_error_string = "UNKNOWN:Error received from peer ipv6:%5B2001:4860:4802:34::223%5D:443 {grpc_message:"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.", grpc_status:8}"
+>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/analyze.py", line 44, in analyze_joint_text
+    result = await service.analyze_joint(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 782, in analyze_joint
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 774, in analyze_joint
+    response = await asyncio.wait_for(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 385, in generate_content_async
+    response = await self._async_client.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/async_client.py", line 440, in generate_content
+    response = await rpc(
+               ^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 231, in retry_wrapped_func
+    return await retry_target(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 163, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 158, in retry_target
+    return await target()
+           ^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 89, in __await__
+    raise exceptions.from_grpc_error(rpc_error) from rpc_error
+google.api_core.exceptions.ResourceExhausted: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+
+--- MIDDLEWARE ERROR at 1772711774.1974132 ---
+Path: /api/analyze-joint
+Error: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 86, in __await__
+    response = yield from self._call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_interceptor.py", line 474, in __await__
+    response = yield from call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_call.py", line 327, in __await__
+    raise _create_rpc_error(
+    ...<2 lines>...
+    )
+grpc.aio._call.AioRpcError: <AioRpcError of RPC that terminated with:
+	status = StatusCode.RESOURCE_EXHAUSTED
+	details = "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details."
+	debug_error_string = "UNKNOWN:Error received from peer ipv6:%5B2001:4860:4802:34::223%5D:443 {grpc_status:8, grpc_message:"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details."}"
+>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/analyze.py", line 44, in analyze_joint_text
+    result = await service.analyze_joint(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 782, in analyze_joint
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 774, in analyze_joint
+    response = await asyncio.wait_for(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 385, in generate_content_async
+    response = await self._async_client.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/async_client.py", line 440, in generate_content
+    response = await rpc(
+               ^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 231, in retry_wrapped_func
+    return await retry_target(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 163, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 158, in retry_target
+    return await target()
+           ^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 89, in __await__
+    raise exceptions.from_grpc_error(rpc_error) from rpc_error
+google.api_core.exceptions.ResourceExhausted: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+
+--- MIDDLEWARE ERROR at 1772711783.107614 ---
+Path: /api/analyze-joint
+Error: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 86, in __await__
+    response = yield from self._call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_interceptor.py", line 474, in __await__
+    response = yield from call.__await__()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/grpc/aio/_call.py", line 327, in __await__
+    raise _create_rpc_error(
+    ...<2 lines>...
+    )
+grpc.aio._call.AioRpcError: <AioRpcError of RPC that terminated with:
+	status = StatusCode.RESOURCE_EXHAUSTED
+	details = "Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details."
+	debug_error_string = "UNKNOWN:Error received from peer ipv6:%5B2001:4860:4802:34::223%5D:443 {grpc_message:"Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.", grpc_status:8}"
+>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/analyze.py", line 44, in analyze_joint_text
+    result = await service.analyze_joint(body)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/cache/manager.py", line 211, in wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 782, in analyze_joint
+    raise e
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/analysis_service.py", line 774, in analyze_joint
+    response = await asyncio.wait_for(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 385, in generate_content_async
+    response = await self._async_client.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/async_client.py", line 440, in generate_content
+    response = await rpc(
+               ^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 231, in retry_wrapped_func
+    return await retry_target(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 163, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary_async.py", line 158, in retry_target
+    return await target()
+           ^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 89, in __await__
+    raise exceptions.from_grpc_error(rpc_error) from rpc_error
+google.api_core.exceptions.ResourceExhausted: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+
+--- MIDDLEWARE ERROR at 1772787509.52937 ---
+Path: /api/pronunciation/assess
+Error: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 115, in assess_pronunciation
+    raw = _run_azure_pronunciation_assessment(tmp_path, reference_text)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 42, in _run_azure_pronunciation_assessment
+    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/speech.py", line 1152, in __init__
+    _call_hr_fn(
+    ~~~~~~~~~~~^
+        fn=_sdk_lib.recognizer_create_speech_recognizer_from_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        *[ctypes.byref(handle), speech_config._handle, audio_config_handle])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 62, in _call_hr_fn
+    _raise_if_failed(hr)
+    ~~~~~~~~~~~~~~~~^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 55, in _raise_if_failed
+    __try_get_error(_spx_handle(hr))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/azure/cognitiveservices/speech/interop.py", line 50, in __try_get_error
+    raise RuntimeError(message)
+RuntimeError: Exception with error code: GetCallStack not implemented on this platform
+Exception with an error code: 0xa (SPXERR_INVALID_HEADER)

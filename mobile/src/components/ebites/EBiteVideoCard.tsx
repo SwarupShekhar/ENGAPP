@@ -18,15 +18,23 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+const WATCH_THRESHOLD_PERCENT = 80;
+
 interface Props {
   item: any;
   isActive: boolean;
+  onWatchProgress?: (reelId: string, progressPercent: number) => void;
 }
 
-export default function EBiteVideoCard({ item, isActive }: Props) {
+export default function EBiteVideoCard({
+  item,
+  isActive,
+  onWatchProgress,
+}: Props) {
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<AVPlaybackStatusSuccess | null>(null);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
+  const hasReportedUnlock = useRef(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -41,6 +49,17 @@ export default function EBiteVideoCard({ item, isActive }: Props) {
   const handlePlaybackStatusUpdate = (update: AVPlaybackStatus) => {
     if (update.isLoaded) {
       setStatus(update);
+      const duration = update.durationMillis ?? 0;
+      const position = update.positionMillis ?? 0;
+      const progressPercent = duration > 0 ? (position / duration) * 100 : 0;
+      if (
+        onWatchProgress &&
+        progressPercent >= WATCH_THRESHOLD_PERCENT &&
+        !hasReportedUnlock.current
+      ) {
+        hasReportedUnlock.current = true;
+        onWatchProgress(String(item.id), progressPercent);
+      }
     }
   };
 

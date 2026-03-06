@@ -86,6 +86,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join personal room for direct notifications
       client.join(`user:${user.id}`);
 
+      // Send internal user data to client for identification
+      client.emit('me', { id: user.id });
+
       // Broadcast presence
       this.broadcastPresence(user.id, 'online');
 
@@ -148,13 +151,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data.metadata,
       );
 
-      // Broadcast to everyone in this conversation room
+      // 1. Broadcast to the conversation room (for users currently in the Chat screen)
       this.server
         .to(`conversation:${data.conversationId}`)
         .emit('new_message', {
           conversationId: data.conversationId,
           message,
         });
+
+      // 2. Broadcast to each participant's individual room (for global notifications/badges)
+      // This ensures the message reaches the user even if they haven't "joined" the conversation room yet (e.g. on Home/List screens)
+      const conversation = await this.prisma.conversation.findUnique({
+        where: { id: data.conversationId },
+        include: { participants: true },
+      });
+
+      if (conversation) {
+        conversation.participants.forEach((p) => {
+          this.server.to(`user:${p.userId}`).emit('new_message', {
+            conversationId: data.conversationId,
+            message,
+          });
+        });
+      }
 
       return { success: true, messageId: message.id };
     } catch (err) {

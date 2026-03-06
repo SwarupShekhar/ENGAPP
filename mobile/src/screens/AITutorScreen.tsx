@@ -24,7 +24,7 @@ import Animated, {
   withSequence,
   withDelay,
 } from "react-native-reanimated";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { Audio } from "expo-av";
 import { useAppTheme } from "../theme/useAppTheme";
 import { tutorApi } from "../api/tutor";
@@ -183,6 +183,7 @@ export default function AITutorScreen({ navigation }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const { user } = useUser();
+  const { getToken } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false); // Transcribing...
@@ -313,10 +314,7 @@ export default function AITutorScreen({ navigation }: any) {
 
       // Trigger final analysis and save session
       if (sessionIdRef.current) {
-        console.log(
-          "[AITutor] Ending session for analysis:",
-          sessionIdRef.current,
-        );
+        if (__DEV__) console.log("[AITutor] Ending session for analysis:", sessionIdRef.current);
         tutorApi.endSession(sessionIdRef.current).catch((err) => {
           console.warn(
             "[AITutor] Failed to end session gracefully:",
@@ -329,7 +327,8 @@ export default function AITutorScreen({ navigation }: any) {
 
   // ─── Stream Handling ────────────────────────────────────
   const handleStreamMessage = (chunk: StreamChunk) => {
-    if (chunk.type === "transcription") {
+    // "transcript" = first chunk from stream (backend-ai); "transcription" = legacy WebSocket key
+    if (chunk.type === "transcription" || chunk.type === "transcript") {
       // Update the placeholder user bubble with the actual transcription
       if (chunk.text) {
         setTranscript((prev) => {
@@ -418,13 +417,13 @@ export default function AITutorScreen({ navigation }: any) {
     );
 
     if (match && match[1]) {
-      console.log("[Pronunciation] Detected reference text:", match[1]);
+      if (__DEV__) console.log("[Pronunciation] Detected reference text:", match[1]);
       setReferenceTextForNextTurn(match[1]);
     } else {
       // Check if user explicitly asked to practice
       const userMatch = lastMsg.text.match(/['"]([^'"]+)['"]/i); // Fallback: just grab quotes if it feels like a correction
       if (txt.includes("practice") && userMatch && userMatch[1]) {
-        console.log("[Pronunciation] Detected practice word:", userMatch[1]);
+        if (__DEV__) console.log("[Pronunciation] Detected practice word:", userMatch[1]);
         setReferenceTextForNextTurn(userMatch[1]);
       } else {
         setReferenceTextForNextTurn(null);
@@ -573,7 +572,7 @@ export default function AITutorScreen({ navigation }: any) {
           !unloadError.message?.includes("already been unloaded") &&
           !unloadError.message?.includes("Recorder does not exist")
         ) {
-          console.log("Unload error (ignoring):", unloadError);
+          if (__DEV__) console.log("Unload error (ignoring):", unloadError);
         }
       }
 
@@ -606,10 +605,7 @@ export default function AITutorScreen({ navigation }: any) {
           formData.append("userId", user?.id || "test");
           formData.append("referenceText", referenceTextForNextTurn);
           formData.append("sessionId", sessionId);
-          console.log(
-            "[AITutor] Assessing pronunciation for:",
-            referenceTextForNextTurn,
-          );
+          if (__DEV__) console.log("[AITutor] Assessing pronunciation for:", referenceTextForNextTurn);
 
           const res = await tutorApi.assessPronunciation(formData);
           const text = res.recognized_text || referenceTextForNextTurn; // Try to use STT result if any
@@ -633,21 +629,69 @@ export default function AITutorScreen({ navigation }: any) {
           // Send to Stream (include raw audio for Gemini analysis)
           streamingTutor.sendText(text, phoneticContext, audioBase64);
         } else {
-          // Fast path: Standard conversation via WebSocket directly!
-
-          // 1. Add Placeholder User Bubble
+          // Fast path: prefer SSE for lower latency (first audio ~2–3s), fallback to WebSocket
           setTranscript((prev) => [
             ...prev,
             {
               id: Date.now().toString(),
               speaker: "user",
-              text: "...", // Will be updated by WS transcription event
+              text: "...",
               tempId: true,
             },
           ]);
 
-          // 2. Send raw audio straight to the WS, no REST!
-          if (audioBase64) {
+          const sessionId = sessionIdRef.current;
+          const formData = new FormData();
+          formData.append("audio", {
+            uri,
+            type: "audio/m4a",
+            name: "audio.m4a",
+          } as any);
+          formData.append("sessionId", sessionId || "");
+
+          // Primary path: SSE stream (first audio ~2–3s). Fallback: WebSocket.
+          let usedSSE = false;
+          const token = await getToken?.();
+          if (token && sessionId) {
+            try {
+              const response = await tutorApi.streamSpeech(formData, {
+                Authorization: `Bearer ${token}`,
+              });
+              if (response.ok && response.body) {
+                usedSSE = true;
+                let userTranscript = "";
+                let aiText = "";
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  buffer += decoder.decode(value, { stream: true });
+                  // Parse SSE: each event is a line "data: {...}\n"
+                  const lines = buffer.split("\n");
+                  buffer = lines.pop() ?? "";
+                  for (const line of lines) {
+                    if (!line.startsWith("data: ")) continue;
+                    try {
+                      const chunk = JSON.parse(line.slice(6).trim());
+                      if (chunk.type === "transcript" && chunk.text) userTranscript = chunk.text;
+                      if (chunk.type === "sentence" && chunk.text) aiText += (aiText ? " " : "") + chunk.text;
+                      handleStreamMessage(chunk);
+                    } catch (_) {
+                      /* incomplete or invalid chunk */
+                    }
+                  }
+                }
+                if (userTranscript && aiText.trim()) {
+                  tutorApi.appendTurn(sessionId, userTranscript, aiText.trim()).catch(() => {});
+                }
+              }
+            } catch (_) {
+              usedSSE = false;
+            }
+          }
+          if (!usedSSE && audioBase64) {
             streamingTutor.sendText(null, null, audioBase64);
           }
         }

@@ -1,15 +1,88 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
-from app.middleware.rate_limiter import rate_limiter
-from app.services.streaming_tutor_service import StreamingTutorService
+import base64
+import json
 import logging
 import time
 import asyncio
-import json
+
+from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect, HTTPException
+from sse_starlette.sse import EventSourceResponse
+
+from app.middleware.rate_limiter import rate_limiter
+from app.services.streaming_tutor_service import StreamingTutorService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 streaming_tutor_service = StreamingTutorService()
+
+
+async def _generate_stream_response(
+    audio_bytes: bytes,
+    session_id: str,
+    user_id: str,
+    conversation_history: list,
+):
+    """Yield SSE events: transcript, then sentence chunks (text + audio base64), then done."""
+    # STT in-process (no extra HTTP hop)
+    user_utterance = await streaming_tutor_service.recognize_audio_bytes(audio_bytes)
+    if not user_utterance:
+        user_utterance = "(no speech detected)"
+
+    # Emit transcript first so mobile can show it immediately
+    yield {"type": "transcript", "text": user_utterance}
+
+    # Stream Gemini + TTS sentence by sentence
+    async for chunk in streaming_tutor_service.generate_chunked_response(
+        user_utterance,
+        conversation_history,
+        session_id,
+        phonetic_context=None,
+        audio_base64=None,
+    ):
+        if chunk.get("type") == "transcript":
+            # Already sent above; skip duplicate
+            continue
+        if chunk.get("type") == "sentence":
+            payload = {"type": "sentence", "text": chunk.get("text", "")}
+            if chunk.get("audio"):
+                payload["audio"] = base64.b64encode(chunk["audio"]).decode("utf-8")
+            yield payload
+    yield {"type": "done"}
+
+
+@router.post("/stream-response")
+async def stream_tutor_response(
+    audio: UploadFile = File(...),
+    session_id: str = Form(...),
+    user_id: str = Form(...),
+    conversation_history: str = Form(default="[]"),
+):
+    """
+    Stream tutor response via SSE. Accepts multipart: audio file + session_id + user_id + conversation_history (JSON array).
+    Events: transcript → sentence (text + optional audio base64) → ... → done.
+    Mobile can play first sentence audio as soon as it arrives (~2–3s) while rest streams.
+    """
+    try:
+        audio_bytes = await audio.read()
+    except Exception as e:
+        logger.error("stream-response read audio: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid audio upload")
+    try:
+        history = json.loads(conversation_history) if conversation_history else []
+    except json.JSONDecodeError:
+        history = []
+
+    async def event_generator():
+        try:
+            async for event in _generate_stream_response(
+                audio_bytes, session_id, user_id, history
+            ):
+                yield {"data": json.dumps(event)}
+        except Exception as e:
+            logger.exception("stream-response error: %s", e)
+            yield {"data": json.dumps({"type": "error", "message": str(e)})}
+
+    return EventSourceResponse(event_generator())
 
 @router.websocket("/ws/{session_id}")
 async def websocket_tutor_session(websocket: WebSocket, session_id: str):

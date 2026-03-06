@@ -360,14 +360,45 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
   const currentAnalysis = sessionData?.analyses?.[0];
   const rawData = currentAnalysis?.rawData;
+  const summary = sessionData?.summaryJson;
   const data = {
-    overallScore: Math.min(100, currentAnalysis?.scores?.overall || 0),
-    cefrLevel: currentAnalysis?.cefrLevel || "B1",
+    overallScore: Math.min(
+      100,
+      summary?.overall_score ??
+        currentAnalysis?.scores?.overall ??
+        currentAnalysis?.scores?.overall_score ??
+        0,
+    ),
+    cefrLevel: summary?.cefr_score ?? currentAnalysis?.cefrLevel ?? "B1",
     scores: {
-      grammar: Math.min(100, currentAnalysis?.scores?.grammar || 0),
-      pronunciation: Math.min(100, currentAnalysis?.scores?.pronunciation || 0),
-      fluency: Math.min(100, currentAnalysis?.scores?.fluency || 0),
-      vocabulary: Math.min(100, currentAnalysis?.scores?.vocabulary || 0),
+      grammar: Math.min(
+        100,
+        summary?.grammar_score ??
+          currentAnalysis?.scores?.grammar ??
+          currentAnalysis?.scores?.grammar_score ??
+          0,
+      ),
+      pronunciation: Math.min(
+        100,
+        summary?.pronunciation_score ??
+          currentAnalysis?.scores?.pronunciation ??
+          currentAnalysis?.scores?.pronunciation_score ??
+          0,
+      ),
+      fluency: Math.min(
+        100,
+        summary?.fluency_score ??
+          currentAnalysis?.scores?.fluency ??
+          currentAnalysis?.scores?.fluency_score ??
+          0,
+      ),
+      vocabulary: Math.min(
+        100,
+        summary?.vocabulary_score ??
+          currentAnalysis?.scores?.vocabulary ??
+          currentAnalysis?.scores?.vocabulary_score ??
+          0,
+      ),
     },
     mistakes: currentAnalysis?.mistakes || [],
     pronunciationIssues: currentAnalysis?.pronunciationIssues || [],
@@ -403,6 +434,33 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           <Text style={styles.headerTitle}>Call Feedback</Text>
           <View style={styles.backButton} />
         </View>
+
+        {/* Cap notification banner: pronunciation is holding score back */}
+        {sessionData?.summaryJson?.pronunciation_cefr_cap && (
+          <Animated.View
+            entering={FadeInDown.delay(80).springify()}
+            style={styles.capBanner}
+          >
+            <View style={styles.capBannerContent}>
+              <Text style={styles.capBannerTitle}>
+                Your grammar shows {sessionData.summaryJson.pronunciation_cefr_cap === "B1" ? "B1" : "higher"} potential!
+              </Text>
+              <Text style={styles.capBannerSubtitle}>
+                {sessionData.summaryJson.dominant_pronunciation_errors?.length
+                  ? `Focus on ${sessionData.summaryJson.dominant_pronunciation_errors.slice(0, 2).join(" and ").replace(/_/g, " ")} to reach ${sessionData.summaryJson.pronunciation_cefr_cap}.`
+                  : `Fix pronunciation patterns to reach ${sessionData.summaryJson.pronunciation_cefr_cap}.`}
+              </Text>
+              <TouchableOpacity
+                style={styles.capBannerCta}
+                onPress={() => navigation.getParent()?.navigate("MainTabs", { screen: "eBites" })}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.capBannerCtaText}>Watch Reels</Text>
+                <Ionicons name="play-circle" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
 
         {/* Meta Info */}
         <Animated.View
@@ -762,6 +820,45 @@ const getStyles = (theme: any) =>
       fontSize: theme.typography.sizes.xs,
       color: theme.colors.text.secondary,
       fontWeight: "500",
+    },
+    capBanner: {
+      marginHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.m,
+      borderRadius: theme.borderRadius.lg,
+      backgroundColor: theme.colors.primary + "18",
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "40",
+      overflow: "hidden",
+    },
+    capBannerContent: {
+      padding: theme.spacing.m,
+    },
+    capBannerTitle: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+      marginBottom: 4,
+    },
+    capBannerSubtitle: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      marginBottom: theme.spacing.s,
+    },
+    capBannerCta: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: theme.borderRadius.md,
+      alignSelf: "flex-start",
+    },
+    capBannerCtaText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "600",
+      color: "#fff",
     },
     scoreCard: {
       marginHorizontal: theme.spacing.l,

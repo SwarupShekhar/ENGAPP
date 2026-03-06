@@ -5,7 +5,8 @@ import Constants from "expo-constants";
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
-const FORCE_LOCAL = true; // Set to true to force LOCAL backend even in prod builds
+// For EAS distribution build set to false so the app uses the production API URL.
+const FORCE_LOCAL = true;
 
 // Your Mac's local IP address on the Wi-Fi network
 const LOCAL_IP = "192.168.1.34";
@@ -22,7 +23,7 @@ export const API_URL = FORCE_LOCAL
         default: `http://${LOCAL_IP}:3000`,
       });
 
-console.log(`[API] Initializing client with URL: ${API_URL}`);
+if (__DEV__) console.log(`[API] Initializing client with URL: ${API_URL}`);
 
 export const client = axios.create({
   baseURL: API_URL,

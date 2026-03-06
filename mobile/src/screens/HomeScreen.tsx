@@ -15,7 +15,9 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
+import Svg, { Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import SocketService from "../services/socketService";
 
 import { useAppTheme } from "../theme/useAppTheme";
 import { ConnectPracticeCard } from "../components/home/ConnectPracticeCard";
@@ -91,6 +93,32 @@ export default function HomeScreen() {
         }
       };
       fetchData();
+
+      // Real-time unread count listener
+      const handleNewMessage = (data: any) => {
+        console.log(
+          "[HomeScreen] Real-time message received, updating unread counts",
+        );
+        // Re-fetch only unread counts and pending requests to minimize overhead
+        Promise.all([
+          chatApi.getUnreadCount(),
+          connectionsApi.getPendingRequests(),
+        ])
+          .then(([unreadData, pendingReqs]) => {
+            setUnreadCount(unreadData.count || 0);
+            setNotifCount(Array.isArray(pendingReqs) ? pendingReqs.length : 0);
+          })
+          .catch((err) =>
+            console.warn("[HomeScreen] Real-time fetch error:", err),
+          );
+      };
+
+      const socketSrv = SocketService.getInstance();
+      socketSrv.onNewMessage(handleNewMessage);
+
+      return () => {
+        socketSrv.offNewMessage(handleNewMessage);
+      };
     }, [user]),
   );
 
@@ -212,29 +240,71 @@ export default function HomeScreen() {
 
           {/* Level badge in header */}
           <View style={styles.levelRow}>
-            <View style={styles.levelBadge}>
-              <Ionicons
-                name="shield-checkmark"
-                size={14}
-                color={theme.colors.warning}
-              />
-              <Text style={styles.levelText}>Level {header.level}</Text>
-            </View>
-            {header.percentile && (
-              <View style={styles.percentileBadge}>
-                <Text style={styles.percentileText}>{header.percentile}</Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.retakeBtn}
-              onPress={() => navigation.navigate("AssessmentIntro")}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              <Ionicons name="refresh" size={12} color="white" />
-              <Text style={styles.retakeText}>Retake Test</Text>
-            </TouchableOpacity>
+              <View style={styles.levelBadge}>
+                <Ionicons
+                  name="shield-checkmark"
+                  size={14}
+                  color={theme.colors.warning}
+                />
+                <Text style={styles.levelText}>Level {header.level}</Text>
+              </View>
+              {header.percentile && (
+                <View style={styles.percentileBadge}>
+                  <Text style={styles.percentileText}>{header.percentile}</Text>
+                </View>
+              )}
+            </View>
+
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              {header.latestAssessmentId && (
+                <TouchableOpacity
+                  style={styles.retakeBtn}
+                  onPress={() =>
+                    navigation.navigate("AssessmentResult", {
+                      sessionId: header.latestAssessmentId,
+                    })
+                  }
+                >
+                  <Ionicons name="stats-chart" size={12} color="white" />
+                  <Text style={styles.retakeText}>Results</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.retakeBtn}
+                onPress={() => navigation.navigate("AssessmentIntro")}
+              >
+                <Ionicons name="refresh" size={12} color="white" />
+                <Text style={styles.retakeText}>Retake</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </SafeAreaView>
       </LinearGradient>
+
+      {/* Curved wave transition */}
+      <View style={styles.waveContainer}>
+        <Svg
+          width="100%"
+          height={30}
+          viewBox="0 0 400 30"
+          preserveAspectRatio="none"
+          style={styles.waveSvg}
+        >
+          <Path
+            d="M0,0 L0,5 Q200,40 400,5 L400,0 Z"
+            fill={
+              theme.colors.gradients.primary[
+                theme.colors.gradients.primary.length - 1
+              ]
+            }
+          />
+        </Svg>
+      </View>
 
       {/* Content */}
       <ScrollView
@@ -248,47 +318,134 @@ export default function HomeScreen() {
           style={styles.ctaContainer}
         >
           <TouchableOpacity
-            style={[
-              styles.mainCTA,
-              {
-                borderLeftColor: primaryCTA.accentColor || theme.colors.primary,
-              },
-            ]}
+            style={[styles.mainCTA, { backgroundColor: theme.colors.surface }]}
             onPress={() => handleCTAAction(primaryCTA.action, primaryCTA.data)}
+            activeOpacity={0.9}
           >
-            <View style={styles.ctaTextSection}>
-              <Text style={styles.ctaTitle}>{primaryCTA.title}</Text>
-              <Text style={styles.ctaDesc}>{primaryCTA.description}</Text>
-              <View
-                style={[
-                  styles.ctaButton,
-                  {
-                    backgroundColor:
-                      primaryCTA.accentColor || theme.colors.primary,
-                  },
-                ]}
-              >
-                <Text style={styles.ctaButtonText}>
-                  {primaryCTA.buttonText}
-                </Text>
-                <Ionicons name="arrow-forward" size={16} color="white" />
+            <BlurView
+              intensity={theme.variation === "deep" ? 30 : 60}
+              tint={theme.variation === "deep" ? "dark" : "light"}
+              style={styles.ctaBlur}
+            >
+              <View style={styles.ctaContent}>
+                <View style={styles.ctaTextSection}>
+                  <Text
+                    style={[
+                      styles.ctaTitle,
+                      { color: theme.colors.text.primary },
+                    ]}
+                  >
+                    {primaryCTA.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.ctaDesc,
+                      { color: theme.colors.text.secondary },
+                    ]}
+                  >
+                    {primaryCTA.description}
+                  </Text>
+                </View>
+
+                {/* New Action Row with avatars and soundwave button */}
+                <View style={styles.actionRow}>
+                  {/* Left Avatar (Robot/Maya) */}
+                  <View style={styles.avatarWrapper}>
+                    <View
+                      style={[
+                        styles.avatarCircle,
+                        { backgroundColor: theme.colors.primary + "30" },
+                      ]}
+                    >
+                      <Ionicons
+                        name="construct-outline"
+                        size={24}
+                        color={theme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                  </View>
+
+                  {/* Primary Button */}
+                  <LinearGradient
+                    colors={theme.colors.gradients.primary as any}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.ctaButtonPremium}
+                  >
+                    <View style={styles.buttonInner}>
+                      <Text style={styles.ctaButtonText}>
+                        {primaryCTA.buttonText}
+                      </Text>
+                      <Ionicons
+                        name="arrow-forward"
+                        size={16}
+                        color="white"
+                        style={{ marginLeft: 8 }}
+                      />
+                      <View style={styles.soundwaves}>
+                        <View style={[styles.wave, { height: 12 }]} />
+                        <View style={[styles.wave, { height: 20 }]} />
+                        <View style={[styles.wave, { height: 15 }]} />
+                        <View style={[styles.wave, { height: 24 }]} />
+                      </View>
+                    </View>
+                  </LinearGradient>
+
+                  {/* Right Avatar (Partner) */}
+                  <View style={styles.avatarWrapper}>
+                    <View
+                      style={[
+                        styles.avatarCircle,
+                        { backgroundColor: theme.colors.surface + "40" },
+                      ]}
+                    >
+                      <Ionicons
+                        name="person"
+                        size={24}
+                        color={theme.colors.text.secondary}
+                      />
+                    </View>
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                    <View style={styles.flagBadge}>
+                      <Text style={{ fontSize: 10 }}>🇬🇧</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
-            </View>
-            <View style={styles.mayaChipContainer}>
-              <TouchableOpacity
-                style={styles.mayaChip}
-                onPress={() => handleCTAAction(primaryCTA.mayaChip.action)}
-              >
-                <Ionicons
-                  name="sparkles"
-                  size={14}
-                  color={theme.colors.primary}
-                />
-                <Text style={styles.mayaChipText}>
-                  {primaryCTA.mayaChip.label}
-                </Text>
-              </TouchableOpacity>
-            </View>
+
+              {primaryCTA.mayaChip && (
+                <View
+                  style={[
+                    styles.mayaChipContainerCentered,
+                    { borderTopColor: "rgba(255,255,255,0.2)" },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.mayaChipSimple}
+                    onPress={() => handleCTAAction(primaryCTA.mayaChip.action)}
+                  >
+                    <Ionicons
+                      name="sparkles"
+                      size={16}
+                      color={theme.colors.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.mayaChipText,
+                        { color: theme.colors.primary, marginLeft: 6 },
+                      ]}
+                    >
+                      {primaryCTA.mayaChip.label}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </BlurView>
           </TouchableOpacity>
         </Animated.View>
 
@@ -510,7 +667,7 @@ const getStyles = (theme: any) =>
     },
     scrollView: {
       flex: 1,
-      marginTop: -12,
+      marginTop: -20,
     },
     scrollContent: {
       paddingTop: theme.spacing.l,
@@ -521,60 +678,135 @@ const getStyles = (theme: any) =>
       marginBottom: theme.spacing.l,
     },
     mainCTA: {
-      backgroundColor: "white",
-      borderRadius: 20,
-      padding: theme.spacing.l,
-      borderLeftWidth: 6,
-      ...theme.shadows.medium,
+      borderRadius: 28,
+      overflow: "hidden",
+      ...theme.shadows.large,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.3)",
+    },
+    ctaBlur: {
+      width: "100%",
+    },
+    waveContainer: {
+      marginTop: -1,
+      backgroundColor: "transparent",
+    },
+    waveSvg: {
+      marginBottom: -1,
+    },
+    ctaContent: {
+      padding: 24,
     },
     ctaTextSection: {
-      marginBottom: 16,
+      marginBottom: 20,
     },
     ctaTitle: {
-      fontSize: 20,
+      fontSize: 26,
       fontWeight: "800",
-      color: theme.colors.text.primary,
-      marginBottom: 4,
+      marginBottom: 10,
+      letterSpacing: -0.8,
+      textAlign: "left",
     },
     ctaDesc: {
-      fontSize: 14,
-      color: theme.colors.text.secondary,
-      marginBottom: 16,
+      fontSize: 16,
+      lineHeight: 22,
+      opacity: 0.8,
+      textAlign: "left",
     },
-    ctaButton: {
+    actionRow: {
       flexDirection: "row",
       alignItems: "center",
-      alignSelf: "flex-start",
+      justifyContent: "center",
+      width: "100%",
+      gap: 12,
+    },
+    avatarWrapper: {
+      position: "relative",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: theme.colors.surface,
+    },
+    liveBadge: {
+      position: "absolute",
+      bottom: -4,
+      backgroundColor: theme.colors.success,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.surface,
+    },
+    liveBadgeText: {
+      color: "white",
+      fontSize: 8,
+      fontWeight: "bold",
+    },
+    flagBadge: {
+      position: "absolute",
+      top: -2,
+      right: -2,
+      backgroundColor: "white",
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 2,
+    },
+    ctaButtonPremium: {
+      flex: 1,
+      height: 56,
+      borderRadius: 28,
+      overflow: "hidden",
+    },
+    buttonInner: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
       paddingHorizontal: 20,
-      paddingVertical: 10,
-      borderRadius: 25,
-      gap: 8,
     },
     ctaButtonText: {
       color: "white",
       fontWeight: "700",
-      fontSize: 15,
+      fontSize: 18,
+      letterSpacing: -0.2,
     },
-    mayaChipContainer: {
-      borderTopWidth: 1,
-      borderTopColor: "#f0f0f0",
-      paddingTop: 12,
-      flexDirection: "row",
-      justifyContent: "flex-end",
-    },
-    mayaChip: {
+    soundwaves: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: theme.colors.primary + "10",
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 15,
-      gap: 6,
+      gap: 2,
+      marginLeft: 10,
+    },
+    wave: {
+      width: 2,
+      backgroundColor: "rgba(255,255,255,0.5)",
+      borderRadius: 1,
+    },
+    mayaChipContainerCentered: {
+      width: "100%",
+      borderTopWidth: 1,
+      paddingVertical: 14,
+      alignItems: "center",
+      backgroundColor: "rgba(255,255,255,0.1)",
+    },
+    mayaChipSimple: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
     },
     mayaChipText: {
-      color: theme.colors.primary,
-      fontSize: 12,
+      fontSize: 15,
       fontWeight: "700",
+      letterSpacing: -0.3,
     },
     footerSpacer: {
       height: 100,
