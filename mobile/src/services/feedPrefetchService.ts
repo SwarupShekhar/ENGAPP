@@ -61,6 +61,8 @@ class FeedPrefetchService {
       console.log(
         `[FeedPrefetch] Starting background prefetch (attempt ${retryCount + 1})...`,
       );
+
+      // Attempt the fetch
       const response = await reelsApi.getFeed();
       this.cache = { response, timestamp: Date.now() };
       console.log(
@@ -75,12 +77,21 @@ class FeedPrefetchService {
 
       // Notify listeners
       this.listeners.forEach((cb) => cb());
-    } catch (error) {
-      console.warn("[FeedPrefetch] Background prefetch failed:", error);
-      // Retry with delay if under max retries
+    } catch (error: any) {
+      console.warn(
+        "[FeedPrefetch] Background prefetch failed:",
+        error.message || error,
+      );
+
+      // If we got a 401, it's highly likely the token fetcher wasn't injected yet.
+      // Retry with delay if under max retries. We increase the delay on a 401
+      // to give Clerk more time to initialize the AuthTokenInjector.
       if (retryCount < MAX_RETRIES) {
         this.isFetching = false;
-        setTimeout(() => this.prefetch(retryCount + 1), RETRY_DELAY_MS);
+        const isAuthError = error.response?.status === 401;
+        const delay = isAuthError ? 2000 : RETRY_DELAY_MS;
+        console.log(`[FeedPrefetch] Retrying in ${delay}ms...`);
+        setTimeout(() => this.prefetch(retryCount + 1), delay);
         return;
       }
     } finally {

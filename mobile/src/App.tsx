@@ -184,10 +184,11 @@ function OnboardingGate() {
       setInitialRoute("AssessmentIntro");
     } else {
       setInitialRoute("MainTabs");
-      // Delay prefetch slightly to let auth token initialize
+      // Use the injected token automatically, but delay slightly to ensure
+      // the AuthTokenInjector's useEffect has completed
       setTimeout(() => {
         FeedPrefetchService.getInstance().prefetch();
-      }, 2000);
+      }, 500);
     }
   }, [isLoaded, user]);
 

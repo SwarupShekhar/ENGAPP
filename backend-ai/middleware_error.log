@@ -3076,3 +3076,295 @@ Traceback (most recent call last):
   File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers_async.py", line 89, in __await__
     raise exceptions.from_grpc_error(rpc_error) from rpc_error
 google.api_core.exceptions.ResourceExhausted: 429 Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.
+
+--- MIDDLEWARE ERROR at 1772878453.555109 ---
+Path: /api/pronunciation/assess
+Error: name 'audio_base64' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 144, in assess_pronunciation
+    if not audio and not audio_base64:
+                         ^^^^^^^^^^^^
+NameError: name 'audio_base64' is not defined. Did you mean: '_audio_base64'?
+
+--- MIDDLEWARE ERROR at 1772878514.690443 ---
+Path: /api/pronunciation/assess
+Error: name 'audio_base64' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 144, in assess_pronunciation
+    if not audio and not audio_base64:
+                         ^^^^^^^^^^^^
+NameError: name 'audio_base64' is not defined. Did you mean: '_audio_base64'?
+
+--- MIDDLEWARE ERROR at 1772878537.4251509 ---
+Path: /api/pronunciation/assess
+Error: name 'audio_base64' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 144, in assess_pronunciation
+    if not audio and not _audio_base64:
+                         ^^^^^^^^^^^^
+NameError: name 'audio_base64' is not defined. Did you mean: '_audio_base64'?
+
+--- MIDDLEWARE ERROR at 1772878583.689162 ---
+Path: /api/pronunciation/assess
+Error: name 'audio_base64' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 144, in assess_pronunciation
+    if not audio and not _audio_base64:
+                         ^^^^^^^^^^^^
+NameError: name 'audio_base64' is not defined. Did you mean: '_audio_base64'?
+
+--- MIDDLEWARE ERROR at 1772878800.560951 ---
+Path: /api/pronunciation/assess
+Error: name 'INTELLIGILITY_WEIGHT' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 197, in assess_pronunciation
+    score_result = calculate_pronunciation_score(errors, azure_avg)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/pronunciation_scorer.py", line 81, in calculate_pronunciation_score
+    weight = INTELLIGILITY_WEIGHT.get(cat, MEDIUM_IMPACT)
+             ^^^^^^^^^^^^^^^^^^^^
+NameError: name 'INTELLIGILITY_WEIGHT' is not defined. Did you mean: 'INTELLIGIBILITY_WEIGHT'?
+
+--- MIDDLEWARE ERROR at 1772878915.8602471 ---
+Path: /api/pronunciation/assess
+Error: name 'INTELLIGILITY_WEIGHT' is not defined
+Traceback (most recent call last):
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/core/middleware.py", line 27, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 119, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 105, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 424, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/.venv/lib/python3.13/site-packages/fastapi/routing.py", line 312, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/api/routes/pronunciation.py", line 197, in assess_pronunciation
+    score_result = calculate_pronunciation_score(errors, azure_avg)
+  File "/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-ai/app/services/pronunciation_scorer.py", line 81, in calculate_pronunciation_score
+    weight = INTELLIGILITY_WEIGHT.get(cat, MEDIUM_IMPACT)
+             ^^^^^^^^^^^^^^^^^^^^
+NameError: name 'INTELLIGILITY_WEIGHT' is not defined. Did you mean: 'INTELLIGIBILITY_WEIGHT'?

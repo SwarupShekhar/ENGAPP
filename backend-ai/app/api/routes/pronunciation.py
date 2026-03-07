@@ -10,7 +10,7 @@ import os
 import tempfile
 from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Request
 
 from app.services.pronunciation_detector import detect_from_azure_result
 from app.services.pronunciation_scorer import calculate_pronunciation_score
@@ -100,20 +100,39 @@ def _run_azure_pronunciation_assessment(
 
 @router.post("/assess")
 async def assess_pronunciation(
+    request: Request,
     audio: UploadFile | None = File(None),
     reference_text: str | None = Form(None),
-    azure_result: str | None = Form(None),  # JSON string if client sends precomputed Azure result
+    azure_result: str | None = Form(None),
 ):
     """
     POST /pronunciation/assess
-    - If body is JSON with "azure_result": run detector only and return flagged errors.
-    - If multipart with audio file: run Azure Pronunciation Assessment then detector (reference_text optional for tutor).
+    Accepts EITHER:
+    1. Multipart Form Data: `audio` (file) and `reference_text`
+    2. JSON Body: `{"audio_base64": "...", "reference_text": "..."}` or `{"azure_result": {...}}`
     """
+    content_type = request.headers.get("content-type", "")
+    is_json = "application/json" in content_type.lower()
+    
+    _audio_base64 = None
+    _reference_text = reference_text
+    _azure_result = azure_result
+
+    if is_json:
+        try:
+            body = await request.json()
+            if "azure_result" in body:
+                _azure_result = body["azure_result"]
+            _audio_base64 = body.get("audio_base64")
+            _reference_text = body.get("reference_text", _reference_text)
+        except Exception as e:
+            raise HTTPException(400, f"Invalid JSON body: {e}")
+
     # JSON-only: { "azure_result": { ... } }
-    if azure_result:
+    if _azure_result:
         try:
             import json as _json
-            data = _json.loads(azure_result)
+            data = _json.loads(_azure_result) if isinstance(_azure_result, str) else _azure_result
         except Exception as e:
             raise HTTPException(400, f"Invalid azure_result JSON: {e}")
         raw = data.get("azure_result") or data
@@ -122,60 +141,96 @@ async def assess_pronunciation(
         score_result = calculate_pronunciation_score(errors, azure_avg)
         return {"flagged_errors": errors, "pronunciation_score": score_result}
 
-    if not audio or not audio.filename:
-        raise HTTPException(400, "Provide audio file or JSON body with azure_result")
+    if not audio and not _audio_base64:
+        raise HTTPException(400, "Provide audio file or JSON body with audio_base64")
 
-    # Create a temp file path but don't keep it open
-    content = await audio.read()
-    fd, tmp_path = tempfile.mkstemp(suffix=".wav")
-    os.close(fd)
-    
+    if audio and audio.filename:
+        content = await audio.read()
+    elif _audio_base64:
+        import base64
+        try:
+            content = base64.b64decode(_audio_base64)
+        except Exception as e:
+            logger.warning("Invalid base64 audio: %s", e)
+            raise HTTPException(400, "Invalid audio_base64") from e
+    else:
+        raise HTTPException(400, "No audio provided")
+
+    # Expo/React Native typically sends m4a. Write to temp with extension so pydub can detect format.
+    fd_in = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a")
+    fd_in.write(content)
+    fd_in.close()
+    tmp_in = fd_in.name
+    fd_wav, tmp_wav = tempfile.mkstemp(suffix=".wav")
+    os.close(fd_wav)
+
     try:
         import io
-        from pydub import AudioSegment
-        audio_segment = AudioSegment.from_file(io.BytesIO(content))
-        # Azure Pronunciation Assessment prefers 16kHz, 16-bit, Mono PCM
-        audio_segment = audio_segment.set_frame_rate(16000).set_channels(1).set_sample_width(2)
-        audio_segment.export(tmp_path, format="wav")
-        logger.info(f"Converted audio to WAV: {tmp_path}")
-    except Exception as e:
-        logger.error(f"Failed to convert audio via pydub: {e}")
-        # Fallback to writing original content (might still fail in Azure if not WAV)
-        with open(tmp_path, "wb") as f:
-            f.write(content)
-
-    try:
-        # Fix C: Two-pass — use client reference_text when provided (e.g. test_01 "water"), else Pass 1 STT then Pass 2 PA
-        import azure.cognitiveservices.speech as speechsdk
-        pass_1_transcript = (reference_text or "").strip()
-        if pass_1_transcript:
-            logger.info(f"Using client reference_text for Pass 2: {pass_1_transcript[:60]}...")
-        else:
-            speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
-            audio_config = speechsdk.audio.AudioConfig(filename=tmp_path)
-            recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-            stt_result = recognizer.recognize_once()
-            if stt_result.reason == speechsdk.ResultReason.RecognizedSpeech and (stt_result.text or "").strip():
-                pass_1_transcript = (stt_result.text or "").strip()
-                logger.info(f"Pass 1 (STT) transcript: {pass_1_transcript}")
-            else:
-                pass_1_transcript = "hello"
-                logger.warning("Pass 1 STT failed or empty; using fallback 'hello'")
-
-        pass_2_result = _run_azure_pronunciation_assessment(tmp_path, pass_1_transcript or "hello")
-        # Pass original client reference_text to detector when provided (e.g. "I vision a better future");
-        # else STT transcript. Avoids "bijan" in reference_words when client sent "vision".
-        detector_reference = (reference_text or "").strip() or pass_1_transcript or ""
-        errors = detect_from_azure_result(pass_2_result, reference_text=detector_reference)
-        azure_avg = _compute_word_accuracy_average(pass_2_result)
-        score_result = calculate_pronunciation_score(errors, azure_avg)
-        return {
-            "flagged_errors": errors,
-            "pronunciation_score": score_result,
-            "azure_result": pass_2_result,
-        }
-    finally:
+        wav_ready = False
         try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+            from pydub import AudioSegment
+            # Prefer loading from file with .m4a so pydub/ffmpeg detects format (Expo records m4a).
+            try:
+                seg = AudioSegment.from_file(tmp_in)
+            except Exception as e1:
+                logger.warning("pydub from_file(m4a) failed: %s; trying from BytesIO", e1)
+                seg = AudioSegment.from_file(io.BytesIO(content))
+            seg = seg.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+            seg.export(tmp_wav, format="wav")
+            wav_ready = True
+            logger.info("Converted audio to WAV: %s", tmp_wav)
+        except Exception as e:
+            logger.error("Failed to convert audio via pydub: %s", e)
+            # Client usually sends m4a (Expo). pydub needs ffmpeg for m4a.
+            raise HTTPException(
+                503,
+                "Audio conversion failed. Install ffmpeg (e.g. brew install ffmpeg) for m4a support: " + str(e),
+            ) from e
+
+        if not wav_ready or not os.path.isfile(tmp_wav) or os.path.getsize(tmp_wav) == 0:
+            raise HTTPException(400, "Could not produce valid WAV from audio")
+
+        try:
+            import azure.cognitiveservices.speech as speechsdk
+            pass_1_transcript = (_reference_text or "").strip()
+            if pass_1_transcript:
+                logger.info("Using client reference_text for Pass 2: %.60s...", pass_1_transcript)
+            else:
+                if not AZURE_SPEECH_KEY:
+                    logger.error("AZURE_SPEECH_KEY not set; cannot run Pass 1 STT")
+                    raise HTTPException(503, "Pronunciation assessment not configured (AZURE_SPEECH_KEY)")
+                speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
+                audio_config = speechsdk.audio.AudioConfig(filename=tmp_wav)
+                recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+                stt_result = recognizer.recognize_once()
+                if stt_result.reason == speechsdk.ResultReason.RecognizedSpeech and (stt_result.text or "").strip():
+                    pass_1_transcript = (stt_result.text or "").strip()
+                    logger.info("Pass 1 (STT) transcript: %s", pass_1_transcript)
+                else:
+                    pass_1_transcript = "hello"
+                    logger.warning("Pass 1 STT failed or empty; using fallback 'hello'")
+
+            pass_2_result = _run_azure_pronunciation_assessment(tmp_wav, pass_1_transcript or "hello")
+            if pass_2_result.get("error"):
+                logger.warning("Azure PA returned error: %s", pass_2_result.get("error"))
+            detector_reference = (_reference_text or "").strip() or pass_1_transcript or ""
+            errors = detect_from_azure_result(pass_2_result, reference_text=detector_reference)
+            azure_avg = _compute_word_accuracy_average(pass_2_result)
+            score_result = calculate_pronunciation_score(errors, azure_avg)
+            return {
+                "flagged_errors": errors,
+                "pronunciation_score": score_result,
+                "azure_result": pass_2_result,
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("Pronunciation assess failed: %s", e)
+            raise HTTPException(500, f"Pronunciation assessment failed: {e!s}") from e
+    finally:
+        for p in (tmp_in, tmp_wav):
+            try:
+                if p and os.path.isfile(p):
+                    os.unlink(p)
+            except OSError:
+                pass

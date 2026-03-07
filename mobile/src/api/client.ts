@@ -51,14 +51,17 @@ client.interceptors.request.use(
           config.headers.Authorization = `Bearer ${token}`;
         } else {
           console.warn(
-            "[API] getToken returned null - request sent without Auth header",
+            `[API] getToken returned null for URL: ${config.url} - request sent without Auth header`,
           );
         }
       } catch (e) {
-        console.error("[API] Failed to retrieve token:", e);
+        console.error(
+          `[API] Failed to retrieve token for URL: ${config.url}:`,
+          e,
+        );
       }
     } else {
-      console.warn("[API] No token fetcher configured");
+      console.warn(`[API] No token fetcher configured yet! URL: ${config.url}`);
     }
     return config;
   },

@@ -14,6 +14,9 @@ class SocketService {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private joinedRooms = new Set<string>();
   private isConnecting = false;
+  private connectErrorCount = 0;
+  private lastConnectErrorLog = 0;
+  private readonly CONNECT_ERROR_LOG_THROTTLE_MS = 15000; // log at most once per 15s
   private NOTIFICATION_SOUND_URL =
     "https://res.cloudinary.com/de8vvmpip/video/upload/v1771405321/preview_uxlib8.mp3";
 
@@ -83,6 +86,7 @@ class SocketService {
 
     this.socket.on("connect", () => {
       this.isConnecting = false;
+      this.connectErrorCount = 0;
       console.log("[Socket] Connected with fresh token:", this.socket?.id);
       this.startHeartbeat();
       this.rejoinRooms();
@@ -95,7 +99,16 @@ class SocketService {
 
     this.socket.on("connect_error", (err) => {
       this.isConnecting = false;
-      console.warn("[Socket] Connection error:", err.message);
+      this.connectErrorCount += 1;
+      const now = Date.now();
+      if (now - this.lastConnectErrorLog >= this.CONNECT_ERROR_LOG_THROTTLE_MS) {
+        this.lastConnectErrorLog = now;
+        console.warn(
+          "[Socket] Connection error:",
+          err.message,
+          this.connectErrorCount > 1 ? `(${this.connectErrorCount} attempts)` : "",
+        );
+      }
       this.stopHeartbeat();
     });
 
@@ -114,6 +127,7 @@ class SocketService {
     this.socket?.disconnect();
     this.socket = null;
     this.isConnecting = false;
+    this.connectErrorCount = 0;
     this.listeners.clear();
     this.joinedRooms.clear();
   }

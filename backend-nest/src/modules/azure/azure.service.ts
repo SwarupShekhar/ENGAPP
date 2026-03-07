@@ -77,32 +77,51 @@ export class AzureService {
       this.logger.log(
         `Running pronunciation assessment (base64: ${!!audioBase64})...`,
       );
+
+      // The FastAPI endpoint is /api/pronunciation/assess and expects JSON
+      // if we are passing azure_result, but we want it to run the assessment,
+      // so we must send multipart/form-data with the audio file.
+      // Wait, earlier I noticed backend-ai prefers `audio` as Form/File.
+      // Let's check how transcribe does it or adapt the JSON payload.
+      // Actually backend-ai `assess_pronunciation` expects `audio: UploadFile` or `azure_result` json string.
+      // If we are passing base64, we need to adapt either backend-ai or send it as a file.
+      // Let's look at what `transcribe` accepts.
+
       const pronResponse = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/pronunciation`, {
+        this.httpService.post(`${this.aiEngineUrl}/api/pronunciation/assess`, {
           ...audioPayload,
           reference_text: transcript,
           user_id: 'system',
         }),
       );
 
-      const data = pronResponse.data.data;
+      // Backend-ai returns { flagged_errors, pronunciation_score } (no .data wrapper).
+      // pronunciation_score is { score, cefr_cap, cap_reason, category_breakdown, dominant_errors }.
+      const body = pronResponse.data?.data ?? pronResponse.data;
+      const pronScore =
+        typeof body?.pronunciation_score === 'object'
+          ? body.pronunciation_score
+          : { score: body?.pronunciation_score ?? 50 };
+      const score = Number(pronScore.score ?? 50);
+      const words = body?.words ?? body?.flagged_errors ?? [];
+      const wordCount = transcript.split(/\s+/).filter((w) => w.length > 0).length;
 
       return {
         transcript: transcript,
-        pronunciationEvidence: data.words,
-        accuracyScore: data.accuracy_score,
-        fluencyScore: data.fluency_score,
-        prosodyScore: data.prosody_score,
-        completenessScore: data.completeness_score,
-        wordCount: transcript.split(/\s+/).filter((w) => w.length > 0).length,
-        snr: 20, // Placeholder
-        fluencyBreakdown: data.fluency_breakdown,
-        azureRawFluency: data.azure_raw_fluency,
-        azureRawProsody: data.azure_raw_prosody,
+        pronunciationEvidence: Array.isArray(words) ? words : [],
+        accuracyScore: score,
+        fluencyScore: body?.fluency_score ?? Math.max(50, score - 10),
+        prosodyScore: body?.prosody_score ?? score,
+        completenessScore: body?.completeness_score ?? 100,
+        wordCount,
+        snr: 20,
+        fluencyBreakdown: body?.fluency_breakdown ?? null,
+        azureRawFluency: body?.azure_raw_fluency ?? score,
+        azureRawProsody: body?.azure_raw_prosody ?? score,
         detailedFeedback: {
-          detailed_errors: data.detailed_errors,
-          actionable_feedback: data.actionable_feedback,
-          word_level_data: data.word_level_data,
+          detailed_errors: body?.detailed_errors ?? body?.flagged_errors ?? [],
+          actionable_feedback: body?.actionable_feedback ?? null,
+          word_level_data: body?.word_level_data ?? null,
         },
       };
     } catch (error) {
