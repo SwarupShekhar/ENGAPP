@@ -55,13 +55,19 @@ const STT_MAX_DURATION_MS = 50000;
 function DataListener({
   onTranscription,
   onEndSession,
+  setRoomRef,
 }: {
   onTranscription: (data: any) => void;
   onEndSession: () => void;
+  setRoomRef?: (room: any) => void;
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const room = useRoomContext();
+
+  useEffect(() => {
+    setRoomRef?.(room);
+  }, [room, setRoomRef]);
 
   useEffect(() => {
     const handleData = (payload: Uint8Array) => {
@@ -72,13 +78,14 @@ function DataListener({
         if (data.type === "end_session") {
           console.log("[LiveKit] Received end_session signal");
           onEndSession();
-        } else if (data.type === "transcription") {
-          console.log(
-            `[LiveKit] Received remote transcription from ${data.userId}: ${data.text}`,
-          );
+        } else if (data.type === "transcription" && data.text?.trim?.()) {
+          if (__DEV__) {
+            console.log("[LiveKit] Received remote transcription:", (data.text || "").slice(0, 40) + "...");
+          }
           onTranscription({
             userId: data.userId,
-            text: data.text,
+            text: (data.text || "").trim(),
+            fromRemote: true,
           });
         } else {
           console.log("[LiveKit] Received data packet:", data);
@@ -91,13 +98,17 @@ function DataListener({
     const handleTranscription = (segments: any[]) => {
       if (!segments || segments.length === 0) return;
 
-      // segments is an array of TranscriptionSegment
       segments.forEach((segment) => {
         if (segment.isFinal) {
-          onTranscription({
-            userId: segment.speakerIdentity,
-            text: segment.text,
-          });
+          // Some versions use speakerIdentity, others use participant.identity
+          const speakerId =
+            segment.speakerIdentity || segment.participant?.identity;
+          if (speakerId) {
+            onTranscription({
+              userId: speakerId,
+              text: segment.text,
+            });
+          }
         }
       });
     };
@@ -203,18 +214,21 @@ function TranscriptionStatus({
 function TranscriptBubble({
   item,
   index,
+  partnerName,
   isPartnerBot,
 }: {
   item: any;
   index: number;
+  partnerName: string;
   isPartnerBot?: boolean;
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const isUser = item.speaker === "user";
+  const speakerLabel = isUser ? "You" : partnerName || "Partner";
   return (
     <Animated.View
-      entering={FadeInUp.delay(index * 100).springify()}
+      entering={FadeInUp.delay(Math.min(index * 50, 300)).springify()}
       style={[
         styles.bubbleRow,
         isUser ? styles.bubbleRowRight : styles.bubbleRowLeft,
@@ -231,7 +245,9 @@ function TranscriptBubble({
             },
           ]}
         >
-          <Text style={styles.miniAvatarText}>{isPartnerBot ? "B" : "P"}</Text>
+          <Text style={styles.miniAvatarText}>
+            {(partnerName || "P").charAt(0).toUpperCase()}
+          </Text>
         </View>
       )}
       <View
@@ -240,6 +256,14 @@ function TranscriptBubble({
           isUser ? styles.bubbleUser : styles.bubblePartner,
         ]}
       >
+        <Text
+          style={[
+            styles.bubbleLabel,
+            isUser ? styles.bubbleLabelUser : styles.bubbleLabelPartner,
+          ]}
+        >
+          {speakerLabel}
+        </Text>
         <Text
           style={[
             styles.bubbleText,
@@ -260,7 +284,7 @@ function TranscriptBubble({
           <Text
             style={[styles.miniAvatarText, { color: theme.colors.primary }]}
           >
-            U
+            Y
           </Text>
         </View>
       )}
@@ -350,6 +374,12 @@ export default function InCallScreen({ navigation, route }: any) {
 
   // Only the caller waits. The receiver has already accepted.
   const [isWaiting, setIsWaiting] = useState(isDirect && isCaller);
+
+  useEffect(() => {
+    console.log(
+      `[InCall] State Update: isWaiting=${isWaiting}, token=${!!token}, isMuted=${isMuted}, sessionId=${sessionId}`,
+    );
+  }, [isWaiting, token, isMuted, sessionId]);
   const [callStatus, setCallStatus] = useState<
     "calling" | "connected" | "declined"
   >("calling");
@@ -357,11 +387,21 @@ export default function InCallScreen({ navigation, route }: any) {
   const [transcriptionStatus, setTranscriptionStatus] = useState<
     "idle" | "active" | "error" | "unavailable"
   >("idle");
+  const [roomReady, setRoomReady] = useState(false);
   const localSttActiveRef = useRef(false);
   const hasLiveKitSttRef = useRef(false);
+  const hasScheduledLocalSTTRef = useRef(false);
+  const hasRetriedLocalSTTRef = useRef(false);
+  const lastLocalSTTStartRef = useRef(0);
+  const isMutedRef = useRef(isMuted);
   const startRecognitionWithKeepaliveRef = useRef<() => void>(() => {});
+  const startLocalSTTRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   const startRecognitionWithKeepalive = useCallback(() => {
+    if (hasEndedRef.current) {
+      console.log("[LocalSTT] Skipping start (Ended)");
+      return;
+    }
     if (sttRestartTimerRef.current) {
       clearTimeout(sttRestartTimerRef.current);
       sttRestartTimerRef.current = null;
@@ -372,23 +412,29 @@ export default function InCallScreen({ navigation, route }: any) {
         interimResults: true,
         continuous: true,
         addsPunctuation: true,
+        // Let LiveKit manage the category; only set if strictly necessary
         iosCategory: {
           category: "playAndRecord",
-          categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
+          categoryOptions: [
+            "defaultToSpeaker",
+            "allowBluetooth",
+            "mixWithOthers" as any,
+          ],
           mode: "voiceChat",
         },
       });
+      console.log("[LocalSTT] start() called successfully");
     } catch (e) {
       return;
     }
     sttRestartTimerRef.current = setTimeout(() => {
       sttRestartTimerRef.current = null;
       try {
-        setTranscript((prev) => {
-          const pending = prev.find((t) => t.id === "pending-local");
-          if (!pending?.text?.trim()) return prev;
+        const prev = transcriptRef.current;
+        const pending = prev.find((t) => t.id === "pending-local");
+        if (pending?.text?.trim()) {
           const without = prev.filter((t) => t.id !== "pending-local");
-          return [
+          const next = [
             ...without,
             {
               id: `local-${Date.now()}`,
@@ -400,7 +446,9 @@ export default function InCallScreen({ navigation, route }: any) {
               }),
             },
           ];
-        });
+          transcriptRef.current = next;
+          setTranscript(next);
+        }
         ExpoSpeechRecognitionModule.stop();
       } catch (_) {}
     }, STT_MAX_DURATION_MS);
@@ -412,22 +460,25 @@ export default function InCallScreen({ navigation, route }: any) {
 
   // ─── On-device Speech Recognition (fallback when LiveKit STT is unavailable) ────
   useSpeechRecognitionEvent("start", () => {
-    console.log("[LocalSTT] Speech recognition started");
+    lastLocalSTTStartRef.current = Date.now();
+    console.log(`[LocalSTT] Event: start. Status: ${transcriptionStatus}`);
     localSttActiveRef.current = true;
-    if (!hasLiveKitSttRef.current) {
-      setTranscriptionStatus("active");
-    }
+    setTranscriptionStatus("active");
   });
 
   useSpeechRecognitionEvent("end", () => {
-    console.log("[LocalSTT] Speech recognition ended, restarting...");
     localSttActiveRef.current = false;
+    const runDuration = Date.now() - lastLocalSTTStartRef.current;
+    const isShortRun = runDuration < 2000;
+    console.log(
+      `[LocalSTT] Event: end. Duration: ${runDuration}ms (Short: ${isShortRun})`,
+    );
     // Commit in-flight interim so we don't lose words at restart boundary
-    setTranscript((prev) => {
-      const pending = prev.find((t) => t.id === "pending-local");
-      if (!pending?.text?.trim()) return prev;
+    const prev = transcriptRef.current;
+    const pending = prev.find((t) => t.id === "pending-local");
+    if (pending?.text?.trim()) {
       const without = prev.filter((t) => t.id !== "pending-local");
-      return [
+      const next = [
         ...without,
         {
           id: `local-${Date.now()}`,
@@ -439,77 +490,93 @@ export default function InCallScreen({ navigation, route }: any) {
           }),
         },
       ];
-    });
-    // Auto-restart quickly so we don't miss words (iOS stops after silence)
-    if (!hasEndedRef.current && token && !isWaiting) {
+      transcriptRef.current = next;
+      setTranscript(next);
+    }
+    // Restart: back off if this was a short run (e.g. no-speech) to avoid tight loop
+    if (!hasEndedRef.current && token && !isMutedRef.current) {
+      const delay = isShortRun ? 2000 : 150;
       setTimeout(() => {
-        if (!hasEndedRef.current && startRecognitionWithKeepaliveRef.current) {
+        if (
+          !hasEndedRef.current &&
+          !isMutedRef.current &&
+          startRecognitionWithKeepaliveRef.current
+        ) {
           startRecognitionWithKeepaliveRef.current();
         }
-      }, 150);
+      }, delay);
     }
   });
 
   useSpeechRecognitionEvent("result", (event) => {
     const transcript = event.results?.[0]?.transcript?.trim() ?? "";
+    console.log(
+      `[LocalSTT] result event: "${transcript}" (isFinal: ${event.isFinal})`,
+    );
     if (transcript.length === 0) return;
 
     if (event.isFinal) {
       console.log(`[LocalSTT] Final result: "${transcript}"`);
 
-      // 1. Replace any pending interim item, then add final
-      setTranscript((prev) => {
-        const withoutPending = prev.filter((t) => t.id !== "pending-local");
-        return [
-          ...withoutPending,
-          {
-            id: `local-${Date.now()}`,
-            speaker: "user",
-            text: transcript,
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          },
-        ];
-      });
+      const newItem = {
+        id: `local-${Date.now()}`,
+        speaker: "user" as const,
+        text: transcript,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      const withoutPending = transcriptRef.current.filter((t) => t.id !== "pending-local");
+      transcriptRef.current = [...withoutPending, newItem];
+      setTranscript(transcriptRef.current);
 
-      // 2. Broadcast to peer so they see it too
-      if (roomRef.current) {
+      // 2. Broadcast to peer only when not muted (mic is on)
+      const sendTranscript = () => {
+        if (isMutedRef.current) return true;
+        const r = roomRef.current;
+        if (!r) return false;
         const signal = JSON.stringify({
           type: "transcription",
           userId: user?.id,
           text: transcript,
         });
-        roomRef.current.localParticipant
-          .publishData(Buffer.from(signal), {
-            reliable: true,
+        r.localParticipant
+          .publishData(Buffer.from(signal), { reliable: true })
+          .then(() => {
+            if (__DEV__) console.log("[InCall] Broadcast local STT ok");
           })
           .catch((err: any) =>
             console.error("[InCall] Failed to broadcast local STT:", err),
           );
+        return true;
+      };
+      if (!sendTranscript()) {
+        if (__DEV__) console.warn("[InCall] No roomRef yet, retry broadcast in 200ms");
+        setTimeout(() => sendTranscript(), 200);
       }
     } else {
-      // Interim: show live so we don't lose text if STT stops before final
-      setTranscript((prev) => {
-        const withoutPending = prev.filter((t) => t.id !== "pending-local");
-        return [
-          ...withoutPending,
-          {
-            id: "pending-local",
-            speaker: "user",
-            text: transcript,
-            time: new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          },
-        ];
-      });
+      const pendingItem = {
+        id: "pending-local",
+        speaker: "user" as const,
+        text: transcript,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      const withoutPending = transcriptRef.current.filter((t) => t.id !== "pending-local");
+      transcriptRef.current = [...withoutPending, pendingItem];
+      setTranscript(transcriptRef.current);
     }
   });
 
   useSpeechRecognitionEvent("error", (event) => {
+    const isNoSpeech = event.error === "no-speech";
+    if (isNoSpeech) {
+      // Expected when user is silent; "end" will fire and we restart with backoff there
+      return;
+    }
     console.warn(`[LocalSTT] Error: ${event.error} - ${event.message}`);
     if (
       !hasLiveKitSttRef.current &&
@@ -535,22 +602,69 @@ export default function InCallScreen({ navigation, route }: any) {
   });
 
   const startLocalSTT = useCallback(async () => {
-    if (!token || isWaiting || hasEndedRef.current) return;
+    console.log(
+      `[LocalSTT] startLocalSTT() called. token: ${!!token}, isMuted: ${isMuted}, hasEnded: ${hasEndedRef.current}`,
+    );
+    if (!token || hasEndedRef.current) {
+      console.log("[LocalSTT] startLocalSTT() aborting due to state");
+      return;
+    }
     try {
       const perms = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      console.log(`[LocalSTT] Permissions check: ${perms.granted}`);
       if (!perms.granted) {
         console.warn("[LocalSTT] Permissions not granted");
         setTranscriptionStatus("unavailable");
         return;
       }
-      console.log("[LocalSTT] Starting on-device speech recognition...");
+      console.log("[LocalSTT] Calling startRecognitionWithKeepalive()...");
       setTranscriptionStatus("active");
       startRecognitionWithKeepalive();
     } catch (e) {
       console.error("[LocalSTT] Failed to start:", e);
       setTranscriptionStatus("unavailable");
     }
-  }, [token, isWaiting, startRecognitionWithKeepalive]);
+  }, [token, isWaiting, isMuted, startRecognitionWithKeepalive]);
+  startLocalSTTRef.current = startLocalSTT;
+
+  // Start Local STT when we have both token and room (same delay for both sides)
+  useEffect(() => {
+    if (!token || !roomReady || hasEndedRef.current || hasScheduledLocalSTTRef.current) return;
+    hasScheduledLocalSTTRef.current = true;
+    const delay = 500;
+    const id = setTimeout(() => {
+      console.log("[InCall] Starting Local STT (token + roomReady)");
+      startLocalSTTRef.current?.();
+    }, delay);
+    return () => clearTimeout(id);
+  }, [token, roomReady]);
+
+  // If one side never got "active", retry once after 3s (e.g. roomReady came late or first start failed)
+  useEffect(() => {
+    if (!token || hasEndedRef.current || hasRetriedLocalSTTRef.current) return;
+    const id = setTimeout(() => {
+      if (hasEndedRef.current) return;
+      if (
+        transcriptionStatus === "idle" &&
+        !localSttActiveRef.current &&
+        !isMutedRef.current
+      ) {
+        hasRetriedLocalSTTRef.current = true;
+        console.log("[InCall] Retry starting Local STT (other side fallback)");
+        startLocalSTTRef.current?.();
+      }
+    }, 3000);
+    return () => clearTimeout(id);
+  }, [token, transcriptionStatus]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+    if (isMuted) {
+      setTranscriptionStatus("active");
+    } else if (token && !hasEndedRef.current && !localSttActiveRef.current) {
+      startLocalSTT();
+    }
+  }, [isMuted, token, startLocalSTT]);
 
   useEffect(() => {
     pulseScale.value = withRepeat(
@@ -622,7 +736,7 @@ export default function InCallScreen({ navigation, route }: any) {
       }
     };
     fetchToken();
-  }, [user, sessionId]);
+  }, [user, sessionId, isWaiting]);
 
   // The obsolete /audio WebSocket connection has been removed.
   // Real-time transcription is now handled by LiveKit natively via DataListener (RoomEvent.TranscriptionReceived).
@@ -676,7 +790,10 @@ export default function InCallScreen({ navigation, route }: any) {
       if (hasEndedRef.current) return;
       hasEndedRef.current = true;
 
-      // 1. Flush any pending interim transcript so it's included in the payload
+      // 1. Brief delay so any in-flight speech result commits to state and ref
+      await new Promise((r) => setTimeout(r, 80));
+
+      // 2. Flush any pending interim transcript so it's included in the payload
       const current = transcriptRef.current;
       const pending = current.find((t) => t.id === "pending-local");
       const lines = pending?.text?.trim()
@@ -691,7 +808,7 @@ export default function InCallScreen({ navigation, route }: any) {
           ]
         : current;
 
-      // 2. Stop STT cleanly (clear keepalive timer, then abort)
+      // 3. Stop STT cleanly (clear keepalive timer, then abort)
       if (sttRestartTimerRef.current) {
         clearTimeout(sttRestartTimerRef.current);
         sttRestartTimerRef.current = null;
@@ -705,17 +822,31 @@ export default function InCallScreen({ navigation, route }: any) {
       );
 
       try {
-        if (sessionId && sessionId !== "session-id") {
-          const segments = lines.map((line) => ({
-            speaker_id: line.speaker === "user" ? "local" : "remote",
-            text: line.text,
-            timestamp: line.time || new Date().toISOString(),
-          }));
-          console.log(
-            `[InCall] Submitting final transcript segments: ${segments.length}`,
-          );
+        if (sessionId && sessionId !== "session-id" && user?.id) {
+          // Only send this device's speech (speaker === "user" — must match transcriptRef labels).
+          const mySegments = lines
+            .filter(
+              (t) =>
+                t.speaker === "user" &&
+                typeof t.text === "string" &&
+                t.text.trim().length > 0,
+            )
+            .map((t) => ({
+              speaker_id: user.id,
+              text: t.text.trim(),
+              timestamp: (t as any).time ?? new Date().toISOString(),
+            }));
+          if (mySegments.length === 0) {
+            console.warn(
+              "[InCall] No local segments found — check speaker label filter (expect \"user\"). Still calling endSession so participant feedback row exists.",
+            );
+          } else {
+            console.log(
+              `[InCall] Submitting my segments only: ${mySegments.length} lines`,
+            );
+          }
           await sessionsApi.endSession(sessionId, {
-            transcript: segments,
+            transcript: mySegments,
             actualDuration: durationRef.current,
             userEndedEarly: true,
           });
@@ -753,25 +884,42 @@ export default function InCallScreen({ navigation, route }: any) {
         duration: durationRef.current,
       });
     },
-    [sessionId, navigation, partnerName, topic],
+    [sessionId, navigation, partnerName, topic, user?.id],
   );
 
   const handleTranscription = useCallback(
     (data: any) => {
+      const text = typeof data.text === "string" ? data.text.trim() : "";
+      if (!text) return;
       hasLiveKitSttRef.current = true;
       setTranscriptionStatus("active");
-      setTranscript((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          speaker: data.userId === user?.id ? "user" : "partner",
-          text: data.text,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
+
+      // 1. If it's from local STT (already added to transcript), don't add again
+      // (Wait, local STT adds itself with speaker "user". Remote signals for local user
+      // should be ignored by the local user, but added by the remote user as "partner")
+
+      // 2. Identify speaker:
+      // - If data.fromRemote is true, it came from the peer's broadcast -> always "partner"
+      // - If data.userId matches local user and NOT fromRemote -> "user"
+      // - Otherwise (LiveKit native STT) -> compare userId
+      const isFromSelf =
+        data.fromRemote !== true &&
+        data.userId != null &&
+        data.userId === user?.id;
+
+      if (isFromSelf && data.fromRemote) return;
+
+      const newItem = {
+        id: `trans-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        speaker: isFromSelf ? "user" : "partner",
+        text,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      transcriptRef.current = [...transcriptRef.current, newItem];
+      setTranscript(transcriptRef.current);
     },
     [user?.id],
   );
@@ -828,7 +976,7 @@ export default function InCallScreen({ navigation, route }: any) {
       <LiveKitRoom
         serverUrl={LIVEKIT_URL}
         token={token}
-        connect={!isWaiting}
+        connect={!!token}
         audio={true}
         video={false}
         onDisconnected={() => handleEndCall(true)}
@@ -837,23 +985,32 @@ export default function InCallScreen({ navigation, route }: any) {
         <RoomHandler
           onRoomReady={(room) => {
             roomRef.current = room;
-            setIsMuted(!room.localParticipant.isMicrophoneEnabled);
-            if (!hasEndedRef.current && token && !isWaiting) {
-              const startDelay = isCaller ? 1000 : 4000;
-              setTimeout(() => {
-                if (!hasEndedRef.current && !localSttActiveRef.current) {
-                  startLocalSTT();
-                }
-              }, startDelay);
+            setRoomReady(true);
+            // Force the microphone into the desired state on join
+            try {
+              room.localParticipant.setMicrophoneEnabled(!isMuted);
+            } catch (e) {
+              console.warn("[InCall] Initial mic enable failed:", e);
             }
           }}
           onReconnected={(room) => {
-            setIsMuted(!room.localParticipant.isMicrophoneEnabled);
+            // Re-sync microphone state on reconnection
+            try {
+              room.localParticipant.setMicrophoneEnabled(!isMuted);
+            } catch (e) {
+              console.warn("[InCall] Re-sync mic enable failed:", e);
+            }
+            if (!hasEndedRef.current && !hasLiveKitSttRef.current && token) {
+              startLocalSTT();
+            }
           }}
         />
         <DataListener
           onTranscription={handleTranscription}
           onEndSession={handleRemoteEndSession}
+          setRoomRef={(r) => {
+            roomRef.current = r;
+          }}
         />
         <View
           style={[
@@ -936,9 +1093,10 @@ export default function InCallScreen({ navigation, route }: any) {
             >
               {transcript.map((item, index) => (
                 <TranscriptBubble
-                  key={item.id}
+                  key={item.id || index}
                   item={item}
                   index={index}
+                  partnerName={partnerName}
                   isPartnerBot={partnerName.toLowerCase().includes("bot")}
                 />
               ))}
@@ -970,6 +1128,7 @@ export default function InCallScreen({ navigation, route }: any) {
                   } catch (e) {
                     console.warn("[InCall] setMicrophoneEnabled failed:", e);
                   }
+                  isMutedRef.current = next;
                   setIsMuted(next);
                 }}
               />
@@ -1196,6 +1355,19 @@ const getStyles = (theme: any) =>
       borderBottomLeftRadius: 4,
       borderWidth: 1,
       borderColor: theme.colors.border + "20",
+    },
+    bubbleLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      marginBottom: 4,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    bubbleLabelUser: {
+      color: "rgba(255,255,255,0.9)",
+    },
+    bubbleLabelPartner: {
+      color: theme.colors.text.secondary,
     },
     bubbleText: {
       fontSize: 15,

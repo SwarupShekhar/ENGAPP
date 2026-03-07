@@ -67,6 +67,18 @@ interface SessionFeedback {
   wordLevelData?: WordScore[];
   grammarErrors?: GrammarError[];
   vocabularyAnalysis?: VocabAnalysis;
+  // New fields for rich feedback
+  cefrExplanation?: string;
+  justifications?: {
+    pronunciation?: string;
+    grammar?: string;
+    vocabulary?: string;
+    fluency?: string;
+  };
+  pronunciationIssues?: any[];
+  pronunciationFlagged?: any[];
+  dominantPronunciationErrors?: string[];
+  actionableFeedback?: any;
 }
 
 interface Mistake {
@@ -160,14 +172,17 @@ function mapSessionToCallSession(
   currentUser?: { clerkId?: string; fullName?: string } | null,
 ): CallSession {
   const analysis = session.analyses?.[0];
-  const scores = analysis?.scores || {
-    grammar: 0,
-    vocabulary: 0,
-    fluency: 0,
-    pronunciation: 0,
-    overall: 0,
-  };
+  const summary = session.summaryJson;
   const rawData = analysis?.rawData;
+
+  const scores = {
+    grammar: summary?.grammar_score ?? analysis?.scores?.grammar ?? 0,
+    vocabulary: summary?.vocabulary_score ?? analysis?.scores?.vocabulary ?? 0,
+    fluency: summary?.fluency_score ?? analysis?.scores?.fluency ?? 0,
+    pronunciation:
+      summary?.pronunciation_score ?? analysis?.scores?.pronunciation ?? 0,
+    overall: summary?.overall_score ?? analysis?.scores?.overall ?? 0,
+  };
 
   // Build mistake list from real analysis
   const mistakes: Mistake[] = (analysis?.mistakes || []).map((m, i) => ({
@@ -222,35 +237,54 @@ function mapSessionToCallSession(
       "Partner"
     : "AI Tutor";
 
-  // Only set partnerId for real human partners — this controls Connect button
   const partnerId = hasRealPartner ? realPartner!.userId : undefined;
+  const cefrLevel = summary?.cefr_score ?? analysis?.cefrLevel ?? "B1";
+
+  // CEFR Explanation
+  const overallScore = scores.overall;
+  const cefrExplanation =
+    overallScore >= 80
+      ? `Strong performance (${cefrLevel})! You communicated clearly. Focus on the details below to reach the next level.`
+      : overallScore >= 60
+        ? `Good effort (${cefrLevel}). You're on the right track. Check the breakdown and word-level feedback below to see exactly where to improve.`
+        : `There’s room to grow. Your score reflects grammar, pronunciation, fluency, and vocabulary. Use the sections below to see which words and patterns to practice.`;
 
   return {
     id: session.id,
     type,
     topic: session.topic || "General Conversation",
     partnerName,
-    partnerLevel: analysis?.cefrLevel || "B1",
+    partnerLevel: cefrLevel,
     partnerId,
     connectionStatus: "none",
     duration: session.duration || 0,
     date: session.startedAt,
     overallScore: scores.overall || 0,
-    scores: {
-      grammar: scores.grammar || 0,
-      vocabulary: scores.vocabulary || 0,
-      fluency: scores.fluency || 0,
-      pronunciation: scores.pronunciation || 0,
-    },
+    scores,
     feedback: {
       aiSummary:
-        rawData?.aiFeedback || "Session feedback is being generated...",
+        (rawData as any)?.aiFeedback ||
+        rawData?.aiFeedback ||
+        "Session feedback is being generated...",
       strengths: rawData?.strengths || [],
       improvements: rawData?.improvementAreas || [],
       mistakes,
       accentNotes:
         rawData?.accentNotes || rawData?.pronunciationTip || undefined,
       wordLevelData: wordLevelData.length > 0 ? wordLevelData : undefined,
+      cefrExplanation,
+      justifications: {
+        pronunciation: (rawData as any)?.ai_detailed_feedback?.pronunciation
+          ?.justification,
+        grammar: (rawData as any)?.ai_detailed_feedback?.grammar?.justification,
+        vocabulary: (rawData as any)?.ai_detailed_feedback?.vocabulary
+          ?.justification,
+        fluency: (rawData as any)?.ai_detailed_feedback?.fluency?.justification,
+      },
+      pronunciationIssues: analysis?.pronunciationIssues || [],
+      pronunciationFlagged: summary?.pronunciation_flagged || [],
+      dominantPronunciationErrors: summary?.dominant_pronunciation_errors || [],
+      actionableFeedback: (rawData as any)?.actionable_feedback || null,
     },
   };
 }
@@ -656,11 +690,61 @@ function FeedbackBottomSheet({
               {/* OVERVIEW TAB */}
               {activeTab === "overview" && (
                 <View style={styles.tabContent}>
+                  {session.feedback.cefrExplanation && (
+                    <View style={styles.whatItMeansCard}>
+                      <Text style={styles.whatItMeansTitle}>
+                        What this score means
+                      </Text>
+                      <Text style={styles.whatItMeansText}>
+                        {session.feedback.cefrExplanation}
+                      </Text>
+                    </View>
+                  )}
+
                   <View style={styles.summaryCard}>
                     <Text style={styles.summaryIcon}>🤖</Text>
                     <Text style={styles.summaryText}>
                       {session.feedback.aiSummary}
                     </Text>
+                  </View>
+
+                  {/* Justifications */}
+                  <View style={styles.justificationsSection}>
+                    <Text style={styles.feedbackSectionTitle}>
+                      Why this score?
+                    </Text>
+                    <View style={styles.justificationGrid}>
+                      {[
+                        {
+                          label: "Pronunciation",
+                          text: session.feedback.justifications?.pronunciation,
+                        },
+                        {
+                          label: "Grammar",
+                          text: session.feedback.justifications?.grammar,
+                        },
+                        {
+                          label: "Vocabulary",
+                          text: session.feedback.justifications?.vocabulary,
+                        },
+                        {
+                          label: "Fluency",
+                          text: session.feedback.justifications?.fluency,
+                        },
+                      ].map(
+                        (item, i) =>
+                          item.text && (
+                            <View key={i} style={styles.justificationItem}>
+                              <Text style={styles.justificationLabel}>
+                                {item.label}
+                              </Text>
+                              <Text style={styles.justificationText}>
+                                {item.text}
+                              </Text>
+                            </View>
+                          ),
+                      )}
+                    </View>
                   </View>
 
                   {session.feedback.accentNotes && (
@@ -776,7 +860,79 @@ function FeedbackBottomSheet({
               {/* WORDS TAB */}
               {activeTab === "words" && (
                 <View style={styles.tabContent}>
-                  {!session.feedback.wordLevelData?.length ? (
+                  {((session.feedback.pronunciationIssues?.length || 0) > 0 ||
+                    (session.feedback.pronunciationFlagged?.length || 0) > 0 ||
+                    (session.feedback.dominantPronunciationErrors?.length ||
+                      0) > 0) && (
+                    <View style={styles.wordsToWorkOnSection}>
+                      <Text style={styles.feedbackSectionTitle}>
+                        Words to work on
+                      </Text>
+                      <Text style={styles.wordsToWorkOnSubtitle}>
+                        These words affected your pronunciation score. Practice
+                        saying them clearly.
+                      </Text>
+                      <View style={styles.pronunciationIssuesList}>
+                        {session.feedback.pronunciationIssues?.map(
+                          (issue: any, i: number) => (
+                            <View key={i} style={styles.pIssueRow}>
+                              <View style={styles.pIssueWord}>
+                                <Text style={styles.pIssueWordText}>
+                                  {issue.word}
+                                </Text>
+                                {(issue.phoneticExpected ||
+                                  issue.phoneticActual) && (
+                                  <Text style={styles.pPhoneticText}>
+                                    {issue.phoneticActual
+                                      ? `You: /${issue.phoneticActual}/ → Try: /${issue.phoneticExpected || "—"}/`
+                                      : `Expected: /${issue.phoneticExpected || "—"}/`}
+                                  </Text>
+                                )}
+                              </View>
+                              {(issue.suggestion || issue.issueType) && (
+                                <Text style={styles.pIssueSuggestion}>
+                                  {issue.suggestion || issue.issueType}
+                                </Text>
+                              )}
+                            </View>
+                          ),
+                        )}
+                        {!session.feedback.pronunciationIssues?.length &&
+                          session.feedback.pronunciationFlagged?.map(
+                            (item: any, i: number) => (
+                              <View key={i} style={styles.pIssueRow}>
+                                <Text style={styles.pIssueWordText}>
+                                  {item.word ?? item.phoneme ?? "—"}
+                                </Text>
+                                {item.error_type && (
+                                  <Text style={styles.pIssueSuggestion}>
+                                    {item.error_type}
+                                  </Text>
+                                )}
+                              </View>
+                            ),
+                          )}
+                      </View>
+                      {(session.feedback.dominantPronunciationErrors?.length ||
+                        0) > 0 && (
+                        <View style={styles.dominantErrorsWrap}>
+                          <Text style={styles.dominantErrorsLabel}>
+                            Focus areas:
+                          </Text>
+                          <Text style={styles.dominantErrorsText}>
+                            {session.feedback
+                              .dominantPronunciationErrors!.map((e: string) =>
+                                e.replace(/_/g, " "),
+                              )
+                              .join(" • ")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {!session.feedback.wordLevelData?.length &&
+                  !session.feedback.pronunciationIssues?.length ? (
                     <View style={styles.emptyTab}>
                       <Text style={styles.emptyTabIcon}>📭</Text>
                       <Text style={styles.emptyTabText}>
@@ -785,11 +941,16 @@ function FeedbackBottomSheet({
                     </View>
                   ) : (
                     <>
+                      <Text
+                        style={[styles.feedbackSectionTitle, { marginTop: 20 }]}
+                      >
+                        All Transcribed Words
+                      </Text>
                       <Text style={styles.wordsSectionHint}>
-                        Words with accuracy score from Azure Speech AI
+                        Accuracy scores from Azure Speech AI
                       </Text>
                       <View style={styles.wordsGrid}>
-                        {session.feedback.wordLevelData.map((w, i) => (
+                        {session.feedback.wordLevelData?.map((w, i) => (
                           <View
                             key={i}
                             style={[
@@ -2129,6 +2290,113 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  // Rich Feedback Additions
+  whatItMeansCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: "#7c3aed",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  whatItMeansTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 6,
+  },
+  whatItMeansText: {
+    fontSize: 13,
+    color: "#64748b",
+    lineHeight: 19,
+  },
+  justificationsSection: {
+    marginBottom: 20,
+  },
+  justificationGrid: {
+    gap: 10,
+  },
+  justificationItem: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+  },
+  justificationLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94a3b8",
+    textTransform: "uppercase",
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  justificationText: {
+    fontSize: 13,
+    color: "#334155",
+    lineHeight: 18,
+  },
+  wordsToWorkOnSection: {
+    marginBottom: 20,
+  },
+  wordsToWorkOnSubtitle: {
+    fontSize: 12,
+    color: "#64748b",
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  pronunciationIssuesList: {
+    gap: 8,
+  },
+  pIssueRow: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+  },
+  pIssueWord: {
+    marginBottom: 4,
+  },
+  pIssueWordText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  pPhoneticText: {
+    fontSize: 11,
+    color: "#94a3b8",
+    fontFamily: "monospace",
+    marginTop: 2,
+  },
+  pIssueSuggestion: {
+    fontSize: 12,
+    color: "#7c3aed",
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  dominantErrorsWrap: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  dominantErrorsLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#94a3b8",
+    marginBottom: 4,
+  },
+  dominantErrorsText: {
+    fontSize: 13,
+    color: "#334155",
+    lineHeight: 18,
+  },
   // No data in sheet
   noDataContainer: {
     flex: 1,

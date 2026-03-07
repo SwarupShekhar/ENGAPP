@@ -604,3 +604,1980 @@ Unique constraint failed on the fields: (`"participantId"`)
     at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
     at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
     at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 7f4cf50c-36a7-4a75-81e1-e436e5aca3fb: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "7f4cf50c-36a7-4a75-81e1-e436e5aca3fb",
+           participantId: "e00ddd94-adf3-4754-a7af-7c53574470e7",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You initiated the conversation, which is good. However, work on grammar and vocabulary accuracy to improve clarity. Focus on using correct verb tenses and choosing the right words.",
+             strengths: [
+               "Initiating conversation"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Vocabulary",
+               "Pronunciation"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 60
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [],
+               appropriate_terms: [],
+               suggested_alternatives: {}
+             }
+           },
+           cefrLevel: "A2",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 30,
+             pronunciation_score: 50,
+             fluency_score: 40,
+             vocabulary_score: 30,
+             overall_score: 40,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 60
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [],
+             appropriate_terms: [],
+             suggested_alternatives: {}
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "major",
+                 original: "yes you seen to be hondable",
+                 corrected: "Yes, you seem to be honorable",
+                 explanation: "The verb 'seen' is the past participle of 'see,' which doesn't fit here. The verb 'seem' (meaning 'to appear') is needed. 'Honorable' needs to be spelled correctly.",
+                 example: "He seems happy today.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "vocabulary",
+                 severity: "critical",
+                 original: "hondable",
+                 corrected: "honorable",
+                 explanation: "'Honorable' is the correct spelling to mean worthy of respect.",
+                 example: "She is an honorable member of the community.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "you are not speaking very good English",
+                 corrected: "you are not speaking very well English",
+                 explanation: "The adverb 'well' is needed to describe the verb 'speaking'. Although commonly used, 'good' should be reserved for adjectives, not adverbs of manner.",
+                 example: "She speaks French very well.",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "7f4cf50c-36a7-4a75-81e1-e436e5aca3fb",
+           participantId: "e00ddd94-adf3-4754-a7af-7c53574470e7",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You initiated the conversation, which is good. However, work on grammar and vocabulary accuracy to improve clarity. Focus on using correct verb tenses and choosing the right words.",
+             strengths: [
+               "Initiating conversation"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Vocabulary",
+               "Pronunciation"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 60
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [],
+               appropriate_terms: [],
+               suggested_alternatives: {}
+             }
+           },
+           cefrLevel: "A2",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 30,
+             pronunciation_score: 50,
+             fluency_score: 40,
+             vocabulary_score: 30,
+             overall_score: 40,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 60
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [],
+             appropriate_terms: [],
+             suggested_alternatives: {}
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "major",
+                 original: "yes you seen to be hondable",
+                 corrected: "Yes, you seem to be honorable",
+                 explanation: "The verb 'seen' is the past participle of 'see,' which doesn't fit here. The verb 'seem' (meaning 'to appear') is needed. 'Honorable' needs to be spelled correctly.",
+                 example: "He seems happy today.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "vocabulary",
+                 severity: "critical",
+                 original: "hondable",
+                 corrected: "honorable",
+                 explanation: "'Honorable' is the correct spelling to mean worthy of respect.",
+                 example: "She is an honorable member of the community.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "you are not speaking very good English",
+                 corrected: "you are not speaking very well English",
+                 explanation: "The adverb 'well' is needed to describe the verb 'speaking'. Although commonly used, 'good' should be reserved for adjectives, not adverbs of manner.",
+                 example: "She speaks French very well.",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+    at throwValidationException (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:202:7)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 7f4cf50c-36a7-4a75-81e1-e436e5aca3fb: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "7f4cf50c-36a7-4a75-81e1-e436e5aca3fb",
+           participantId: "e00ddd94-adf3-4754-a7af-7c53574470e7",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You attempted to communicate but there are significant grammatical and pronunciation errors. Focus on basic grammar rules and clear pronunciation to improve your English.",
+             strengths: [
+               "Attempted to initiate conversation"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Pronunciation",
+               "Vocabulary"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 60
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "Connectivity",
+                 "Basic Communication"
+               ],
+               appropriate_terms: [
+                 "Audible",
+                 "Communicate",
+                 "Speak",
+                 "Understand"
+               ],
+               suggested_alternatives: {
+                 good: [
+                   "fluent",
+                   "articulate",
+                   "proficient"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A1",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 30,
+             pronunciation_score: 40,
+             fluency_score: 30,
+             vocabulary_score: 30,
+             overall_score: 30,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 60
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "Connectivity",
+               "Basic Communication"
+             ],
+             appropriate_terms: [
+               "Audible",
+               "Communicate",
+               "Speak",
+               "Understand"
+             ],
+             suggested_alternatives: {
+               good: [
+                 "fluent",
+                 "articulate",
+                 "proficient"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "major",
+                 original: "yes you seen to be hondable",
+                 corrected: "Yes, you seem to be audible",
+                 explanation: "The correct verb form is 'seem' (present tense) or 'seemed' (past tense). 'Seen' is the past participle and requires an auxiliary verb (e.g., have seen). The spelling 'hondable' is likely a mispronunciation of 'audible'.",
+                 example: "You seem tired today.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "grammar",
+                 severity: "major",
+                 original: "you are not speaking very good English",
+                 corrected: "You are not speaking very well.",
+                 explanation: "'Well' is an adverb, used to describe how someone speaks. 'Good' is an adjective, used to describe a noun.",
+                 example: "She sings very well.",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "7f4cf50c-36a7-4a75-81e1-e436e5aca3fb",
+           participantId: "e00ddd94-adf3-4754-a7af-7c53574470e7",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You attempted to communicate but there are significant grammatical and pronunciation errors. Focus on basic grammar rules and clear pronunciation to improve your English.",
+             strengths: [
+               "Attempted to initiate conversation"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Pronunciation",
+               "Vocabulary"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 60
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "Connectivity",
+                 "Basic Communication"
+               ],
+               appropriate_terms: [
+                 "Audible",
+                 "Communicate",
+                 "Speak",
+                 "Understand"
+               ],
+               suggested_alternatives: {
+                 good: [
+                   "fluent",
+                   "articulate",
+                   "proficient"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A1",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 30,
+             pronunciation_score: 40,
+             fluency_score: 30,
+             vocabulary_score: 30,
+             overall_score: 30,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 60
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "Connectivity",
+               "Basic Communication"
+             ],
+             appropriate_terms: [
+               "Audible",
+               "Communicate",
+               "Speak",
+               "Understand"
+             ],
+             suggested_alternatives: {
+               good: [
+                 "fluent",
+                 "articulate",
+                 "proficient"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "major",
+                 original: "yes you seen to be hondable",
+                 corrected: "Yes, you seem to be audible",
+                 explanation: "The correct verb form is 'seem' (present tense) or 'seemed' (past tense). 'Seen' is the past participle and requires an auxiliary verb (e.g., have seen). The spelling 'hondable' is likely a mispronunciation of 'audible'.",
+                 example: "You seem tired today.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "grammar",
+                 severity: "major",
+                 original: "you are not speaking very good English",
+                 corrected: "You are not speaking very well.",
+                 explanation: "'Well' is an adverb, used to describe how someone speaks. 'Good' is an adjective, used to describe a noun.",
+                 example: "She sings very well.",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+    at throwValidationException (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:202:7)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 7f4cf50c-36a7-4a75-81e1-e436e5aca3fb: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "7f4cf50c-36a7-4a75-81e1-e436e5aca3fb",
+           participantId: "e00ddd94-adf3-4754-a7af-7c53574470e7",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "Your feedback is direct, but your own English needs improvement. Focus on basic grammar and vocabulary to express your thoughts more clearly.",
+             strengths: [
+               "Willingness to provide feedback"
+             ],
+             improvementAreas: [
+               "Grammar accuracy",
+               "Vocabulary range",
+               "Pronunciation clarity"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 60
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "General Conversation",
+                 "Language Learning"
+               ],
+               appropriate_terms: [
+                 "honorable",
+                 "speaking",
+                 "English"
+               ],
+               suggested_alternatives: {
+                 good: [
+                   "fluent",
+                   "proficient",
+                   "clear"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A2",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 40,
+             pronunciation_score: 50,
+             fluency_score: 40,
+             vocabulary_score: 40,
+             overall_score: 40,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 60
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "General Conversation",
+               "Language Learning"
+             ],
+             appropriate_terms: [
+               "honorable",
+               "speaking",
+               "English"
+             ],
+             suggested_alternatives: {
+               good: [
+                 "fluent",
+                 "proficient",
+                 "clear"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "vocabulary",
+                 severity: "major",
+                 original: "hondable",
+                 corrected: "honorable",
+                 explanation: "'Hondable' is not a word. The intended word was likely 'honorable'.",
+                 example: "He is an honorable man, known for his integrity.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "you seen",
+                 corrected: "you seem",
+                 explanation: "'Seen' is the past participle of 'see'. The verb 'seem' requires the base form in this context.",
+                 example: "You seem tired. Did you sleep well?",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "7f4cf50c-36a7-4a75-81e1-e436e5aca3fb",
+           participantId: "e00ddd94-adf3-4754-a7af-7c53574470e7",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "Your feedback is direct, but your own English needs improvement. Focus on basic grammar and vocabulary to express your thoughts more clearly.",
+             strengths: [
+               "Willingness to provide feedback"
+             ],
+             improvementAreas: [
+               "Grammar accuracy",
+               "Vocabulary range",
+               "Pronunciation clarity"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 60
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "General Conversation",
+                 "Language Learning"
+               ],
+               appropriate_terms: [
+                 "honorable",
+                 "speaking",
+                 "English"
+               ],
+               suggested_alternatives: {
+                 good: [
+                   "fluent",
+                   "proficient",
+                   "clear"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A2",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 40,
+             pronunciation_score: 50,
+             fluency_score: 40,
+             vocabulary_score: 40,
+             overall_score: 40,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 60
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "General Conversation",
+               "Language Learning"
+             ],
+             appropriate_terms: [
+               "honorable",
+               "speaking",
+               "English"
+             ],
+             suggested_alternatives: {
+               good: [
+                 "fluent",
+                 "proficient",
+                 "clear"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "vocabulary",
+                 severity: "major",
+                 original: "hondable",
+                 corrected: "honorable",
+                 explanation: "'Hondable' is not a word. The intended word was likely 'honorable'.",
+                 example: "He is an honorable man, known for his integrity.",
+                 timestamp: 0,
+                 segmentId: "0"
+               },
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "you seen",
+                 corrected: "you seem",
+                 explanation: "'Seen' is the past participle of 'see'. The verb 'seem' requires the base form in this context.",
+                 example: "You seem tired. Did you sleep well?",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+    at throwValidationException (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:202:7)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 45fb855b-b2b6-4395-ab91-ecabca611696: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 45fb855b-b2b6-4395-ab91-ecabca611696: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 45fb855b-b2b6-4395-ab91-ecabca611696: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 6ee8ac2d-9ce2-4c9e-95db-5e821e153d2d: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "6ee8ac2d-9ce2-4c9e-95db-5e821e153d2d",
+           participantId: "307cbc2c-0a6a-4115-926c-922674e6d60f",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You initiated the conversation with an audibility check. While understandable, try to move quickly to the main topic to maximize practice time. Focus on clear sentence structure.",
+             strengths: [
+               "Initiating communication"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Expanding utterances"
+             ],
+             confidenceTimeline: [],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [],
+               appropriate_terms: [
+                 "audible",
+                 "voice"
+               ],
+               suggested_alternatives: {
+                 hear: [
+                   "discern",
+                   "comprehend"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A1",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 20,
+             pronunciation_score: 20,
+             fluency_score: 20,
+             vocabulary_score: 20,
+             overall_score: 20,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [],
+             appropriate_terms: [
+               "audible",
+               "voice"
+             ],
+             suggested_alternatives: {
+               hear: [
+                 "discern",
+                 "comprehend"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "hello my audible is my voice audible to you",
+                 corrected: "Hello, am I audible? Is my voice audible to you?",
+                 explanation: "The initial phrasing is grammatically awkward and lacks proper sentence structure. Joining independent clauses requires conjunction or separation.",
+                 example: "Hello, are you there? Can you hear me?",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "6ee8ac2d-9ce2-4c9e-95db-5e821e153d2d",
+           participantId: "307cbc2c-0a6a-4115-926c-922674e6d60f",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You initiated the conversation with an audibility check. While understandable, try to move quickly to the main topic to maximize practice time. Focus on clear sentence structure.",
+             strengths: [
+               "Initiating communication"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Expanding utterances"
+             ],
+             confidenceTimeline: [],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [],
+               appropriate_terms: [
+                 "audible",
+                 "voice"
+               ],
+               suggested_alternatives: {
+                 hear: [
+                   "discern",
+                   "comprehend"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A1",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 20,
+             pronunciation_score: 20,
+             fluency_score: 20,
+             vocabulary_score: 20,
+             overall_score: 20,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [],
+             appropriate_terms: [
+               "audible",
+               "voice"
+             ],
+             suggested_alternatives: {
+               hear: [
+                 "discern",
+                 "comprehend"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "hello my audible is my voice audible to you",
+                 corrected: "Hello, am I audible? Is my voice audible to you?",
+                 explanation: "The initial phrasing is grammatically awkward and lacks proper sentence structure. Joining independent clauses requires conjunction or separation.",
+                 example: "Hello, are you there? Can you hear me?",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+    at throwValidationException (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:202:7)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 6ee8ac2d-9ce2-4c9e-95db-5e821e153d2d: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 6ee8ac2d-9ce2-4c9e-95db-5e821e153d2d: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session a1739ee0-724e-408e-94e1-c4a1f61f3adb: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session a1739ee0-724e-408e-94e1-c4a1f61f3adb: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session a1739ee0-724e-408e-94e1-c4a1f61f3adb: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 0b3ddd42-15ab-4cc2-ab61-93e8770f06e4: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 0b3ddd42-15ab-4cc2-ab61-93e8770f06e4: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 0b3ddd42-15ab-4cc2-ab61-93e8770f06e4: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 92c1bc25-7002-4142-abe4-e85e65e6af9e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "92c1bc25-7002-4142-abe4-e85e65e6af9e",
+           participantId: "2fc416a4-eaf1-4b6e-add3-802fadf7b5ce",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "The participant attempted to communicate, but there were some grammatical errors. Focus on using articles correctly and proper sentence structure.",
+             strengths: [
+               "Initiating communication"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Sentence Structure"
+             ],
+             confidenceTimeline: [],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "Technology",
+                 "Communication"
+               ],
+               appropriate_terms: [
+                 "transcription"
+               ],
+               suggested_alternatives: {}
+             }
+           },
+           cefrLevel: "A1",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 35,
+             pronunciation_score: 40,
+             fluency_score: 30,
+             vocabulary_score: 30,
+             overall_score: 35,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "Technology",
+               "Communication"
+             ],
+             appropriate_terms: [
+               "transcription"
+             ],
+             suggested_alternatives: {}
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "no transcription is not happening on your side but on my side only",
+                 corrected: "the transcription is not happening on your side, but only on my side",
+                 explanation: "The article 'the' is needed before 'transcription'. Also, it is more natural to use 'only' after 'but'.",
+                 example: "The meeting is not scheduled for tomorrow, but only for next week.",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "92c1bc25-7002-4142-abe4-e85e65e6af9e",
+           participantId: "2fc416a4-eaf1-4b6e-add3-802fadf7b5ce",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "The participant attempted to communicate, but there were some grammatical errors. Focus on using articles correctly and proper sentence structure.",
+             strengths: [
+               "Initiating communication"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Sentence Structure"
+             ],
+             confidenceTimeline: [],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "Technology",
+                 "Communication"
+               ],
+               appropriate_terms: [
+                 "transcription"
+               ],
+               suggested_alternatives: {}
+             }
+           },
+           cefrLevel: "A1",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 35,
+             pronunciation_score: 40,
+             fluency_score: 30,
+             vocabulary_score: 30,
+             overall_score: 35,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "Technology",
+               "Communication"
+             ],
+             appropriate_terms: [
+               "transcription"
+             ],
+             suggested_alternatives: {}
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "no transcription is not happening on your side but on my side only",
+                 corrected: "the transcription is not happening on your side, but only on my side",
+                 explanation: "The article 'the' is needed before 'transcription'. Also, it is more natural to use 'only' after 'but'.",
+                 example: "The meeting is not scheduled for tomorrow, but only for next week.",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+    at throwValidationException (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:202:7)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 92c1bc25-7002-4142-abe4-e85e65e6af9e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 92c1bc25-7002-4142-abe4-e85e65e6af9e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 92c1bc25-7002-4142-abe4-e85e65e6af9e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 92c1bc25-7002-4142-abe4-e85e65e6af9e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 92c1bc25-7002-4142-abe4-e85e65e6af9e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session ce1a137b-3d07-4988-93a3-4afa316b89b6: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 2785a869-9d3b-442a-81e8-731c6a796622: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "2785a869-9d3b-442a-81e8-731c6a796622",
+           participantId: "6442db18-c5be-4f2f-b051-fcbe26ae1361",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You've started a thought, but the expression is unclear. Pay closer attention to sentence structure and word order to improve clarity. Try to form complete sentences.",
+             strengths: [
+               "Attempting to express an idea"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Sentence structure",
+               "Clarity"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 55
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "Translation",
+                 "Technology"
+               ],
+               appropriate_terms: [
+                 "translation",
+                 "issue",
+                 "problem",
+                 "solved"
+               ],
+               suggested_alternatives: {
+                 problem: [
+                   "challenge",
+                   "difficulty",
+                   "hiccup"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A2",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 45,
+             pronunciation_score: 50,
+             fluency_score: 40,
+             vocabulary_score: 40,
+             overall_score: 42,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 55
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "Translation",
+               "Technology"
+             ],
+             appropriate_terms: [
+               "translation",
+               "issue",
+               "problem",
+               "solved"
+             ],
+             suggested_alternatives: {
+               problem: [
+                 "challenge",
+                 "difficulty",
+                 "hiccup"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "all alone fixed yet",
+                 corrected: "all alone fixed yet?",
+                 explanation: "This phrase is grammatically incomplete and lacks a clear question structure. It's missing auxiliary verbs to form a proper question.",
+                 example: "Is everything ready?",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+Stack: PrismaClientValidationError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create({
+         data: {
+           sessionId: "2785a869-9d3b-442a-81e8-731c6a796622",
+           participantId: "6442db18-c5be-4f2f-b051-fcbe26ae1361",
+           rawData: {
+             azureEvidence: undefined,
+             aiFeedback: "You've started a thought, but the expression is unclear. Pay closer attention to sentence structure and word order to improve clarity. Try to form complete sentences.",
+             strengths: [
+               "Attempting to express an idea"
+             ],
+             improvementAreas: [
+               "Grammar",
+               "Sentence structure",
+               "Clarity"
+             ],
+             confidenceTimeline: [
+               {
+                 timestamp: 0,
+                 confidence_score: 55
+               }
+             ],
+             hesitationMarkers: {
+               filler_usage: {
+                 um: 0,
+                 uh: 0,
+                 ...: 0
+               },
+               self_corrections: 0,
+               false_starts: 0
+             },
+             topicVocabulary: {
+               detected_domains: [
+                 "Translation",
+                 "Technology"
+               ],
+               appropriate_terms: [
+                 "translation",
+                 "issue",
+                 "problem",
+                 "solved"
+               ],
+               suggested_alternatives: {
+                 problem: [
+                   "challenge",
+                   "difficulty",
+                   "hiccup"
+                 ]
+               }
+             }
+           },
+           cefrLevel: "A2",
+           scores: {
+             wpm: 0,
+             unique_words: 0,
+             grammar_score: 45,
+             pronunciation_score: 50,
+             fluency_score: 40,
+             vocabulary_score: 40,
+             overall_score: 42,
+             grammar_breakdown: null,
+             vocab_breakdown: null,
+             confidence_metrics: null
+           },
+           confidenceTimeline: [
+             {
+               timestamp: 0,
+               confidence_score: 55
+             }
+           ],
+           hesitationMarkers: {
+             filler_usage: {
+               um: 0,
+               uh: 0,
+               ...: 0
+             },
+             self_corrections: 0,
+             false_starts: 0
+           },
+           topicVocabulary: {
+             detected_domains: [
+               "Translation",
+               "Technology"
+             ],
+             appropriate_terms: [
+               "translation",
+               "issue",
+               "problem",
+               "solved"
+             ],
+             suggested_alternatives: {
+               problem: [
+                 "challenge",
+                 "difficulty",
+                 "hiccup"
+               ]
+             }
+           },
+           mistakes: {
+             create: [
+               {
+                 type: "grammar",
+                 severity: "minor",
+                 original: "all alone fixed yet",
+                 corrected: "all alone fixed yet?",
+                 explanation: "This phrase is grammatically incomplete and lacks a clear question structure. It's missing auxiliary verbs to form a proper question.",
+                 example: "Is everything ready?",
+                 timestamp: 0,
+                 segmentId: "0"
+               }
+             ]
+           }
+         },
+         include: {
+           mistakes: true
+         }
+       })
+
+Unknown argument `example`. Available options are marked with ?.
+    at throwValidationException (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:202:7)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 2785a869-9d3b-442a-81e8-731c6a796622: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 2785a869-9d3b-442a-81e8-731c6a796622: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)

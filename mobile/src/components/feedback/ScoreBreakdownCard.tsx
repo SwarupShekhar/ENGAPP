@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useAppTheme } from "../../theme/useAppTheme";
 
 interface ScoreBreakdownCardProps {
@@ -20,9 +20,8 @@ interface ScoreBreakdownCardProps {
 export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({ scores, justifications }) => {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
 
-    const metrics = [
+  const metrics = [
         {
             key: 'pronunciation',
             label: 'Pronunciation',
@@ -59,33 +58,24 @@ const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
 
             {metrics.map((metric) => (
                 <View key={metric.key}>
-                    <TouchableOpacity
-                        style={styles.metricRow}
-                        onPress={() => setExpandedMetric(
-                            expandedMetric === metric.key ? null : metric.key
-                        )}
-                        activeOpacity={0.7}
-                    >
+                    <View style={styles.metricRow}>
                         <Text style={styles.metricLabel}>{metric.label}</Text>
                         <View style={styles.scoreContainer}>
                             <Text style={[styles.score, { color: metric.color }]}>{metric.score}/100</Text>
-                            <Text style={styles.expandIcon}>
-                                {expandedMetric === metric.key ? '▼' : '▶'}
-                            </Text>
                         </View>
-                    </TouchableOpacity>
+                    </View>
 
                     {/* Progress bar */}
                     <View style={styles.progressBarBg}>
                         <View style={[styles.progressBarFill, { width: `${Math.min(100, Math.max(0, metric.score))}%`, backgroundColor: metric.color }]} />
                     </View>
 
-                    {expandedMetric === metric.key && (
-                        <View style={styles.justificationContainer}>
-                            <Text style={styles.justificationLabel}>Why this score?</Text>
-                            <Text style={styles.justificationText}>{metric.justification}</Text>
-                        </View>
-                    )}
+                    <View style={styles.justificationContainer}>
+                        <Text style={styles.justificationLabel}>Why this score?</Text>
+                        <Text style={styles.justificationText}>
+                            {metric.justification || `Based on your ${metric.label.toLowerCase()} during the call. ${metric.score >= 70 ? 'Keep it up.' : 'Focus on the tips below to improve.'}`}
+                        </Text>
+                    </View>
                 </View>
             ))}
         </View>
@@ -128,10 +118,6 @@ const getStyles = (theme: any) => StyleSheet.create({
     score: {
         fontSize: theme.typography.sizes.m,
         fontWeight: '700',
-    },
-    expandIcon: {
-        fontSize: 12,
-        color: theme.colors.text.secondary,
     },
     progressBarBg: {
         height: 6,

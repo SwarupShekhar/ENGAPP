@@ -103,11 +103,15 @@ export const sessionsApi = {
     return response.data;
   },
 
-  /** Get detailed analysis for a specific session */
+  /** Get detailed analysis for a specific session. Pass retry: true to ask the backend to re-queue analysis when status is ANALYSIS_FAILED. */
   getSessionAnalysis: async (
     sessionId: string,
+    options?: { retry?: boolean },
   ): Promise<ConversationSession> => {
-    const response = await client.get(`/sessions/${sessionId}/analysis`);
+    const params = options?.retry ? { retry: "1" } : undefined;
+    const response = await client.get(`/sessions/${sessionId}/analysis`, {
+      params,
+    });
     return response.data;
   },
 

@@ -235,7 +235,7 @@ model ConversationSession {
   participants SessionParticipant[]
   analyses     Analysis[]
   tasks        LearningTask[]
-  feedback     Feedback?
+  feedbacks    Feedback[]
   reviews      PartnerReview[]
 }
 
@@ -251,6 +251,7 @@ model SessionParticipant {
   session      ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   analysis     Analysis?
+  feedbacks    Feedback[]
 
   @@unique([sessionId, userId])
 }
@@ -352,14 +353,17 @@ model TaskMistake {
 }
 
 model Feedback {
-  id          String    @id @default(uuid())
-  sessionId   String    @unique
-  transcript  String?   @db.Text
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String   @id @default(uuid())
+  sessionId     String
+  participantId String   // SessionParticipant.id — each device submits only its own speech
+  transcript    Json?    // array of { speaker_id, text, timestamp } for this participant
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   session     ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant SessionParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
+  @@unique([sessionId, participantId])
   @@index([sessionId])
 }
 

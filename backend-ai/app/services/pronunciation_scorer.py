@@ -78,7 +78,7 @@ def calculate_pronunciation_score(
 
     # Apply pattern penalties per category (1→8, 2→15, 3+→22), weighted by intelligibility
     for cat, count in category_breakdown.items():
-        weight = INTELLIGILITY_WEIGHT.get(cat, MEDIUM_IMPACT)
+        weight = INTELLIGIBILITY_WEIGHT.get(cat, MEDIUM_IMPACT)
         if count >= 3:
             penalty = PATTERN_PENALTY_TABLE[3] * weight
         elif count == 2:

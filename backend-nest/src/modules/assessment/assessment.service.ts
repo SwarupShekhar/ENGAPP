@@ -1053,11 +1053,12 @@ export class AssessmentService {
     };
   }
 
-  // Restore for regular session analysis (backward compatibility)
+  // Restore for regular session analysis. When segments are provided (per-device submission), use them directly.
   async analyzeAndStoreJoint(
     sessionId: string,
     audioUrls: Record<string, string>,
     transcript?: string,
+    segmentsInput?: { speaker_id: string; text: string; timestamp?: number }[],
   ) {
     this.logger.log(`Starting joint analysis for session ${sessionId}`);
 
@@ -1068,56 +1069,61 @@ export class AssessmentService {
 
     if (!session) throw new NotFoundException('Session not found');
 
-    const segments: any[] = [];
     const participantEvidence: Record<string, any> = {};
+    let segments: { speaker_id: string; text: string; timestamp?: number; context?: string }[] = [];
 
-    // 1. STT for each participant (or fallback to provided transcript)
-    // Parse the labelled transcript into per-speaker lines
-    const participantLines: Record<string, string[]> = {};
-    if (transcript && transcript.trim()) {
-      const lines = transcript.split('\n').filter((l) => l.trim());
-      for (const line of lines) {
-        const match = line.match(/^(User|Partner):\s*(.+)$/i);
-        if (match) {
-          const role = match[1].toLowerCase(); // 'user' or 'partner'
-          const text = match[2].trim();
-          if (!participantLines[role]) participantLines[role] = [];
-          participantLines[role].push(text);
+    if (segmentsInput && segmentsInput.length > 0) {
+      // Per-participant transcripts from each device — use as-is
+      segments = segmentsInput.map((s) => ({
+        speaker_id: s.speaker_id,
+        text: s.text,
+        timestamp: s.timestamp ?? 0,
+      }));
+      this.logger.log(
+        `Using ${segments.length} segments from per-participant feedback (Session: ${sessionId})`,
+      );
+    } else {
+      // Legacy: build segments from string transcript or audio URLs
+      const participantLines: Record<string, string[]> = {};
+      if (transcript && transcript.trim()) {
+        const lines = transcript.split('\n').filter((l) => l.trim());
+        for (const line of lines) {
+          const match = line.match(/^(User|Partner):\s*(.+)$/i);
+          if (match) {
+            const role = match[1].toLowerCase();
+            const text = match[2].trim();
+            if (!participantLines[role]) participantLines[role] = [];
+            participantLines[role].push(text);
+          }
         }
       }
-    }
 
-    // Map participants to roles: first participant = "user", second = "partner"
-    // (The transcript is always from the perspective of the user who submitted it)
-    for (let i = 0; i < session.participants.length; i++) {
-      const participant = session.participants[i];
-      const url = audioUrls[participant.userId];
+      for (let i = 0; i < session.participants.length; i++) {
+        const participant = session.participants[i];
+        const url = audioUrls[participant.userId];
 
-      if (url) {
-        const evidence = await this.azure.analyzeSpeech(url, '');
-        participantEvidence[participant.userId] = evidence;
-
-        segments.push({
-          speaker_id: participant.userId,
-          text: evidence.transcript,
-          timestamp: 0,
-        });
-      } else if (transcript && transcript.trim()) {
-        // Determine which role this participant maps to
-        const role = i === 0 ? 'user' : 'partner';
-        const speakerLines = participantLines[role] || [];
-        const speakerText = speakerLines.join(' ');
-
-        this.logger.log(
-          `Using diarized transcript for participant ${participant.userId} (role: ${role}, words: ${speakerText.split(/\s+/).length}) (Session: ${sessionId})`,
-        );
-
-        segments.push({
-          speaker_id: participant.userId,
-          text: speakerText || '(no speech detected)',
-          timestamp: 0,
-          context: transcript || undefined, // full conversation for AI context (schema field)
-        });
+        if (url) {
+          const evidence = await this.azure.analyzeSpeech(url, '');
+          participantEvidence[participant.userId] = evidence;
+          segments.push({
+            speaker_id: participant.userId,
+            text: evidence.transcript,
+            timestamp: 0,
+          });
+        } else if (transcript && transcript.trim()) {
+          const role = i === 0 ? 'user' : 'partner';
+          const speakerLines = participantLines[role] || [];
+          const speakerText = speakerLines.join(' ');
+          this.logger.log(
+            `Using diarized transcript for participant ${participant.userId} (role: ${role}, words: ${speakerText.split(/\s+/).length}) (Session: ${sessionId})`,
+          );
+          segments.push({
+            speaker_id: participant.userId,
+            text: speakerText || '(no speech detected)',
+            timestamp: 0,
+            context: transcript,
+          });
+        }
       }
     }
 

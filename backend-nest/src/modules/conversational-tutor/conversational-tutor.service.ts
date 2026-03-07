@@ -388,24 +388,39 @@ export class ConversationalTutorService implements OnModuleInit {
         }
       }
 
-      // 5. Update Session Status
+      // 5. Update Session Status and store transcript as one participant's feedback
+      const durationSec = Math.floor(
+        (new Date().getTime() - (dbSession?.createdAt?.getTime() || 0)) /
+          1000,
+      );
       await this.prisma.conversationSession.update({
         where: { id: sessionId },
         data: {
           status: 'COMPLETED',
           endedAt: new Date(),
-          duration: Math.floor(
-            (new Date().getTime() - (dbSession?.createdAt?.getTime() || 0)) /
-              1000,
-          ),
-          feedback: {
-            upsert: {
-              create: { transcript },
-              update: { transcript },
-            },
-          },
+          duration: durationSec,
         },
       });
+      if (participant) {
+        const segments = [
+          {
+            speaker_id: participant.userId,
+            text: transcript,
+            timestamp: 0,
+          },
+        ];
+        await this.prisma.feedback.upsert({
+          where: {
+            sessionId_participantId: { sessionId, participantId: participant.id },
+          },
+          create: {
+            sessionId,
+            participantId: participant.id,
+            transcript: segments as any,
+          },
+          update: { transcript: segments as any },
+        });
+      }
     } catch (error) {
       this.logger.error(
         `Final analysis failed for AI session: ${error.message}`,

@@ -16,7 +16,7 @@ export class FeedbackService {
                     participants: {
                         include: { user: true },
                     },
-                    feedback: true,
+                    feedbacks: true,
                 },
             });
 

@@ -1,6 +1,7 @@
+import { InjectQueue } from '@nestjs/bull';
 import { OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import { Job, Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -21,6 +22,7 @@ export class SessionsProcessor {
     private brainService: BrainService,
     private pronunciationService: PronunciationService,
     private pronunciationScorerService: PronunciationScorerService,
+    @InjectQueue('sessions') private sessionsQueue: Queue,
   ) {}
 
   @OnQueueFailed()
@@ -44,100 +46,96 @@ export class SessionsProcessor {
       `Processing session ${sessionId} in background (started)...`,
     );
 
-    // Wait 5 seconds to allow partner's endSession call to potentially provide a merged transcript
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const WAIT_FOR_PARTNER_MS = 10000; // 10s — slow networks can take 15–20s to complete endSession
+    const MAX_WAIT_ATTEMPTS = 6; // 6 × 10s = 60s total window for second device
+    const attempt = (job.data.waitAttempts ?? 0) + 1;
 
     try {
-      // 1) Update session status to PROCESSING
       await this.prisma.conversationSession.update({
         where: { id: sessionId },
         data: { status: 'PROCESSING' },
       });
 
-      // Try to get transcript: favor Feedback table over job data
-      const feedback = await this.prisma.feedback.findUnique({
-        where: { sessionId },
-        select: { transcript: true },
+      const session = await this.prisma.conversationSession.findUnique({
+        where: { id: sessionId },
+        include: {
+          participants: true,
+          feedbacks: { include: { participant: true } },
+        },
       });
 
-      let transcript = (
-        feedback?.transcript ||
-        job.data.transcript ||
-        ''
-      ).trim();
+      if (!session) {
+        this.logger.warn(`Session ${sessionId} not found.`);
+        return;
+      }
 
-      if (feedback?.transcript) {
-        this.logger.log(
-          `[SessionsProcessor] Using transcript from Feedback table (${transcript.length} chars)`,
-        );
-      } else if (job.data.transcript) {
-        this.logger.log(
-          `[SessionsProcessor] Using transcript from job data (${transcript.length} chars)`,
-        );
-      } else {
-        this.logger.warn(
-          `[SessionsProcessor] No transcript found for session ${sessionId}. Waiting 8s for partner submission...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, 8000));
-        const retryFeedback = await this.prisma.feedback.findUnique({
-          where: { sessionId },
-          select: { transcript: true },
-        });
-        transcript = (retryFeedback?.transcript || '').trim();
-        if (transcript) {
-          this.logger.log(
-            `[SessionsProcessor] Using transcript from Feedback (after wait): ${transcript.length} chars`,
+      // Wait for both participants to submit before analyzing (with ceiling to avoid infinite re-queue)
+      if (session.feedbacks.length < session.participants.length) {
+        if (attempt >= MAX_WAIT_ATTEMPTS) {
+          this.logger.warn(
+            `[SessionsProcessor] Session ${sessionId}: only ${session.feedbacks.length}/${session.participants.length} transcripts after ${MAX_WAIT_ATTEMPTS} attempts, proceeding anyway.`,
           );
         } else {
-          this.logger.warn(
-            `[SessionsProcessor] No transcript found for session ${sessionId}`,
+          this.logger.log(
+            `[SessionsProcessor] Session ${sessionId}: only ${session.feedbacks.length}/${session.participants.length} feedbacks (attempt ${attempt}/${MAX_WAIT_ATTEMPTS}). Re-queuing in ${WAIT_FOR_PARTNER_MS}ms.`,
           );
+          await this.sessionsQueue.add(
+            'process-session',
+            {
+              sessionId,
+              audioUrls: audioUrls || {},
+              participantIds: session.participants.map((p) => p.userId),
+              waitAttempts: attempt,
+            },
+            {
+              delay: WAIT_FOR_PARTNER_MS,
+              attempts: 5,
+              backoff: { type: 'exponential', delay: 2000 },
+              jobId: `process-session-${sessionId}-wait-${attempt}`,
+            },
+          );
+          return;
         }
       }
 
-      // Only short-circuit if truly no transcript exists anywhere
-      if (!transcript) {
+      // Merge segments from each participant's feedback (each device sent only its own speech)
+      type Seg = { speaker_id: string; text: string; timestamp?: number };
+      const segments: Seg[] = session.feedbacks.flatMap((fb) => {
+        const arr = Array.isArray(fb.transcript) ? (fb.transcript as Seg[]) : [];
+        return arr.map((t) => ({
+          speaker_id: fb.participant.userId,
+          text: typeof t.text === 'string' ? t.text : String(t.text ?? ''),
+          timestamp: typeof t.timestamp === 'number' ? t.timestamp : 0,
+        }));
+      });
+
+      const transcriptForLog = segments.map((s) => `${s.speaker_id}: ${s.text}`).join('\n');
+
+      if (segments.length === 0) {
         this.logger.warn(
-          `Short-circuiting session ${sessionId}: No speech detected from any source.`,
+          `Short-circuiting session ${sessionId}: No speech segments from any participant.`,
         );
-
-        // Look up actual SessionParticipant records (Analysis.participantId → SessionParticipant.id)
-        const sessionParticipants =
-          await this.prisma.sessionParticipant.findMany({
-            where: { sessionId },
-            select: { id: true },
+        for (const sp of session.participants) {
+          await this.prisma.analysis.upsert({
+            where: {
+              sessionId_participantId: { sessionId, participantId: sp.id },
+            },
+            create: {
+              sessionId,
+              participantId: sp.id,
+              rawData: { message: 'No speech detected' },
+              scores: {
+                grammar: 0,
+                pronunciation: 0,
+                fluency: 0,
+                vocabulary: 0,
+                overall: 0,
+              },
+              cefrLevel: 'N/A',
+            },
+            update: {},
           });
-
-        if (sessionParticipants.length > 0) {
-          await Promise.all(
-            sessionParticipants.map(async (sp) => {
-              await this.prisma.analysis.upsert({
-                where: {
-                  sessionId_participantId: { sessionId, participantId: sp.id },
-                },
-                create: {
-                  sessionId,
-                  participantId: sp.id,
-                  rawData: { message: 'No speech detected' },
-                  scores: {
-                    grammar: 0,
-                    pronunciation: 0,
-                    fluency: 0,
-                    vocabulary: 0,
-                    overall: 0,
-                  },
-                  cefrLevel: 'N/A',
-                },
-                update: {},
-              });
-            }),
-          );
-        } else {
-          this.logger.warn(
-            `Session ${sessionId} has no participants in DB, skipping analysis creation.`,
-          );
         }
-
         await this.prisma.conversationSession.update({
           where: { id: sessionId },
           data: { status: 'COMPLETED' },
@@ -146,34 +144,26 @@ export class SessionsProcessor {
       }
 
       this.logger.log(
-        `[SessionsProcessor] Proceeding with AI analysis for session ${sessionId} (transcript: ${transcript.length} chars)`,
+        `[SessionsProcessor] Proceeding with AI analysis for session ${sessionId} (${segments.length} segments).`,
       );
 
-      // 2) Pre-flight: Verify AI engine is reachable before attempting analysis
       const aiStatus = this.brainService.getAiEngineStatus();
       if (!aiStatus.healthy) {
-        this.logger.warn(
-          `[SessionsProcessor] AI engine was last reported as unhealthy. Running live check...`,
-        );
         const isAlive = await this.brainService.checkAiEngineHealth();
         if (!isAlive) {
           this.logger.error(
-            `🔴 [SessionsProcessor] AI ENGINE IS DOWN! Session ${sessionId} analysis will likely fail. ` +
-              `Start the AI engine: cd backend-ai && uvicorn app.main:app --port 8001`,
+            `🔴 [SessionsProcessor] AI ENGINE IS DOWN! Session ${sessionId} analysis will likely fail.`,
           );
-          // Still attempt — Bull will retry on failure
         } else {
-          this.logger.log(
-            `[SessionsProcessor] AI engine is now reachable. Proceeding...`,
-          );
+          this.logger.log(`[SessionsProcessor] AI engine is now reachable. Proceeding...`);
         }
       }
 
-      // 3) AI Pipeline - Joint Session Analysis
       await this.assessmentService.analyzeAndStoreJoint(
         sessionId,
-        audioUrls,
-        transcript,
+        audioUrls || {},
+        undefined,
+        segments,
       );
 
       // Handle session complete for streaks & achievements
@@ -193,11 +183,12 @@ export class SessionsProcessor {
             this.logger.log(
               `[SessionsProcessor] Running pronunciation assessment for session ${sessionId} on ${sessionData.recordingUrl}`,
             );
+            const transcriptStr = segments.map((s) => `${s.speaker_id}: ${s.text}`).join('\n');
             const { flagged_errors: flaggedErrors, pronunciation_score: pronScore } =
               await this.pronunciationService.assessFromRecordingUrl(
                 firstParticipant.userId,
                 sessionData.recordingUrl,
-                transcript,
+                transcriptStr,
               );
 
             const firstAnalysis = firstParticipant.analysis;
@@ -231,7 +222,7 @@ export class SessionsProcessor {
               where: { id: sessionId },
               data: {
                 summaryJson: {
-                  transcript,
+                  transcript: transcriptStr,
                   pronunciation_flagged: flaggedErrors,
                   cefr_score: cefrFromScore,
                   overall_score: roundedOverall,

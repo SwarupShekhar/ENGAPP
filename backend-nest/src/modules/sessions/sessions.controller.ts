@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Put, Param, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Put, Param, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 
@@ -25,14 +25,30 @@ export class SessionsController {
 
     @Get(':id/analysis')
     @UseGuards(ClerkGuard)
-    async getAnalysis(@Param('id') sessionId: string, @Request() req) {
-        // Use the authenticated user's ID to filter the analysis
-        return this.sessionsService.getSessionAnalysis(sessionId, req.user.id);
+    async getAnalysis(
+        @Param('id') sessionId: string,
+        @Request() req,
+        @Query('retry') retry?: string,
+    ) {
+        return this.sessionsService.getSessionAnalysis(sessionId, req.user.id, {
+            retry: retry === '1' || retry === 'true',
+        });
     }
 
     @Post(':id/end')
-    async end(@Param('id') sessionId: string, @Body() data: { actualDuration: number; userEndedEarly: boolean; audioUrls: Record<string, string>; transcript?: string }) {
-        return this.sessionsService.endSession(sessionId, data);
+    @UseGuards(ClerkGuard)
+    async end(
+        @Param('id') sessionId: string,
+        @Request() req: { user: { id: string } },
+        @Body()
+        data: {
+            actualDuration?: number;
+            userEndedEarly?: boolean;
+            audioUrls?: Record<string, string>;
+            transcript?: { speaker_id: string; text: string; timestamp?: string }[];
+        },
+    ) {
+        return this.sessionsService.endSession(sessionId, req.user.id, data);
     }
 
     @Post(':id/participant/:userId/audio')

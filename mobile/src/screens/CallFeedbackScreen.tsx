@@ -366,6 +366,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       } catch (error) {
         console.error("Failed to fetch session analysis:", error);
         if (isMounted) {
+          setErrorHeader("Couldn't load feedback");
+          setErrorDetail(
+            "The request failed. Tap Check again to retry or go back home.",
+          );
           setIsFailed(true);
           setLoading(false);
         }
@@ -438,17 +442,25 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     if (!sessionId || sessionId === "session-id") return;
     setCheckingAgain(true);
     try {
-      const data = await sessionsApi.getSessionAnalysis(sessionId);
+      const isRetryingAfterFailure = isFailed && !!sessionData;
+      const data = await sessionsApi.getSessionAnalysis(sessionId, {
+        retry: isRetryingAfterFailure,
+      });
       if (data.analyses && data.analyses.length > 0) {
         setSessionData(data);
         setIsFailed(false);
         setLoading(false);
       } else if (data.status === "COMPLETED" || data.status === "PROCESSING") {
         setSessionData(data);
+        setIsFailed(false);
         if (data.status === "PROCESSING") {
           setErrorHeader("Almost there...");
           setErrorDetail("The AI is still finalizing. Tap Check again in a moment.");
+          setLoading(true);
+          setRetryCount(0);
         }
+      } else {
+        setSessionData(data);
       }
     } catch (e) {
       console.warn("[CallFeedback] Check again failed:", e);
@@ -456,7 +468,17 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     setCheckingAgain(false);
   };
 
-  // Point 7: Handle failure UI
+  // Point 7: Handle failure UI (no analyses: ANALYSIS_FAILED, fetch error, or timed out)
+  const hasTranscript =
+    typeof sessionData?.feedback?.transcript === "string" &&
+    sessionData.feedback.transcript.trim().length > 0;
+  const failureTitle =
+    sessionData?.status === "ANALYSIS_FAILED" ? errorHeader : "Analysis Unavailable";
+  const failureMessage =
+    sessionData?.status === "ANALYSIS_FAILED"
+      ? errorDetail
+      : "We were unable to generate a full analysis for this call. Tap Check again to retry, or go back home.";
+
   if (
     isFailed &&
     (!sessionData?.analyses || sessionData.analyses.length === 0)
@@ -477,7 +499,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             color={theme.colors.error}
           />
           <Text style={{ fontSize: 20, fontWeight: "bold", marginTop: 16 }}>
-            Analysis Unavailable
+            {failureTitle}
           </Text>
           <Text
             style={{
@@ -486,9 +508,36 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               marginTop: 12,
             }}
           >
-            We were unable to generate a full analysis for this call. This could
-            be due to a poor connection or very short audio.
+            {failureMessage}
           </Text>
+          {hasTranscript && (
+            <View
+              style={{
+                marginTop: 20,
+                padding: 12,
+                backgroundColor: theme.colors.surface,
+                borderRadius: 8,
+                maxHeight: 120,
+                width: "100%",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.colors.text.secondary,
+                  marginBottom: 4,
+                }}
+              >
+                Captured transcript
+              </Text>
+              <Text
+                numberOfLines={6}
+                style={{ fontSize: 13, color: theme.colors.text.primary }}
+              >
+                {sessionData.feedback.transcript.trim()}
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
             style={[styles.primaryAction, { marginTop: 32, width: "100%" }]}
             onPress={handleCheckAgain}
@@ -556,12 +605,22 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     mistakes: currentAnalysis?.mistakes || [],
     pronunciationIssues: currentAnalysis?.pronunciationIssues || [],
     aiFeedback: (rawData as any)?.ai_detailed_feedback || null,
+    summaryText:
+      typeof (rawData as any)?.aiFeedback === "string"
+        ? (rawData as any).aiFeedback
+        : null,
     actionableFeedback: (rawData as any)?.actionable_feedback || null,
     wordLevelData: (rawData as any)?.detailed_errors?.word_level_scores || [],
     strengths: rawData?.strengths || [],
     improvementAreas: rawData?.improvementAreas || [],
     accentNotes: rawData?.accentNotes || null,
     pronunciationTip: rawData?.pronunciationTip || null,
+    pronunciationFlagged: sessionData?.summaryJson?.pronunciation_flagged as
+      | { word?: string; error_type?: string; phoneme?: string }[]
+      | undefined,
+    dominantPronunciationErrors:
+      (sessionData?.summaryJson?.dominant_pronunciation_errors as string[]) ||
+      [],
   };
 
   const overallColor = getScoreColor(data.overallScore, theme);
@@ -703,6 +762,21 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </LinearGradient>
         </Animated.View>
 
+        {/* What your score means */}
+        <Animated.View
+          entering={FadeInDown.delay(220).springify()}
+          style={styles.whatItMeansCard}
+        >
+          <Text style={styles.whatItMeansTitle}>What this score means</Text>
+          <Text style={styles.whatItMeansText}>
+            {data.overallScore >= 80
+              ? `Strong performance (${data.cefrLevel})! You communicated clearly. Focus on the details below to reach the next level.`
+              : data.overallScore >= 60
+                ? `Good effort (${data.cefrLevel}). You're on the right track. Check the breakdown and word-level feedback below to see exactly where to improve.`
+                : `There’s room to grow. Your score reflects grammar, pronunciation, fluency, and vocabulary. Use the sections below to see which words and patterns to practice.`}
+          </Text>
+        </Animated.View>
+
         {/* New Score Breakdown */}
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <ScoreBreakdownCard
@@ -764,6 +838,62 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             {data.actionableFeedback && (
               <PracticeTips actionableFeedback={data.actionableFeedback} />
             )}
+          </Animated.View>
+        )}
+
+        {/* Words to work on (pronunciation) – so user knows which words drove the score */}
+        {(data.pronunciationIssues?.length > 0 ||
+          (data.pronunciationFlagged && data.pronunciationFlagged.length > 0) ||
+          data.dominantPronunciationErrors?.length > 0) && (
+          <Animated.View entering={FadeInDown.delay(400).springify()}>
+            <Text style={styles.sectionTitle}>Words to work on</Text>
+            <Text style={styles.wordsToWorkOnSubtitle}>
+              These words affected your pronunciation score. Practice saying them clearly.
+            </Text>
+            <View style={styles.glassCard}>
+              {data.pronunciationIssues?.length > 0 &&
+                data.pronunciationIssues.map((issue: any, i: number) => (
+                  <View key={issue.id || i} style={styles.pronunciationIssueRow}>
+                    <View style={styles.pronunciationIssueWord}>
+                      <Text style={styles.pronunciationIssueWordText}>{issue.word}</Text>
+                      {(issue.phoneticExpected || issue.phoneticActual) && (
+                        <Text style={styles.phoneticText}>
+                          {issue.phoneticActual
+                            ? `You: /${issue.phoneticActual}/ → Try: /${issue.phoneticExpected || "—"}/`
+                            : `Expected: /${issue.phoneticExpected || "—"}/`}
+                        </Text>
+                      )}
+                    </View>
+                    {(issue.suggestion || issue.issueType) && (
+                      <Text style={styles.pronunciationIssueSuggestion}>
+                        {issue.suggestion || issue.issueType}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              {data.pronunciationFlagged?.length > 0 &&
+                data.pronunciationIssues?.length === 0 &&
+                data.pronunciationFlagged.map((item: any, i: number) => (
+                  <View key={i} style={styles.pronunciationIssueRow}>
+                    <Text style={styles.pronunciationIssueWordText}>
+                      {item.word ?? item.phoneme ?? "—"}
+                    </Text>
+                    {item.error_type && (
+                      <Text style={styles.pronunciationIssueSuggestion}>{item.error_type}</Text>
+                    )}
+                  </View>
+                ))}
+              {data.dominantPronunciationErrors?.length > 0 && (
+                <View style={styles.dominantErrorsWrap}>
+                  <Text style={styles.dominantErrorsLabel}>Focus areas:</Text>
+                  <Text style={styles.dominantErrorsText}>
+                    {data.dominantPronunciationErrors
+                      .map((e: string) => e.replace(/_/g, " "))
+                      .join(" • ")}
+                  </Text>
+                </View>
+              )}
+            </View>
           </Animated.View>
         )}
 
@@ -901,7 +1031,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         )}
 
         {/* AI Summary */}
-        {data.aiFeedback && (
+        {data.summaryText && (
           <Animated.View entering={FadeInDown.delay(1000).springify()}>
             <Text style={styles.sectionTitle}>AI Summary</Text>
             <View style={styles.glassCard}>
@@ -914,7 +1044,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                 </LinearGradient>
                 <Text style={styles.aiLabel}>EngR AI Analysis</Text>
               </View>
-              <Text style={styles.summaryText}>{data.aiFeedback}</Text>
+              <Text style={styles.summaryText}>{data.summaryText}</Text>
             </View>
           </Animated.View>
         )}
@@ -1093,6 +1223,26 @@ const getStyles = (theme: any) =>
       fontSize: theme.typography.sizes.m,
       fontWeight: "700",
     },
+    whatItMeansCard: {
+      marginHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.m,
+      padding: theme.spacing.m,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surface,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.primary,
+    },
+    whatItMeansTitle: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+      marginBottom: 6,
+    },
+    whatItMeansText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      lineHeight: 20,
+    },
     sectionTitle: {
       fontSize: theme.typography.sizes.l,
       fontWeight: "bold",
@@ -1100,6 +1250,54 @@ const getStyles = (theme: any) =>
       paddingHorizontal: theme.spacing.l,
       marginBottom: theme.spacing.m,
       marginTop: theme.spacing.m,
+    },
+    wordsToWorkOnSubtitle: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+      lineHeight: 20,
+    },
+    pronunciationIssueRow: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    pronunciationIssueWord: {
+      marginBottom: 4,
+    },
+    pronunciationIssueWordText: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+    },
+    phoneticText: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      marginTop: 2,
+      fontFamily: "monospace",
+    },
+    pronunciationIssueSuggestion: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.primary,
+      marginTop: 4,
+    },
+    dominantErrorsWrap: {
+      marginTop: theme.spacing.s,
+      paddingTop: theme.spacing.s,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    dominantErrorsLabel: {
+      fontSize: theme.typography.sizes.xs,
+      fontWeight: "600",
+      color: theme.colors.text.secondary,
+      marginBottom: 4,
+    },
+    dominantErrorsText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.primary,
+      lineHeight: 20,
     },
     // Glassmorphism card used for all sections
     glassCard: {
