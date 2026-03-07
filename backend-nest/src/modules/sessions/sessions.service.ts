@@ -35,6 +35,7 @@ export class SessionsService {
             user: true,
           },
         },
+        feedback: true,
       },
     });
 

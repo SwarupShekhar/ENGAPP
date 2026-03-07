@@ -1171,6 +1171,7 @@ export class AssessmentService {
                 original: e.original_text,
                 corrected: e.corrected_text,
                 explanation: e.explanation || '',
+                example: e.example || null,
                 timestamp: 0,
                 segmentId: '0',
               })) || [],

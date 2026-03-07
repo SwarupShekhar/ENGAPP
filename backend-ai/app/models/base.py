@@ -46,6 +46,7 @@ class ErrorDetail(BaseModel):
     explanation: str = ""
     suggestion: str = ""
     rule: Optional[str] = None
+    example: Optional[str] = None  # Separate example sentence showing correct usage
 
 class CEFRAssessment(BaseModel):
     level: CEFRLevel

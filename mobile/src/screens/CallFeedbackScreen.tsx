@@ -68,6 +68,102 @@ function SkillBar({
   );
 }
 
+// ─── Build highlight ranges from transcript + mistakes ─────
+function getTranscriptHighlightRanges(
+  transcript: string,
+  mistakes: { original_text?: string; original?: string }[],
+): [number, number][] {
+  const phrases = mistakes
+    .map((m) => (m.original_text ?? m.original ?? "").trim())
+    .filter((p) => p.length >= 2);
+  if (!transcript || phrases.length === 0) return [];
+
+  const lower = transcript.toLowerCase();
+  const ranges: [number, number][] = [];
+
+  for (const phrase of phrases) {
+    if (!phrase) continue;
+    const phraseLower = phrase.toLowerCase();
+    let i = 0;
+    while (true) {
+      const idx = lower.indexOf(phraseLower, i);
+      if (idx === -1) break;
+      ranges.push([idx, idx + phrase.length]);
+      i = idx + 1;
+    }
+  }
+
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const [s, e] of ranges) {
+    if (merged.length && s <= merged[merged.length - 1][1]) {
+      merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], e);
+    } else {
+      merged.push([s, e]);
+    }
+  }
+  return merged;
+}
+
+// ─── Transcript with mistake phrases highlighted ───────────
+function TranscriptWithHighlights({
+  transcript,
+  mistakes,
+}: {
+  transcript: string;
+  mistakes: { original_text?: string; original?: string }[];
+}) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+  const ranges = getTranscriptHighlightRanges(transcript, mistakes);
+  const segments: { text: string; highlight: boolean }[] = [];
+  let pos = 0;
+  for (const [s, e] of ranges) {
+    if (s > pos) {
+      segments.push({
+        text: transcript.slice(pos, s),
+        highlight: false,
+      });
+    }
+    segments.push({
+      text: transcript.slice(s, e),
+      highlight: true,
+    });
+    pos = e;
+  }
+  if (pos < transcript.length) {
+    segments.push({
+      text: transcript.slice(pos),
+      highlight: false,
+    });
+  }
+
+  if (segments.length === 0) {
+    return (
+      <Text style={styles.transcriptText} selectable>
+        {transcript}
+      </Text>
+    );
+  }
+
+  return (
+    <Text style={styles.transcriptText} selectable>
+      {segments.map((seg, i) =>
+        seg.highlight ? (
+          <Text
+            key={i}
+            style={[styles.transcriptText, styles.transcriptHighlight]}
+          >
+            {seg.text}
+          </Text>
+        ) : (
+          seg.text
+        ),
+      )}
+    </Text>
+  );
+}
+
 // ─── Severity Badge ───────────────────────────────────────
 function SeverityBadge({ severity }: { severity: string }) {
   const theme = useAppTheme();
@@ -95,7 +191,11 @@ function SeverityBadge({ severity }: { severity: string }) {
 function MistakeCard({ item, index }: { item: any; index: number }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const orig = item.original_text ?? item.original ?? "";
+  const corr = item.corrected_text ?? item.corrected ?? "";
+  const expl = item.explanation ?? "";
+  const example = item.example ?? "";
   return (
     <Animated.View entering={FadeInDown.delay(600 + index * 100).springify()}>
       <TouchableOpacity
@@ -120,36 +220,57 @@ function MistakeCard({ item, index }: { item: any; index: number }) {
         </View>
 
         <View style={styles.mistakeContent}>
-          <View style={styles.mistakeLine}>
-            <View
-              style={[
-                styles.mistakeDot,
-                { backgroundColor: theme.colors.error },
-              ]}
-            />
-            <Text style={styles.originalText}>{item.original}</Text>
-          </View>
-          <View style={styles.mistakeLine}>
-            <View
-              style={[
-                styles.mistakeDot,
-                { backgroundColor: theme.colors.success },
-              ]}
-            />
-            <Text style={styles.correctedText}>{item.corrected}</Text>
-          </View>
+          {orig ? (
+            <View style={styles.mistakeLine}>
+              <Text style={styles.mistakeLabel}>What you said</Text>
+              <View style={styles.mistakeLineInner}>
+                <View
+                  style={[
+                    styles.mistakeDot,
+                    { backgroundColor: theme.colors.error },
+                  ]}
+                />
+                <Text style={styles.originalText}>{orig}</Text>
+              </View>
+            </View>
+          ) : null}
+          {corr ? (
+            <View style={styles.mistakeLine}>
+              <Text style={styles.mistakeLabel}>Better way</Text>
+              <View style={styles.mistakeLineInner}>
+                <View
+                  style={[
+                    styles.mistakeDot,
+                    { backgroundColor: theme.colors.success },
+                  ]}
+                />
+                <Text style={styles.correctedText}>{corr}</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
-        {expanded && (
+        {expanded && expl ? (
           <View style={styles.explanationContainer}>
             <Ionicons
               name="bulb-outline"
               size={16}
               color={theme.colors.primary}
             />
-            <Text style={styles.explanationText}>{item.explanation}</Text>
+            <Text style={styles.explanationText}>{expl}</Text>
           </View>
-        )}
+        ) : null}
+        {expanded && example ? (
+          <View style={styles.exampleContainer}>
+            <Ionicons
+              name="chatbox-ellipses-outline"
+              size={14}
+              color={theme.colors.primary}
+            />
+            <Text style={styles.exampleLabel}>Example of correct usage</Text>
+            <Text style={styles.exampleText}>{example}</Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -494,6 +615,37 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
+        {/* Full conversation transcript (mistakes highlighted when available) */}
+        {(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
+          <Animated.View
+            entering={FadeInDown.delay(80).springify()}
+            style={styles.transcriptSection}
+          >
+            <Text style={styles.sectionTitle}>Conversation</Text>
+            {data.mistakes.length > 0 && (
+              <Text style={styles.transcriptHint}>
+                Mistakes are highlighted below so you can see exactly where to improve.
+              </Text>
+            )}
+            <View style={styles.transcriptCard}>
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+                style={styles.transcriptScroll}
+              >
+                <TranscriptWithHighlights
+                  transcript={
+                    sessionData?.feedback?.transcript ??
+                    sessionData?.summaryJson?.transcript ??
+                    ""
+                  }
+                  mistakes={data.mistakes}
+                />
+              </ScrollView>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Meta Info */}
         <Animated.View
           entering={FadeInDown.delay(100).springify()}
@@ -714,10 +866,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
-        {/* Key Mistakes */}
+        {/* Key Mistakes (reference the highlighted spots in the conversation above) */}
         <Text style={styles.sectionTitle}>
           Key Mistakes {data.mistakes.length > 0 && `(${data.mistakes.length})`}
         </Text>
+        {data.mistakes.length > 0 && (sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
+          <Text style={styles.keyMistakesHint}>
+            See where each mistake appears in your conversation above, then use the cards below to learn the correction.
+          </Text>
+        )}
         {data.mistakes.length > 0 ? (
           data.mistakes.map((item, index) => (
             <MistakeCard key={item.id || index} item={item} index={index} />
@@ -955,6 +1112,46 @@ const getStyles = (theme: any) =>
       borderColor: "rgba(255, 255, 255, 0.6)",
       ...theme.shadows.medium,
     },
+    transcriptSection: {
+      marginBottom: theme.spacing.s,
+    },
+    transcriptCard: {
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      marginHorizontal: theme.spacing.l,
+      borderRadius: 16,
+      padding: theme.spacing.m,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.6)",
+      ...theme.shadows.medium,
+      maxHeight: 240,
+    },
+    transcriptScroll: {
+      maxHeight: 220,
+    },
+    transcriptText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+    },
+    transcriptHighlight: {
+      backgroundColor: theme.colors.error + "25",
+      color: theme.colors.error,
+      textDecorationLine: "underline",
+    },
+    transcriptHint: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.primary,
+      fontWeight: "600",
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+    },
+    keyMistakesHint: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+      lineHeight: 18,
+    },
     skillRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -1106,9 +1303,20 @@ const getStyles = (theme: any) =>
       fontWeight: "600",
     },
     mistakeContent: {
-      gap: 6,
+      gap: 10,
+    },
+    mistakeLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: theme.colors.text.secondary,
+      marginBottom: 2,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
     },
     mistakeLine: {
+      gap: 2,
+    },
+    mistakeLineInner: {
       flexDirection: "row",
       alignItems: "flex-start",
       gap: 8,
@@ -1147,6 +1355,26 @@ const getStyles = (theme: any) =>
       fontSize: theme.typography.sizes.xs,
       color: theme.colors.text.secondary,
       lineHeight: 18,
+    },
+    exampleContainer: {
+      marginTop: theme.spacing.s,
+      paddingTop: theme.spacing.s,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      gap: 4,
+    },
+    exampleLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: theme.colors.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    exampleText: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      lineHeight: 18,
+      fontStyle: "italic",
     },
     // AI Summary
     summaryHeader: {

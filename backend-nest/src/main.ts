@@ -5,8 +5,24 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
+import { PrismaService } from './database/prisma/prisma.service';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Prisma migration guard: Check if 'example' column exists in 'Mistake' table
+  const prismaService = app.get(PrismaService);
+  try {
+    await prismaService.$executeRaw`SELECT "example" FROM "Mistake" LIMIT 1`;
+  } catch (error) {
+    console.error(
+      "CRITICAL: Prisma migration has not been applied! The 'Mistake' table is missing the 'example' column.",
+    );
+    console.error(
+      "Please run 'npx prisma migrate deploy' before starting the server.",
+    );
+    process.exit(1);
+  }
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
@@ -15,11 +31,13 @@ async function bootstrap() {
   app.use(urlencoded({ limit: '50mb', extended: true }));
 
   // Enable validation pipes
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   // Enable CORS for mobile app integration
   app.enableCors({

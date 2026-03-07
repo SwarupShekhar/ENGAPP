@@ -48,6 +48,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // In a real app, these would come from environment variables
 const LIVEKIT_URL = "wss://engrapp-8lz8v8ia.livekit.cloud";
 
+// Restart STT before engine hard-stops (~60s on most engines)
+const STT_MAX_DURATION_MS = 50000;
+
 // ─── Data & Transcription Listener Component ───────────────────────────────
 function DataListener({
   onTranscription,
@@ -125,11 +128,24 @@ function DataListener({
 }
 
 // ─── Room Handler Component ────────────────────────────────
-function RoomHandler({ onRoomReady }: { onRoomReady: (room: any) => void }) {
+function RoomHandler({
+  onRoomReady,
+  onReconnected,
+}: {
+  onRoomReady: (room: any) => void;
+  onReconnected?: (room: any) => void;
+}) {
   const room = useRoomContext();
   useEffect(() => {
     onRoomReady(room);
-  }, [room, onRoomReady]);
+    if (onReconnected) {
+      const handler = () => onReconnected(room);
+      room.on(RoomEvent.Reconnected, handler);
+      return () => {
+        room.off(RoomEvent.Reconnected, handler);
+      };
+    }
+  }, [room, onRoomReady, onReconnected]);
   return null;
 }
 
@@ -309,6 +325,7 @@ export default function InCallScreen({ navigation, route }: any) {
   const roomRef = useRef<any>(null);
   const hasEndedRef = useRef(false);
   const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sttRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -342,6 +359,53 @@ export default function InCallScreen({ navigation, route }: any) {
   >("idle");
   const localSttActiveRef = useRef(false);
   const hasLiveKitSttRef = useRef(false);
+  const startRecognitionWithKeepaliveRef = useRef<() => void>(() => {});
+
+  const startRecognitionWithKeepalive = useCallback(() => {
+    if (sttRestartTimerRef.current) {
+      clearTimeout(sttRestartTimerRef.current);
+      sttRestartTimerRef.current = null;
+    }
+    try {
+      ExpoSpeechRecognitionModule.start({
+        lang: "en-US",
+        interimResults: true,
+        continuous: true,
+        addsPunctuation: true,
+        iosCategory: {
+          category: "playAndRecord",
+          categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
+          mode: "voiceChat",
+        },
+      });
+    } catch (e) {
+      return;
+    }
+    sttRestartTimerRef.current = setTimeout(() => {
+      sttRestartTimerRef.current = null;
+      try {
+        setTranscript((prev) => {
+          const pending = prev.find((t) => t.id === "pending-local");
+          if (!pending?.text?.trim()) return prev;
+          const without = prev.filter((t) => t.id !== "pending-local");
+          return [
+            ...without,
+            {
+              id: `local-${Date.now()}`,
+              speaker: "user",
+              text: pending.text.trim(),
+              time: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+            },
+          ];
+        });
+        ExpoSpeechRecognitionModule.stop();
+      } catch (_) {}
+    }, STT_MAX_DURATION_MS);
+  }, []);
+  startRecognitionWithKeepaliveRef.current = startRecognitionWithKeepalive;
 
   const pulseScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(0.15);
@@ -358,99 +422,114 @@ export default function InCallScreen({ navigation, route }: any) {
   useSpeechRecognitionEvent("end", () => {
     console.log("[LocalSTT] Speech recognition ended, restarting...");
     localSttActiveRef.current = false;
-    // Auto-restart continuous recognition (iOS stops after silence)
-    if (!hasEndedRef.current && token && !isWaiting) {
-      setTimeout(() => {
-        if (!hasEndedRef.current) {
-          try {
-            ExpoSpeechRecognitionModule.start({
-              lang: "en-US",
-              interimResults: false,
-              continuous: true,
-              addsPunctuation: true,
-              iosCategory: {
-                category: "playAndRecord",
-                categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
-                mode: "voiceChat",
-              },
-            });
-          } catch (e) {
-            console.warn("[LocalSTT] Restart failed:", e);
-          }
-        }
-      }, 300);
-    }
-  });
-
-  useSpeechRecognitionEvent("result", (event) => {
-    if (event.isFinal && event.results?.[0]?.transcript) {
-      const text = event.results[0].transcript.trim();
-      if (text.length > 0) {
-        console.log(`[LocalSTT] Final result: "${text}"`);
-
-        // 1. Update local state
-        const transcriptItem = {
+    // Commit in-flight interim so we don't lose words at restart boundary
+    setTranscript((prev) => {
+      const pending = prev.find((t) => t.id === "pending-local");
+      if (!pending?.text?.trim()) return prev;
+      const without = prev.filter((t) => t.id !== "pending-local");
+      return [
+        ...without,
+        {
           id: `local-${Date.now()}`,
           speaker: "user",
-          text,
+          text: pending.text.trim(),
           time: new Date().toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           }),
-        };
-        setTranscript((prev) => [...prev, transcriptItem]);
-
-        // 2. Broadcast to peer so they see it too
-        if (roomRef.current) {
-          const signal = JSON.stringify({
-            type: "transcription",
-            userId: user?.id,
-            text,
-          });
-          roomRef.current.localParticipant
-            .publishData(Buffer.from(signal), {
-              reliable: true,
-            })
-            .catch((err: any) =>
-              console.error("[InCall] Failed to broadcast local STT:", err),
-            );
+        },
+      ];
+    });
+    // Auto-restart quickly so we don't miss words (iOS stops after silence)
+    if (!hasEndedRef.current && token && !isWaiting) {
+      setTimeout(() => {
+        if (!hasEndedRef.current && startRecognitionWithKeepaliveRef.current) {
+          startRecognitionWithKeepaliveRef.current();
         }
+      }, 150);
+    }
+  });
+
+  useSpeechRecognitionEvent("result", (event) => {
+    const transcript = event.results?.[0]?.transcript?.trim() ?? "";
+    if (transcript.length === 0) return;
+
+    if (event.isFinal) {
+      console.log(`[LocalSTT] Final result: "${transcript}"`);
+
+      // 1. Replace any pending interim item, then add final
+      setTranscript((prev) => {
+        const withoutPending = prev.filter((t) => t.id !== "pending-local");
+        return [
+          ...withoutPending,
+          {
+            id: `local-${Date.now()}`,
+            speaker: "user",
+            text: transcript,
+            time: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+        ];
+      });
+
+      // 2. Broadcast to peer so they see it too
+      if (roomRef.current) {
+        const signal = JSON.stringify({
+          type: "transcription",
+          userId: user?.id,
+          text: transcript,
+        });
+        roomRef.current.localParticipant
+          .publishData(Buffer.from(signal), {
+            reliable: true,
+          })
+          .catch((err: any) =>
+            console.error("[InCall] Failed to broadcast local STT:", err),
+          );
       }
+    } else {
+      // Interim: show live so we don't lose text if STT stops before final
+      setTranscript((prev) => {
+        const withoutPending = prev.filter((t) => t.id !== "pending-local");
+        return [
+          ...withoutPending,
+          {
+            id: "pending-local",
+            speaker: "user",
+            text: transcript,
+            time: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+        ];
+      });
     }
   });
 
   useSpeechRecognitionEvent("error", (event) => {
     console.warn(`[LocalSTT] Error: ${event.error} - ${event.message}`);
-    // Try to recover by restarting STT after a brief delay
     if (
       !hasLiveKitSttRef.current &&
       !hasEndedRef.current &&
       token &&
       !isWaiting
     ) {
+      if (sttRestartTimerRef.current) {
+        clearTimeout(sttRestartTimerRef.current);
+        sttRestartTimerRef.current = null;
+      }
       setTranscriptionStatus("idle");
       setTimeout(() => {
-        if (!hasEndedRef.current) {
-          try {
-            ExpoSpeechRecognitionModule.start({
-              lang: "en-US",
-              interimResults: false,
-              continuous: true,
-              addsPunctuation: true,
-              iosCategory: {
-                category: "playAndRecord",
-                categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
-                mode: "voiceChat",
-              },
-            });
-          } catch (e) {
-            console.warn("[LocalSTT] Recovery restart failed:", e);
-            setTranscriptionStatus("error");
-          }
+        if (!hasEndedRef.current && startRecognitionWithKeepaliveRef.current) {
+          startRecognitionWithKeepaliveRef.current();
+        } else if (!hasEndedRef.current) {
+          setTranscriptionStatus("error");
         }
-      }, 1000);
+      }, 500);
     } else if (!hasLiveKitSttRef.current && !hasEndedRef.current) {
-      // Only set error if we are not ending or waiting
       setTranscriptionStatus("error");
     }
   });
@@ -464,25 +543,14 @@ export default function InCallScreen({ navigation, route }: any) {
         setTranscriptionStatus("unavailable");
         return;
       }
-
       console.log("[LocalSTT] Starting on-device speech recognition...");
       setTranscriptionStatus("active");
-      ExpoSpeechRecognitionModule.start({
-        lang: "en-US",
-        interimResults: false,
-        continuous: true,
-        addsPunctuation: true,
-        iosCategory: {
-          category: "playAndRecord",
-          categoryOptions: ["defaultToSpeaker", "allowBluetooth"],
-          mode: "voiceChat",
-        },
-      });
+      startRecognitionWithKeepalive();
     } catch (e) {
       console.error("[LocalSTT] Failed to start:", e);
       setTranscriptionStatus("unavailable");
     }
-  }, [token, isWaiting]);
+  }, [token, isWaiting, startRecognitionWithKeepalive]);
 
   useEffect(() => {
     pulseScale.value = withRepeat(
@@ -608,59 +676,71 @@ export default function InCallScreen({ navigation, route }: any) {
       if (hasEndedRef.current) return;
       hasEndedRef.current = true;
 
-      // Stop local speech recognition
+      // 1. Flush any pending interim transcript so it's included in the payload
+      const current = transcriptRef.current;
+      const pending = current.find((t) => t.id === "pending-local");
+      const lines = pending?.text?.trim()
+        ? [
+            ...current.filter((t) => t.id !== "pending-local"),
+            {
+              ...pending,
+              id: `local-${Date.now()}`,
+              speaker: "user" as const,
+              text: pending.text.trim(),
+            },
+          ]
+        : current;
+
+      // 2. Stop STT cleanly (clear keepalive timer, then abort)
+      if (sttRestartTimerRef.current) {
+        clearTimeout(sttRestartTimerRef.current);
+        sttRestartTimerRef.current = null;
+      }
       try {
         ExpoSpeechRecognitionModule.abort();
-      } catch (e) {
-        // ignore
-      }
+      } catch (_) {}
 
       console.log(
         `[InCall] Ending session: ${sessionId} (remote: ${remoteTriggered})`,
       );
 
       try {
-        // If we are the ones ending it, tell the partner
+        if (sessionId && sessionId !== "session-id") {
+          const segments = lines.map((line) => ({
+            speaker_id: line.speaker === "user" ? "local" : "remote",
+            text: line.text,
+            timestamp: line.time || new Date().toISOString(),
+          }));
+          console.log(
+            `[InCall] Submitting final transcript segments: ${segments.length}`,
+          );
+          await sessionsApi.endSession(sessionId, {
+            transcript: segments,
+            actualDuration: durationRef.current,
+            userEndedEarly: true,
+          });
+        }
+
+        // 3. Then tell the partner and disconnect (so they get a clean end)
         if (
           !remoteTriggered &&
           roomRef.current &&
           roomRef.current.state === "connected"
         ) {
-          const signal = JSON.stringify({ type: "end_session" });
-          const data = Buffer.from(signal);
           try {
-            await roomRef.current.localParticipant.publishData(data, {
-              reliable: true,
-            });
+            await roomRef.current.localParticipant.publishData(
+              Buffer.from(JSON.stringify({ type: "end_session" })),
+              { reliable: true },
+            );
             console.log("[InCall] Broadcasted end_session signal");
           } catch (err) {
             console.warn("[InCall] Failed to send end_session signal:", err);
           }
-        }
-
-        if (sessionId && sessionId !== "session-id") {
-          // Collect full transcript history with speaker labels for AI analysis
-          const fullTranscriptText = transcriptRef.current
-            .map(
-              (t) => `${t.speaker === "user" ? "User" : "Partner"}: ${t.text}`,
-            )
-            .join("\n");
-
-          console.log(
-            `[InCall] Submitting final transcript length: ${fullTranscriptText.length}`,
-          );
-
-          // We only call the end API if we are the initiator, or if we want to be safe
-          // In a P2P scenario, both calling is fine for idempotency
-          await sessionsApi.endSession(sessionId, {
-            transcript: fullTranscriptText,
-            actualDuration: durationRef.current,
-            userEndedEarly: true,
-          });
-        } else {
-          console.log(
-            "[InCall] No valid sessionId to end (likely placeholder)",
-          );
+          try {
+            roomRef.current.disconnect();
+          } catch (e) {
+            console.warn("[InCall] Disconnect error:", e);
+          }
         }
       } catch (error) {
         console.error("[InCall] Failed to end session:", error);
@@ -698,6 +778,12 @@ export default function InCallScreen({ navigation, route }: any) {
 
   const handleRemoteEndSession = useCallback(() => {
     console.log("[InCall] Remote ended call");
+    // Disconnect so we leave the room immediately
+    try {
+      roomRef.current?.disconnect();
+    } catch (e) {
+      console.warn("[InCall] Disconnect on remote end:", e);
+    }
     handleEndCall(true);
   }, [handleEndCall]);
 
@@ -751,8 +837,7 @@ export default function InCallScreen({ navigation, route }: any) {
         <RoomHandler
           onRoomReady={(room) => {
             roomRef.current = room;
-
-            // Start local speech recognition ONLY after room is ready and connected
+            setIsMuted(!room.localParticipant.isMicrophoneEnabled);
             if (!hasEndedRef.current && token && !isWaiting) {
               const startDelay = isCaller ? 1000 : 4000;
               setTimeout(() => {
@@ -761,6 +846,9 @@ export default function InCallScreen({ navigation, route }: any) {
                 }
               }, startDelay);
             }
+          }}
+          onReconnected={(room) => {
+            setIsMuted(!room.localParticipant.isMicrophoneEnabled);
           }}
         />
         <DataListener
@@ -831,16 +919,13 @@ export default function InCallScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Transcript: Glassmorphism container */}
+          {/* Transcript: Live conversation */}
           <View style={styles.transcriptContainer}>
             <View style={styles.transcriptHeader}>
               <View style={styles.transcriptIndicator} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.transcriptLabel}>Live Analysis</Text>
+                <Text style={styles.transcriptLabel}>Live transcript</Text>
                 <TranscriptionStatus status={transcriptionStatus} />
-              </View>
-              <View style={styles.activeLabel}>
-                <Text style={styles.activeLabelText}>AI ASSISTANT</Text>
               </View>
             </View>
             <ScrollView
@@ -876,7 +961,17 @@ export default function InCallScreen({ navigation, route }: any) {
                 label={isMuted ? "Muted" : "Mic"}
                 active={!isMuted}
                 secondary
-                onPress={() => setIsMuted(!isMuted)}
+                onPress={() => {
+                  const next = !isMuted;
+                  try {
+                    roomRef.current?.localParticipant?.setMicrophoneEnabled(
+                      !next,
+                    );
+                  } catch (e) {
+                    console.warn("[InCall] setMicrophoneEnabled failed:", e);
+                  }
+                  setIsMuted(next);
+                }}
               />
               <ControlButton
                 icon={isSpeaker ? "volume-high" : "volume-medium"}
@@ -885,16 +980,10 @@ export default function InCallScreen({ navigation, route }: any) {
                 secondary
                 onPress={() => setIsSpeaker(!isSpeaker)}
               />
-              <ControlButton
-                icon="create-outline"
-                label="Notes"
-                secondary
-                onPress={() => {}}
-              />
               <View style={styles.controlDivider} />
               <ControlButton
                 icon="close"
-                label="End"
+                label="End call"
                 danger
                 onPress={() => handleEndCall(false)}
               />
@@ -1027,8 +1116,9 @@ const getStyles = (theme: any) =>
     },
     transcriptContainer: {
       flex: 1,
+      minHeight: 160,
       marginHorizontal: 16,
-      marginBottom: 100, // Room for dock
+      marginBottom: 100,
       borderRadius: 24,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
@@ -1058,22 +1148,12 @@ const getStyles = (theme: any) =>
       fontWeight: "700",
       flex: 1,
     },
-    activeLabel: {
-      backgroundColor: theme.colors.primary + "20",
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    activeLabelText: {
-      color: theme.colors.primary,
-      fontSize: 10,
-      fontWeight: "800",
-    },
     transcriptScroll: {
       flex: 1,
     },
     transcriptContent: {
       padding: 16,
+      paddingBottom: 24,
       gap: 12,
     },
     bubbleRow: {
@@ -1119,7 +1199,7 @@ const getStyles = (theme: any) =>
     },
     bubbleText: {
       fontSize: 15,
-      lineHeight: 20,
+      lineHeight: 22,
     },
     bubbleTextUser: {
       color: "white",
@@ -1146,12 +1226,12 @@ const getStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: "white",
-      paddingHorizontal: 20,
-      paddingVertical: 12,
-      borderRadius: 35,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 32,
       borderWidth: 1,
       borderColor: theme.colors.border + "20",
-      gap: 15,
+      gap: 12,
       ...theme.shadows.large,
     },
     controlDivider: {
@@ -1162,12 +1242,13 @@ const getStyles = (theme: any) =>
     },
     controlButton: {
       alignItems: "center",
-      minWidth: 50,
+      justifyContent: "center",
+      minWidth: 52,
     },
     controlIcon: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       justifyContent: "center",
       alignItems: "center",
       marginBottom: 4,
@@ -1179,6 +1260,7 @@ const getStyles = (theme: any) =>
     },
     controlIconDanger: {
       backgroundColor: theme.colors.error,
+      ...theme.shadows.small,
     },
     controlIconActive: {
       backgroundColor: theme.colors.primary,

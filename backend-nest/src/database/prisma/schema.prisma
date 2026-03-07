@@ -286,6 +286,7 @@ model Mistake {
   corrected         String
   rule              String?
   explanation       String
+  example           String?  // optional example sentence for correct usage
   cefrLevel         String?
   timestamp         Float
   reviewed          Boolean  @default(false)

@@ -741,10 +741,11 @@ Analyze the following multi-speaker transcript of an English practice session.
                     {{
                         "type": "GRAMMAR" | "VOCABULARY" | "TENSE" | "ARTICLE" | "FLUENCY",
                         "severity": "CRITICAL" | "MAJOR" | "MINOR" | "SUGGESTION",
-                        "original_text": "<text>",
-                        "corrected_text": "<text>",
-                        "explanation": "<text>",
-                        "suggestion": "<text>"
+                        "original_text": "<exact phrase or sentence the speaker said>",
+                        "corrected_text": "<corrected phrase/sentence>",
+                        "explanation": "<WHY this is wrong: cite the grammar rule or usage principle>",
+                        "suggestion": "<a rewritten version of the FULL sentence, not just the phrase>",
+                        "example": "<optional: a separate example sentence showing correct usage in a different context>"
                     }}
                 ],
                 "feedback": "<2-3 sentences>",
@@ -792,6 +793,7 @@ Analyze the following multi-speaker transcript of an English practice session.
             corrected_text=str(e.get("corrected_text", e.get("corrected", "")) or ""),
             explanation=str(e.get("explanation", "")) or "",
             suggestion=str(e.get("suggestion", "")) or "",
+            example=str(e.get("example", "")) or None,
         )
 
     @cached(prefix="analysis", ttl=settings.cache_ttl_analysis)

@@ -50,6 +50,7 @@ export interface SessionMistake {
   explanation: string;
   rule?: string;
   cefrLevel?: string;
+  example?: string;
 }
 
 export interface SessionPronunciationIssue {
@@ -120,7 +121,9 @@ export const sessionsApi = {
   endSession: async (
     sessionId: string,
     data?: {
-      transcript?: string;
+      transcript?:
+        | string
+        | { speaker_id: string; text: string; timestamp: string }[];
       actualDuration?: number;
       userEndedEarly?: boolean;
     },
