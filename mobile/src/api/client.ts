@@ -6,17 +6,19 @@ import Constants from "expo-constants";
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
 // For EAS distribution build set to false so the app uses the production API URL.
+// For EAS distribution builds, ALWAYS set this to false.
+// Use true only for temporary local testing on a physical device.
 const FORCE_LOCAL = true;
 
 // Your Mac's local IP address on the Wi-Fi network
-const LOCAL_IP = "192.168.1.34";
+const LOCAL_IP = "172.20.10.13";
 
-// When FORCE_LOCAL is true, always connect to your Mac's IP directly.
-// This works for physical devices, emulators, and iOS simulators.
-export const API_URL = FORCE_LOCAL
-  ? `http://${LOCAL_IP}:3000`
-  : IS_PROD
-    ? "https://engapp-3210.onrender.com"
+// Determine the API URL based on environment.
+// Production builds (IS_PROD=true) will ALWAYS use the production URL.
+export const API_URL = IS_PROD
+  ? "https://engapp-3210.onrender.com"
+  : FORCE_LOCAL
+    ? `http://${LOCAL_IP}:3000`
     : Platform.select({
         ios: "http://localhost:3000",
         android: "http://10.0.2.2:3000",

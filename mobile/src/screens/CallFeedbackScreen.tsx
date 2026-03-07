@@ -179,6 +179,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     "We're preparing your personalized feedback and corrections.",
   );
   const [isFailed, setIsFailed] = useState(false);
+  const [checkingAgain, setCheckingAgain] = useState(false);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(true);
   const insets = useSafeAreaInsets();
 
@@ -222,8 +223,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             setSessionData(data);
             setLoading(false);
           }
-        } else if (retryCount < 12) {
-          // 60 seconds total
+        } else if (retryCount < 24) {
+          // ~120 seconds total
           if (retryCount === 5) {
             setErrorHeader("Still working...");
             setErrorDetail(
@@ -295,7 +296,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           {retryCount > 0 && (
             <Text style={{ color: theme.colors.text.secondary, fontSize: 12 }}>
               Progress:{" "}
-              {Math.min(100, Math.round(((retryCount + 1) / 12) * 100))}%
+              {Math.min(100, Math.round(((retryCount + 1) / 24) * 100))}%
             </Text>
           )}
 
@@ -311,6 +312,28 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       </SafeAreaView>
     );
   }
+
+  const handleCheckAgain = async () => {
+    if (!sessionId || sessionId === "session-id") return;
+    setCheckingAgain(true);
+    try {
+      const data = await sessionsApi.getSessionAnalysis(sessionId);
+      if (data.analyses && data.analyses.length > 0) {
+        setSessionData(data);
+        setIsFailed(false);
+        setLoading(false);
+      } else if (data.status === "COMPLETED" || data.status === "PROCESSING") {
+        setSessionData(data);
+        if (data.status === "PROCESSING") {
+          setErrorHeader("Almost there...");
+          setErrorDetail("The AI is still finalizing. Tap Check again in a moment.");
+        }
+      }
+    } catch (e) {
+      console.warn("[CallFeedback] Check again failed:", e);
+    }
+    setCheckingAgain(false);
+  };
 
   // Point 7: Handle failure UI
   if (
@@ -347,6 +370,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Text>
           <TouchableOpacity
             style={[styles.primaryAction, { marginTop: 32, width: "100%" }]}
+            onPress={handleCheckAgain}
+            disabled={checkingAgain}
+          >
+            <Text style={{ color: "white", fontWeight: "bold" }}>
+              {checkingAgain ? "Checking..." : "Check again"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryAction, { marginTop: 12, width: "100%", opacity: 0.8 }]}
             onPress={() => navigation.navigate("MainTabs")}
           >
             <Text style={{ color: "white", fontWeight: "bold" }}>

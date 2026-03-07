@@ -54,6 +54,35 @@ export class SessionsService {
       });
     }
 
+    // Recovery: if stuck in PROCESSING for >45s with no real Analysis records, re-queue
+    if (
+      session.status === 'PROCESSING' &&
+      (!session.analyses || session.analyses.length === 0) &&
+      session.updatedAt &&
+      Date.now() - new Date(session.updatedAt).getTime() > 45_000
+    ) {
+      const feedback = await this.prisma.feedback.findUnique({
+        where: { sessionId },
+        select: { transcript: true },
+      });
+      const transcript = feedback?.transcript?.trim() || '';
+      if (transcript.length > 10) {
+        this.logger.warn(
+          `[SessionsService] Session ${sessionId} stuck in PROCESSING with no analyses. Re-queuing (transcript: ${transcript.length} chars).`,
+        );
+        const participantIds = session.participants.map((p) => p.userId);
+        await this.sessionsQueue.add(
+          'process-session',
+          { sessionId, audioUrls: {}, participantIds, transcript },
+          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
+        );
+        await this.prisma.conversationSession.update({
+          where: { id: sessionId },
+          data: { updatedAt: new Date() },
+        });
+      }
+    }
+
     // Find the participant record for the requesting user
     const myParticipant = session.participants.find((p) => p.userId === userId);
 
@@ -227,8 +256,42 @@ export class SessionsService {
 
       if (!session) throw new Error('Session not found');
 
-      // If already COMPLETED/FAILED, ignore
+      // If COMPLETED/ANALYSIS_FAILED but partner sends a late transcript (e.g. first device had empty transcript), accept it and re-run analysis
       if (['COMPLETED', 'ANALYSIS_FAILED'].includes(session.status)) {
+        const existingLength = session.feedback?.transcript?.length ?? 0;
+        if (
+          data?.transcript &&
+          data.transcript.length > 50 &&
+          data.transcript.length > existingLength + 20
+        ) {
+          this.logger.log(
+            `Late transcript for ${session.status} session ${sessionId} (${data.transcript.length} chars). Saving and re-queuing analysis.`,
+          );
+          await this.prisma.feedback.upsert({
+            where: { sessionId },
+            create: { sessionId, transcript: data.transcript },
+            update: { transcript: data.transcript },
+          });
+          const participantIds = session.participants.map((p) => p.userId);
+          await this.prisma.conversationSession.update({
+            where: { id: sessionId },
+            data: { status: 'PROCESSING' },
+          });
+          await this.sessionsQueue.add(
+            'process-session',
+            {
+              sessionId,
+              audioUrls: data?.audioUrls || {},
+              participantIds,
+              transcript: data.transcript,
+            },
+            {
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 2000 },
+            },
+          );
+          return { status: 'PROCESSING', sessionId };
+        }
         this.logger.warn(`Session ${sessionId} is already ${session.status}.`);
         return { status: session.status, sessionId };
       }
@@ -241,13 +304,27 @@ export class SessionsService {
             data.transcript.length > session.feedback.transcript.length + 20)
         ) {
           this.logger.log(
-            `Improving transcript for already processing session ${sessionId}`,
+            `Improving transcript for already processing session ${sessionId} (${data.transcript.length} chars). Re-queuing analysis.`,
           );
           await this.prisma.feedback.upsert({
             where: { sessionId },
             create: { sessionId, transcript: data.transcript },
             update: { transcript: data.transcript },
           });
+          const participantIds = session.participants.map((p) => p.userId);
+          await this.sessionsQueue.add(
+            'process-session',
+            {
+              sessionId,
+              audioUrls: data?.audioUrls || {},
+              participantIds,
+              transcript: data.transcript,
+            },
+            {
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 2000 },
+            },
+          );
         }
         return { status: 'PROCESSING', sessionId };
       }
@@ -299,10 +376,13 @@ export class SessionsService {
       }
 
       // 3) Trigger Analysis via Queue
-      // We use participant IDs from the fetched session
       const participantIds = session.participants.map((p) => p.userId);
+      const transcriptLen = data?.transcript?.length ?? 0;
+      this.logger.log(
+        `[endSession] Session ${sessionId} → PROCESSING. Transcript: ${transcriptLen} chars. Queuing job now.`,
+      );
 
-      await this.sessionsQueue.add(
+      const job = await this.sessionsQueue.add(
         'process-session',
         {
           sessionId,
@@ -317,6 +397,10 @@ export class SessionsService {
             delay: 2000,
           },
         },
+      );
+
+      this.logger.log(
+        `[endSession] Job ${job.id} queued for session ${sessionId}`,
       );
 
       return { status: 'PROCESSING', sessionId };

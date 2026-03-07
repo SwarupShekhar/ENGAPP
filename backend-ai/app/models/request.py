@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl
 from typing import Optional, List
 from app.models.base import AnalysisTaskType
 
@@ -26,13 +26,16 @@ class PronunciationRequest(BaseModel):
     language: str = "en-US"
 
 class SpeakerSegment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     speaker_id: str
     text: str
     timestamp: float
     context: Optional[str] = None
     user_native_language: Optional[str] = None
 
+
 class JointAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     session_id: str
     segments: List[SpeakerSegment]
 

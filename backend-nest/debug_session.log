@@ -178,3 +178,429 @@ Stack: AxiosError: Request failed with status code 400
     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
     at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 36301bce-69f1-41f1-8846-8ba2ef86e2de: 
+Stack: AggregateError
+    at Function.from (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/AxiosError.js:7:28)
+    at RedirectableRequest.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:820:25)
+    at RedirectableRequest.emit (node:events:519:28)
+    at eventHandlers.<computed> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/follow-redirects/index.js:49:24)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:105:11)
+    at Socket.socketErrorListener (node:_http_client:518:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 36301bce-69f1-41f1-8846-8ba2ef86e2de: 
+Stack: AggregateError
+    at Function.from (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/AxiosError.js:7:28)
+    at RedirectableRequest.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:820:25)
+    at RedirectableRequest.emit (node:events:519:28)
+    at eventHandlers.<computed> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/follow-redirects/index.js:49:24)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:105:11)
+    at Socket.socketErrorListener (node:_http_client:518:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 36301bce-69f1-41f1-8846-8ba2ef86e2de: 
+Stack: AggregateError
+    at Function.from (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/AxiosError.js:7:28)
+    at RedirectableRequest.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:820:25)
+    at RedirectableRequest.emit (node:events:519:28)
+    at eventHandlers.<computed> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/follow-redirects/index.js:49:24)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:105:11)
+    at Socket.socketErrorListener (node:_http_client:518:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 36301bce-69f1-41f1-8846-8ba2ef86e2de: 
+Stack: AggregateError
+    at Function.from (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/AxiosError.js:7:28)
+    at RedirectableRequest.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:820:25)
+    at RedirectableRequest.emit (node:events:519:28)
+    at eventHandlers.<computed> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/follow-redirects/index.js:49:24)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:105:11)
+    at Socket.socketErrorListener (node:_http_client:518:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 36301bce-69f1-41f1-8846-8ba2ef86e2de: 
+Stack: AggregateError
+    at Function.from (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/AxiosError.js:7:28)
+    at RedirectableRequest.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:820:25)
+    at RedirectableRequest.emit (node:events:519:28)
+    at eventHandlers.<computed> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/follow-redirects/index.js:49:24)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:105:11)
+    at Socket.socketErrorListener (node:_http_client:518:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 36301bce-69f1-41f1-8846-8ba2ef86e2de: 
+Stack: AggregateError
+    at Function.from (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/AxiosError.js:7:28)
+    at RedirectableRequest.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:820:25)
+    at RedirectableRequest.emit (node:events:519:28)
+    at eventHandlers.<computed> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/follow-redirects/index.js:49:24)
+    at ClientRequest.emit (node:events:519:28)
+    at emitErrorEvent (node:_http_client:105:11)
+    at Socket.socketErrorListener (node:_http_client:518:5)
+    at Socket.emit (node:events:519:28)
+    at emitErrorNT (node:internal/streams/destroy:170:8)
+    at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session eb921db6-9363-427b-b6bf-a819399d188d: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session eb921db6-9363-427b-b6bf-a819399d188d: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session eb921db6-9363-427b-b6bf-a819399d188d: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0df28e1d-6641-46b6-992a-38250e5536bb: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0df28e1d-6641-46b6-992a-38250e5536bb: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0df28e1d-6641-46b6-992a-38250e5536bb: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0df28e1d-6641-46b6-992a-38250e5536bb: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0df28e1d-6641-46b6-992a-38250e5536bb: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0df28e1d-6641-46b6-992a-38250e5536bb: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0ce85e6a-81b1-4dde-a7e7-90a0f598924c: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0ce85e6a-81b1-4dde-a7e7-90a0f598924c: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 0ce85e6a-81b1-4dde-a7e7-90a0f598924c: Request failed with status code 400
+Stack: AxiosError: Request failed with status code 400
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at Unzip.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at Unzip.emit (node:events:519:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 408721bf-9255-4ca6-b50b-1ba5e14d1710: Request failed with status code 500
+Stack: AxiosError: Request failed with status code 500
+    at settle (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/settle.js:19:12)
+    at IncomingMessage.handleStreamEnd (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/adapters/http.js:798:11)
+    at IncomingMessage.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at Axios.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/axios/lib/core/Axios.js:46:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[SessionsProcessor] Error processing session 3c3538f4-5fbe-4b1a-968c-6bb29009f195: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 3c3538f4-5fbe-4b1a-968c-6bb29009f195: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session 3c3538f4-5fbe-4b1a-968c-6bb29009f195: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session cf384952-d34b-49ff-a14b-57fc91e24c5e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session cf384952-d34b-49ff-a14b-57fc91e24c5e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session cf384952-d34b-49ff-a14b-57fc91e24c5e: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session b062190e-baa0-4485-b0c7-3e18fd275bc9: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session b062190e-baa0-4485-b0c7-3e18fd275bc9: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)
+[SessionsProcessor] Error processing session b062190e-baa0-4485-b0c7-3e18fd275bc9: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+Stack: PrismaClientKnownRequestError: 
+Invalid `this.prisma.analysis.create()` invocation in
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:51
+
+  1145 const evidence = participantEvidence[pa.participant_id];
+  1146 const feedback = pa.analysis;
+  1147 
+→ 1148 const analysis = await this.prisma.analysis.create(
+Unique constraint failed on the fields: (`"participantId"`)
+    at zr.handleRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:13)
+    at zr.handleAndLogRequestError (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:12)
+    at zr.request (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async a (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:807:24)
+    at async AssessmentService.analyzeAndStoreJoint (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/assessment/assessment.service.ts:1148:24)
+    at async SessionsProcessor.handleProcessSession (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/src/modules/sessions/sessions.processor.ts:173:7)

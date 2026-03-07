@@ -768,6 +768,32 @@ Analyze the following multi-speaker transcript of an English practice session.
     ]
 }}"""
 
+    def _joint_error_to_detail(self, e: Dict[str, Any]) -> ErrorDetail:
+        """Convert LLM joint-analysis error dict to ErrorDetail. LLM returns uppercase type/severity; enums expect lowercase. Unknown types fall back to GENERAL."""
+        raw_type = (e.get("type") or "grammar")
+        raw_severity = (e.get("severity") or "minor")
+        type_str = raw_type.lower() if isinstance(raw_type, str) else "grammar"
+        severity_str = raw_severity.lower() if isinstance(raw_severity, str) else "minor"
+        valid_types = {t.value for t in ErrorType}
+        if type_str not in valid_types:
+            type_str = "general"
+        try:
+            et = ErrorType(type_str)
+        except ValueError:
+            et = ErrorType.GENERAL
+        try:
+            sev = ErrorSeverity(severity_str)
+        except ValueError:
+            sev = ErrorSeverity.MINOR
+        return ErrorDetail(
+            type=et,
+            severity=sev,
+            original_text=str(e.get("original_text", e.get("original", "")) or ""),
+            corrected_text=str(e.get("corrected_text", e.get("corrected", "")) or ""),
+            explanation=str(e.get("explanation", "")) or "",
+            suggestion=str(e.get("suggestion", "")) or "",
+        )
+
     @cached(prefix="analysis", ttl=settings.cache_ttl_analysis)
     async def analyze_joint(self, request: JointAnalysisRequest) -> JointAnalysisResponse:
         """
@@ -795,7 +821,11 @@ Analyze the following multi-speaker transcript of an English practice session.
         for pa in analysis_data.get("participant_analyses", []):
             ad = pa.get("analysis_data", {})
             ai_scores = ad.get("scores", {})
-            
+            # Normalize LLM errors: Gemini returns uppercase type/severity; ErrorDetail expects lowercase
+            errors_normalized = [
+                self._joint_error_to_detail(e) for e in ad.get("errors", [])
+            ]
+
             # Map to ParticipantAnalysis model
             participant_analyses.append(ParticipantAnalysis(
                 participant_id=pa["participant_id"],
@@ -808,7 +838,7 @@ Analyze the following multi-speaker transcript of an English practice session.
                         weaknesses=ad.get("improvement_areas", []),
                         next_level_requirements=[]
                     ),
-                    errors=[ErrorDetail(**e) for e in ad.get("errors", [])],
+                    errors=errors_normalized,
                     metrics=AnalysisMetrics(
                         wpm=0, # Placeholder
                         unique_words=0, # Placeholder
@@ -827,6 +857,46 @@ Analyze the following multi-speaker transcript of an English practice session.
                 confidence_timeline=pa.get("confidence_timeline"),
                 hesitation_markers=pa.get("hesitation_markers"),
                 topic_vocabulary=pa.get("topic_vocabulary")
+            ))
+
+        # Ensure every segment speaker has an analysis (LLM sometimes returns only one)
+        segment_speaker_ids = {s.speaker_id for s in request.segments}
+        have_ids = {pa.participant_id for pa in participant_analyses}
+        for speaker_id in segment_speaker_ids:
+            if speaker_id in have_ids:
+                continue
+            logger.warning(
+                "joint_analysis_missing_participant",
+                speaker_id=speaker_id,
+                session_id=request.session_id,
+            )
+            participant_analyses.append(ParticipantAnalysis(
+                participant_id=speaker_id,
+                analysis=AnalysisResponse(
+                    cefr_assessment=CEFRAssessment(
+                        level=CEFRLevel("B1"),
+                        score=50,
+                        confidence=0.5,
+                        strengths=[],
+                        weaknesses=[],
+                        next_level_requirements=[],
+                    ),
+                    errors=[],
+                    metrics=AnalysisMetrics(
+                        wpm=0,
+                        unique_words=0,
+                        grammar_score=50,
+                        pronunciation_score=50,
+                        fluency_score=50,
+                        vocabulary_score=50,
+                        overall_score=50,
+                    ),
+                    feedback="Analysis based on shared conversation.",
+                    strengths=[],
+                    improvement_areas=[],
+                    recommended_tasks=[],
+                    processing_time=0,
+                ),
             ))
 
         return JointAnalysisResponse(

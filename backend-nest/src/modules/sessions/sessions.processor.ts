@@ -1,4 +1,4 @@
-import { Process, Processor } from '@nestjs/bull';
+import { OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -22,6 +22,20 @@ export class SessionsProcessor {
     private pronunciationService: PronunciationService,
     private pronunciationScorerService: PronunciationScorerService,
   ) {}
+
+  @OnQueueFailed()
+  onFailed(job: Job, error: Error) {
+    this.logger.error(
+      `Job ${job.id} (session ${job.data?.sessionId}) FAILED after ${job.attemptsMade} attempts: ${error.message}`,
+    );
+  }
+
+  @OnQueueStalled()
+  onStalled(job: Job) {
+    this.logger.warn(
+      `Job ${job.id} (session ${job.data?.sessionId}) STALLED — will be retried by Bull`,
+    );
+  }
 
   @Process('process-session')
   async handleProcessSession(job: Job<any>) {
@@ -62,8 +76,23 @@ export class SessionsProcessor {
         );
       } else {
         this.logger.warn(
-          `[SessionsProcessor] No transcript found for session ${sessionId}`,
+          `[SessionsProcessor] No transcript found for session ${sessionId}. Waiting 8s for partner submission...`,
         );
+        await new Promise((resolve) => setTimeout(resolve, 8000));
+        const retryFeedback = await this.prisma.feedback.findUnique({
+          where: { sessionId },
+          select: { transcript: true },
+        });
+        transcript = (retryFeedback?.transcript || '').trim();
+        if (transcript) {
+          this.logger.log(
+            `[SessionsProcessor] Using transcript from Feedback (after wait): ${transcript.length} chars`,
+          );
+        } else {
+          this.logger.warn(
+            `[SessionsProcessor] No transcript found for session ${sessionId}`,
+          );
+        }
       }
 
       // Only short-circuit if truly no transcript exists anywhere

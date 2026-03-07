@@ -19,7 +19,10 @@ import {
   StyleSheet,
   AppState,
   Alert,
+  Text,
+  TouchableOpacity,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SocketService from "./services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
@@ -155,9 +158,21 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
 function OnboardingGate() {
   const { user, isLoaded } = useUser();
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !user) return;
+    let timeout: NodeJS.Timeout;
+
+    if (!isLoaded || !user) {
+      // If it takes more than 10s to load user data, show an error (likely API unreachable)
+      timeout = setTimeout(() => {
+        if (!initialRoute) {
+          console.warn("[OnboardingGate] Timed out waiting for user data");
+          setError("Connection timed out. Please check your internet.");
+        }
+      }, 10000);
+      return () => clearTimeout(timeout);
+    }
 
     const hasProfile = !!(user.unsafeMetadata as any)?.profileCompleted;
     const hasCompletedAssessment = !!(user.unsafeMetadata as any)
@@ -175,6 +190,23 @@ function OnboardingGate() {
       }, 2000);
     }
   }, [isLoaded, user]);
+
+  const handleRetry = () => {
+    setError(null);
+    // This will trigger a re-render and re-run the effect
+  };
+
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="cloud-offline-outline" size={48} color="#FF6B6B" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!initialRoute) {
     return (
@@ -220,5 +252,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#F5F6FA",
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#2D3436",
+    textAlign: "center",
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: "#6C5CE7",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

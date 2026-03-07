@@ -335,8 +335,12 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
       );
 
       return response.data.data;
-    } catch (error) {
-      this.logger.error('BrainService Joint Analysis Error:', error);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const body = error?.response?.data;
+      this.logger.error(
+        `BrainService Joint Analysis Error: ${error?.message} (status ${status}). Body: ${JSON.stringify(body ?? {})}`,
+      );
       throw error;
     }
   }

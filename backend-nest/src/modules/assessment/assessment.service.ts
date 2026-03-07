@@ -1116,7 +1116,7 @@ export class AssessmentService {
           speaker_id: participant.userId,
           text: speakerText || '(no speech detected)',
           timestamp: 0,
-          full_conversation: transcript, // Give AI full context
+          context: transcript || undefined, // full conversation for AI context (schema field)
         });
       }
     }
@@ -1135,6 +1135,7 @@ export class AssessmentService {
     });
 
     // 4. Store Individual Analyses & Generate Tasks
+    const participantsWithAnalysis = new Set<string>();
     for (const pa of jointResult.participant_analyses) {
       const participant = session.participants.find(
         (p) => p.userId === pa.participant_id,
@@ -1178,6 +1179,8 @@ export class AssessmentService {
         include: { mistakes: true },
       });
 
+      participantsWithAnalysis.add(participant.id);
+
       // B) Generate Tasks based on mistakes
       if (analysis.mistakes && analysis.mistakes.length > 0) {
         try {
@@ -1192,6 +1195,33 @@ export class AssessmentService {
           );
         }
       }
+    }
+
+    // 5. Ensure every participant has an Analysis row (LLM sometimes returns only one)
+    for (const participant of session.participants) {
+      if (participantsWithAnalysis.has(participant.id)) continue;
+      this.logger.warn(
+        `Joint analysis missing participant ${participant.userId}; creating placeholder (Session: ${sessionId})`,
+      );
+      await this.prisma.analysis.create({
+        data: {
+          sessionId,
+          participantId: participant.id,
+          rawData: {
+            aiFeedback: 'Analysis based on shared conversation.',
+            strengths: [],
+            improvementAreas: [],
+          } as any,
+          cefrLevel: 'B1',
+          scores: {
+            grammar_score: 50,
+            pronunciation_score: 50,
+            fluency_score: 50,
+            vocabulary_score: 50,
+            overall_score: 50,
+          } as any,
+        },
+      });
     }
 
     return { status: 'COMPLETED', sessionId };

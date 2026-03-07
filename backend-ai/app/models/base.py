@@ -23,6 +23,7 @@ class ErrorType(str, Enum):
     ARTICLE = "article"
     FLUENCY = "fluency"
     COHERENCE = "coherence"
+    GENERAL = "general"  # safe fallback when LLM returns unknown type
 
 class ErrorSeverity(str, Enum):
     CRITICAL = "critical"
@@ -37,12 +38,13 @@ class Word(BaseModel):
     confidence: float
 
 class ErrorDetail(BaseModel):
+    """Gemini often omits suggestion/corrected_text; defaults avoid 422 on partial errors."""
     type: ErrorType
     severity: ErrorSeverity
-    original_text: str
-    corrected_text: str
-    explanation: str
-    suggestion: str
+    original_text: str = ""
+    corrected_text: str = ""
+    explanation: str = ""
+    suggestion: str = ""
     rule: Optional[str] = None
 
 class CEFRAssessment(BaseModel):
