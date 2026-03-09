@@ -80,7 +80,10 @@ function DataListener({
           onEndSession();
         } else if (data.type === "transcription" && data.text?.trim?.()) {
           if (__DEV__) {
-            console.log("[LiveKit] Received remote transcription:", (data.text || "").slice(0, 40) + "...");
+            console.log(
+              "[LiveKit] Received remote transcription:",
+              (data.text || "").slice(0, 40) + "...",
+            );
           }
           onTranscription({
             userId: data.userId,
@@ -181,7 +184,7 @@ const INITIAL_TRANSCRIPT: any[] = [];
 function TranscriptionStatus({
   status,
 }: {
-  status: "idle" | "active" | "error" | "unavailable";
+  status: "idle" | "active" | "error" | "unavailable" | "muted";
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -192,19 +195,23 @@ function TranscriptionStatus({
           styles.statusDot,
           status === "active"
             ? styles.statusDotActive
-            : status === "error"
-              ? styles.statusDotError
-              : styles.statusDotIdle,
+            : status === "muted"
+              ? styles.statusDotMuted
+              : status === "error"
+                ? styles.statusDotError
+                : styles.statusDotIdle,
         ]}
       />
       <Text style={styles.statusTextMini}>
         {status === "active"
           ? "Live Transcribing..."
-          : status === "error"
-            ? "Transcription Error"
-            : status === "unavailable"
-              ? "Transcription Unavailable"
-              : "Initializing STT..."}
+          : status === "muted"
+            ? "Muted (No Transcribing)"
+            : status === "error"
+              ? "Transcription Error"
+              : status === "unavailable"
+                ? "Transcription Unavailable"
+                : "Initializing STT..."}
       </Text>
     </View>
   );
@@ -385,7 +392,7 @@ export default function InCallScreen({ navigation, route }: any) {
   >("calling");
 
   const [transcriptionStatus, setTranscriptionStatus] = useState<
-    "idle" | "active" | "error" | "unavailable"
+    "idle" | "active" | "error" | "unavailable" | "muted"
   >("idle");
   const [roomReady, setRoomReady] = useState(false);
   const localSttActiveRef = useRef(false);
@@ -488,6 +495,7 @@ export default function InCallScreen({ navigation, route }: any) {
             hour: "2-digit",
             minute: "2-digit",
           }),
+          timestamp: Date.now(),
         },
       ];
       transcriptRef.current = next;
@@ -526,8 +534,11 @@ export default function InCallScreen({ navigation, route }: any) {
           hour: "2-digit",
           minute: "2-digit",
         }),
+        timestamp: Date.now(),
       };
-      const withoutPending = transcriptRef.current.filter((t) => t.id !== "pending-local");
+      const withoutPending = transcriptRef.current.filter(
+        (t) => t.id !== "pending-local",
+      );
       transcriptRef.current = [...withoutPending, newItem];
       setTranscript(transcriptRef.current);
 
@@ -552,7 +563,8 @@ export default function InCallScreen({ navigation, route }: any) {
         return true;
       };
       if (!sendTranscript()) {
-        if (__DEV__) console.warn("[InCall] No roomRef yet, retry broadcast in 200ms");
+        if (__DEV__)
+          console.warn("[InCall] No roomRef yet, retry broadcast in 200ms");
         setTimeout(() => sendTranscript(), 200);
       }
     } else {
@@ -564,8 +576,11 @@ export default function InCallScreen({ navigation, route }: any) {
           hour: "2-digit",
           minute: "2-digit",
         }),
+        timestamp: Date.now(),
       };
-      const withoutPending = transcriptRef.current.filter((t) => t.id !== "pending-local");
+      const withoutPending = transcriptRef.current.filter(
+        (t) => t.id !== "pending-local",
+      );
       transcriptRef.current = [...withoutPending, pendingItem];
       setTranscript(transcriptRef.current);
     }
@@ -629,7 +644,13 @@ export default function InCallScreen({ navigation, route }: any) {
 
   // Start Local STT when we have both token and room (same delay for both sides)
   useEffect(() => {
-    if (!token || !roomReady || hasEndedRef.current || hasScheduledLocalSTTRef.current) return;
+    if (
+      !token ||
+      !roomReady ||
+      hasEndedRef.current ||
+      hasScheduledLocalSTTRef.current
+    )
+      return;
     hasScheduledLocalSTTRef.current = true;
     const delay = 500;
     const id = setTimeout(() => {
@@ -642,27 +663,36 @@ export default function InCallScreen({ navigation, route }: any) {
   // If one side never got "active", retry once after 3s (e.g. roomReady came late or first start failed)
   useEffect(() => {
     if (!token || hasEndedRef.current || hasRetriedLocalSTTRef.current) return;
-    const id = setTimeout(() => {
+    const id = setInterval(() => {
       if (hasEndedRef.current) return;
       if (
         transcriptionStatus === "idle" &&
         !localSttActiveRef.current &&
-        !isMutedRef.current
+        !isMutedRef.current &&
+        token &&
+        roomReady
       ) {
-        hasRetriedLocalSTTRef.current = true;
-        console.log("[InCall] Retry starting Local STT (other side fallback)");
+        console.log("[InCall] Periodic retry starting Local STT...");
         startLocalSTTRef.current?.();
       }
-    }, 3000);
-    return () => clearTimeout(id);
+    }, 5000);
+    return () => clearInterval(id);
   }, [token, transcriptionStatus]);
 
   useEffect(() => {
     isMutedRef.current = isMuted;
     if (isMuted) {
-      setTranscriptionStatus("active");
-    } else if (token && !hasEndedRef.current && !localSttActiveRef.current) {
-      startLocalSTT();
+      setTranscriptionStatus("muted");
+      // When muted, we can safely stop local STT to save resources
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch (_) {}
+    } else {
+      // When unmuted, if we have a token and it's not active, start it
+      if (token && !hasEndedRef.current && !localSttActiveRef.current) {
+        setTranscriptionStatus("active");
+        startLocalSTT();
+      }
     }
   }, [isMuted, token, startLocalSTT]);
 
@@ -804,6 +834,7 @@ export default function InCallScreen({ navigation, route }: any) {
               id: `local-${Date.now()}`,
               speaker: "user" as const,
               text: pending.text.trim(),
+              timestamp: Date.now(),
             },
           ]
         : current;
@@ -834,22 +865,39 @@ export default function InCallScreen({ navigation, route }: any) {
             .map((t) => ({
               speaker_id: user.id,
               text: t.text.trim(),
-              timestamp: (t as any).time ?? new Date().toISOString(),
+              timestamp: (t as any).timestamp ?? Date.now(),
             }));
           if (mySegments.length === 0) {
             console.warn(
-              "[InCall] No local segments found — check speaker label filter (expect \"user\"). Still calling endSession so participant feedback row exists.",
+              '[InCall] No local segments found — check speaker label filter (expect "user"). Still calling endSession so participant feedback row exists.',
             );
           } else {
             console.log(
               `[InCall] Submitting my segments only: ${mySegments.length} lines`,
             );
           }
-          await sessionsApi.endSession(sessionId, {
-            transcript: mySegments,
-            actualDuration: durationRef.current,
-            userEndedEarly: true,
-          });
+          const submitResult = async (retries = 3): Promise<void> => {
+            try {
+              await sessionsApi.endSession(sessionId, {
+                transcript: mySegments,
+                actualDuration: durationRef.current,
+                userEndedEarly: true,
+              });
+            } catch (err) {
+              if (retries > 0) {
+                console.warn(
+                  `[InCall] endSession failed, retrying (${retries} left)...`,
+                  err,
+                );
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                return submitResult(retries - 1);
+              }
+              throw err;
+            }
+          };
+          await submitResult().catch((err) =>
+            console.error("[InCall] All endSession retries failed:", err),
+          );
         }
 
         // 3. Then tell the partner and disconnect (so they get a clean end)
@@ -905,7 +953,9 @@ export default function InCallScreen({ navigation, route }: any) {
       const isFromSelf =
         data.fromRemote !== true &&
         data.userId != null &&
-        data.userId === user?.id;
+        user?.id != null &&
+        data.userId.toString().toLowerCase() ===
+          user.id.toString().toLowerCase();
 
       if (isFromSelf && data.fromRemote) return;
 
@@ -917,6 +967,7 @@ export default function InCallScreen({ navigation, route }: any) {
           hour: "2-digit",
           minute: "2-digit",
         }),
+        timestamp: Date.now(),
       };
       transcriptRef.current = [...transcriptRef.current, newItem];
       setTranscript(transcriptRef.current);
@@ -1461,6 +1512,9 @@ const getStyles = (theme: any) =>
     },
     statusDotError: {
       backgroundColor: "#ef4444",
+    },
+    statusDotMuted: {
+      backgroundColor: "#f59e0b", // Amber/Orange
     },
     statusTextMini: {
       fontSize: 10,

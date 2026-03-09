@@ -1,5 +1,10 @@
 import { InjectQueue } from '@nestjs/bull';
-import { OnQueueFailed, OnQueueStalled, Process, Processor } from '@nestjs/bull';
+import {
+  OnQueueFailed,
+  OnQueueStalled,
+  Process,
+  Processor,
+} from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -47,7 +52,7 @@ export class SessionsProcessor {
     );
 
     const WAIT_FOR_PARTNER_MS = 10000; // 10s — slow networks can take 15–20s to complete endSession
-    const MAX_WAIT_ATTEMPTS = 6; // 6 × 10s = 60s total window for second device
+    const MAX_WAIT_ATTEMPTS = 12; // 12 × 10s = 120s total window for second device
     const attempt = (job.data.waitAttempts ?? 0) + 1;
 
     try {
@@ -101,15 +106,20 @@ export class SessionsProcessor {
       // Merge segments from each participant's feedback (each device sent only its own speech)
       type Seg = { speaker_id: string; text: string; timestamp?: number };
       const segments: Seg[] = session.feedbacks.flatMap((fb) => {
-        const arr = Array.isArray(fb.transcript) ? (fb.transcript as Seg[]) : [];
+        const arr = Array.isArray(fb.transcript)
+          ? (fb.transcript as Seg[])
+          : [];
         return arr.map((t) => ({
           speaker_id: fb.participant.userId,
           text: typeof t.text === 'string' ? t.text : String(t.text ?? ''),
           timestamp: typeof t.timestamp === 'number' ? t.timestamp : 0,
         }));
       });
+      segments.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
 
-      const transcriptForLog = segments.map((s) => `${s.speaker_id}: ${s.text}`).join('\n');
+      const transcriptForLog = segments
+        .map((s) => `${s.speaker_id}: ${s.text}`)
+        .join('\n');
 
       if (segments.length === 0) {
         this.logger.warn(
@@ -155,7 +165,9 @@ export class SessionsProcessor {
             `🔴 [SessionsProcessor] AI ENGINE IS DOWN! Session ${sessionId} analysis will likely fail.`,
           );
         } else {
-          this.logger.log(`[SessionsProcessor] AI engine is now reachable. Proceeding...`);
+          this.logger.log(
+            `[SessionsProcessor] AI engine is now reachable. Proceeding...`,
+          );
         }
       }
 
@@ -183,30 +195,38 @@ export class SessionsProcessor {
             this.logger.log(
               `[SessionsProcessor] Running pronunciation assessment for session ${sessionId} on ${sessionData.recordingUrl}`,
             );
-            const transcriptStr = segments.map((s) => `${s.speaker_id}: ${s.text}`).join('\n');
-            const { flagged_errors: flaggedErrors, pronunciation_score: pronScore } =
-              await this.pronunciationService.assessFromRecordingUrl(
-                firstParticipant.userId,
-                sessionData.recordingUrl,
-                transcriptStr,
-              );
+            const transcriptStr = segments
+              .map((s) => `${s.speaker_id}: ${s.text}`)
+              .join('\n');
+            const {
+              flagged_errors: flaggedErrors,
+              pronunciation_score: pronScore,
+            } = await this.pronunciationService.assessFromRecordingUrl(
+              firstParticipant.userId,
+              sessionData.recordingUrl,
+              transcriptStr,
+            );
 
             const firstAnalysis = firstParticipant.analysis;
             let grammar = 0,
               vocabulary = 0,
               fluency = 0,
               overallScore = 0;
-            if (firstAnalysis?.scores && typeof firstAnalysis.scores === 'object') {
+            if (
+              firstAnalysis?.scores &&
+              typeof firstAnalysis.scores === 'object'
+            ) {
               const s = firstAnalysis.scores as Record<string, number>;
               grammar = s.grammar ?? s.grammar_score ?? 0;
               vocabulary = s.vocabulary ?? s.vocabulary_score ?? 0;
               fluency = s.fluency ?? s.fluency_score ?? 0;
             }
             const pronFromAi = pronScore?.score ?? 0;
-            overallScore = this.pronunciationScorerService.applyPronunciationScore(
-              { grammar, vocabulary, fluency, pronunciation: pronFromAi },
-              pronFromAi,
-            );
+            overallScore =
+              this.pronunciationScorerService.applyPronunciationScore(
+                { grammar, vocabulary, fluency, pronunciation: pronFromAi },
+                pronFromAi,
+              );
             if (pronScore?.cefr_cap) {
               overallScore = this.pronunciationScorerService.applyCEFRCap(
                 overallScore,
@@ -215,7 +235,13 @@ export class SessionsProcessor {
             }
 
             const cefrFromScore =
-              overallScore > 72 ? 'B2' : overallScore > 55 ? 'B1' : overallScore > 35 ? 'A2' : 'A1';
+              overallScore > 72
+                ? 'B2'
+                : overallScore > 55
+                  ? 'B1'
+                  : overallScore > 35
+                    ? 'A2'
+                    : 'A1';
 
             const roundedOverall = Math.round(overallScore * 10) / 10;
             await this.prisma.conversationSession.update({
@@ -232,7 +258,8 @@ export class SessionsProcessor {
                   pronunciation_score: pronFromAi,
                   pronunciation_cefr_cap: pronScore?.cefr_cap ?? null,
                   pronunciation_cap_reason: pronScore?.cap_reason ?? null,
-                  dominant_pronunciation_errors: pronScore?.dominant_errors ?? [],
+                  dominant_pronunciation_errors:
+                    pronScore?.dominant_errors ?? [],
                   grammar_errors: (firstAnalysis?.rawData as any)?.aiFeedback
                     ? []
                     : undefined,
