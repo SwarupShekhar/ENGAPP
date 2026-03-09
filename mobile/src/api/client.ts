@@ -11,7 +11,7 @@ const IS_PROD = !__DEV__;
 const FORCE_LOCAL = true;
 
 // Your Mac's local IP address on the Wi-Fi network
-const LOCAL_IP = "172.20.10.13";
+const LOCAL_IP = "192.168.1.34";
 
 // Determine the API URL based on environment.
 // Production builds (IS_PROD=true) will ALWAYS use the production URL.

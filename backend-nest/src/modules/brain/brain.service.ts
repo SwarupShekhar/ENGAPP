@@ -43,7 +43,7 @@ export class BrainService implements OnModuleInit {
   async checkAiEngineHealth(): Promise<boolean> {
     try {
       const response = await lastValueFrom(
-        this.httpService.get(`${this.aiEngineUrl}/docs`, {
+        this.httpService.get(`${this.aiEngineUrl}/`, {
           timeout: 5000, // 5 second timeout
         }),
       );
