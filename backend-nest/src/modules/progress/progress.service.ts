@@ -6,149 +6,190 @@ export class ProgressService {
   constructor(private prisma: PrismaService) {}
 
   async getDetailedMetrics(userId: string) {
-    // 1. Get most recent completed sessions of both types
-    const [lastAssessment, lastConversation] = await Promise.all([
-      this.prisma.assessmentSession.findFirst({
-        where: { userId, status: 'COMPLETED' },
-        orderBy: { completedAt: 'desc' },
-      }),
-      this.prisma.conversationSession.findFirst({
-        where: {
-          participants: { some: { userId } },
-          status: 'COMPLETED',
-          summaryJson: { not: null },
-        },
-        orderBy: { startedAt: 'desc' },
-      }),
-    ]);
+    try {
+      // 1. Get most recent completed sessions of both types
+      const [lastAssessment, lastConversation] = await Promise.all([
+        this.prisma.assessmentSession
+          .findFirst({
+            where: { userId, status: 'COMPLETED' },
+            orderBy: { completedAt: 'desc' },
+          })
+          .catch(() => null),
+        this.prisma.conversationSession
+          .findFirst({
+            where: {
+              participants: { some: { userId } },
+              status: 'COMPLETED',
+              summaryJson: { not: null },
+            },
+            orderBy: { startedAt: 'desc' },
+          })
+          .catch(() => null),
+      ]);
 
-    if (!lastAssessment && !lastConversation) {
+      if (!lastAssessment && !lastConversation) {
+        return this.getEmptyMetrics();
+      }
+
+      // Determine which one is "current" (the most recent)
+      const lastAssessmentTime = lastAssessment?.completedAt
+        ? new Date(lastAssessment.completedAt).getTime()
+        : 0;
+      const lastConversationTime = lastConversation?.startedAt
+        ? new Date(lastConversation.startedAt).getTime()
+        : 0;
+
+      const currentIsAssessment = lastAssessmentTime >= lastConversationTime;
+      const currentSession = currentIsAssessment
+        ? lastAssessment
+        : lastConversation;
+
+      // 2. Get previous session for delta calculation
+      let previousSession: any = null;
+      try {
+        if (currentIsAssessment && currentSession) {
+          previousSession = await this.prisma.assessmentSession.findFirst({
+            where: {
+              userId,
+              status: 'COMPLETED',
+              completedAt: { lt: (currentSession as any).completedAt },
+            },
+            orderBy: { completedAt: 'desc' },
+          });
+          const interConversation =
+            await this.prisma.conversationSession.findFirst({
+              where: {
+                participants: { some: { userId } },
+                status: 'COMPLETED',
+                summaryJson: { not: null },
+                startedAt: {
+                  lt: (currentSession as any).completedAt,
+                  gt: previousSession?.completedAt || 0,
+                },
+              },
+              orderBy: { startedAt: 'desc' },
+            });
+          if (interConversation) previousSession = interConversation;
+        } else if (currentSession) {
+          previousSession = await this.prisma.conversationSession.findFirst({
+            where: {
+              participants: { some: { userId } },
+              status: 'COMPLETED',
+              summaryJson: { not: null },
+              startedAt: { lt: (currentSession as any).startedAt },
+            },
+            orderBy: { startedAt: 'desc' },
+          });
+          const interAssessment = await this.prisma.assessmentSession.findFirst(
+            {
+              where: {
+                userId,
+                status: 'COMPLETED',
+                completedAt: {
+                  lt: (currentSession as any).startedAt,
+                  gt: previousSession?.startedAt || 0,
+                },
+              },
+              orderBy: { completedAt: 'desc' },
+            },
+          );
+          if (interAssessment) previousSession = interAssessment;
+        }
+      } catch (err) {
+        console.warn('Error fetching previous session:', err);
+      }
+
+      const currentScores = this.extractScores(currentSession);
+      const previousScores = this.extractScores(previousSession);
+
+      // 3. Calculate deltas (ensure numbers)
+      const deltas = {
+        pronunciation:
+          (Number(currentScores.pronunciation) || 0) -
+          (Number(previousScores.pronunciation) || 0),
+        fluency:
+          (Number(currentScores.fluency) || 0) -
+          (Number(previousScores.fluency) || 0),
+        grammar:
+          (Number(currentScores.grammar) || 0) -
+          (Number(previousScores.grammar) || 0),
+        vocabulary:
+          (Number(currentScores.vocabulary) || 0) -
+          (Number(previousScores.vocabulary) || 0),
+        comprehension:
+          (Number(currentScores.comprehension) || 0) -
+          (Number(previousScores.comprehension) || 0),
+        overallScore:
+          (Number(currentScores.overallScore) || 0) -
+          (Number(previousScores.overallScore) || 0),
+      };
+
+      // 4. Get weekly activity (last 7 days)
+      const weeklyActivity = await this.getWeeklyActivity(userId).catch(() => [
+        0, 0, 0, 0, 0, 0, 0,
+      ]);
+
+      // 5. Get weaknesses
+      let weaknesses: any[] = [];
+      try {
+        if (currentIsAssessment && currentSession) {
+          let weaknessMap = (currentSession as any).weaknessMap;
+          if (typeof weaknessMap === 'string') {
+            try {
+              weaknessMap = JSON.parse(weaknessMap);
+            } catch (_) {
+              weaknessMap = {};
+            }
+          }
+          weaknessMap = weaknessMap || {};
+          weaknesses = Object.entries(weaknessMap).map(
+            ([skill, details]: [string, any]) => ({
+              skill,
+              severity: details?.severity || 'MEDIUM',
+              recommendation:
+                details?.recommendation || `Practice more ${skill} exercises`,
+            }),
+          );
+        } else if (currentSession) {
+          let summary = (currentSession as any).summaryJson;
+          if (typeof summary === 'string') {
+            try {
+              summary = JSON.parse(summary);
+            } catch (_) {
+              summary = {};
+            }
+          }
+          const dominantErrors = summary?.dominant_pronunciation_errors || [];
+          weaknesses = dominantErrors.map((error: string) => ({
+            skill: 'Pronunciation',
+            severity: 'MEDIUM',
+            recommendation: `Focus on ${error.replace(/_/g, ' ')} in your next call`,
+          }));
+        }
+      } catch (err) {
+        console.warn('Error extracting weaknesses:', err);
+      }
+
+      // 6. Get streak and total sessions
+      const [reliability, profile] = await Promise.all([
+        this.prisma.userReliability
+          .findUnique({ where: { userId } })
+          .catch(() => null),
+        this.prisma.profile.findUnique({ where: { userId } }).catch(() => null),
+      ]);
+
+      return {
+        current: currentScores,
+        deltas,
+        weeklyActivity,
+        weaknesses: weaknesses.slice(0, 3),
+        streak: profile?.streak || 0,
+        totalSessions: reliability?.totalSessions || 0,
+      };
+    } catch (e) {
+      console.error('FATAL ERROR in getDetailedMetrics:', e);
       return this.getEmptyMetrics();
     }
-
-    // Determine which one is "current" (the most recent)
-    const currentIsAssessment =
-      !lastConversation ||
-      (lastAssessment &&
-        lastAssessment.completedAt &&
-        lastAssessment.completedAt > (lastConversation.startedAt || 0));
-
-    const currentSession = currentIsAssessment
-      ? lastAssessment
-      : lastConversation;
-
-    // 2. Get previous session for delta calculation
-    let previousSession: any = null;
-    if (currentIsAssessment) {
-      previousSession = await this.prisma.assessmentSession.findFirst({
-        where: {
-          userId,
-          status: 'COMPLETED',
-          completedAt: { lt: (currentSession as any).completedAt },
-        },
-        orderBy: { completedAt: 'desc' },
-      });
-      // Also check if there's a conversation session between this and previous assessment
-      const interConversation = await this.prisma.conversationSession.findFirst(
-        {
-          where: {
-            participants: { some: { userId } },
-            status: 'COMPLETED',
-            summaryJson: { not: null },
-            startedAt: {
-              lt: (currentSession as any).completedAt,
-              gt: previousSession?.completedAt || 0,
-            },
-          },
-          orderBy: { startedAt: 'desc' },
-        },
-      );
-      if (interConversation) previousSession = interConversation;
-    } else {
-      previousSession = await this.prisma.conversationSession.findFirst({
-        where: {
-          participants: { some: { userId } },
-          status: 'COMPLETED',
-          summaryJson: { not: null },
-          startedAt: { lt: (currentSession as any).startedAt },
-        },
-        orderBy: { startedAt: 'desc' },
-      });
-      // Also check if there's an assessment session between this and previous conversation
-      const interAssessment = await this.prisma.assessmentSession.findFirst({
-        where: {
-          userId,
-          status: 'COMPLETED',
-          completedAt: {
-            lt: (currentSession as any).startedAt,
-            gt: previousSession?.startedAt || 0,
-          },
-        },
-        orderBy: { completedAt: 'desc' },
-      });
-      if (interAssessment) previousSession = interAssessment;
-    }
-
-    const currentScores = this.extractScores(currentSession);
-    const previousScores = this.extractScores(previousSession);
-
-    // 3. Calculate deltas
-    const deltas = {
-      pronunciation:
-        (currentScores.pronunciation || 0) -
-        (previousScores.pronunciation || 0),
-      fluency: (currentScores.fluency || 0) - (previousScores.fluency || 0),
-      grammar: (currentScores.grammar || 0) - (previousScores.grammar || 0),
-      vocabulary:
-        (currentScores.vocabulary || 0) - (previousScores.vocabulary || 0),
-      comprehension:
-        (currentScores.comprehension || 0) -
-        (previousScores.comprehension || 0),
-      overallScore:
-        (currentScores.overallScore || 0) - (previousScores.overallScore || 0),
-    };
-
-    // 4. Get weekly activity (last 7 days)
-    const weeklyActivity = await this.getWeeklyActivity(userId);
-
-    // 5. Get weaknesses
-    let weaknesses: any[] = [];
-    if (currentIsAssessment) {
-      const weaknessMap = (currentSession as any).weaknessMap || {};
-      weaknesses = Object.entries(weaknessMap).map(
-        ([skill, details]: [string, any]) => ({
-          skill,
-          severity: details.severity || 'MEDIUM',
-          recommendation:
-            details.recommendation || `Practice more ${skill} exercises`,
-        }),
-      );
-    } else {
-      // For conversations, use dominant errors from summary
-      const dominantErrors =
-        (currentSession as any).summaryJson?.dominant_pronunciation_errors ||
-        [];
-      weaknesses = dominantErrors.map((error: string) => ({
-        skill: 'Pronunciation',
-        severity: 'MEDIUM',
-        recommendation: `Focus on ${error.replace(/_/g, ' ')} in your next call`,
-      }));
-    }
-
-    // 6. Get streak and total sessions
-    const [reliability, profile] = await Promise.all([
-      this.prisma.userReliability.findUnique({ where: { userId } }),
-      this.prisma.profile.findUnique({ where: { userId } }),
-    ]);
-
-    return {
-      current: currentScores,
-      deltas,
-      weeklyActivity,
-      weaknesses: weaknesses.slice(0, 3),
-      streak: profile?.streak || 0,
-      totalSessions: reliability?.totalSessions || 0,
-    };
   }
 
   private extractScores(session: any) {
@@ -163,26 +204,42 @@ export class ProgressService {
         cefrLevel: 'A1',
       };
 
-    const isAssessment = 'skillBreakdown' in session;
+    // Defensive check if it's an assessment
+    const isAssessment =
+      'skillBreakdown' in session || 'overallLevel' in session;
 
     if (isAssessment) {
-      const breakdown = session.skillBreakdown || {};
+      let breakdown = session.skillBreakdown || {};
+      if (typeof breakdown === 'string') {
+        try {
+          breakdown = JSON.parse(breakdown);
+        } catch (_) {
+          breakdown = {};
+        }
+      }
       const flattened = this.flattenSkills(breakdown);
       return {
         ...flattened,
-        overallScore: Math.round(session.overallScore || 0),
+        overallScore: Math.round(Number(session.overallScore) || 0),
         cefrLevel: session.overallLevel || 'A1',
-        comprehension: Math.round(flattened.comprehension || 0),
+        comprehension: Math.round(Number(flattened.comprehension) || 0),
       };
     } else {
-      const summary = session.summaryJson || {};
+      let summary = session.summaryJson || {};
+      if (typeof summary === 'string') {
+        try {
+          summary = JSON.parse(summary);
+        } catch (_) {
+          summary = {};
+        }
+      }
       return {
-        pronunciation: Math.round(summary.pronunciation_score || 0),
-        fluency: Math.round(summary.fluency_score || 0),
-        grammar: Math.round(summary.grammar_score || 0),
-        vocabulary: Math.round(summary.vocabulary_score || 0),
-        comprehension: Math.round(summary.overall_score || 0), // Default comprehension to overall for calls
-        overallScore: Math.round(summary.overall_score || 0),
+        pronunciation: Math.round(Number(summary.pronunciation_score) || 0),
+        fluency: Math.round(Number(summary.fluency_score) || 0),
+        grammar: Math.round(Number(summary.grammar_score) || 0),
+        vocabulary: Math.round(Number(summary.vocabulary_score) || 0),
+        comprehension: Math.round(Number(summary.overall_score) || 0),
+        overallScore: Math.round(Number(summary.overall_score) || 0),
         cefrLevel: summary.cefr_score || 'B1',
       };
     }

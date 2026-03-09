@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useAppTheme } from "../theme/useAppTheme";
+import { getLevelColor } from "../theme/colorUtils";
 import { sessionsApi, ConversationSession } from "../api/sessions";
 
 // Feedback Components
@@ -534,7 +535,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                 numberOfLines={6}
                 style={{ fontSize: 13, color: theme.colors.text.primary }}
               >
-                {sessionData.feedback.transcript.trim()}
+                {sessionData.feedback?.transcript?.trim() || ""}
               </Text>
             </View>
           )}
@@ -615,13 +616,66 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     improvementAreas: rawData?.improvementAreas || [],
     accentNotes: rawData?.accentNotes || null,
     pronunciationTip: rawData?.pronunciationTip || null,
-    pronunciationFlagged: sessionData?.summaryJson?.pronunciation_flagged as
-      | { word?: string; error_type?: string; phoneme?: string }[]
-      | undefined,
+    pronunciationFlagged:
+      (sessionData?.summaryJson?.pronunciation_flagged as
+        | { word?: string; error_type?: string; phoneme?: string }[]
+        | undefined) ?? [],
     dominantPronunciationErrors:
       (sessionData?.summaryJson?.dominant_pronunciation_errors as string[]) ||
       [],
   };
+
+  // MAYA Summary: derive weak spots (lowest 2 dimensions) and words to learn from real data
+  const scoreEntries = [
+    { key: "Grammar", score: data.scores.grammar, icon: "document-text" },
+    { key: "Pronunciation", score: data.scores.pronunciation, icon: "mic" },
+    { key: "Fluency", score: data.scores.fluency, icon: "flash" },
+    { key: "Vocabulary", score: data.scores.vocabulary, icon: "book" },
+  ] as const;
+  const weakSpots = [...scoreEntries]
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 2)
+    .filter((s) => s.score < 80);
+
+  const wordsFromMistakes = (data.mistakes || [])
+    .map((m: any) => m.corrected_text ?? m.corrected)
+    .filter(Boolean)
+    .filter((t: string) => t.trim().length > 0);
+  const wordsFromPronunciation =
+    (data.pronunciationIssues || []).map((p: any) => p.word).filter(Boolean) ||
+    (data.pronunciationFlagged || []).map((p: any) => p.word ?? p.phoneme).filter(Boolean);
+  const advancedWords =
+    ((rawData as any)?.ai_detailed_feedback?.vocabulary?.advanced_words as string[]) || []; 
+  const wordsToLearn = Array.from(
+    new Set([
+      ...wordsFromMistakes.slice(0, 5),
+      ...wordsFromPronunciation.slice(0, 5),
+      ...advancedWords.slice(0, 5),
+    ]),
+  ).filter(Boolean) as string[];
+
+  const mayaHasContent =
+    data.summaryText ||
+    weakSpots.length > 0 ||
+    wordsToLearn.length > 0 ||
+    data.mistakes.length > 0 ||
+    data.improvementAreas.length > 0;
+
+  // MAYA personality: one-line headline and top tip so it doesn't feel like raw data
+  const mayaHeadline =
+    data.overallScore >= 80
+      ? "You're doing great — small tweaks will make you even stronger."
+      : data.overallScore >= 60
+        ? "Solid effort. Here's exactly where to focus to level up."
+        : weakSpots.length > 0
+          ? `${weakSpots[0].key} is your biggest lever — improve it and your score will jump.`
+          : "Every call is practice. Here's what to work on next.";
+  const mayaTopTip =
+    data.improvementAreas?.[0] ||
+    data.pronunciationTip ||
+    (weakSpots.length > 0
+      ? `Spend 5 minutes on ${weakSpots[0].key.toLowerCase()} before your next call.`
+      : null);
 
   const overallColor = getScoreColor(data.overallScore, theme);
 
@@ -756,7 +810,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               <Text style={styles.scoreValue}>{data.overallScore}</Text>
               <Text style={styles.scoreMax}>/100</Text>
             </View>
-            <View style={styles.levelChip}>
+            <View style={[styles.levelChip, { backgroundColor: getLevelColor(theme, data.cefrLevel.toLowerCase() as any) }]}>
               <Text style={styles.levelChipText}>{data.cefrLevel}</Text>
             </View>
           </LinearGradient>
@@ -843,7 +897,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         {/* Words to work on (pronunciation) – so user knows which words drove the score */}
         {(data.pronunciationIssues?.length > 0 ||
-          (data.pronunciationFlagged && data.pronunciationFlagged.length > 0) ||
+          data.pronunciationFlagged.length > 0 ||
           data.dominantPronunciationErrors?.length > 0) && (
           <Animated.View entering={FadeInDown.delay(400).springify()}>
             <Text style={styles.sectionTitle}>Words to work on</Text>
@@ -871,7 +925,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                     )}
                   </View>
                 ))}
-              {data.pronunciationFlagged?.length > 0 &&
+              {data.pronunciationFlagged.length > 0 &&
                 data.pronunciationIssues?.length === 0 &&
                 data.pronunciationFlagged.map((item: any, i: number) => (
                   <View key={i} style={styles.pronunciationIssueRow}>
@@ -1030,22 +1084,129 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </View>
         )}
 
-        {/* AI Summary */}
-        {data.summaryText && (
+        {/* MAYA AI Summary – engaging, human copy + real data */}
+        {mayaHasContent && (
           <Animated.View entering={FadeInDown.delay(1000).springify()}>
-            <Text style={styles.sectionTitle}>AI Summary</Text>
-            <View style={styles.glassCard}>
-              <View style={styles.summaryHeader}>
-                <LinearGradient
-                  colors={theme.colors.gradients.primary}
-                  style={styles.aiIcon}
-                >
-                  <Ionicons name="sparkles" size={14} color="white" />
-                </LinearGradient>
-                <Text style={styles.aiLabel}>EngR AI Analysis</Text>
+            <Text style={styles.sectionTitle}>What MAYA noticed</Text>
+            <LinearGradient
+              colors={[
+                theme.colors.primary + "12",
+                theme.colors.primary + "06",
+                "transparent",
+              ]}
+              style={styles.mayaCard}
+            >
+              <View style={styles.mayaCardInner}>
+                <View style={styles.mayaHeader}>
+                  <LinearGradient
+                    colors={theme.colors.gradients.primary}
+                    style={styles.mayaIcon}
+                  >
+                    <Ionicons name="sparkles" size={20} color="white" />
+                  </LinearGradient>
+                  <View style={styles.mayaHeaderText}>
+                    <Text style={styles.mayaTitle}>MAYA AI</Text>
+                    <Text style={styles.mayaSubtitle}>
+                      CEFR {data.cefrLevel} • {data.overallScore}% this call
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.mayaHeadline}>{mayaHeadline}</Text>
+
+                {data.summaryText ? (
+                  <View style={styles.mayaNarrativeWrap}>
+                    <Text style={styles.mayaSaysLabel}>MAYA says</Text>
+                    <Text style={styles.mayaNarrative}>{data.summaryText}</Text>
+                  </View>
+                ) : null}
+
+                {mayaTopTip ? (
+                  <View style={styles.mayaTipWrap}>
+                    <Ionicons name="bulb" size={18} color={theme.colors.warning} />
+                    <Text style={styles.mayaTipText}>{mayaTopTip}</Text>
+                  </View>
+                ) : null}
+
+                {weakSpots.length > 0 && (
+                  <View style={styles.mayaSection}>
+                    <Text style={styles.mayaSectionTag}>Where to level up</Text>
+                    <Text style={styles.mayaSectionSub}>
+                      A little practice here will go a long way
+                    </Text>
+                    {weakSpots.map((s) => (
+                      <View key={s.key} style={styles.mayaWeakRow}>
+                        <View style={styles.mayaWeakLabel}>
+                          <Ionicons name={s.icon as any} size={16} color={theme.colors.primary} />
+                          <Text style={styles.mayaWeakName}>{s.key}</Text>
+                        </View>
+                        <View style={styles.mayaWeakBarBg}>
+                          <View
+                            style={[
+                              styles.mayaWeakBarFill,
+                              {
+                                width: `${Math.min(100, s.score)}%`,
+                                backgroundColor: getScoreColor(s.score, theme),
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.mayaWeakScore, { color: getScoreColor(s.score, theme) }]}>
+                          {s.score}%
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {wordsToLearn.length > 0 && (
+                  <View style={styles.mayaSection}>
+                    <Text style={styles.mayaSectionTag}>Try these next time</Text>
+                    <Text style={styles.mayaSectionSub}>
+                      Phrases that'll make you sound sharper
+                    </Text>
+                    <View style={styles.mayaWordsWrap}>
+                      {wordsToLearn.slice(0, 8).map((word, i) => (
+                        <View key={`${word}-${i}`} style={styles.mayaWordPill}>
+                          <Text style={styles.mayaWordPillText} numberOfLines={1}>
+                            {String(word).trim()}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {(data.mistakes.length > 0 ||
+                  (data.strengths?.length ?? 0) > 0 ||
+                  data.improvementAreas.length > 0) && (
+                  <View style={styles.mayaQuickStats}>
+                    {data.mistakes.length > 0 && (
+                      <View style={styles.mayaStat}>
+                        <Text style={styles.mayaStatValue}>{data.mistakes.length}</Text>
+                        <Text style={styles.mayaStatLabel}>to polish</Text>
+                      </View>
+                    )}
+                    {(data.strengths?.length ?? 0) > 0 && (
+                      <View style={styles.mayaStat}>
+                        <Text style={[styles.mayaStatValue, { color: theme.colors.success }]}>
+                          {data.strengths.length}
+                        </Text>
+                        <Text style={styles.mayaStatLabel}>you did well</Text>
+                      </View>
+                    )}
+                    {data.improvementAreas.length > 0 && (
+                      <View style={styles.mayaStat}>
+                        <Text style={[styles.mayaStatValue, { color: theme.colors.warning }]}>
+                          {data.improvementAreas.length}
+                        </Text>
+                        <Text style={styles.mayaStatLabel}>to grow</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
-              <Text style={styles.summaryText}>{data.summaryText}</Text>
-            </View>
+            </LinearGradient>
           </Animated.View>
         )}
 
@@ -1216,7 +1377,6 @@ const getStyles = (theme: any) =>
       paddingHorizontal: theme.spacing.m,
       paddingVertical: theme.spacing.xs,
       borderRadius: theme.borderRadius.circle,
-      backgroundColor: "rgba(255,255,255,0.2)",
     },
     levelChipText: {
       color: "white",
@@ -1574,7 +1734,192 @@ const getStyles = (theme: any) =>
       lineHeight: 18,
       fontStyle: "italic",
     },
-    // AI Summary
+    // MAYA AI Summary
+    mayaCard: {
+      marginHorizontal: theme.spacing.l,
+      borderRadius: 24,
+      overflow: "hidden",
+      ...theme.shadows.medium,
+    },
+    mayaCardInner: {
+      padding: theme.spacing.m,
+      borderRadius: 24,
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.7)",
+    },
+    mayaHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginBottom: theme.spacing.s,
+    },
+    mayaIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    mayaHeaderText: {
+      flex: 1,
+    },
+    mayaTitle: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "800",
+      color: theme.colors.text.primary,
+    },
+    mayaSubtitle: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      marginTop: 2,
+    },
+    mayaHeadline: {
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+      lineHeight: 24,
+      marginBottom: theme.spacing.m,
+    },
+    mayaNarrativeWrap: {
+      marginBottom: theme.spacing.m,
+      padding: theme.spacing.m,
+      backgroundColor: theme.colors.primary + "10",
+      borderRadius: 16,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.primary,
+    },
+    mayaSaysLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.colors.primary,
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+    mayaNarrative: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.primary,
+      lineHeight: 22,
+    },
+    mayaTipWrap: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      marginBottom: theme.spacing.m,
+      padding: theme.spacing.s,
+      backgroundColor: theme.colors.warning + "18",
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.warning + "40",
+    },
+    mayaTipText: {
+      flex: 1,
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+      lineHeight: 20,
+    },
+    mayaSection: {
+      marginBottom: theme.spacing.m,
+    },
+    mayaSectionTag: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "800",
+      color: theme.colors.text.primary,
+      marginBottom: 2,
+    },
+    mayaSectionSub: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      marginBottom: 10,
+    },
+    mayaSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 10,
+    },
+    mayaSectionTitle: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    mayaWeakRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 8,
+    },
+    mayaWeakLabel: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      width: 120,
+    },
+    mayaWeakName: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.primary,
+      fontWeight: "500",
+    },
+    mayaWeakBarBg: {
+      flex: 1,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.border + "80",
+      overflow: "hidden",
+    },
+    mayaWeakBarFill: {
+      height: "100%",
+      borderRadius: 4,
+    },
+    mayaWeakScore: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      minWidth: 36,
+      textAlign: "right",
+    },
+    mayaWordsWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    mayaWordPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: theme.colors.primary + "18",
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "40",
+    },
+    mayaWordPillText: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.primary,
+      fontWeight: "500",
+      maxWidth: 140,
+    },
+    mayaQuickStats: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing.l,
+      paddingTop: theme.spacing.s,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    mayaStat: {
+      alignItems: "center",
+      minWidth: 80,
+    },
+    mayaStatValue: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.colors.primary,
+    },
+    mayaStatLabel: {
+      fontSize: 11,
+      color: theme.colors.text.secondary,
+      marginTop: 2,
+    },
+    // Legacy AI Summary (kept for any refs)
     summaryHeader: {
       flexDirection: "row",
       alignItems: "center",

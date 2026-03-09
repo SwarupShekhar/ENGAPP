@@ -1,28 +1,35 @@
 import { useUser } from "@clerk/clerk-expo";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  StatusBar,
   TouchableOpacity,
+  Dimensions,
+  RefreshControl,
+  ActivityIndicator,
   Image,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, { FadeInDown } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
-import Svg, { Path } from "react-native-svg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import SocketService from "../services/socketService";
-
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, {
+  FadeIn,
+  SlideInRight,
+  FadeInDown,
+} from "react-native-reanimated";
 import { useAppTheme } from "../theme/useAppTheme";
+import { Svg, Path } from "react-native-svg";
+import { SemanticLevelBadge } from "../components/common/SemanticLevelBadge";
+import { LevelType } from "../theme/semanticTokens";
 import { ConnectPracticeCard } from "../components/home/ConnectPracticeCard";
 import { FeedbackReadyCard } from "../components/home/FeedbackReadyCard";
-import { SkillRingsRow } from "../components/home/SkillRingsRow";
+import YourSkillsCard from "../components/home/YourSkillsCard";
 import WeeklyActivityGrid from "../components/home/WeeklyActivityGrid";
 import { ContextualCard } from "../components/home/ContextualCard";
 import AnimatedScoreRing from "../components/home/AnimatedScoreRing";
@@ -30,6 +37,8 @@ import NextGoalBar from "../components/home/NextGoalBar";
 import { userApi, UserStats } from "../api/user";
 import { chatApi, connectionsApi } from "../api/connections";
 import { getHomeData, HomeData } from "../api/home";
+import HomeMainCarousel from "../components/home/HomeMainCarousel";
+import SocketService from "../services/socketService";
 
 export default function HomeScreen() {
   const { user, isLoaded } = useUser();
@@ -141,16 +150,29 @@ export default function HomeScreen() {
     }
   };
 
-  if (!isLoaded || !homeData) return null;
+  if (!isLoaded) {
+    return (
+      <View style={styles.loadingRoot}>
+        <ActivityIndicator size="large" color="#6C5CE7" />
+        <Text style={styles.loadingText}>Loading…</Text>
+      </View>
+    );
+  }
 
-  const { header, primaryCTA, skills, contextualCards } = homeData;
+  if (!homeData) {
+    return (
+      <View style={styles.loadingRoot}>
+        <ActivityIndicator size="large" color="#6C5CE7" />
+        <Text style={styles.loadingText}>Loading your home…</Text>
+      </View>
+    );
+  }
+
+  const { header, skills, contextualCards } = homeData;
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={theme.colors.primary}
-      />
+      <StatusBar style="light" backgroundColor={theme.colors.primary} />
 
       {/* Gradient Header */}
       <LinearGradient
@@ -243,14 +265,11 @@ export default function HomeScreen() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              <View style={styles.levelBadge}>
-                <Ionicons
-                  name="shield-checkmark"
-                  size={14}
-                  color={theme.colors.warning}
-                />
-                <Text style={styles.levelText}>Level {header.level}</Text>
-              </View>
+              <SemanticLevelBadge
+                level={(header.level?.toLowerCase() || "a1") as LevelType}
+                pattern="tinted"
+                size="small"
+              />
               {header.percentile && (
                 <View style={styles.percentileBadge}>
                   <Text style={styles.percentileText}>{header.percentile}</Text>
@@ -312,153 +331,21 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-        {/* Dynamic primary CTA */}
-        <Animated.View
-          entering={FadeInDown.delay(100)}
-          style={styles.ctaContainer}
-        >
-          <TouchableOpacity
-            style={[styles.mainCTA, { backgroundColor: theme.colors.surface }]}
-            onPress={() => handleCTAAction(primaryCTA.action, primaryCTA.data)}
-            activeOpacity={0.9}
-          >
-            <BlurView
-              intensity={theme.variation === "deep" ? 30 : 60}
-              tint={theme.variation === "deep" ? "dark" : "light"}
-              style={styles.ctaBlur}
-            >
-              <View style={styles.ctaContent}>
-                <View style={styles.ctaTextSection}>
-                  <Text
-                    style={[
-                      styles.ctaTitle,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {primaryCTA.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.ctaDesc,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    {primaryCTA.description}
-                  </Text>
-                </View>
-
-                {/* New Action Row with avatars and soundwave button */}
-                <View style={styles.actionRow}>
-                  {/* Left Avatar (Robot/Maya) */}
-                  <View style={styles.avatarWrapper}>
-                    <View
-                      style={[
-                        styles.avatarCircle,
-                        { backgroundColor: theme.colors.primary + "30" },
-                      ]}
-                    >
-                      <Ionicons
-                        name="construct-outline"
-                        size={24}
-                        color={theme.colors.primary}
-                      />
-                    </View>
-                    <View style={styles.liveBadge}>
-                      <Text style={styles.liveBadgeText}>LIVE</Text>
-                    </View>
-                  </View>
-
-                  {/* Primary Button */}
-                  <LinearGradient
-                    colors={theme.colors.gradients.primary as any}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.ctaButtonPremium}
-                  >
-                    <View style={styles.buttonInner}>
-                      <Text style={styles.ctaButtonText}>
-                        {primaryCTA.buttonText}
-                      </Text>
-                      <Ionicons
-                        name="arrow-forward"
-                        size={16}
-                        color="white"
-                        style={{ marginLeft: 8 }}
-                      />
-                      <View style={styles.soundwaves}>
-                        <View style={[styles.wave, { height: 12 }]} />
-                        <View style={[styles.wave, { height: 20 }]} />
-                        <View style={[styles.wave, { height: 15 }]} />
-                        <View style={[styles.wave, { height: 24 }]} />
-                      </View>
-                    </View>
-                  </LinearGradient>
-
-                  {/* Right Avatar (Partner) */}
-                  <View style={styles.avatarWrapper}>
-                    <View
-                      style={[
-                        styles.avatarCircle,
-                        { backgroundColor: theme.colors.surface + "40" },
-                      ]}
-                    >
-                      <Ionicons
-                        name="person"
-                        size={24}
-                        color={theme.colors.text.secondary}
-                      />
-                    </View>
-                    <View style={styles.liveBadge}>
-                      <Text style={styles.liveBadgeText}>LIVE</Text>
-                    </View>
-                    <View style={styles.flagBadge}>
-                      <Text style={{ fontSize: 10 }}>🇬🇧</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {primaryCTA.mayaChip && (
-                <View
-                  style={[
-                    styles.mayaChipContainerCentered,
-                    { borderTopColor: "rgba(255,255,255,0.2)" },
-                  ]}
-                >
-                  <TouchableOpacity
-                    style={styles.mayaChipSimple}
-                    onPress={() => handleCTAAction(primaryCTA.mayaChip.action)}
-                  >
-                    <Ionicons
-                      name="sparkles"
-                      size={16}
-                      color={theme.colors.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.mayaChipText,
-                        { color: theme.colors.primary, marginLeft: 6 },
-                      ]}
-                    >
-                      {primaryCTA.mayaChip.label}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </BlurView>
-          </TouchableOpacity>
+        {/* Main Carousel */}
+        <Animated.View entering={FadeInDown.delay(100)}>
+          <HomeMainCarousel />
         </Animated.View>
 
         {/* Skill Matrix */}
         <View>
-          <SkillRingsRow
+          <YourSkillsCard
             grammar={skills.scores.grammar || 0}
             pronunciation={skills.scores.pronunciation || 0}
             fluency={skills.scores.fluency || 0}
             vocabulary={skills.scores.vocabulary || 0}
-            deltas={skills.deltas}
-            masteryFlags={skills.masteryFlags}
+            avgScore={skills.avgScore}
             deltaLabel={skills.deltaLabel}
+            details={skills.details}
           />
         </View>
 
@@ -496,6 +383,17 @@ export default function HomeScreen() {
 
 const getStyles = (theme: any) =>
   StyleSheet.create({
+    loadingRoot: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "#F5F6FA",
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 14,
+      color: "#6B7280",
+    },
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,

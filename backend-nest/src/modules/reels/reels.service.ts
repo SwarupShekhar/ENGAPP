@@ -158,9 +158,27 @@ export class ReelsService {
       }
 
       // 6. Sort by relevance score, then shuffle so order varies per user/request
-      const sortedReels = Array.from(allReels.values()).sort(
+      let sortedReels = Array.from(allReels.values()).sort(
         (a, b) => b._relevanceScore - a._relevanceScore,
       );
+
+      // Fallback: If feed is empty and user has watched history, show some watched reels
+      // instead of an empty screen.
+      if (sortedReels.length === 0 && watchedIds.size > 0) {
+        this.logger.debug(
+          `Feed empty due to watch filters. Relaxing filters for user ${userId}`,
+        );
+        const allFetched = [...weakReels, ...featuredReels, ...generalReels];
+        for (const reel of allFetched) {
+          const id = reel.id;
+          if (allReels.has(id)) continue;
+          allReels.set(id, { ...reel, _relevanceScore: 10 }); // Low relevance for watched
+        }
+        sortedReels = Array.from(allReels.values()).sort(
+          (a, b) => b._relevanceScore - a._relevanceScore,
+        );
+      }
+
       this.shuffleArray(sortedReels);
 
       // Apply pagination cursor

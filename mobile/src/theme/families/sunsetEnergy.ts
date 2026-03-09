@@ -25,10 +25,10 @@ export const dawn: Theme = {
     warning: "#F59E0B",
     border: "#FFCCBC",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#FF7043",
-      fluency: "#10B981",
-      vocabulary: "#FFAB91",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {
@@ -67,10 +67,10 @@ export const ember: Theme = {
     warning: "#F59E0B",
     border: "#FFE0B2",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#F57C00",
-      fluency: "#10B981",
-      vocabulary: "#FFAB40",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {

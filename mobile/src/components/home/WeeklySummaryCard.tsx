@@ -1,15 +1,29 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../../theme/useAppTheme";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 
 interface Props {
   text: string;
   sessionsCount: number;
   avgScore: number;
   highlights: string[];
+  skillBreakdown?: {
+    grammar: { score: number; delta: number };
+    pronunciation: { score: number; delta: number };
+    fluency: { score: number; delta: number };
+    vocabulary: { score: number; delta: number };
+  };
+  actionableFocus?: {
+    label: string;
+    recommendation: string;
+    actionLabel: string;
+    action: string;
+    priority?: string;
+  };
+  edgeCase?: string;
+  progressTarget?: number;
 }
 
 export default function WeeklySummaryCard({
@@ -17,219 +31,326 @@ export default function WeeklySummaryCard({
   sessionsCount,
   avgScore,
   highlights,
+  skillBreakdown,
+  actionableFocus,
+  edgeCase,
+  progressTarget,
 }: Props) {
   const theme = useAppTheme();
-
-  // Use a soft gradient based on the primary color for the background
-  const isDeep = theme.variation === "deep";
-
   const styles = getStyles(theme);
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Handle edge cases
+  if (edgeCase === 'no_sessions') {
+    return null; // Don't show card if no sessions
+  }
+  
+  if (edgeCase === 'first_week') {
+    return (
+      <View style={[styles.container, theme.shadows.medium]}>
+        <View style={styles.mayaBorder} />
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <LinearGradient
+                colors={["#8B5CF6", "#A78BFA"]}
+                style={styles.mayaAvatar}
+              >
+                <Ionicons name="sparkles" size={16} color="white" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.mayaName}>Maya</Text>
+                <Text style={styles.mayaRole}>Building your baseline</Text>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.progressSection}>
+            <Text style={styles.progressText}>{text}</Text>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${(sessionsCount / (progressTarget || 3)) * 100}%` }]} />
+            </View>
+            <Text style={styles.progressLabel}>{sessionsCount} of {progressTarget || 3} sessions completed</Text>
+          </View>
+          
+          {actionableFocus && (
+            <TouchableOpacity style={styles.ctaButton}>
+              <Text style={styles.ctaText}>{actionableFocus.actionLabel}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  const shouldShowReadMore = text && text.length > 180;
+  const displayText = shouldShowReadMore && !isExpanded 
+    ? text.slice(0, 180) + "..." 
+    : text;
 
   return (
-    <View style={[styles.containerOuter, theme.shadows.medium]}>
-      <BlurView
-        intensity={isDeep ? 40 : 80}
-        tint={isDeep ? "dark" : "light"}
-        style={styles.blurContainer}
-      >
-        <LinearGradient
-          colors={[
-            theme.colors.primary + (isDeep ? "20" : "15"),
-            theme.colors.surface + (isDeep ? "80" : "90"),
-          ]}
-          style={styles.gradientFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.header}>
-            <View
-              style={[
-                styles.aiLabel,
-                { backgroundColor: theme.colors.surface },
-              ]}
+    <View style={[styles.container, theme.shadows.medium]}>
+      {/* Maya's identity left border */}
+      <View style={styles.mayaBorder} />
+      
+      <View style={styles.content}>
+        {/* Header Row 1: Avatar + Name + Chip */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            {/* Maya avatar with violet gradient */}
+            <LinearGradient
+              colors={["#8B5CF6", "#A78BFA"]}
+              style={styles.mayaAvatar}
             >
-              <Ionicons
-                name="sparkles"
-                size={14}
-                color={theme.colors.primary}
-              />
-              <Text
-                style={[styles.aiLabelText, { color: theme.colors.primary }]}
-              >
-                MAYA AI SUMMARY
-              </Text>
+              <Ionicons name="sparkles" size={16} color="white" />
+            </LinearGradient>
+            <View>
+              <Text style={styles.mayaName}>Maya</Text>
+              <Text style={styles.mayaRole}>Your weekly insight</Text>
             </View>
-            <Text
-              style={[styles.dateRange, { color: theme.colors.text.secondary }]}
-            >
-              This Week
+          </View>
+          
+          {/* "This Week" outlined chip */}
+          <View style={styles.weekChip}>
+            <Text style={styles.weekChipText}>This Week</Text>
+          </View>
+        </View>
+
+        {/* Zone 1: Headline Insight */}
+        {text && (
+          <View style={styles.headlineZone}>
+            <Text style={styles.headlineText}>
+              {displayText}
+              {shouldShowReadMore && !isExpanded && (
+                <TouchableOpacity onPress={() => setIsExpanded(true)}>
+                  <Text style={styles.readMore}> Read more</Text>
+                </TouchableOpacity>
+              )}
             </Text>
           </View>
+        )}
 
-          <Text
-            style={[styles.summaryText, { color: theme.colors.text.primary }]}
-          >
-            {text}
-          </Text>
-
-          <View
-            style={[
-              styles.statsRow,
-              {
-                backgroundColor: isDeep
-                  ? "rgba(0,0,0,0.2)"
-                  : "rgba(255,255,255,0.6)",
-              },
-            ]}
-          >
-            <View style={styles.statItem}>
-              <Text
-                style={[styles.statValue, { color: theme.colors.text.primary }]}
-              >
-                {sessionsCount}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                Sessions
-              </Text>
+        {/* Zone 2: Skill Delta Row */}
+        {skillBreakdown && (
+          <View style={styles.skillDeltaZone}>
+            <View style={styles.skillDeltaRow}>
+              {Object.entries(skillBreakdown).map(([skill, data]) => {
+                const skillName = skill.charAt(0).toUpperCase() + skill.slice(1);
+                const deltaColor = data.delta > 0 ? theme.colors.success : data.delta < 0 ? theme.colors.error : theme.colors.text.secondary;
+                const deltaSymbol = data.delta > 0 ? '↑' : data.delta < 0 ? '↓' : '→';
+                
+                return (
+                  <View key={skill} style={styles.skillDeltaItem}>
+                    <Text style={styles.skillName}>{skillName.slice(0, 4)}</Text>
+                    <Text style={[styles.skillDelta, { color: deltaColor }]}>
+                      {data.delta >= 0 ? '+' : ''}{data.delta}{deltaSymbol}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
-            <View
-              style={[styles.divider, { backgroundColor: theme.colors.border }]}
-            />
-            <View style={styles.statItem}>
-              <Text
-                style={[styles.statValue, { color: theme.colors.text.primary }]}
-              >
-                {avgScore}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                Avg Score
-              </Text>
-            </View>
+            
+            {/* Supporting data line */}
+            <Text style={styles.supportingData}>
+              {sessionsCount} sessions · Avg {avgScore} this week
+            </Text>
           </View>
+        )}
 
-          <View style={styles.highlights}>
-            {highlights.map((h, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.highlightItem,
-                  { backgroundColor: theme.colors.primary + "15" },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.highlightText,
-                    { color: theme.colors.primary },
-                  ]}
-                >
-                  {h}
-                </Text>
-              </View>
-            ))}
+        {/* Zone 3: Actionable Focus */}
+        {actionableFocus && (
+          <View style={styles.actionableFocusZone}>
+            <Text style={styles.focusLabel}>{actionableFocus.label}</Text>
+            <Text style={styles.focusRecommendation}>{actionableFocus.recommendation}</Text>
+            <TouchableOpacity style={styles.focusAction}>
+              <Text style={styles.focusActionText}>{actionableFocus.actionLabel} →</Text>
+            </TouchableOpacity>
           </View>
-        </LinearGradient>
-      </BlurView>
+        )}
+      </View>
     </View>
   );
 }
 
 const getStyles = (theme: any) =>
   StyleSheet.create({
-    containerOuter: {
+    container: {
       marginHorizontal: 20,
       marginBottom: 16,
       borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 0,
+      position: "relative",
       overflow: "hidden",
-      borderWidth: 1,
-      borderColor:
-        theme.colors.border + (theme.variation === "deep" ? "40" : "60"),
     },
-    blurContainer: {
-      width: "100%",
+    mayaBorder: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 3,
+      backgroundColor: "#8B5CF6", // Maya's exclusive violet color
     },
-    gradientFill: {
-      padding: 24,
+    content: {
+      padding: 20,
+      paddingLeft: 23, // Extra padding to account for border
     },
     header: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 20,
+      marginBottom: 16,
     },
-    aiLabel: {
+    headerLeft: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: 12,
+    },
+    mayaAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    mayaName: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    mayaRole: {
+      fontSize: 12,
+      fontWeight: "500",
+      color: theme.colors.text.secondary,
+      marginTop: 1,
+    },
+    weekChip: {
       paddingHorizontal: 12,
       paddingVertical: 6,
-      borderRadius: 100,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: "#8B5CF6",
+      backgroundColor: "transparent",
     },
-    aiLabelText: {
+    weekChipText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#8B5CF6",
+    },
+    // First week progress styles
+    progressSection: {
+      marginBottom: 16,
+    },
+    progressText: {
+      fontSize: 15,
+      fontWeight: "500",
+      color: theme.colors.text.primary,
+      marginBottom: 12,
+      lineHeight: 22,
+    },
+    progressBar: {
+      height: 8,
+      backgroundColor: theme.colors.border,
+      borderRadius: 4,
+      marginBottom: 8,
+      overflow: "hidden",
+    },
+    progressFill: {
+      height: "100%",
+      backgroundColor: "#8B5CF6",
+      borderRadius: 4,
+    },
+    progressLabel: {
+      fontSize: 12,
+      fontWeight: "500",
+      color: theme.colors.text.secondary,
+    },
+    // Zone 1: Headline
+    headlineZone: {
+      marginBottom: 16,
+    },
+    headlineText: {
+      fontSize: 16,
+      fontWeight: "600",
+      lineHeight: 24,
+      color: theme.colors.text.primary,
+    },
+    readMore: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: "#8B5CF6",
+    },
+    // Zone 2: Skill Deltas
+    skillDeltaZone: {
+      marginBottom: 16,
+    },
+    skillDeltaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    skillDeltaItem: {
+      alignItems: "center",
+      flex: 1,
+    },
+    skillName: {
       fontSize: 11,
-      fontWeight: "800",
+      fontWeight: "600",
+      color: theme.colors.text.secondary,
+      marginBottom: 2,
+      textTransform: "uppercase",
       letterSpacing: 0.5,
     },
-    dateRange: {
+    skillDelta: {
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    supportingData: {
+      fontSize: 12,
+      fontWeight: "500",
+      color: theme.colors.text.secondary,
+      fontStyle: "italic",
+    },
+    // Zone 3: Actionable Focus
+    actionableFocusZone: {
+      marginBottom: 8,
+    },
+    focusLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: theme.colors.text.secondary,
+      marginBottom: 4,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    focusRecommendation: {
+      fontSize: 14,
+      fontWeight: "500",
+      lineHeight: 20,
+      color: theme.colors.text.primary,
+      marginBottom: 12,
+    },
+    focusAction: {
+      alignSelf: "flex-start",
+    },
+    focusActionText: {
       fontSize: 13,
       fontWeight: "600",
+      color: "#8B5CF6",
     },
-    summaryText: {
-      fontSize: 18,
-      lineHeight: 26,
-      fontWeight: "600",
-      marginBottom: 24,
-    },
-    statsRow: {
-      flexDirection: "row",
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 20,
-    },
-    statItem: {
-      flex: 1,
+    // CTA Button
+    ctaButton: {
+      borderWidth: 1,
+      borderColor: "#8B5CF6",
+      backgroundColor: "transparent",
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
       alignItems: "center",
     },
-    statValue: {
-      fontSize: 24,
-      fontWeight: "800",
-    },
-    statLabel: {
-      fontSize: 13,
-      marginTop: 4,
-      fontWeight: "500",
-    },
-    divider: {
-      width: 1,
-      height: "100%",
-      alignSelf: "center",
-    },
-    highlights: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
-    },
-    highlightItem: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 12,
-    },
-    highlightText: {
-      fontSize: 13,
-      fontWeight: "700",
+    ctaText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: "#8B5CF6",
     },
   });

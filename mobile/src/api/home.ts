@@ -38,6 +38,7 @@ export interface HomeData {
     hottestSkill: string;
     masteryFlags: Record<string, boolean> | null;
     trends: Record<string, number[]> | null;
+    details: Record<string, { items: string[]; subtext: string }>;
   };
   contextualCards: Array<{
     type: string;

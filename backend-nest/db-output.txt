@@ -1,0 +1,34 @@
+[dotenv@17.2.4] injecting env (33) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:259
+        throw new PrismaClientInitializationError(
+              ^
+PrismaClientInitializationError: `PrismaClient` needs to be constructed with a non-empty, valid `PrismaClientOptions`:
+
+```
+new PrismaClient({
+  ...
+})
+```
+
+or
+
+```
+constructor() {
+  super({ ... });
+}
+```
+          
+    at new t (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:259:15)
+    at main (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/check-db-cli.ts:6:18)
+    at Object.<anonymous> (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/check-db-cli.ts:38:1)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)
+    at Module.m._compile (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/ts-node/src/index.ts:1618:23)
+    at node:internal/modules/cjs/loader:1839:10
+    at Object.require.extensions.<computed> [as .ts] (/Users/swarupshekhar/AndroidStudioProjects/EngR_app/backend-nest/node_modules/ts-node/src/index.ts:1621:12)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14) {
+  clientVersion: '7.4.0',
+  errorCode: undefined,
+  retryable: undefined
+}

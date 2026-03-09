@@ -18,6 +18,10 @@ export class SkillsBuilder {
     const latestAnalysis = await this.prisma.analysis.findFirst({
       where: { participant: { userId } },
       orderBy: { createdAt: 'desc' },
+      include: {
+        mistakes: true,
+        pronunciationIssues: true,
+      },
     });
 
     let currentScores = latestAnalysis?.scores as any;
@@ -50,6 +54,9 @@ export class SkillsBuilder {
         };
       }
     }
+
+    // Process detailed insights for each skill
+    const skillDetails = this.formatSkillDetails(latestAnalysis, currentScores);
 
     // Calculate deltas
     let deltas: any = {
@@ -147,7 +154,126 @@ export class SkillsBuilder {
       hottestSkill,
       masteryFlags,
       trends,
+      details: skillDetails,
     };
+  }
+
+  private formatSkillDetails(analysis: any, scores: any) {
+    const details: Record<string, { items: string[]; subtext: string }> = {
+      grammar: { items: [], subtext: 'Keep practicing!' },
+      pronunciation: { items: [], subtext: 'Sounds good!' },
+      fluency: { items: [], subtext: 'Nice flow!' },
+      vocabulary: { items: [], subtext: 'Growing strong!' },
+    };
+
+    if (!analysis) {
+      // Return helpful placeholders if no analysis exists
+      details.grammar.items = [
+        'Focus on subject-verb agreement',
+        'Use varied tenses',
+      ];
+      details.pronunciation.items = [
+        'Work on vowel clarity',
+        'Practice word stress',
+      ];
+      details.fluency.items = ['Reduce filler words', 'Improve speech rate'];
+      details.vocabulary.items = [
+        'Learn 5 new idioms',
+        'Use more precise verbs',
+      ];
+      return details;
+    }
+
+    // 1. Grammar & Vocabulary from Mistakes
+    const mistakes = analysis.mistakes || [];
+    const grammarMistakes = mistakes.filter((m: any) =>
+      ['grammar', 'verb_form', 'syntax', 'article', 'general'].includes(m.type),
+    );
+    const vocabMistakes = mistakes.filter((m: any) =>
+      ['vocabulary', 'word_choice', 'lexical'].includes(m.type),
+    );
+
+    if (grammarMistakes.length > 0) {
+      details.grammar.items = grammarMistakes
+        .slice(0, 2)
+        .map((m: any) => `${m.original} \u2192 ${m.corrected}`);
+      details.grammar.subtext = `${grammarMistakes.length} errors found`;
+    } else if (scores.grammar >= 85) {
+      details.grammar.items = [
+        'Excellent sentence structure',
+        'Proper tense usage',
+      ];
+      details.grammar.subtext = 'Mastery level';
+    } else {
+      details.grammar.items = [
+        'No major errors detected',
+        'Clean sentence structure',
+      ];
+      details.grammar.subtext = 'Looking solid';
+    }
+
+    if (vocabMistakes.length > 0) {
+      details.vocabulary.items = vocabMistakes
+        .slice(0, 2)
+        .map((m: any) => `${m.original} \u2192 ${m.corrected}`);
+      details.vocabulary.subtext = `${vocabMistakes.length} improvements found`;
+    } else {
+      const topicVocab = analysis.topicVocabulary as any;
+      if (topicVocab && topicVocab.relevant_terms?.length > 0) {
+        details.vocabulary.items = topicVocab.relevant_terms
+          .slice(0, 2)
+          .map((t: any) => `Used: ${t}`);
+        details.vocabulary.subtext = `${topicVocab.relevant_terms.length} key terms used`;
+      } else {
+        details.vocabulary.items = ['Good word choice', 'Appropriate register'];
+        details.vocabulary.subtext = 'Strong range';
+      }
+    }
+
+    // 2. Pronunciation from pronunciationIssues
+    const pronIssues = analysis.pronunciationIssues || [];
+    if (pronIssues.length > 0) {
+      details.pronunciation.items = pronIssues
+        .slice(0, 2)
+        .map((i: any) => `Focus on: "${i.word}"`);
+      details.pronunciation.subtext = `${pronIssues.length} sounds to refine`;
+    } else if (scores.pronunciation >= 85) {
+      details.pronunciation.items = [
+        'Natural intonation',
+        'Clear articulation',
+      ];
+      details.pronunciation.subtext = 'Near-native clarity';
+    } else {
+      details.pronunciation.items = [
+        'Consistent clarity',
+        'Clear vowel sounds',
+      ];
+      details.pronunciation.subtext = 'Clear delivery';
+    }
+
+    // 3. Fluency from hesitationMarkers or rawData
+    const hesitations = analysis.hesitationMarkers as any;
+    if (
+      hesitations &&
+      (hesitations.filler_words_count > 3 || hesitations.pauses_count > 2)
+    ) {
+      const fillers =
+        hesitations.top_fillers?.slice(0, 1).join(', ') || 'fillers';
+      details.fluency.items = [
+        `Reduce "${fillers}" usage`,
+        'Minimize long pauses',
+      ];
+      details.fluency.subtext = 'Work on flow';
+    } else {
+      const wpm = (analysis.rawData as any)?.azureEvidence?.wpm || 130;
+      details.fluency.items = [
+        `Speed: ${Math.round(wpm)} WPM (Ideal)`,
+        'Few interruptions',
+      ];
+      details.fluency.subtext = 'Smooth delivery';
+    }
+
+    return details;
   }
 
   private flattenSkills(breakdown: any) {

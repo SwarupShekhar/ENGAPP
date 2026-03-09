@@ -1,12 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Component } from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  useAuth,
-  useUser,
-} from "@clerk/clerk-expo";
+import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import RootNavigator from "./navigation/RootNavigator";
 import { navigationRef, navigate } from "./navigation/navigationRef";
 import AuthNavigator from "./navigation/AuthNavigator";
@@ -27,6 +21,42 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import SocketService from "./services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
 import { ThemeProvider } from "./theme/ThemeProvider";
+
+class AppErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("[App] ErrorBoundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning" size={48} color="#F59E0B" />
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorDetail}>
+            {this.state.error?.message || "An error occurred"}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => this.setState({ hasError: false, error: null })}
+          >
+            <Text style={styles.retryText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Ideally this should be in an .env file, but for now hardcoding as retrieved
 const CLERK_PUBLISHABLE_KEY =
@@ -220,6 +250,30 @@ function OnboardingGate() {
   return <RootNavigator initialRoute={initialRoute} />;
 }
 
+/**
+ * Renders content only after auth is loaded. When Clerk is still loading,
+ * SignedIn/SignedOut both render nothing → blank screen. So we show a loading
+ * screen until isLoaded, then render the correct branch.
+ */
+function AuthGate() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6C5CE7" />
+        <Text style={styles.loadingLabel}>Loading…</Text>
+      </View>
+    );
+  }
+
+  if (isSignedIn) {
+    return <OnboardingGate />;
+  }
+
+  return <AuthNavigator onLoginSuccess={() => {}} />;
+}
+
 export default function App() {
   return (
     <ClerkProvider
@@ -230,15 +284,45 @@ export default function App() {
         <AppSocketHandler>
           <SafeAreaProvider>
             <ThemeProvider>
-              <NavigationContainer ref={navigationRef}>
-                <StatusBar style="auto" />
-                <SignedIn>
-                  <OnboardingGate />
-                </SignedIn>
-                <SignedOut>
-                  <AuthNavigator onLoginSuccess={() => {}} />
-                </SignedOut>
-              </NavigationContainer>
+              <AppErrorBoundary>
+                <View style={styles.appRoot}>
+                  <NavigationContainer
+                    ref={navigationRef}
+                    theme={{
+                      dark: false,
+                      colors: {
+                        primary: "#6C5CE7",
+                        background: "#F5F6FA",
+                        card: "#FFFFFF",
+                        text: "#1F2937",
+                        border: "#E5E7EB",
+                        notification: "#6C5CE7",
+                      },
+                      fonts: {
+                        regular: {
+                          fontFamily: "System",
+                          fontWeight: "400" as const,
+                        },
+                        medium: {
+                          fontFamily: "System",
+                          fontWeight: "500" as const,
+                        },
+                        bold: {
+                          fontFamily: "System",
+                          fontWeight: "700" as const,
+                        },
+                        heavy: {
+                          fontFamily: "System",
+                          fontWeight: "900" as const,
+                        },
+                      },
+                    }}
+                  >
+                    <StatusBar style="auto" />
+                    <AuthGate />
+                  </NavigationContainer>
+                </View>
+              </AppErrorBoundary>
             </ThemeProvider>
           </SafeAreaProvider>
         </AppSocketHandler>
@@ -248,12 +332,41 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+    backgroundColor: "#F5F6FA",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F6FA",
+    padding: 24,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorDetail: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: 24,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#F5F6FA",
     padding: 20,
+  },
+  loadingLabel: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#6B7280",
   },
   errorText: {
     fontSize: 16,

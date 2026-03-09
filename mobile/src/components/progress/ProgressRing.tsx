@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import Svg, { Circle } from "react-native-svg";
-import { useTheme } from "../../theme/ThemeProvider";
+import { Svg, Circle } from "react-native-svg";
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface ProgressRingProps {
   score: number;
@@ -16,7 +16,11 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
   size = 140,
   strokeWidth = 14,
 }) => {
-  const { theme } = useTheme();
+  const theme = useAppTheme();
+
+  const levelKey = (cefrLevel?.toLowerCase() ||
+    "a1") as keyof typeof theme.tokens.level;
+  const levelColor = theme.tokens.level[levelKey] || theme.tokens.level.a1;
 
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -40,7 +44,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={theme.colors.accent}
+          stroke={levelColor}
           strokeWidth={strokeWidth}
           fill="transparent"
           strokeDasharray={`${progress} ${circumference}`}
@@ -55,9 +59,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
         <Text style={[styles.score, { color: theme.colors.text.primary }]}>
           {score}
         </Text>
-        <View
-          style={[styles.levelBadge, { backgroundColor: theme.colors.accent }]}
-        >
+        <View style={[styles.levelBadge, { backgroundColor: levelColor }]}>
           <Text style={styles.levelText}>{cefrLevel}</Text>
         </View>
       </View>

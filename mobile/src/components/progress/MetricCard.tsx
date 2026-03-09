@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useTheme } from "../../theme/ThemeProvider";
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface MetricCardProps {
   title: string;
@@ -16,15 +16,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   delta,
   maxScore = 100,
 }) => {
-  const { theme } = useTheme();
+  const theme = useAppTheme();
   const rounded = Math.round(score);
   const roundedDelta = Math.round(delta * 10) / 10;
 
   const deltaColor =
     roundedDelta > 0
-      ? "#10B981"
+      ? theme.colors.success
       : roundedDelta < 0
-        ? "#F43F5E"
+        ? theme.colors.error
         : theme.colors.text.secondary;
 
   const deltaIcon = roundedDelta > 0 ? "↑" : roundedDelta < 0 ? "↓" : "→";
@@ -34,6 +34,15 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       : `${roundedDelta > 0 ? "+" : ""}${roundedDelta}`;
 
   const fillPercent = Math.min(Math.max((rounded / maxScore) * 100, 0), 100);
+
+  const skillKey = title.toLowerCase() as keyof typeof theme.tokens.skill;
+  const isSkill = !!theme.tokens.skill[skillKey];
+  const skillColor = isSkill
+    ? theme.tokens.skill[skillKey]
+    : theme.colors.primary;
+  const skillTint = isSkill
+    ? (theme.tokens.skill as any)[`${skillKey}Tint`]
+    : theme.colors.primary + "15";
 
   return (
     <View
@@ -69,11 +78,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       <View
         style={[
           styles.progressBar,
-          { backgroundColor: theme.colors.border + "20" },
+          { backgroundColor: isSkill ? skillTint : theme.colors.border + "20" },
         ]}
       >
         <LinearGradient
-          colors={theme.gradients.primary as any}
+          colors={[
+            skillColor,
+            isSkill ? skillColor + "dd" : theme.colors.primary,
+          ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.progressFill, { width: `${fillPercent}%` }]}

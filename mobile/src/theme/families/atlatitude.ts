@@ -25,10 +25,10 @@ export const atlatitudeLight: Theme = {
     warning: "#F59E0B",
     border: "#E2E8F0",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#F59E0B",
-      fluency: "#10B981",
-      vocabulary: "#977DFF",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {
@@ -67,10 +67,10 @@ export const atlatitudeStandard: Theme = {
     warning: "#F59E0B",
     border: "#334155",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#F59E0B",
-      fluency: "#10B981",
-      vocabulary: "#0033FF",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {

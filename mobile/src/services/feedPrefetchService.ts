@@ -18,6 +18,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for in-memory freshness
 const STORAGE_KEY = "@ebites_feed_cache";
 const PRELOAD_VIDEO_COUNT = 2;
 const RETRY_DELAY_MS = 3000; // Retry after 3 seconds if first attempt fails
+const AUTH_RETRY_DELAY_MS = 5000; // Longer delay for 401s to allow AuthTokenInjector to initialize
 const MAX_RETRIES = 2;
 
 interface CachedFeed {
@@ -89,7 +90,7 @@ class FeedPrefetchService {
       if (retryCount < MAX_RETRIES) {
         this.isFetching = false;
         const isAuthError = error.response?.status === 401;
-        const delay = isAuthError ? 2000 : RETRY_DELAY_MS;
+        const delay = isAuthError ? AUTH_RETRY_DELAY_MS : RETRY_DELAY_MS;
         console.log(`[FeedPrefetch] Retrying in ${delay}ms...`);
         setTimeout(() => this.prefetch(retryCount + 1), delay);
         return;

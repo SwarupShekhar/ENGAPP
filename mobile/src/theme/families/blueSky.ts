@@ -25,10 +25,10 @@ export const blueSkyStandard: Theme = {
     warning: "#F59E0B",
     border: "#E2E8F0",
     skill: {
-      grammar: "#4F89E6",
-      pronunciation: "#F59E0B",
-      fluency: "#10B981",
-      vocabulary: "#3A61A4",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {
@@ -71,10 +71,10 @@ export const blueSkyLight: Theme = {
     warning: "#F59E0B",
     border: "#E0F2FE",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#F59E0B",
-      fluency: "#10B981",
-      vocabulary: "#0EA5E9",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {
@@ -113,10 +113,10 @@ export const blueSkyDeep: Theme = {
     warning: "#F59E0B",
     border: "#1E293B",
     skill: {
-      grammar: "#60A5FA",
-      pronunciation: "#FBBF24",
-      fluency: "#34D399",
-      vocabulary: "#93C5FD",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {

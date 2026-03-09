@@ -58,7 +58,19 @@ export default function ShareJourneyCard({
           </View>
 
           <View style={styles.progression}>
-            <View style={styles.levelBadge}>
+            <View
+              style={[
+                styles.levelBadge,
+                {
+                  backgroundColor:
+                    theme.tokens.level[
+                      (startLevel?.toLowerCase() ||
+                        "a1") as keyof typeof theme.tokens.level
+                    ] || theme.tokens.level.a1,
+                  borderColor: "rgba(255,255,255,0.2)",
+                },
+              ]}
+            >
               <Text style={styles.levelText}>{startLevel}</Text>
             </View>
             <Ionicons
@@ -67,7 +79,20 @@ export default function ShareJourneyCard({
               color="white"
               style={styles.arrow}
             />
-            <View style={[styles.levelBadge, styles.levelBadgeEnd]}>
+            <View
+              style={[
+                styles.levelBadge,
+                {
+                  backgroundColor:
+                    theme.tokens.level[
+                      (todayLevel?.toLowerCase() ||
+                        "a1") as keyof typeof theme.tokens.level
+                    ] || theme.tokens.level.a1,
+                  borderColor: "white",
+                  borderWidth: 2,
+                },
+              ]}
+            >
               <Text style={styles.levelText}>{todayLevel}</Text>
             </View>
           </View>

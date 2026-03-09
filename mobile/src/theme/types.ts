@@ -46,6 +46,32 @@ export interface Theme {
   colors: ThemeColors;
   gradients: ThemeGradients;
   shadows: ThemeShadows;
+  tokens: {
+    skill: {
+      grammar: string;
+      grammarTint: string;
+      pronunciation: string;
+      pronunciationTint: string;
+      fluency: string;
+      fluencyTint: string;
+      vocabulary: string;
+      vocabularyTint: string;
+    };
+    level: {
+      a1: string;
+      a1Tint: string;
+      a2: string;
+      a2Tint: string;
+      b1: string;
+      b1Tint: string;
+      b2: string;
+      b2Tint: string;
+      c1: string;
+      c1Tint: string;
+      c2: string;
+      c2Tint: string;
+    };
+  };
   spacing: {
     xs: number;
     s: number;

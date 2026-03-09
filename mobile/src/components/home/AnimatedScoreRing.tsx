@@ -6,7 +6,7 @@ import Animated, {
   withTiming,
   Easing,
 } from "react-native-reanimated";
-import Svg, { Circle, G } from "react-native-svg";
+import { Svg, Circle, G } from "react-native-svg";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 

@@ -133,13 +133,22 @@ export const SkillRadarChart: React.FC<SkillRadarChartProps> = ({
                 const r = valueRatio * RADIUS;
                 const x = CENTER + r * Math.cos(angleRad);
                 const y = CENTER + r * Math.sin(angleRad);
+
+                const labelLower = axis.label.toLowerCase();
+                const skillKey = (
+                  labelLower === "vocab" ? "vocabulary" : labelLower
+                ) as keyof typeof theme.tokens.skill;
+
+                const skillColor =
+                  theme.tokens.skill[skillKey] || theme.colors.primary;
+
                 return (
                   <Circle
                     key={`dot-${i}`}
                     cx={x}
                     cy={y}
-                    r="4"
-                    fill={theme.colors.primary}
+                    r="5"
+                    fill={skillColor}
                     stroke="white"
                     strokeWidth="2"
                   />
@@ -151,14 +160,23 @@ export const SkillRadarChart: React.FC<SkillRadarChartProps> = ({
                 const labelR = RADIUS + 25;
                 const x = CENTER + labelR * Math.cos(angleRad);
                 const y = CENTER + labelR * Math.sin(angleRad);
+
+                const labelLower = axis.label.toLowerCase();
+                const skillKey = (
+                  labelLower === "vocab" ? "vocabulary" : labelLower
+                ) as keyof typeof theme.tokens.skill;
+
+                const skillColor =
+                  theme.tokens.skill[skillKey] || theme.colors.text.secondary;
+
                 return (
                   <SvgText
                     key={`label-${i}`}
                     x={x}
                     y={y}
-                    fill={theme.colors.text.secondary}
+                    fill={skillColor}
                     fontSize="12"
-                    fontWeight="500"
+                    fontWeight="800"
                     textAnchor="middle"
                     alignmentBaseline="middle"
                   >

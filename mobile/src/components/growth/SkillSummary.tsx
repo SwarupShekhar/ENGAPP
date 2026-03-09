@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useAppTheme } from '../../theme/useAppTheme';
+import { getSkillColor, SKILL_NAMES } from '../../theme/colorUtils';
 
 interface Props {
     scores: {
@@ -11,11 +13,13 @@ interface Props {
 }
 
 function SkillBar({ label, score, color }: { label: string; score: number; color: string }) {
+    const theme = useAppTheme();
+    const styles = getStyles(theme);
     return (
         <View style={styles.skillRow}>
             <View style={styles.skillInfo}>
                 <Text style={styles.skillLabel}>{label}</Text>
-                <Text style={styles.skillScore}>{score}</Text>
+                <Text style={[styles.skillScore, { color }]}>{score}</Text>
             </View>
             <View style={styles.barBg}>
                 <View 
@@ -30,25 +34,28 @@ function SkillBar({ label, score, color }: { label: string; score: number; color
 }
 
 export default function SkillSummary({ scores }: Props) {
+    const theme = useAppTheme();
+    const styles = getStyles(theme);
+    
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Skill Proficiency</Text>
-            <SkillBar label="Grammar" score={scores.grammar} color="#8b5cf6" />
-            <SkillBar label="Vocabulary" score={scores.vocabulary} color="#10b981" />
-            <SkillBar label="Fluency" score={scores.fluency} color="#f59e0b" />
-            <SkillBar label="Pronunciation" score={scores.pronunciation} color="#3b82f6" />
+            <SkillBar label={SKILL_NAMES.grammar} score={scores.grammar} color={getSkillColor(theme, 'grammar')} />
+            <SkillBar label={SKILL_NAMES.vocabulary} score={scores.vocabulary} color={getSkillColor(theme, 'vocabulary')} />
+            <SkillBar label={SKILL_NAMES.fluency} score={scores.fluency} color={getSkillColor(theme, 'fluency')} />
+            <SkillBar label={SKILL_NAMES.pronunciation} score={scores.pronunciation} color={getSkillColor(theme, 'pronunciation')} />
         </View>
     );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
     container: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.colors.surface,
         borderRadius: 24,
         padding: 20,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: theme.colors.border,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.03,
@@ -56,7 +63,7 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     title: {
-        color: '#0F172A',
+        color: theme.colors.text.primary,
         fontSize: 18,
         fontWeight: '800',
         marginBottom: 20,
@@ -71,18 +78,18 @@ const styles = StyleSheet.create({
         alignItems: 'baseline',
     },
     skillLabel: {
-        color: '#64748B',
+        color: theme.colors.text.secondary,
         fontSize: 14,
         fontWeight: '600',
     },
     skillScore: {
-        color: '#0F172A',
+        color: theme.colors.text.primary,
         fontSize: 16,
         fontWeight: '800',
     },
     barBg: {
         height: 10,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: theme.colors.border + '20',
         borderRadius: 6,
         overflow: 'hidden',
     },

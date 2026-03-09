@@ -141,12 +141,22 @@ async def assess_pronunciation(
         score_result = calculate_pronunciation_score(errors, azure_avg)
         return {"flagged_errors": errors, "pronunciation_score": score_result}
 
+    # Limit audio size to 10MB to prevent resource exhaustion
+    MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024
+
     if not audio and not _audio_base64:
         raise HTTPException(400, "Provide audio file or JSON body with audio_base64")
 
     if audio and audio.filename:
+        # Check size if available in headers, otherwise read in chunks or after read
         content = await audio.read()
+        if len(content) > MAX_AUDIO_SIZE_BYTES:
+            raise HTTPException(413, "Audio file too large (max 10MB)")
     elif _audio_base64:
+        # Check base64 length (approximate byte size is 3/4 of base64 length)
+        if len(_audio_base64) > (MAX_AUDIO_SIZE_BYTES * 4 / 3):
+            raise HTTPException(413, "Audio base64 payload too large (max 10MB)")
+            
         import base64
         try:
             content = base64.b64decode(_audio_base64)

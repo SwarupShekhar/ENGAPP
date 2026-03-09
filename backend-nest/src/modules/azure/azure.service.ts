@@ -78,15 +78,6 @@ export class AzureService {
         `Running pronunciation assessment (base64: ${!!audioBase64})...`,
       );
 
-      // The FastAPI endpoint is /api/pronunciation/assess and expects JSON
-      // if we are passing azure_result, but we want it to run the assessment,
-      // so we must send multipart/form-data with the audio file.
-      // Wait, earlier I noticed backend-ai prefers `audio` as Form/File.
-      // Let's check how transcribe does it or adapt the JSON payload.
-      // Actually backend-ai `assess_pronunciation` expects `audio: UploadFile` or `azure_result` json string.
-      // If we are passing base64, we need to adapt either backend-ai or send it as a file.
-      // Let's look at what `transcribe` accepts.
-
       const pronResponse = await lastValueFrom(
         this.httpService.post(`${this.aiEngineUrl}/api/pronunciation/assess`, {
           ...audioPayload,
@@ -102,9 +93,14 @@ export class AzureService {
         typeof body?.pronunciation_score === 'object'
           ? body.pronunciation_score
           : { score: body?.pronunciation_score ?? 50 };
-      const score = Number(pronScore.score ?? 50);
+
+      const rawScore = Number(pronScore.score ?? 50);
+      const score = Number.isFinite(rawScore) ? rawScore : 50;
+
       const words = body?.words ?? body?.flagged_errors ?? [];
-      const wordCount = transcript.split(/\s+/).filter((w) => w.length > 0).length;
+      const wordCount = transcript
+        .split(/\s+/)
+        .filter((w) => w.length > 0).length;
 
       return {
         transcript: transcript,

@@ -136,10 +136,10 @@ export function SkillRingsRow({
             isMastered={masteryFlags?.grammar}
             icon="text"
             gradientColors={[
-              theme.colors.skill.grammar,
-              theme.colors.skill.grammar + "dd",
+              theme.tokens.skill.grammar,
+              theme.tokens.skill.grammar + "dd",
             ]}
-            bgColor={theme.colors.skill.grammar + "15"}
+            bgColor={theme.tokens.skill.grammarTint}
           />
           <SkillBar
             label="Pronunciation"
@@ -148,10 +148,10 @@ export function SkillRingsRow({
             isMastered={masteryFlags?.pronunciation}
             icon="mic"
             gradientColors={[
-              theme.colors.skill.pronunciation,
-              theme.colors.skill.pronunciation + "dd",
+              theme.tokens.skill.pronunciation,
+              theme.tokens.skill.pronunciation + "dd",
             ]}
-            bgColor={theme.colors.skill.pronunciation + "15"}
+            bgColor={theme.tokens.skill.pronunciationTint}
           />
           <SkillBar
             label="Fluency"
@@ -160,10 +160,10 @@ export function SkillRingsRow({
             isMastered={masteryFlags?.fluency}
             icon="water"
             gradientColors={[
-              theme.colors.skill.fluency,
-              theme.colors.skill.fluency + "dd",
+              theme.tokens.skill.fluency,
+              theme.tokens.skill.fluency + "dd",
             ]}
-            bgColor={theme.colors.skill.fluency + "15"}
+            bgColor={theme.tokens.skill.fluencyTint}
           />
           <SkillBar
             label="Vocabulary"
@@ -172,10 +172,10 @@ export function SkillRingsRow({
             isMastered={masteryFlags?.vocabulary}
             icon="book"
             gradientColors={[
-              theme.colors.skill.vocabulary,
-              theme.colors.skill.vocabulary + "dd",
+              theme.tokens.skill.vocabulary,
+              theme.tokens.skill.vocabulary + "dd",
             ]}
-            bgColor={theme.colors.skill.vocabulary + "15"}
+            bgColor={theme.tokens.skill.vocabularyTint}
           />
         </View>
       </BlurView>

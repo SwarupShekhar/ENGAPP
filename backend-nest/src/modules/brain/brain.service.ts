@@ -347,38 +347,65 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
 
   async generateWeeklySummary(
     userId: string,
-    stats: {
+    data: {
       sessions: number;
       avgScore: number;
-      strength: string;
-      weakness: string;
-      improvement: number;
+      lastWeekAvgScore: number;
+      avgScoreDelta: number;
+      skillBreakdown: {
+        grammar: { score: number; errorCount: number; topErrorType: string | null; delta: number };
+        pronunciation: { score: number; problemSounds: string[]; delta: number };
+        fluency: { score: number; fillerWordCount: number; avgWPM: number; delta: number };
+        vocabulary: { score: number; newWordsUsed: number; wordsToReview: number; delta: number };
+      };
+      strongestSkill: string;
+      weakestSkill: string;
+      mostImprovedSkill: string;
+      mostImprovedDelta: number;
+      biggestDropSkill: string | null;
+      biggestDropAmount: number;
+      actionableFocus: any;
     },
   ): Promise<string> {
     try {
+      const prompt = `You are Maya, an English learning coach. Write a 2-sentence weekly summary for a learner with this data:
+
+- Sessions: ${data.sessions}
+- Average score: ${data.avgScore} (last week: ${data.lastWeekAvgScore}, delta: ${data.avgScoreDelta >= 0 ? '+' : ''}${data.avgScoreDelta})
+- Grammar: ${data.skillBreakdown.grammar.score} (${data.skillBreakdown.grammar.errorCount} errors, mainly ${data.skillBreakdown.grammar.topErrorType || 'general'}, delta: ${data.skillBreakdown.grammar.delta >= 0 ? '+' : ''}${data.skillBreakdown.grammar.delta})
+- Pronunciation: ${data.skillBreakdown.pronunciation.score} (problem sounds: ${data.skillBreakdown.pronunciation.problemSounds.join(', ') || 'none'}, delta: ${data.skillBreakdown.pronunciation.delta >= 0 ? '+' : ''}${data.skillBreakdown.pronunciation.delta})
+- Fluency: ${data.skillBreakdown.fluency.score} (${data.skillBreakdown.fluency.fillerWordCount} filler words avg, ${data.skillBreakdown.fluency.avgWPM} WPM, delta: ${data.skillBreakdown.fluency.delta >= 0 ? '+' : ''}${data.skillBreakdown.fluency.delta})
+- Vocabulary: ${data.skillBreakdown.vocabulary.score} (${data.skillBreakdown.vocabulary.newWordsUsed} new words, ${data.skillBreakdown.vocabulary.wordsToReview} to review, delta: ${data.skillBreakdown.vocabulary.delta >= 0 ? '+' : ''}${data.skillBreakdown.vocabulary.delta})
+- Most improved: ${data.mostImprovedSkill} (+${data.mostImprovedDelta})
+- Biggest drop: ${data.biggestDropSkill || 'none'} (${data.biggestDropAmount})
+
+Rules:
+1. Mention exactly one strength with a specific number
+2. Mention exactly one area to improve with a specific number
+3. Never use generic praise like "great job" or "keep it up" without a specific data point
+4. Write as if speaking directly to the learner, use "you" not "the learner"
+5. Maximum 40 words total
+6. Be specific and actionable`;
+
       const response = await lastValueFrom(
         this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
           text: `UserID: ${userId}`,
           user_id: userId,
           session_id: 'weekly_summary',
-          context: `Generate a short (2-3 sentences), highly personalized, and motivating weekly progress summary for an English learner. 
-          Stats for the week:
-          - Sessions completed: ${stats.sessions}
-          - Average score: ${stats.avgScore}/100
-          - Strongest skill: ${stats.strength}
-          - Skill needing focus: ${stats.weakness}
-          - Score improvement: ${stats.improvement} points
-          Tone: Encouraging, professional, and coach-like. Mention a specific "win" and one specific "goal" for next week.`,
+          context: prompt,
         }),
       );
 
       return (
         response.data.data?.feedback ||
-        `Great job this week! You've completed ${stats.sessions} sessions and shown strong ${stats.strength}. Focus more on ${stats.weakness} next week.`
+        `Your ${data.strongestSkill} improved ${data.mostImprovedDelta >= 0 ? data.mostImprovedDelta : 0} points to ${data.skillBreakdown[data.strongestSkill as keyof typeof data.skillBreakdown]?.score || data.avgScore}. Focus on ${data.weakestSkill} which dropped ${data.biggestDropAmount < 0 ? Math.abs(data.biggestDropAmount) : 0} points.`
       );
     } catch (error) {
       this.logger.error('BrainService Weekly Summary Error:', error);
-      return `You had a productive week with ${stats.sessions} sessions! Your ${stats.strength} is improving. Keep it up!`;
+      // Fallback to specific data-driven summary
+      const strengthScore = data.skillBreakdown[data.strongestSkill as keyof typeof data.skillBreakdown]?.score || data.avgScore;
+      const weaknessScore = data.skillBreakdown[data.weakestSkill as keyof typeof data.skillBreakdown]?.score || data.avgScore;
+      return `Your ${data.strongestSkill} reached ${strengthScore} points. ${data.weakestSkill} needs attention at ${weaknessScore} points.`;
     }
   }
 }

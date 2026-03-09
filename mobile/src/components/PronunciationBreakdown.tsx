@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useAppTheme } from "../theme/useAppTheme";
 
 export interface PhonemeDetail {
   phoneme: string;
@@ -26,44 +27,51 @@ export interface TutorPronunciationAssessmentResult {
 // IPA → plain English descriptions for Indian learners
 // Don't show raw IPA to users — they won't know what ɪ means
 const PHONEME_DESCRIPTIONS: Record<string, string> = {
-  'ɪ':  'short "i" as in s-I-t',
-  'iː': 'long "ee" as in s-EE-n',
-  'ɛ':  '"e" as in b-E-d',
-  'æ':  'flat "a" as in c-A-t',
-  'ʌ':  'short "u" as in c-U-p',
-  'ɑː': 'long "aa" as in f-A-ther',
-  'ʊ':  'short "oo" as in b-OO-k',
-  'uː': 'long "oo" as in f-OO-d',
-  'ə':  'soft "uh" as in sof-A',
-  'ʃ':  '"sh" as in SH-oe',
-  's':  '"s" as in S-ee',
-  'w':  '"w" as in W-et (round lips)',
-  'v':  '"v" as in V-et (teeth on lip)',
-  'θ':  '"th" as in TH-ink (tongue between teeth)',
-  'ð':  '"th" as in TH-e (soft, voiced)',
-  'd':  '"d" as in D-og',
-  't':  '"t" as in T-op',
-  'ŋ':  '"ng" as in si-NG',
-  'l':  '"l" as in L-eg',
-  'r':  '"r" as in R-ed',
+  ɪ: 'short "i" as in s-I-t',
+  iː: 'long "ee" as in s-EE-n',
+  ɛ: '"e" as in b-E-d',
+  æ: 'flat "a" as in c-A-t',
+  ʌ: 'short "u" as in c-U-p',
+  ɑː: 'long "aa" as in f-A-ther',
+  ʊ: 'short "oo" as in b-OO-k',
+  uː: 'long "oo" as in f-OO-d',
+  ə: 'soft "uh" as in sof-A',
+  ʃ: '"sh" as in SH-oe',
+  s: '"s" as in S-ee',
+  w: '"w" as in W-et (round lips)',
+  v: '"v" as in V-et (teeth on lip)',
+  θ: '"th" as in TH-ink (tongue between teeth)',
+  ð: '"th" as in TH-e (soft, voiced)',
+  d: '"d" as in D-og',
+  t: '"t" as in T-op',
+  ŋ: '"ng" as in si-NG',
+  l: '"l" as in L-eg',
+  r: '"r" as in R-ed',
 };
 
-const getDescription = (phoneme: string) => 
+const getDescription = (phoneme: string) =>
   PHONEME_DESCRIPTIONS[phoneme] ?? `"${phoneme}"`;
 
 // Single word with colour-coded phoneme slots
 const WordBreakdown = ({ wordData }: { wordData: WordDetail }) => {
-  const [selectedPhoneme, setSelectedPhoneme] = useState<PhonemeDetail | null>(null);
+  const theme = useAppTheme();
+  const [selectedPhoneme, setSelectedPhoneme] = useState<PhonemeDetail | null>(
+    null,
+  );
 
-  const hasErrors = wordData.phonemes?.some(p => !p.is_correct);
+  const hasErrors = wordData.phonemes?.some((p) => !p.is_correct);
+  const coral = theme.tokens.skill.pronunciation;
+  const coralTint = theme.tokens.skill.pronunciationTint;
 
   return (
     <View style={styles.wordContainer}>
       {/* Word label */}
-      <Text style={[
-        styles.wordLabel,
-        hasErrors ? styles.wordLabelError : styles.wordLabelOk
-      ]}>
+      <Text
+        style={[
+          styles.wordLabel,
+          hasErrors ? { color: coral } : { color: theme.colors.success },
+        ]}
+      >
         {wordData.word}
       </Text>
 
@@ -72,12 +80,18 @@ const WordBreakdown = ({ wordData }: { wordData: WordDetail }) => {
         {wordData.phonemes?.map((p, i) => (
           <TouchableOpacity
             key={i}
-            onPress={() => setSelectedPhoneme(
-              selectedPhoneme?.phoneme === p.phoneme && !p.is_correct ? null : p
-            )}
+            onPress={() =>
+              setSelectedPhoneme(
+                selectedPhoneme?.phoneme === p.phoneme && !p.is_correct
+                  ? null
+                  : p,
+              )
+            }
             style={[
               styles.phonemeSlot,
-              p.is_correct ? styles.phonemeCorrect : styles.phonemeWrong,
+              p.is_correct
+                ? styles.phonemeCorrect
+                : { backgroundColor: coralTint, borderColor: coral },
               selectedPhoneme === p && styles.phonemeSelected,
             ]}
           >
@@ -91,12 +105,16 @@ const WordBreakdown = ({ wordData }: { wordData: WordDetail }) => {
         <View style={styles.tooltip}>
           <Text style={styles.tooltipTitle}>Sound mismatch</Text>
           <Text style={styles.tooltipLine}>
-            ✗ You said: <Text style={styles.tooltipWrong}>
-              {getDescription(selectedPhoneme.actually_said ?? '?')}
+            ✗ You said:{" "}
+            <Text style={styles.tooltipWrong}>
+              {getDescription(selectedPhoneme.actually_said ?? "?")}
             </Text>
           </Text>
           <Text style={styles.tooltipLine}>
-            ✓ Should be: <Text style={styles.tooltipCorrect}>
+            ✓ Should be:{" "}
+            <Text
+              style={[styles.tooltipCorrect, { color: theme.colors.success }]}
+            >
               {getDescription(selectedPhoneme.phoneme)}
             </Text>
           </Text>
@@ -107,15 +125,15 @@ const WordBreakdown = ({ wordData }: { wordData: WordDetail }) => {
 };
 
 // Full breakdown card shown after assessment
-export const PronunciationBreakdown = ({ 
-  result 
-}: { 
-  result: TutorPronunciationAssessmentResult 
+export const PronunciationBreakdown = ({
+  result,
+}: {
+  result: TutorPronunciationAssessmentResult;
 }) => {
   if (!result.words?.length) return null;
 
-  const problemWords = result.words.filter(w => 
-    w.phonemes?.some(p => !p.is_correct)
+  const problemWords = result.words.filter((w) =>
+    w.phonemes?.some((p) => !p.is_correct),
   );
 
   if (!problemWords.length) {
@@ -143,21 +161,21 @@ export const PronunciationBreakdown = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1E293B',
+    backgroundColor: "#1E293B",
     borderRadius: 16,
     padding: 16,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)'
+    borderColor: "rgba(255,255,255,0.1)",
   },
   cardTitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
   },
   cardSubtitle: {
-    color: '#94A3B8',
+    color: "#94A3B8",
     fontSize: 12,
     marginBottom: 16,
   },
@@ -166,14 +184,14 @@ const styles = StyleSheet.create({
   },
   wordLabel: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 8,
   },
-  wordLabelOk: { color: '#4ade80' },
-  wordLabelError: { color: '#f87171' },
+  wordLabelOk: { color: "#4ade80" },
+  wordLabelError: { color: "#f87171" },
   phonemeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
   },
   phonemeSlot: {
@@ -183,46 +201,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   phonemeCorrect: {
-    backgroundColor: '#14532d',
-    borderColor: '#4ade80',
+    backgroundColor: "#14532d",
+    borderColor: "#4ade80",
   },
   phonemeWrong: {
-    backgroundColor: '#450a0a',
-    borderColor: '#f87171',
+    backgroundColor: "#450a0a",
+    borderColor: "#f87171",
   },
   phonemeSelected: {
     borderWidth: 2,
-    borderColor: '#facc15',
+    borderColor: "#facc15",
   },
   phonemeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontFamily: 'monospace',
+    fontFamily: "monospace",
   },
   tooltip: {
     marginTop: 8,
-    backgroundColor: '#0F172A',
+    backgroundColor: "#0F172A",
     borderRadius: 10,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#facc15',
+    borderLeftColor: "#facc15",
   },
   tooltipTitle: {
-    color: '#facc15',
+    color: "#facc15",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 6,
   },
   tooltipLine: {
-    color: '#ccc',
+    color: "#ccc",
     fontSize: 13,
     marginBottom: 3,
   },
-  tooltipWrong: { color: '#f87171', fontWeight: '600' },
-  tooltipCorrect: { color: '#4ade80', fontWeight: '600' },
+  tooltipWrong: { color: "#f87171", fontWeight: "600" },
+  tooltipCorrect: { color: "#4ade80", fontWeight: "600" },
   allGoodText: {
-    color: '#4ade80',
+    color: "#4ade80",
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

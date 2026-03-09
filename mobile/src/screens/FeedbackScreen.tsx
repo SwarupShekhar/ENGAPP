@@ -31,6 +31,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sessionsApi, ConversationSession } from "../api/sessions";
 import { connectionsApi, chatApi } from "../api/connections";
+import { useAppTheme } from "../theme/useAppTheme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -301,10 +302,18 @@ function MiniScoreRing({
   size?: number;
   label: string;
 }) {
+  const theme = useAppTheme();
   const r = (size - 8) / 2;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
-  const color = getScoreColor(score);
+
+  const skillKey = label.toLowerCase() as keyof typeof theme.tokens.skill;
+  const isSkill =
+    !!theme.tokens.skill[skillKey] || label.toLowerCase() === "vocab";
+  const skillColor =
+    label.toLowerCase() === "vocab"
+      ? theme.tokens.skill.vocabulary
+      : theme.tokens.skill[skillKey] || getScoreColor(score);
 
   return (
     <View style={{ alignItems: "center" }}>
@@ -321,7 +330,7 @@ function MiniScoreRing({
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={color}
+          stroke={skillColor}
           strokeWidth={5}
           fill="none"
           strokeDasharray={`${dash} ${circ}`}
@@ -339,7 +348,14 @@ function MiniScoreRing({
           {score === 0 ? "-" : String(score)}
         </SvgText>
       </Svg>
-      <Text style={styles.miniRingLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.miniRingLabel,
+          isSkill && { color: skillColor, fontWeight: "700" },
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -412,6 +428,7 @@ function SessionCard({
   onPress: () => void;
   onConnectionPress: (s: CallSession) => void;
 }) {
+  const theme = useAppTheme();
   const typeConfig = getTypeConfig(session.type);
   const isAI = session.type === "ai_tutor";
   const hasData = session.overallScore > 0;
@@ -474,10 +491,15 @@ function SessionCard({
             <View
               style={[
                 styles.levelChip,
-                { backgroundColor: typeConfig.color + "15" },
+                {
+                  backgroundColor:
+                    theme.tokens.level[
+                      session.partnerLevel.toLowerCase() as keyof typeof theme.tokens.level
+                    ] || typeConfig.color,
+                },
               ]}
             >
-              <Text style={[styles.levelChipText, { color: typeConfig.color }]}>
+              <Text style={[styles.levelChipText, { color: "white" }]}>
                 {session.partnerLevel}
               </Text>
             </View>

@@ -17,6 +17,7 @@ export function useAppTheme() {
     family: t.family,
     variation: t.variation,
     theme: t, // Expose raw theme for new components
+    tokens: t.tokens,
     colors: {
       ...t.colors,
       primary: t.colors.accent,

@@ -25,10 +25,10 @@ export const aquasoft: Theme = {
     warning: "#F59E0B",
     border: "#B2EBF2",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#F59E0B",
-      fluency: "#10B981",
-      vocabulary: "#26C6DA",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {
@@ -67,10 +67,10 @@ export const oceanic: Theme = {
     warning: "#F59E0B",
     border: "#B3E5FC",
     skill: {
-      grammar: "#3B82F6",
-      pronunciation: "#F59E0B",
-      fluency: "#10B981",
-      vocabulary: "#039BE5",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {
@@ -113,10 +113,10 @@ export const abyss: Theme = {
     warning: "#FFD740",
     border: "#102A43",
     skill: {
-      grammar: "#4FC3F7",
-      pronunciation: "#FFD740",
-      fluency: "#69F0AE",
-      vocabulary: "#B3E5FC",
+      grammar: baseTheme.tokens.skill.grammar,
+      pronunciation: baseTheme.tokens.skill.pronunciation,
+      fluency: baseTheme.tokens.skill.fluency,
+      vocabulary: baseTheme.tokens.skill.vocabulary,
     },
   },
   gradients: {

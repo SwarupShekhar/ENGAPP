@@ -5,11 +5,12 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
+import { useAppTheme } from "../../theme/useAppTheme";
 
 interface Props {
   currentScore: number;
   goalTarget: number;
-  goalLabel: string; // e.g., "Reach B2"
+  goalLabel: string;
 }
 
 export default function NextGoalBar({
@@ -17,6 +18,7 @@ export default function NextGoalBar({
   goalTarget,
   goalLabel,
 }: Props) {
+  const theme = useAppTheme();
   const width = useSharedValue(0);
 
   useEffect(() => {
@@ -42,8 +44,15 @@ export default function NextGoalBar({
         </Text>
       </View>
 
-      <View style={styles.barContainer}>
-        <Animated.View style={[styles.barFill, animatedStyle]} />
+      <View
+        style={[
+          styles.barContainer,
+          { backgroundColor: "rgba(255, 255, 255, 0.2)" },
+        ]}
+      >
+        <Animated.View
+          style={[styles.barFill, animatedStyle, { backgroundColor: "#FFF" }]}
+        />
       </View>
 
       <Text style={styles.scoreRange}>
@@ -76,13 +85,11 @@ const styles = StyleSheet.create({
   },
   barContainer: {
     height: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 3,
     overflow: "hidden",
   },
   barFill: {
     height: "100%",
-    backgroundColor: "#10B981", // theme success color or bright color
     borderRadius: 3,
   },
   scoreRange: {

@@ -69,7 +69,7 @@ export default function C2MasteryGateCard({
 
       {allMet && (
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.colors.warning }]}
+          style={[styles.button, { backgroundColor: theme.tokens.level.c2 }]}
           onPress={() => onPress?.("start_assessment")}
         >
           <Text style={styles.buttonText}>Take C2 Assessment</Text>
@@ -82,13 +82,13 @@ export default function C2MasteryGateCard({
 const getStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: theme.colors.surface,
       borderRadius: 20,
       padding: 16,
       marginBottom: 16,
       marginHorizontal: 16,
       borderWidth: 2,
-      borderColor: theme.colors.warning + "50",
+      borderColor: theme.tokens.level.c2 + "50",
+      backgroundColor: theme.tokens.level.c2Tint,
       ...theme.shadows.medium,
     },
     header: {

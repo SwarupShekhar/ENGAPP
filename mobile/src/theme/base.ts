@@ -1,4 +1,7 @@
+import { semanticTokens } from "./tokens";
+
 export const baseTheme = {
+  tokens: semanticTokens,
   spacing: {
     xs: 4,
     s: 8,

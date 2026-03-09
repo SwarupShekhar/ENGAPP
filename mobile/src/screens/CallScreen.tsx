@@ -343,13 +343,21 @@ export default function CallScreen() {
                   Find a partner to practice with
                 </Text>
               </View>
-              <View style={styles.levelBadge}>
-                <Ionicons
-                  name="trophy"
-                  size={14}
-                  color={theme.colors.primary}
-                />
-                <Text style={styles.levelText}>{userLevel}</Text>
+              <View
+                style={[
+                  styles.levelBadge,
+                  {
+                    backgroundColor:
+                      theme.tokens.level[
+                        userLevel.toLowerCase() as keyof typeof theme.tokens.level
+                      ] || theme.colors.primary,
+                  },
+                ]}
+              >
+                <Ionicons name="trophy" size={14} color="white" />
+                <Text style={[styles.levelText, { color: "white" }]}>
+                  {userLevel}
+                </Text>
               </View>
             </AnimatedRN.View>
 

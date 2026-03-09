@@ -1,0 +1,26 @@
+export const semanticTokens = {
+  skill: {
+    grammar: "#5C6BC0",
+    grammarTint: "#E8EAF6",
+    pronunciation: "#EF5350",
+    pronunciationTint: "#FFEBEE",
+    fluency: "#26A69A",
+    fluencyTint: "#E0F2F1",
+    vocabulary: "#FFA726",
+    vocabularyTint: "#FFF8E1",
+  },
+  level: {
+    a1: "#78909C",
+    a1Tint: "#ECEFF1",
+    a2: "#29B6F6",
+    a2Tint: "#E1F5FE",
+    b1: "#7E57C2",
+    b1Tint: "#EDE7F6",
+    b2: "#66BB6A",
+    b2Tint: "#E8F5E9",
+    c1: "#FFA040",
+    c1Tint: "#FFF3E0",
+    c2: "#FFD600",
+    c2Tint: "#FFFDE7",
+  },
+};

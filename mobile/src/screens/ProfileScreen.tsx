@@ -346,19 +346,22 @@ export default function ProfileScreen() {
               <View
                 style={[
                   styles.levelPill,
-                  { backgroundColor: theme.colors.accent + "12" },
+                  {
+                    backgroundColor:
+                      theme.tokens.level[
+                        (
+                          meta.assessmentLevel || "B1"
+                        ).toLowerCase() as keyof typeof theme.tokens.level
+                      ] || theme.colors.primary,
+                  },
                 ]}
               >
-                <Ionicons
-                  name="trophy-outline"
-                  size={12}
-                  color={theme.colors.accent}
-                />
+                <Ionicons name="trophy-outline" size={12} color="white" />
                 <Text
                   style={{
                     fontSize: 12,
                     fontWeight: "600",
-                    color: theme.colors.accent,
+                    color: "white",
                   }}
                 >
                   {meta.assessmentCompleted

@@ -9,6 +9,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import {
   SafeAreaView,
@@ -51,6 +52,13 @@ const LIVEKIT_URL = "wss://engrapp-8lz8v8ia.livekit.cloud";
 // Restart STT before engine hard-stops (~60s on most engines)
 const STT_MAX_DURATION_MS = 50000;
 
+const IS_ANDROID = Platform.OS === "android";
+// Android cannot share the mic between WebRTC and SpeechRecognizer simultaneously.
+// After this many consecutive short-lived failures we stop retrying local STT.
+const MAX_CONSECUTIVE_STT_FAILURES = 6;
+const STT_INITIAL_BACKOFF_MS = 1500;
+const STT_MAX_BACKOFF_MS = 15000;
+
 // ─── Data & Transcription Listener Component ───────────────────────────────
 function DataListener({
   onTranscription,
@@ -70,11 +78,16 @@ function DataListener({
   }, [room, setRoomRef]);
 
   useEffect(() => {
-    const handleData = (payload: Uint8Array) => {
+    const handleData = (payload: Uint8Array, participant?: any) => {
       try {
+        // Skip our own data packets (local publishData echoes back)
+        const isLocal =
+          participant?.isLocal ||
+          participant?.identity === room.localParticipant?.identity;
+        if (isLocal) return;
+
         const str = Buffer.from(payload).toString("utf-8");
         const data = JSON.parse(str);
-        // Custom data signals
         if (data.type === "end_session") {
           console.log("[LiveKit] Received end_session signal");
           onEndSession();
@@ -98,20 +111,21 @@ function DataListener({
       }
     };
 
-    const handleTranscription = (segments: any[]) => {
+    const handleTranscription = (segments: any[], participant?: any) => {
       if (!segments || segments.length === 0) return;
+      // Speaker identity comes from the participant argument (2nd arg), not the segment
+      const speakerId =
+        participant?.identity ||
+        participant?.sid ||
+        segments[0]?.speakerIdentity;
 
       segments.forEach((segment) => {
-        if (segment.isFinal) {
-          // Some versions use speakerIdentity, others use participant.identity
-          const speakerId =
-            segment.speakerIdentity || segment.participant?.identity;
-          if (speakerId) {
-            onTranscription({
-              userId: speakerId,
-              text: segment.text,
-            });
-          }
+        // LiveKit SDK uses `final` (not `isFinal`)
+        if ((segment.final || segment.isFinal) && speakerId) {
+          onTranscription({
+            userId: speakerId,
+            text: segment.text,
+          });
         }
       });
     };
@@ -210,7 +224,7 @@ function TranscriptionStatus({
             : status === "error"
               ? "Transcription Error"
               : status === "unavailable"
-                ? "Transcription Unavailable"
+                ? "Using Server Transcription"
                 : "Initializing STT..."}
       </Text>
     </View>
@@ -400,13 +414,43 @@ export default function InCallScreen({ navigation, route }: any) {
   const hasScheduledLocalSTTRef = useRef(false);
   const hasRetriedLocalSTTRef = useRef(false);
   const lastLocalSTTStartRef = useRef(0);
+  const consecutiveSttFailuresRef = useRef(0);
+  const sttBackoffMsRef = useRef(STT_INITIAL_BACKOFF_MS);
+  const sttGaveUpRef = useRef(false);
+  const sttErrorRetryCountRef = useRef(0);
   const isMutedRef = useRef(isMuted);
+  const isStartingLocalSTTRef = useRef(false);
   const startRecognitionWithKeepaliveRef = useRef<() => void>(() => {});
   const startLocalSTTRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
+  // Reset all STT refs when a new call starts (new token) so STT can run again.
+  useEffect(() => {
+    if (!token) return;
+    sttGaveUpRef.current = false;
+    hasScheduledLocalSTTRef.current = false;
+    hasRetriedLocalSTTRef.current = false;
+    consecutiveSttFailuresRef.current = 0;
+    sttBackoffMsRef.current = STT_INITIAL_BACKOFF_MS;
+    hasLiveKitSttRef.current = false;
+    sttErrorRetryCountRef.current = 0;
+    hasAttemptedNormalSTTRef.current = false;
+  }, [token]);
+
+  const hasAttemptedNormalSTTRef = useRef(false);
 
   const startRecognitionWithKeepalive = useCallback(() => {
     if (hasEndedRef.current) {
       console.log("[LocalSTT] Skipping start (Ended)");
+      return;
+    }
+    if (
+      sttGaveUpRef.current ||
+      isStartingLocalSTTRef.current ||
+      localSttActiveRef.current
+    ) {
+      console.log(
+        `[LocalSTT] Skipping start (GaveUp: ${sttGaveUpRef.current}, Starting: ${isStartingLocalSTTRef.current}, Active: ${localSttActiveRef.current})`,
+      );
       return;
     }
     if (sttRestartTimerRef.current) {
@@ -414,24 +458,52 @@ export default function InCallScreen({ navigation, route }: any) {
       sttRestartTimerRef.current = null;
     }
     try {
-      ExpoSpeechRecognitionModule.start({
+      const sttOptions: Record<string, any> = {
         lang: "en-US",
         interimResults: true,
         continuous: true,
         addsPunctuation: true,
-        // Let LiveKit manage the category; only set if strictly necessary
-        iosCategory: {
+      };
+
+      if (IS_ANDROID) {
+        // If we haven't failed the on-device attempt yet, try forcing on-device.
+        // If we HAVE failed it (hasAttemptedNormalSTTRef is true), we allow network STT.
+        if (!hasAttemptedNormalSTTRef.current) {
+          sttOptions.requiresOnDeviceRecognition = true;
+          sttOptions.androidIntentOptions = {
+            EXTRA_PREFER_OFFLINE: true,
+          };
+        } else {
+          console.log(
+            "[LocalSTT] Attempting Network-based STT (on-device unavailable)",
+          );
+          sttOptions.requiresOnDeviceRecognition = false;
+          // When falling back to network STT while WebRTC is using the mic,
+          // we tell the intent we don't prefer offline, which sometimes helps
+          // the Google engine route audio differently or handle the shared mic state better.
+          sttOptions.androidIntentOptions = {
+            EXTRA_PREFER_OFFLINE: false,
+          };
+        }
+      } else {
+        sttOptions.iosCategory = {
           category: "playAndRecord",
           categoryOptions: [
             "defaultToSpeaker",
             "allowBluetooth",
-            "mixWithOthers" as any,
+            "mixWithOthers",
           ],
           mode: "voiceChat",
-        },
-      });
-      console.log("[LocalSTT] start() called successfully");
+        };
+      }
+
+      console.log(`[LocalSTT] Calling startRecognitionModule.start()...`);
+      isStartingLocalSTTRef.current = true;
+      lastLocalSTTStartRef.current = Date.now();
+      ExpoSpeechRecognitionModule.start(sttOptions);
     } catch (e) {
+      console.warn("[LocalSTT] start() threw:", e);
+      isStartingLocalSTTRef.current = false;
       return;
     }
     sttRestartTimerRef.current = setTimeout(() => {
@@ -456,6 +528,7 @@ export default function InCallScreen({ navigation, route }: any) {
           transcriptRef.current = next;
           setTranscript(next);
         }
+        console.log("[LocalSTT] Keepalive: stopping to restart...");
         ExpoSpeechRecognitionModule.stop();
       } catch (_) {}
     }, STT_MAX_DURATION_MS);
@@ -467,6 +540,7 @@ export default function InCallScreen({ navigation, route }: any) {
 
   // ─── On-device Speech Recognition (fallback when LiveKit STT is unavailable) ────
   useSpeechRecognitionEvent("start", () => {
+    isStartingLocalSTTRef.current = false;
     lastLocalSTTStartRef.current = Date.now();
     console.log(`[LocalSTT] Event: start. Status: ${transcriptionStatus}`);
     localSttActiveRef.current = true;
@@ -475,11 +549,39 @@ export default function InCallScreen({ navigation, route }: any) {
 
   useSpeechRecognitionEvent("end", () => {
     localSttActiveRef.current = false;
+    isStartingLocalSTTRef.current = false;
     const runDuration = Date.now() - lastLocalSTTStartRef.current;
-    const isShortRun = runDuration < 2000;
+    const isShortRun = runDuration < 3000;
     console.log(
       `[LocalSTT] Event: end. Duration: ${runDuration}ms (Short: ${isShortRun})`,
     );
+
+    // Track consecutive short failures (mic contention on Android)
+    if (isShortRun) {
+      consecutiveSttFailuresRef.current += 1;
+      sttBackoffMsRef.current = Math.min(
+        sttBackoffMsRef.current * 1.5,
+        STT_MAX_BACKOFF_MS,
+      );
+    } else {
+      consecutiveSttFailuresRef.current = 0;
+      sttBackoffMsRef.current = STT_INITIAL_BACKOFF_MS;
+    }
+
+    // If too many consecutive short failures, stop retrying
+    if (
+      consecutiveSttFailuresRef.current >= MAX_CONSECUTIVE_STT_FAILURES &&
+      !sttGaveUpRef.current
+    ) {
+      console.warn(
+        `[LocalSTT] ${consecutiveSttFailuresRef.current} consecutive short failures — stopping local STT. ` +
+          "Will rely on partner broadcast for transcription.",
+      );
+      sttGaveUpRef.current = true;
+      setTranscriptionStatus("unavailable");
+      return;
+    }
+
     // Commit in-flight interim so we don't lose words at restart boundary
     const prev = transcriptRef.current;
     const pending = prev.find((t) => t.id === "pending-local");
@@ -501,13 +603,22 @@ export default function InCallScreen({ navigation, route }: any) {
       transcriptRef.current = next;
       setTranscript(next);
     }
-    // Restart: back off if this was a short run (e.g. no-speech) to avoid tight loop
-    if (!hasEndedRef.current && token && !isMutedRef.current) {
-      const delay = isShortRun ? 2000 : 150;
+    // Restart with exponential backoff for short runs
+    if (
+      !hasEndedRef.current &&
+      token &&
+      !isMutedRef.current &&
+      !hasLiveKitSttRef.current &&
+      !sttGaveUpRef.current
+    ) {
+      const delay = isShortRun ? sttBackoffMsRef.current : 250;
+      console.log(`[LocalSTT] Scheduling restart in ${delay}ms...`);
       setTimeout(() => {
         if (
           !hasEndedRef.current &&
           !isMutedRef.current &&
+          !sttGaveUpRef.current &&
+          !hasLiveKitSttRef.current &&
           startRecognitionWithKeepaliveRef.current
         ) {
           startRecognitionWithKeepaliveRef.current();
@@ -587,12 +698,75 @@ export default function InCallScreen({ navigation, route }: any) {
   });
 
   useSpeechRecognitionEvent("error", (event) => {
+    isStartingLocalSTTRef.current = false;
     const isNoSpeech = event.error === "no-speech";
     if (isNoSpeech) {
-      // Expected when user is silent; "end" will fire and we restart with backoff there
       return;
     }
+    const isNetworkError = event.error === "network";
     console.warn(`[LocalSTT] Error: ${event.error} - ${event.message}`);
+
+    if (sttGaveUpRef.current) return;
+
+    // Check for fatal Android "on-device unavailable" error
+    const isOnDeviceUnavailable =
+      IS_ANDROID &&
+      event.error === "audio-capture" &&
+      event.message
+        ?.toLowerCase()
+        .includes("on-device recognition is not available");
+
+    if (isOnDeviceUnavailable) {
+      if (!hasAttemptedNormalSTTRef.current) {
+        console.warn(
+          "[LocalSTT] On-device STT unavailable. Will retry with network-based STT on next start.",
+        );
+        hasAttemptedNormalSTTRef.current = true;
+
+        // We need to explicitly clear the error status and trigger a restart
+        // because the 'end' event might not always follow immediately for a fatal initialization error.
+        setTranscriptionStatus("idle");
+        if (sttRestartTimerRef.current)
+          clearTimeout(sttRestartTimerRef.current);
+
+        // Give the OS 1 second to fully release the microphone from the failed offline attempt
+        // before trying the network request, to prevent WebRTC lock contention.
+        setTimeout(() => {
+          if (
+            !hasEndedRef.current &&
+            startRecognitionWithKeepaliveRef.current
+          ) {
+            console.log("[LocalSTT] Initiating Network STT Fallback...");
+            startRecognitionWithKeepaliveRef.current();
+          }
+        }, 1000);
+
+        return;
+      }
+      console.warn(
+        "[LocalSTT] Both on-device and network STT failed or unavailable. Giving up.",
+      );
+      sttGaveUpRef.current = true;
+      setTranscriptionStatus("unavailable");
+      if (sttRestartTimerRef.current) {
+        clearTimeout(sttRestartTimerRef.current);
+        sttRestartTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Cap retries for non-network errors so we don't loop forever (start -> error -> retry -> start -> ...).
+    const MAX_ERROR_RETRIES = 2;
+    if (!isNetworkError) {
+      sttErrorRetryCountRef.current += 1;
+      if (sttErrorRetryCountRef.current > MAX_ERROR_RETRIES) {
+        console.warn("[LocalSTT] Too many error retries, stopping");
+        setTranscriptionStatus("error");
+        sttGaveUpRef.current = true; // Prevent "end" handler from restarting
+        return;
+      }
+    }
+
     if (
       !hasLiveKitSttRef.current &&
       !hasEndedRef.current &&
@@ -603,46 +777,44 @@ export default function InCallScreen({ navigation, route }: any) {
         clearTimeout(sttRestartTimerRef.current);
         sttRestartTimerRef.current = null;
       }
-      setTranscriptionStatus("idle");
-      setTimeout(() => {
-        if (!hasEndedRef.current && startRecognitionWithKeepaliveRef.current) {
-          startRecognitionWithKeepaliveRef.current();
-        } else if (!hasEndedRef.current) {
-          setTranscriptionStatus("error");
-        }
-      }, 500);
-    } else if (!hasLiveKitSttRef.current && !hasEndedRef.current) {
+      // Let the "end" event handler handle the restart.
+      // It follows the error event and has backoff logic to prevent fast loops.
+      if (!isNetworkError) {
+        setTranscriptionStatus("idle");
+      }
+    } else if (
+      !hasLiveKitSttRef.current &&
+      !hasEndedRef.current &&
+      token &&
+      !isWaiting
+    ) {
       setTranscriptionStatus("error");
     }
   });
 
   const startLocalSTT = useCallback(async () => {
     console.log(
-      `[LocalSTT] startLocalSTT() called. token: ${!!token}, isMuted: ${isMuted}, hasEnded: ${hasEndedRef.current}`,
+      `[LocalSTT] startLocalSTT() called. token: ${!!token}, isMuted: ${isMutedRef.current}, hasEnded: ${hasEndedRef.current}`,
     );
-    if (!token || hasEndedRef.current) {
-      console.log("[LocalSTT] startLocalSTT() aborting due to state");
-      return;
-    }
+    if (!token || hasEndedRef.current) return;
+    if (isMutedRef.current) return;
+
     try {
       const perms = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      console.log(`[LocalSTT] Permissions check: ${perms.granted}`);
       if (!perms.granted) {
-        console.warn("[LocalSTT] Permissions not granted");
         setTranscriptionStatus("unavailable");
         return;
       }
-      console.log("[LocalSTT] Calling startRecognitionWithKeepalive()...");
       setTranscriptionStatus("active");
       startRecognitionWithKeepalive();
     } catch (e) {
       console.error("[LocalSTT] Failed to start:", e);
       setTranscriptionStatus("unavailable");
     }
-  }, [token, isWaiting, isMuted, startRecognitionWithKeepalive]);
+  }, [token, startRecognitionWithKeepalive]);
   startLocalSTTRef.current = startLocalSTT;
 
-  // Start Local STT when we have both token and room (same delay for both sides)
+  // Start Local STT when we have token and room (primary path)
   useEffect(() => {
     if (
       !token ||
@@ -660,24 +832,17 @@ export default function InCallScreen({ navigation, route }: any) {
     return () => clearTimeout(id);
   }, [token, roomReady]);
 
-  // If one side never got "active", retry once after 3s (e.g. roomReady came late or first start failed)
+  // Fallback: if roomReady never fires, start STT once after delay (so we never stay on "Initializing")
   useEffect(() => {
-    if (!token || hasEndedRef.current || hasRetriedLocalSTTRef.current) return;
-    const id = setInterval(() => {
-      if (hasEndedRef.current) return;
-      if (
-        transcriptionStatus === "idle" &&
-        !localSttActiveRef.current &&
-        !isMutedRef.current &&
-        token &&
-        roomReady
-      ) {
-        console.log("[InCall] Periodic retry starting Local STT...");
-        startLocalSTTRef.current?.();
-      }
-    }, 5000);
-    return () => clearInterval(id);
-  }, [token, transcriptionStatus]);
+    if (!token || hasEndedRef.current) return;
+    const id = setTimeout(() => {
+      if (hasEndedRef.current || hasScheduledLocalSTTRef.current) return;
+      console.log("[InCall] Fallback: starting Local STT (token only)");
+      hasScheduledLocalSTTRef.current = true;
+      startLocalSTTRef.current?.();
+    }, 2500);
+    return () => clearTimeout(id);
+  }, [token]);
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -688,13 +853,21 @@ export default function InCallScreen({ navigation, route }: any) {
         ExpoSpeechRecognitionModule.stop();
       } catch (_) {}
     } else {
-      // When unmuted, if we have a token and it's not active, start it
-      if (token && !hasEndedRef.current && !localSttActiveRef.current) {
+      // Clear error retries when manually unmuting to allow a fresh start
+      sttErrorRetryCountRef.current = 0;
+      // When unmuted, if we have a token and it's not active, start it (unless native STT is already handling it)
+      if (
+        token &&
+        !hasEndedRef.current &&
+        !localSttActiveRef.current &&
+        !hasLiveKitSttRef.current &&
+        !sttGaveUpRef.current
+      ) {
         setTranscriptionStatus("active");
-        startLocalSTT();
+        startLocalSTTRef.current?.();
       }
     }
-  }, [isMuted, token, startLocalSTT]);
+  }, [isMuted, token]);
 
   useEffect(() => {
     pulseScale.value = withRepeat(
@@ -939,17 +1112,27 @@ export default function InCallScreen({ navigation, route }: any) {
     (data: any) => {
       const text = typeof data.text === "string" ? data.text.trim() : "";
       if (!text) return;
-      hasLiveKitSttRef.current = true;
+      // 1. If native STT is detected for the first time, stop local fallback to save resources/avoid conflicts
+      if (!data.fromRemote && !hasLiveKitSttRef.current) {
+        console.log(
+          "[InCall] Native STT detected. Disabling local STT fallback.",
+        );
+        hasLiveKitSttRef.current = true;
+        try {
+          ExpoSpeechRecognitionModule.stop();
+        } catch (e) {}
+      }
+
       setTranscriptionStatus("active");
 
       // 1. If it's from local STT (already added to transcript), don't add again
       // (Wait, local STT adds itself with speaker "user". Remote signals for local user
       // should be ignored by the local user, but added by the remote user as "partner")
 
-      // 2. Identify speaker:
-      // - If data.fromRemote is true, it came from the peer's broadcast -> always "partner"
-      // - If data.userId matches local user and NOT fromRemote -> "user"
-      // - Otherwise (LiveKit native STT) -> compare userId
+      // Identify speaker:
+      // - fromRemote === true: came from peer's DataReceived broadcast → always "partner"
+      //   (self-echoes are already filtered in DataListener)
+      // - fromRemote !== true: came from native LiveKit STT → compare userId
       const isFromSelf =
         data.fromRemote !== true &&
         data.userId != null &&
@@ -957,7 +1140,9 @@ export default function InCallScreen({ navigation, route }: any) {
         data.userId.toString().toLowerCase() ===
           user.id.toString().toLowerCase();
 
-      if (isFromSelf && data.fromRemote) return;
+      // Skip if native STT echoed our own speech IFF local STT is currently active and handling it.
+      // If local STT is inactive (failed or disabled), we want the native transcription.
+      if (isFromSelf && localSttActiveRef.current) return;
 
       const newItem = {
         id: `trans-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1035,24 +1220,25 @@ export default function InCallScreen({ navigation, route }: any) {
         <StatusBar barStyle="dark-content" />
         <RoomHandler
           onRoomReady={(room) => {
+            console.log("[InCall] Room Ready. State:", room.state);
             roomRef.current = room;
             setRoomReady(true);
-            // Force the microphone into the desired state on join
             try {
-              room.localParticipant.setMicrophoneEnabled(!isMuted);
+              room.localParticipant.setMicrophoneEnabled(!isMutedRef.current);
+              console.log("[InCall] Set mic to:", !isMutedRef.current);
             } catch (e) {
               console.warn("[InCall] Initial mic enable failed:", e);
             }
           }}
           onReconnected={(room) => {
-            // Re-sync microphone state on reconnection
+            console.log("[InCall] Room Reconnected.");
             try {
-              room.localParticipant.setMicrophoneEnabled(!isMuted);
+              room.localParticipant.setMicrophoneEnabled(!isMutedRef.current);
             } catch (e) {
               console.warn("[InCall] Re-sync mic enable failed:", e);
             }
             if (!hasEndedRef.current && !hasLiveKitSttRef.current && token) {
-              startLocalSTT();
+              startLocalSTTRef.current?.();
             }
           }}
         />
@@ -1171,16 +1357,25 @@ export default function InCallScreen({ navigation, route }: any) {
                 active={!isMuted}
                 secondary
                 onPress={() => {
-                  const next = !isMuted;
+                  const nextMute = !isMuted;
+                  console.log(
+                    `[InCall] Mute button pressed. New state: ${nextMute}`,
+                  );
                   try {
-                    roomRef.current?.localParticipant?.setMicrophoneEnabled(
-                      !next,
-                    );
+                    const room = roomRef.current;
+                    if (room?.localParticipant) {
+                      room.localParticipant.setMicrophoneEnabled(!nextMute);
+                      console.log(`[InCall] LiveKit mic set to: ${!nextMute}`);
+                    } else {
+                      console.warn(
+                        "[InCall] Cannot toggle mic: room/participant not ready",
+                      );
+                    }
                   } catch (e) {
-                    console.warn("[InCall] setMicrophoneEnabled failed:", e);
+                    console.warn("[InCall] Mic toggle error:", e);
                   }
-                  isMutedRef.current = next;
-                  setIsMuted(next);
+                  isMutedRef.current = nextMute;
+                  setIsMuted(nextMute);
                 }}
               />
               <ControlButton

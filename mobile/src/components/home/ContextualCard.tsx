@@ -153,7 +153,11 @@ export const ContextualCard = ({
             text={data.text}
             sessionsCount={data.sessionsCount}
             avgScore={data.avgScore}
-            highlights={data.highlights}
+            highlights={data.highlights || []}
+            skillBreakdown={data.skillBreakdown}
+            actionableFocus={data.actionableFocus}
+            edgeCase={data.edgeCase}
+            progressTarget={data.progressTarget}
           />
         );
       default:
