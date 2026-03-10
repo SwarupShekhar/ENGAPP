@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,165 +6,139 @@ datasource db {
   provider = "postgresql"
 }
 
-// User model
 model User {
-  id          String    @id @default(uuid())
-  clerkId     String    @unique
-  fname       String
-  lname       String
-  gender      String?
-  hobbies     String[]
-  nativeLang  String
-  level       String
-  overallLevel String?
-  talkStyle        TalkStyle?
-  levelUpdatedAt   DateTime?
-  learningDurationDays Int @default(0)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  // Relations
-  participants SessionParticipant[]
-  tasks        LearningTask[]
-  profile      Profile?
-  assessments  AssessmentSession[]
-  
-  // Reviews given and received
-  reviewsGiven    PartnerReview[] @relation("ReviewsGiven")
-  reviewsReceived PartnerReview[] @relation("ReviewsReceived")
-  
-  // Blocking relations
-  blockedUsers    BlockedUser[] @relation("BlockingUser")
-  blockedBy       BlockedUser[] @relation("BlockedUser")
-
-  // Friendship relations
-  friendshipsRequested Friendship[] @relation("FriendshipRequester")
-  friendshipsReceived  Friendship[] @relation("FriendshipAddressee")
-  friendRequestsSent   FriendRequest[] @relation("FriendRequestSender")
-  friendRequestsReceived FriendRequest[] @relation("FriendRequestReceiver")
-  sentMessages         ChatMessage[] @relation("MessageSender")
-  receivedMessages     ChatMessage[] @relation("MessageReceiver")
-
-  // Chat system (conversation-based)
-  chatParticipants     ConversationParticipant[]
-  chatMessages         Message[]     @relation("ChatMessagesSent")
-
-  // Gamification & Reliability
-  reliability     UserReliability?
-  points          UserPoints?
-  matchmakingQueue MatchmakingQueue[]
-  topicScores     UserTopicScore[]
-  reelHistory     UserReelHistory[]
-  recurringErrors RecurringErrorPattern[]
-
-  // Home Screen Evolution
-  totalSessions       Int       @default(0)
-  currentStreak       Int       @default(0)
-  lastSessionAt       DateTime?
-  lastResolvedStage   Int?
-  assessmentScore     Int?      @default(0)
-  assessmentLevel     String?
-  lastAssessmentAt    DateTime?
-  initialAssessmentScore Int?   @default(0)
-  
-  achievements        UserAchievement[]
-  streakHistory       StreakHistory[]
-
-  // Privacy & GDPR Compliance
-  shareDataForResearch Boolean   @default(false)
-  allowBenchmarking    Boolean   @default(true)
-  dataRetentionDays    Int       @default(90)
-  dataDeletedAt        DateTime?
+  id                     String                    @id @default(uuid())
+  clerkId                String                    @unique
+  fname                  String
+  lname                  String
+  gender                 String?
+  hobbies                String[]
+  nativeLang             String
+  level                  String
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  levelUpdatedAt         DateTime?
+  talkStyle              TalkStyle?
+  overallLevel           String?
+  allowBenchmarking      Boolean                   @default(true)
+  dataDeletedAt          DateTime?
+  dataRetentionDays      Int                       @default(90)
+  learningDurationDays   Int                       @default(0)
+  shareDataForResearch   Boolean                   @default(false)
+  assessmentLevel        String?
+  assessmentScore        Int?                      @default(0)
+  currentStreak          Int                       @default(0)
+  initialAssessmentScore Int?                      @default(0)
+  lastAssessmentAt       DateTime?
+  lastResolvedStage      Int?
+  lastSessionAt          DateTime?
+  totalSessions          Int                       @default(0)
+  assessments            AssessmentSession[]
+  blockedBy              BlockedUser[]             @relation("BlockedUser")
+  blockedUsers           BlockedUser[]             @relation("BlockingUser")
+  receivedMessages       ChatMessage[]             @relation("MessageReceiver")
+  sentMessages           ChatMessage[]             @relation("MessageSender")
+  chatParticipants       ConversationParticipant[]
+  friendRequestsReceived FriendRequest[]           @relation("FriendRequestReceiver")
+  friendRequestsSent     FriendRequest[]           @relation("FriendRequestSender")
+  friendshipsReceived    Friendship[]              @relation("FriendshipAddressee")
+  friendshipsRequested   Friendship[]              @relation("FriendshipRequester")
+  tasks                  LearningTask[]
+  matchmakingQueue       MatchmakingQueue[]
+  chatMessages           Message[]                 @relation("ChatMessagesSent")
+  reviewsReceived        PartnerReview[]           @relation("ReviewsReceived")
+  reviewsGiven           PartnerReview[]           @relation("ReviewsGiven")
+  profile                Profile?
+  recurringErrors        RecurringErrorPattern[]
+  participants           SessionParticipant[]
+  streakHistory          StreakHistory[]
+  achievements           UserAchievement[]
+  points                 UserPoints?
+  reelHistory            UserReelHistory[]
+  reliability            UserReliability?
+  topicScores            UserTopicScore[]
 
   @@index([clerkId])
 }
 
 model UserAchievement {
-  id          String   @id @default(uuid())
-  userId      String
-  badgeType   String   // 'streak_20', 'sessions_50', 'points_20', 'p2p_10'
-  unlockedAt  DateTime @default(now())
-  displayed   Boolean  @default(false)
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  userId     String
+  badgeType  String
+  unlockedAt DateTime @default(now())
+  displayed  Boolean  @default(false)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model StreakHistory {
-  id          String   @id @default(uuid())
-  userId      String
-  streakDays  Int
-  endedAt     DateTime?
-  reason      String   // 'active', 'broken', 'shield_used'
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  userId     String
+  streakDays Int
+  endedAt    DateTime?
+  reason     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-
 model UserReliability {
-  id               String   @id @default(uuid())
-  userId           String   @unique
-  reliabilityScore Float    @default(100.0)
-  tier             String   @default("bronze") // bronze, silver, gold, platinum
-  lastSessionAt    DateTime?
-  lastDisconnectAt DateTime?
-  lastDisconnectReason String? // manual_exit, network_drop, etc.
-  consecutiveDrops Int      @default(0)
-  totalSessions    Int      @default(0)
-  successfulSessions Int    @default(0)
-  completedSessions Int     @default(0)
-  earlyExits       Int      @default(0)
-  noShows          Int      @default(0)
-  reportsReceived  Int      @default(0)
-  consecutiveCompletions Int @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String    @id @default(uuid())
+  userId                 String    @unique
+  reliabilityScore       Float     @default(100.0)
+  tier                   String    @default("bronze")
+  lastSessionAt          DateTime?
+  consecutiveDrops       Int       @default(0)
+  totalSessions          Int       @default(0)
+  successfulSessions     Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  lastDisconnectAt       DateTime?
+  lastDisconnectReason   String?
+  completedSessions      Int       @default(0)
+  consecutiveCompletions Int       @default(0)
+  earlyExits             Int       @default(0)
+  noShows                Int       @default(0)
+  reportsReceived        Int       @default(0)
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserPoints {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  total     Int      @default(0)
-  level     Int      @default(1)
+  id        String         @id @default(uuid())
+  userId    String         @unique
+  total     Int            @default(0)
+  level     Int            @default(1)
+  updatedAt DateTime       @updatedAt
   history   PointHistory[]
-  updatedAt DateTime @updatedAt
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PointHistory {
-  id        String   @id @default(uuid())
+  id           String     @id @default(uuid())
   userPointsId String
-  amount    Int
-  reason    String
-  createdAt DateTime @default(now())
-
-  userPoints UserPoints @relation(fields: [userPointsId], references: [id], onDelete: Cascade)
+  amount       Int
+  reason       String
+  createdAt    DateTime   @default(now())
+  userPoints   UserPoints @relation(fields: [userPointsId], references: [id], onDelete: Cascade)
 }
 
 model MatchmakingQueue {
   id        String   @id @default(uuid())
   userId    String
-  structure String // 'free_talk', 'ielts_speaking', etc.
-  status    String   @default("waiting") // waiting, matched, timeout
+  structure String
+  status    String   @default("waiting")
   createdAt DateTime @default(now())
-
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status, structure])
 }
 
 model Friendship {
-  id        String   @id @default(uuid())
+  id          String   @id @default(uuid())
   requesterId String
   addresseeId String
-  status    String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  addressee   User     @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  requester   User     @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
 
   @@unique([requesterId, addresseeId])
   @@index([requesterId])
@@ -180,9 +151,8 @@ model FriendRequest {
   receiverId String
   status     String   @default("PENDING")
   createdAt  DateTime @default(now())
-
-  sender     User @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User @relation("FriendRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("FriendRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User     @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@unique([senderId, receiverId])
   @@index([receiverId])
@@ -195,9 +165,8 @@ model ChatMessage {
   content    String
   read       Boolean  @default(false)
   createdAt  DateTime @default(now())
-
-  sender     User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([senderId])
   @@index([receiverId])
@@ -205,72 +174,71 @@ model ChatMessage {
 }
 
 model Profile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  bio         String?
-  avatarUrl   String?
-  streak      Int      @default(0)
-  totalSessions Int    @default(0)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  bio           String?
+  avatarUrl     String?
+  streak        Int     @default(0)
+  totalSessions Int     @default(0)
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ConversationSession {
-  id          String    @id @default(uuid())
-  topic       String?
-  structure   String?   // 'free_talk', 'ielts_speaking', etc.
-  objectives  Json?     // Structured objectives for the session
-  checkpoints Json?     // Progress checkpoints
-  status      String    @default("CREATED") // CREATED, IN_PROGRESS, ENDED, PROCESSING, COMPLETED, ANALYSIS_FAILED
-  startedAt   DateTime  @default(now())
-  endedAt     DateTime?
-  duration    Int?      // in seconds
-  interactionMetrics Json? // interaction-specific scores (turn-taking, active listening)
-  peerComparison      Json? // comparative analysis between participants
-  recordingUrl        String?
-  egressId            String?
-  summaryJson         Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  participants SessionParticipant[]
-  analyses     Analysis[]
-  tasks        LearningTask[]
-  feedbacks    Feedback[]
-  reviews      PartnerReview[]
+  id                 String               @id @default(uuid())
+  topic              String?
+  status             String               @default("CREATED")
+  startedAt          DateTime             @default(now())
+  endedAt            DateTime?
+  duration           Int?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  interactionMetrics Json?
+  peerComparison     Json?
+  structure          String?
+  objectives         Json?
+  checkpoints        Json?
+  egressId           String?
+  recordingUrl       String?
+  summaryJson        Json?
+  analyses           Analysis[]
+  feedbacks          Feedback[]
+  tasks              LearningTask[]
+  reviews            PartnerReview[]
+  participants       SessionParticipant[]
 }
 
 model SessionParticipant {
-  id           String    @id @default(uuid())
-  sessionId    String
-  userId       String
-  audioUrl     String?
-  speakingTime Int       @default(0)
-  turnsTaken   Int       @default(0)
-  lastHeartbeat DateTime @default(now())
-
-  session      ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  analysis     Analysis?
-  feedbacks    Feedback[]
+  id            String              @id @default(uuid())
+  sessionId     String
+  userId        String
+  audioUrl      String?
+  speakingTime  Int                 @default(0)
+  turnsTaken    Int                 @default(0)
+  lastHeartbeat DateTime            @default(now())
+  participantEgressId     String?
+  participantRecordingUrl String?
+  analysis                Analysis?
+  feedbacks               Feedback[]
+  session                 ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user                    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, userId])
 }
 
 model Analysis {
-  id            String   @id @default(uuid())
-  sessionId     String
-  participantId String   @unique // Refers to SessionParticipant.id
-  rawData       Json     // Stores full FastAPI response
-  cefrLevel     String?
-  scores        Json     // { grammar, pronunciation, fluency, vocabulary, overall }
-  confidenceTimeline Json? // timeline of confidence scores
-  hesitationMarkers  Json? // filler words, self-corrections, false starts
-  topicVocabulary    Json? // domain-specific vocabulary audit
-  createdAt     DateTime @default(now())
-
-  session      ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  participant  SessionParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  mistakes     Mistake[]
+  id                  String               @id @default(uuid())
+  sessionId           String
+  participantId       String               @unique
+  rawData             Json
+  cefrLevel           String?
+  scores              Json
+  createdAt           DateTime             @default(now())
+  confidenceTimeline  Json?
+  hesitationMarkers   Json?
+  topicVocabulary     Json?
+  participant         SessionParticipant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  session             ConversationSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mistakes            Mistake[]
   pronunciationIssues PronunciationIssue[]
 
   @@unique([sessionId, participantId])
@@ -278,22 +246,21 @@ model Analysis {
 }
 
 model Mistake {
-  id                String   @id @default(uuid())
-  analysisId        String
-  type              String   // verb_form, article, etc.
-  severity          String   @default("medium")
-  segmentId         String
-  original          String
-  corrected         String
-  rule              String?
-  explanation       String
-  example           String?  // optional example sentence for correct usage
-  cefrLevel         String?
-  timestamp         Float
-  reviewed          Boolean  @default(false)
-  masteryScore      Float?
-  createdAt         DateTime @default(now())
-
+  id           String        @id @default(uuid())
+  analysisId   String
+  type         String
+  severity     String        @default("medium")
+  segmentId    String
+  original     String
+  corrected    String
+  rule         String?
+  explanation  String
+  cefrLevel    String?
+  timestamp    Float
+  reviewed     Boolean       @default(false)
+  masteryScore Float?
+  createdAt    DateTime      @default(now())
+  example      String?
   analysis     Analysis      @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   tasks        TaskMistake[]
 
@@ -301,41 +268,39 @@ model Mistake {
 }
 
 model PronunciationIssue {
-  id          String   @id @default(uuid())
-  analysisId  String
-  word        String
-  segmentId   String?
+  id               String   @id @default(uuid())
+  analysisId       String
+  word             String
+  segmentId        String?
   phoneticExpected String?
   phoneticActual   String?
-  issueType   String?
-  severity    String   @default("medium")
-  suggestion  String?
-  audioStart  Float?
-  audioEnd    Float?
-  confidence  Float?
-  createdAt   DateTime @default(now())
-
-  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  issueType        String?
+  severity         String   @default("medium")
+  suggestion       String?
+  audioStart       Float?
+  audioEnd         Float?
+  confidence       Float?
+  createdAt        DateTime @default(now())
+  analysis         Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
 
   @@index([analysisId])
 }
 
 model LearningTask {
-  id               String    @id @default(uuid())
+  id               String               @id @default(uuid())
   userId           String
   sessionId        String?
-  type             String    // grammar_drill, flashcard, etc.
+  type             String
   title            String
   content          Json
-  status           String    @default("pending") // pending, completed
-  estimatedMinutes Int       @default(5)
+  status           String               @default("pending")
+  estimatedMinutes Int                  @default(5)
   dueDate          DateTime
   completedAt      DateTime?
   score            Float?
-  createdAt        DateTime  @default(now())
-
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime             @default(now())
   session          ConversationSession? @relation(fields: [sessionId], references: [id])
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   mistakes         TaskMistake[]
 
   @@index([userId])
@@ -345,40 +310,37 @@ model LearningTask {
 model TaskMistake {
   taskId    String
   mistakeId String
-
-  task      LearningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   mistake   Mistake      @relation(fields: [mistakeId], references: [id], onDelete: Cascade)
+  task      LearningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@id([taskId, mistakeId])
 }
 
 model Feedback {
-  id            String   @id @default(uuid())
+  id            String              @id @default(uuid())
   sessionId     String
-  participantId String   // SessionParticipant.id — each device submits only its own speech
-  transcript    Json?    // array of { speaker_id, text, timestamp } for this participant
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  session     ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  participant SessionParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  participantId String
+  transcript    Json?
+  participant   SessionParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  session       ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, participantId])
   @@index([sessionId])
 }
 
 model PartnerReview {
-  id          String   @id @default(uuid())
-  sessionId   String
-  reviewerId  String
-  revieweeId  String
-  rating      Int      // 1-5
-  comment     String?
-  createdAt   DateTime @default(now())
-
-  session     ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  reviewer    User                @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
-  reviewee    User                @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+  id         String              @id @default(uuid())
+  sessionId  String
+  reviewerId String
+  revieweeId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime            @default(now())
+  reviewee   User                @relation("ReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
+  reviewer   User                @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  session    ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, reviewerId])
   @@index([revieweeId])
@@ -389,89 +351,125 @@ model BlockedUser {
   blockerId     String
   blockedUserId String
   createdAt     DateTime @default(now())
-
-  blocker     User @relation("BlockingUser", fields: [blockerId], references: [id], onDelete: Cascade)
-  blockedUser User @relation("BlockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  blockedUser   User     @relation("BlockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  blocker       User     @relation("BlockingUser", fields: [blockerId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedUserId])
   @@index([blockedUserId])
 }
 
 model AssessmentSession {
-  id               String           @id @default(uuid())
-  userId           String
-  status           AssessmentStatus @default(IN_PROGRESS)
-
-  overallLevel     String?
-  overallScore     Float?
-  confidence       Float?
-  talkStyle        TalkStyle?
-
-  skillBreakdown   Json?
-  fluencyBreakdown Json?
-  rawAzureMetrics  Json?
-  weaknessMap      Json?
-  improvementDelta Json?
-  personalizedPlan Json?
-  
-  benchmarking     Json?
-  readiness        Json?
+  id                 String           @id @default(uuid())
+  userId             String
+  status             AssessmentStatus @default(IN_PROGRESS)
+  confidence         Float?
+  talkStyle          TalkStyle?
+  phase1Data         Json?
+  phase2Data         Json?
+  phase3Data         Json?
+  phase4Data         Json?
+  createdAt          DateTime         @default(now())
+  completedAt        DateTime?
+  improvementDelta   Json?
+  overallLevel       String?
+  overallScore       Float?
+  personalizedPlan   Json?
+  skillBreakdown     Json?
+  weaknessMap        Json?
+  fluencyBreakdown   Json?
+  rawAzureMetrics    Json?
+  benchmarking       Json?
   confidence_metrics Json?
-
-  phase1Data       Json?
-  phase2Data       Json?
-  phase3Data       Json?
-  phase4Data       Json?
-
-  createdAt        DateTime @default(now())
-  completedAt      DateTime?
-
-  user             User     @relation(fields: [userId], references: [id])
+  readiness          Json?
+  user               User             @relation(fields: [userId], references: [id])
 
   @@index([userId, status])
 }
 
-// ── Chat System (conversation-based) ─────────────────────────
-
 model Conversation {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id           String                    @id @default(uuid())
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
   participants ConversationParticipant[]
   messages     Message[]
 }
 
 model ConversationParticipant {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   conversationId String
   userId         String
-  joinedAt       DateTime @default(now())
-  lastReadAt     DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@index([userId])
 }
 
 model Message {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   conversationId String
   senderId       String
   content        String
-  type           String   @default("text") // text | call_invite | system
+  type           String       @default("text")
   metadata       Json?
-  readBy         String[] @default([])
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation("ChatMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  readBy         String[]     @default([])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("ChatMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
   @@index([senderId])
+}
+
+model UserTopicScore {
+  id          String   @id @default(uuid())
+  userId      String
+  topicTag    String
+  score       Float    @default(50.0)
+  updatedAt   DateTime @updatedAt
+  decayRate   Float    @default(0.95)
+  lastSeenAt  DateTime @default(now())
+  occurrences Int      @default(1)
+  source      String   @default("activity")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicTag])
+  @@index([userId])
+  @@index([userId, score])
+}
+
+model UserReelHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  strapiReelId Int
+  watchedAt    DateTime @default(now())
+  completed    Boolean  @default(false)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, strapiReelId])
+  @@index([userId])
+}
+
+model RecurringErrorPattern {
+  id              String   @id @default(uuid())
+  userId          String
+  errorType       String
+  errorCategory   String
+  firstDetectedAt DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  occurrenceCount Int      @default(1)
+  improvementRate Float?
+  status          String   @default("ACTIVE")
+  examples        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, errorType])
+  @@index([userId, status])
 }
 
 enum TalkStyle {
@@ -484,62 +482,4 @@ enum AssessmentStatus {
   COMPLETED
   FAILED
   ABANDONED
-}
-
-model UserTopicScore {
-  id          String   @id @default(uuid())
-  userId      String
-  topicTag    String
-  score       Float    @default(50.0)
-  source      String   @default("activity") // "activity" | "session" | "assessment"
-  occurrences Int      @default(1)           // how many times this weakness was detected
-  lastSeenAt  DateTime @default(now())        // when was this weakness last detected
-  decayRate   Float    @default(0.95)         // for score decay over time (multiply per day)
-  updatedAt   DateTime @updatedAt
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, topicTag])
-  @@index([userId])
-  @@index([userId, score])  // for efficient top-weaknesses query
-}
-
-// Track which reels a user has already watched (to avoid repeats in feed)
-model UserReelHistory {
-  id           String   @id @default(uuid())
-  userId       String
-  strapiReelId Int      // Strapi reel ID
-  watchedAt    DateTime @default(now())
-  completed    Boolean  @default(false) // watched >80%
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, strapiReelId])
-  @@index([userId])
-}
-
-model RecurringErrorPattern {
-  id              String   @id @default(uuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  errorType       String   // "tense_mixing", "th_sound", etc
-  errorCategory   String   // "grammar", "pronunciation", "vocabulary"
-  
-  firstDetectedAt DateTime @default(now())
-  lastSeenAt      DateTime @default(now())
-  occurrenceCount Int      @default(1)
-  
-  // Progress tracking
-  improvementRate Float?   // % reduction over time
-  status          String   @default("ACTIVE") // ACTIVE, IMPROVING, RESOLVED
-  
-  // Example instances
-  examples        Json     // [{ "original": "...", "corrected": "...", "context": "..." }]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([userId, errorType])
-  @@index([userId, status])
 }

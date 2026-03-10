@@ -38,6 +38,20 @@ def _compute_word_accuracy_average(azure_result: dict[str, Any]) -> float:
             total += float(acc)
             count += 1
     return total / count if count else 100.0
+
+
+def _clean_reference_text(text: str) -> str:
+    """Removes speaker labels (e.g. 'User A:', 'Partner:') and empty lines."""
+    import re
+    if not text:
+        return "hello"
+    # Remove things like "User 123:", "Partner:", "AnyName:" at start of lines
+    cleaned = re.sub(r"^[A-Za-z0-9\s]+:\s*", "", text, flags=re.MULTILINE)
+    # Remove punctuation that might confuse PA if it's too heavy
+    cleaned = cleaned.replace("\n", " ").strip()
+    return cleaned or "hello"
+
+
 router = APIRouter(prefix="/pronunciation", tags=["pronunciation"])
 
 # Optional: Azure Speech for Pronunciation Assessment (same key as STT)
@@ -202,9 +216,9 @@ async def assess_pronunciation(
 
         try:
             import azure.cognitiveservices.speech as speechsdk
-            pass_1_transcript = (_reference_text or "").strip()
-            if pass_1_transcript:
-                logger.info("Using client reference_text for Pass 2: %.60s...", pass_1_transcript)
+            pass_1_transcript = _clean_reference_text(_reference_text or "")
+            if pass_1_transcript and pass_1_transcript != "hello":
+                logger.info("Using cleaned reference_text for Pass 2: %.60s...", pass_1_transcript)
             else:
                 if not AZURE_SPEECH_KEY:
                     logger.error("AZURE_SPEECH_KEY not set; cannot run Pass 1 STT")
@@ -214,16 +228,16 @@ async def assess_pronunciation(
                 recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
                 stt_result = recognizer.recognize_once()
                 if stt_result.reason == speechsdk.ResultReason.RecognizedSpeech and (stt_result.text or "").strip():
-                    pass_1_transcript = (stt_result.text or "").strip()
+                    pass_1_transcript = _clean_reference_text(stt_result.text or "")
                     logger.info("Pass 1 (STT) transcript: %s", pass_1_transcript)
                 else:
                     pass_1_transcript = "hello"
                     logger.warning("Pass 1 STT failed or empty; using fallback 'hello'")
 
-            pass_2_result = _run_azure_pronunciation_assessment(tmp_wav, pass_1_transcript or "hello")
+            pass_2_result = _run_azure_pronunciation_assessment(tmp_wav, pass_1_transcript)
             if pass_2_result.get("error"):
                 logger.warning("Azure PA returned error: %s", pass_2_result.get("error"))
-            detector_reference = (_reference_text or "").strip() or pass_1_transcript or ""
+            detector_reference = pass_1_transcript
             errors = detect_from_azure_result(pass_2_result, reference_text=detector_reference)
             azure_avg = _compute_word_accuracy_average(pass_2_result)
             score_result = calculate_pronunciation_score(errors, azure_avg)

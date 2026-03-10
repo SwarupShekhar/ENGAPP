@@ -327,8 +327,24 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         // Point 1: Handle different session statuses
         if (data.status === "PROCESSING") {
-          setErrorHeader("Almost there...");
-          setErrorDetail("The AI is finalizing your speech metrics.");
+          const participantCount = data.participants?.length ?? 0;
+          const feedbackCount = data.feedbacks?.length ?? 0;
+          const waitingForPartner = participantCount > 0 && feedbackCount < participantCount;
+          setErrorHeader(
+            waitingForPartner ? "Waiting for your partner" : "Almost there...",
+          );
+          setErrorDetail(
+            waitingForPartner
+              ? "Ask your partner to end the call so we can analyze the conversation."
+              : "The AI is finalizing your speech metrics.",
+          );
+          // Keep polling until analysis is ready (was missing: we never re-fetched on PROCESSING)
+          if (isMounted && retryCount < 24) {
+            setTimeout(() => {
+              if (isMounted) setRetryCount((prev) => prev + 1);
+            }, 3000); // Poll every 3s while processing so the user who ended first sees feedback sooner
+          }
+          return;
         } else if (data.status === "ANALYSIS_FAILED") {
           setErrorHeader("Analysis Failed");
           setErrorDetail(
@@ -345,8 +361,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             setSessionData(data);
             setLoading(false);
           }
-        } else if (retryCount < 24) {
-          // ~120 seconds total
+        } else if (retryCount < 40) {
+          // ~2 min total at 3s per poll (both users see feedback sooner)
           if (retryCount === 5) {
             setErrorHeader("Still working...");
             setErrorDetail(
@@ -355,7 +371,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           }
           setTimeout(() => {
             if (isMounted) setRetryCount((prev) => prev + 1);
-          }, 5000);
+          }, 3000);
         } else {
           // Point 7: Final fallback
           if (isMounted) {
@@ -897,7 +913,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         {/* Words to work on (pronunciation) – so user knows which words drove the score */}
         {(data.pronunciationIssues?.length > 0 ||
-          data.pronunciationFlagged.length > 0 ||
+          (data.pronunciationFlagged?.length ?? 0) > 0 ||
           data.dominantPronunciationErrors?.length > 0) && (
           <Animated.View entering={FadeInDown.delay(400).springify()}>
             <Text style={styles.sectionTitle}>Words to work on</Text>
@@ -925,9 +941,9 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                     )}
                   </View>
                 ))}
-              {data.pronunciationFlagged.length > 0 &&
+              {(data.pronunciationFlagged?.length ?? 0) > 0 &&
                 data.pronunciationIssues?.length === 0 &&
-                data.pronunciationFlagged.map((item: any, i: number) => (
+                (data.pronunciationFlagged ?? []).map((item: any, i: number) => (
                   <View key={i} style={styles.pronunciationIssueRow}>
                     <Text style={styles.pronunciationIssueWordText}>
                       {item.word ?? item.phoneme ?? "—"}

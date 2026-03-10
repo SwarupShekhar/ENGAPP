@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.swarupshekhar.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "EngR uses speech recognition to provide real-time pronunciation feedback and transcription."
       }
     },
     "android": {

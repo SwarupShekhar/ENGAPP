@@ -117,6 +117,19 @@ export class SessionsProcessor {
       });
       segments.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
 
+      // Log when one participant sent no segments (explains "errors not caught" / static feedback for that user)
+      const segmentCountByUser = session.participants.map((p) => ({
+        userId: p.userId,
+        count: segments.filter((s) => s.speaker_id === p.userId).length,
+      }));
+      const emptySpeakers = segmentCountByUser.filter((x) => x.count === 0);
+      if (emptySpeakers.length > 0) {
+        this.logger.warn(
+          `[SessionsProcessor] Session ${sessionId}: ${emptySpeakers.map((x) => x.userId).join(', ')} sent 0 transcript segments. ` +
+            `Check in-call STT / transcription; that user will get placeholder analysis and errors may be missed.`,
+        );
+      }
+
       const transcriptForLog = segments
         .map((s) => `${s.speaker_id}: ${s.text}`)
         .join('\n');
@@ -187,111 +200,6 @@ export class SessionsProcessor {
           },
         },
       });
-
-      if (sessionData && sessionData.recordingUrl) {
-        const firstParticipant = sessionData.participants?.[0];
-        if (firstParticipant) {
-          try {
-            this.logger.log(
-              `[SessionsProcessor] Running pronunciation assessment for session ${sessionId} on ${sessionData.recordingUrl}`,
-            );
-            const transcriptStr = segments
-              .map((s) => `${s.speaker_id}: ${s.text}`)
-              .join('\n');
-            const {
-              flagged_errors: flaggedErrors,
-              pronunciation_score: pronScore,
-            } = await this.pronunciationService.assessFromRecordingUrl(
-              firstParticipant.userId,
-              sessionData.recordingUrl,
-              transcriptStr,
-            );
-
-            const firstAnalysis = firstParticipant.analysis;
-            let grammar = 0,
-              vocabulary = 0,
-              fluency = 0,
-              overallScore = 0;
-            if (
-              firstAnalysis?.scores &&
-              typeof firstAnalysis.scores === 'object'
-            ) {
-              const s = firstAnalysis.scores as Record<string, number>;
-              grammar = s.grammar ?? s.grammar_score ?? 0;
-              vocabulary = s.vocabulary ?? s.vocabulary_score ?? 0;
-              fluency = s.fluency ?? s.fluency_score ?? 0;
-            }
-            const pronFromAi = pronScore?.score ?? 0;
-            overallScore =
-              this.pronunciationScorerService.applyPronunciationScore(
-                { grammar, vocabulary, fluency, pronunciation: pronFromAi },
-                pronFromAi,
-              );
-            if (pronScore?.cefr_cap) {
-              overallScore = this.pronunciationScorerService.applyCEFRCap(
-                overallScore,
-                pronScore.cefr_cap,
-              );
-            }
-
-            const cefrFromScore =
-              overallScore > 72
-                ? 'B2'
-                : overallScore > 55
-                  ? 'B1'
-                  : overallScore > 35
-                    ? 'A2'
-                    : 'A1';
-
-            const roundedOverall = Math.round(overallScore * 10) / 10;
-            await this.prisma.conversationSession.update({
-              where: { id: sessionId },
-              data: {
-                summaryJson: {
-                  transcript: transcriptStr,
-                  pronunciation_flagged: flaggedErrors,
-                  cefr_score: cefrFromScore,
-                  overall_score: roundedOverall,
-                  grammar_score: grammar,
-                  vocabulary_score: vocabulary,
-                  fluency_score: fluency,
-                  pronunciation_score: pronFromAi,
-                  pronunciation_cefr_cap: pronScore?.cefr_cap ?? null,
-                  pronunciation_cap_reason: pronScore?.cap_reason ?? null,
-                  dominant_pronunciation_errors:
-                    pronScore?.dominant_errors ?? [],
-                  grammar_errors: (firstAnalysis?.rawData as any)?.aiFeedback
-                    ? []
-                    : undefined,
-                },
-              },
-            });
-
-            if (firstAnalysis?.id) {
-              const existingScores =
-                (firstAnalysis.scores as Record<string, number>) || {};
-              await this.prisma.analysis.update({
-                where: { id: firstAnalysis.id },
-                data: {
-                  scores: {
-                    ...existingScores,
-                    grammar,
-                    vocabulary,
-                    fluency,
-                    pronunciation: pronFromAi,
-                    overall: roundedOverall,
-                  },
-                  cefrLevel: cefrFromScore,
-                },
-              });
-            }
-          } catch (pronunErr) {
-            this.logger.error(
-              `[SessionsProcessor] Pronunciation assessment failed for session ${sessionId}: ${pronunErr.message}`,
-            );
-          }
-        }
-      }
 
       if (sessionData && sessionData.participants) {
         for (const sp of sessionData.participants) {

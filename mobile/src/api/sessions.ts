@@ -88,6 +88,8 @@ export interface ConversationSession {
   duration: number | null;
   participants: SessionParticipant[];
   analyses?: SessionAnalysis[];
+  /** Per-participant feedback rows (from getSessionAnalysis); used to show "waiting for partner" */
+  feedbacks?: { transcript?: unknown; participantId?: string }[];
   feedback?: {
     id: string;
     transcript: string | null;

@@ -5,8 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const sdk = require('@azure/cognitiveservices-speech-sdk') as any;
+import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,7 +33,8 @@ export class TranscriptionService {
     speechConfig.speechRecognitionLanguage = 'en-US';
     speechConfig.outputFormat = sdk.OutputFormat.Detailed;
 
-    const audioConfig = sdk.AudioConfig.fromWavFileInput(filePath);
+    const wavBuffer = fs.readFileSync(filePath);
+    const audioConfig = sdk.AudioConfig.fromWavFileInput(wavBuffer);
     const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
 
     return new Promise((resolve, reject) => {

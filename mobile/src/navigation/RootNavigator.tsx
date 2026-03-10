@@ -137,8 +137,10 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
         name="CallPreference"
         component={CallPreferenceScreen}
         options={{
-          presentation: "modal",
-          animation: "slide_from_bottom",
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "none",
+          contentStyle: { backgroundColor: "transparent" },
         }}
       />
 

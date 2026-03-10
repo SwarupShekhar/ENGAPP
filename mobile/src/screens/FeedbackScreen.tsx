@@ -175,14 +175,29 @@ function mapSessionToCallSession(
   const analysis = session.analyses?.[0];
   const summary = session.summaryJson;
   const rawData = analysis?.rawData;
+  const s = analysis?.scores as Record<string, number> | undefined;
 
+  // Backend stores scores as snake_case (grammar_score, overall_score); support both
   const scores = {
-    grammar: summary?.grammar_score ?? analysis?.scores?.grammar ?? 0,
-    vocabulary: summary?.vocabulary_score ?? analysis?.scores?.vocabulary ?? 0,
-    fluency: summary?.fluency_score ?? analysis?.scores?.fluency ?? 0,
+    grammar:
+      summary?.grammar_score ??
+      s?.grammar ??
+      s?.grammar_score ??
+      0,
+    vocabulary:
+      summary?.vocabulary_score ??
+      s?.vocabulary ??
+      s?.vocabulary_score ??
+      0,
+    fluency:
+      summary?.fluency_score ?? s?.fluency ?? s?.fluency_score ?? 0,
     pronunciation:
-      summary?.pronunciation_score ?? analysis?.scores?.pronunciation ?? 0,
-    overall: summary?.overall_score ?? analysis?.scores?.overall ?? 0,
+      summary?.pronunciation_score ??
+      s?.pronunciation ??
+      s?.pronunciation_score ??
+      0,
+    overall:
+      summary?.overall_score ?? s?.overall ?? s?.overall_score ?? 0,
   };
 
   // Build mistake list from real analysis
@@ -558,10 +573,18 @@ function FeedbackBottomSheet({
   session,
   visible,
   onClose,
+  loadingDetail,
+  detailFetchFailed,
+  onRetryDetail,
+  onOpenFullFeedback,
 }: {
   session: CallSession | null;
   visible: boolean;
   onClose: () => void;
+  loadingDetail?: boolean;
+  detailFetchFailed?: boolean;
+  onRetryDetail?: () => void;
+  onOpenFullFeedback?: (sessionId: string) => void;
 }) {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const [activeTab, setActiveTab] = useState<
@@ -637,7 +660,17 @@ function FeedbackBottomSheet({
           </TouchableOpacity>
         </View>
 
-        {!hasData ? (
+        {loadingDetail ? (
+          <View style={styles.noDataContainer}>
+            <ActivityIndicator size="large" color="#8b5cf6" />
+            <Text style={[styles.noDataTitle, { marginTop: 12 }]}>
+              Loading full feedback…
+            </Text>
+            <Text style={styles.noDataSubtitle}>
+              Mistakes, pronunciation tips, and more
+            </Text>
+          </View>
+        ) : !hasData ? (
           <View style={styles.noDataContainer}>
             <Text style={styles.noDataIcon}>📭</Text>
             <Text style={styles.noDataTitle}>No feedback available</Text>
@@ -647,6 +680,17 @@ function FeedbackBottomSheet({
           </View>
         ) : (
           <>
+            {detailFetchFailed && onRetryDetail ? (
+              <TouchableOpacity
+                style={styles.detailRetryBanner}
+                onPress={onRetryDetail}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.detailRetryBannerText}>
+                  Full feedback couldn’t load. Tap to retry
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             {/* Score Row */}
             <View style={styles.sheetScoreRow}>
               <View style={styles.sheetOverallScore}>
@@ -662,12 +706,28 @@ function FeedbackBottomSheet({
                   label="Vocab"
                 />
                 <MiniScoreRing score={session.scores.fluency} label="Fluency" />
-                <MiniScoreRing
-                  score={session.scores.pronunciation}
-                  label="Pronun."
-                />
+              <MiniScoreRing
+                score={session.scores.pronunciation}
+                label="Pronun."
+              />
               </View>
             </View>
+
+            {/* Open full post-call feedback (same screen as after a call) */}
+            {onOpenFullFeedback && session.type === "p2p" && (
+              <TouchableOpacity
+                style={styles.openFullFeedbackBtn}
+                onPress={() => onOpenFullFeedback(session.id)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.openFullFeedbackBtnText}>
+                  View full feedback
+                </Text>
+                <Text style={styles.openFullFeedbackBtnSubtext}>
+                  Transcript, word-level tips, and full report
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Tab Bar */}
             <ScrollView
@@ -1151,12 +1211,60 @@ export default function FeedbackScreen() {
     null,
   );
   const [sheetVisible, setSheetVisible] = useState(false);
+  /** Full post-call feedback (mistakes, pronunciation, etc.) fetched when user opens a session */
+  const [fullDetailSession, setFullDetailSession] = useState<CallSession | null>(
+    null,
+  );
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailFetchFailed, setDetailFetchFailed] = useState(false);
 
   // ── Current user info for partner filtering ──
   const { user } = useUser();
   const currentUserInfo = user
     ? { clerkId: user.id, fullName: user.fullName || "" }
     : null;
+
+  // ── Fetch full session analysis when user opens a session (retry on network error)
+  const fetchFullDetail = useCallback(
+    async (sessionId: string, retries = 3) => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const fullSession = await sessionsApi.getSessionAnalysis(sessionId);
+          if (!currentUserInfo) return null;
+          return mapSessionToCallSession(fullSession, currentUserInfo);
+        } catch (err) {
+          if (attempt < retries) {
+            await new Promise((r) => setTimeout(r, 1500));
+          } else {
+            console.warn("[Feedback] getSessionAnalysis failed after retries:", err);
+            return null;
+          }
+        }
+      }
+      return null;
+    },
+    [currentUserInfo?.clerkId],
+  );
+
+  useEffect(() => {
+    if (!sheetVisible || !selectedSession?.id || !currentUserInfo) return;
+    setFullDetailSession(null);
+    setLoadingDetail(true);
+    let cancelled = false;
+    setDetailFetchFailed(false);
+    fetchFullDetail(selectedSession.id)
+      .then((mapped) => {
+        if (cancelled) return;
+        setFullDetailSession(mapped ?? selectedSession);
+        setDetailFetchFailed(mapped == null && selectedSession != null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetail(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sheetVisible, selectedSession?.id, currentUserInfo?.clerkId, fetchFullDetail]);
 
   // ── Fetch real data from API ──────────────
   const fetchSessions = useCallback(async () => {
@@ -1504,6 +1612,7 @@ export default function FeedbackScreen() {
                 session={session}
                 onPress={() => {
                   setSelectedSession(session);
+                  setFullDetailSession(null);
                   setSheetVisible(true);
                 }}
                 onConnectionPress={handleConnectionPress}
@@ -1517,9 +1626,35 @@ export default function FeedbackScreen() {
 
       {/* DETAILED FEEDBACK BOTTOM SHEET */}
       <FeedbackBottomSheet
-        session={selectedSession}
+        session={fullDetailSession ?? selectedSession}
         visible={sheetVisible}
-        onClose={() => setSheetVisible(false)}
+        onClose={() => {
+          setSheetVisible(false);
+          setFullDetailSession(null);
+          setDetailFetchFailed(false);
+        }}
+        loadingDetail={loadingDetail}
+        detailFetchFailed={detailFetchFailed}
+        onRetryDetail={() => {
+          if (!selectedSession?.id) return;
+          setDetailFetchFailed(false);
+          setLoadingDetail(true);
+          fetchFullDetail(selectedSession.id).then((mapped) => {
+            setFullDetailSession(mapped ?? selectedSession);
+            setDetailFetchFailed(mapped == null);
+            setLoadingDetail(false);
+          });
+        }}
+        onOpenFullFeedback={(sessionId) => {
+          setSheetVisible(false);
+          setFullDetailSession(null);
+          setDetailFetchFailed(false);
+          (navigation as any).navigate("CallFeedback", {
+            sessionId,
+            partnerName: (fullDetailSession ?? selectedSession)?.partnerName,
+            topic: (fullDetailSession ?? selectedSession)?.topic,
+          });
+        }}
       />
     </View>
   );
@@ -1958,6 +2093,45 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+
+  openFullFeedbackBtn: {
+    marginHorizontal: 20,
+    marginVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "#8b5cf615",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#8b5cf640",
+  },
+  openFullFeedbackBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#7c3aed",
+  },
+  openFullFeedbackBtnSubtext: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginTop: 2,
+  },
+
+  detailRetryBanner: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: "#fef3c7",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#f59e0b40",
+  },
+  detailRetryBannerText: {
+    fontSize: 14,
+    color: "#92400e",
+    textAlign: "center",
+    fontWeight: "500",
   },
 
   // Tab bar
