@@ -2,8 +2,6 @@ import os
 import httpx
 import aiofiles
 from urllib.parse import urlparse
-from urllib.error import URLError
-import socket
 from typing import Tuple
 from app.core.config import settings
 from app.core.logging import logger
@@ -41,7 +39,7 @@ async def validate_audio_url(url: str) -> Tuple[bool, str]:
                 
             return True, ""
             
-    except (httpx.RequestError, URLError, socket.timeout) as e:
+    except (httpx.RequestError, httpx.TimeoutException) as e:
         logger.error("audio_validation_failed", url=url[:100], error=str(e), exc_info=True)
         # Fallback to true if validation fails due to network (let download attempt decide)
         return True, ""
@@ -55,15 +53,15 @@ async def download_audio_streamed(url: str, target_path: str):
     async with httpx.AsyncClient(timeout=60.0) as client:
         async with client.stream("GET", url) as response:
             response.raise_for_status()
-            async with aiofiles.open(target_path, "wb") as f:
-                try:
+            try:
+                async with aiofiles.open(target_path, "wb") as f:
                     async for chunk in response.aiter_bytes():
                         await f.write(chunk)
-                except Exception:
-                    # Cleanup partial file on failure
-                    if os.path.exists(target_path):
-                        os.remove(target_path)
-                    raise
+            except Exception:
+                # Cleanup partial file on failure (after file handle is closed)
+                if os.path.exists(target_path):
+                    os.remove(target_path)
+                raise
 
 async def stream_audio_content(url: str):
     """Yield audio content chunks directly from URL."""

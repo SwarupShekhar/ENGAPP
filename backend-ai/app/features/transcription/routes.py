@@ -1,5 +1,4 @@
 import time
-import traceback
 from fastapi import APIRouter, Depends, Request
 from app.models.request import TranscriptionRequest
 from app.models.response import TranscriptionResponse, StandardResponse, Meta
@@ -7,7 +6,6 @@ from app.features.transcription.service import transcription_service, Transcript
 from app.api.deps import get_logger
 
 router = APIRouter()
-logger = get_logger
 
 @router.post("/transcribe", response_model=StandardResponse[TranscriptionResponse])
 async def transcribe_audio(

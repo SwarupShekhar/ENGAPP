@@ -166,7 +166,7 @@ class PronunciationService:
             recalibrated = self.recalibrator.recalibrate_fluency(
                 result["fluency_score"],
                 result.get("prosody_score", prosody_metrics["prosody_score"]),
-                prosody_metrics["speech_rate_wpm"],
+                prosody_metrics["tempo_bpm"],
                 word_timing["pause_data"],
                 word_timing["word_durations"],
                 nbest0,

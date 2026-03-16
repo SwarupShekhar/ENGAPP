@@ -19,8 +19,8 @@ def _ensure_nltk_data():
         except LookupError:
             # Try to download the resource
             try:
-                # Extract the base resource name for download
-                base_resource = resource.split('/')[0] if '/' in resource else resource
+                # Extract the base resource name for download (last path segment)
+                base_resource = resource.rsplit('/', 1)[-1] if '/' in resource else resource
                 nltk.download(base_resource, quiet=True)
             except Exception as e:
                 logger.warning(f"Failed to download NLTK resource {resource}: {e}")

@@ -53,6 +53,7 @@ class StreamingGeminiService:
         buffer = ""
         sentence_endings = re.compile(r'[.!?]\s')
         
+        has_yielded = False
         max_retries = 3
         for attempt in range(max_retries + 1):
             try:
@@ -79,6 +80,7 @@ class StreamingGeminiService:
                             buffer = buffer[match.end():]
                             
                             if sentence:
+                                has_yielded = True
                                 yield sentence
                             
                             match = sentence_endings.search(buffer)
@@ -90,8 +92,8 @@ class StreamingGeminiService:
                         logger.exception(f"Error processing chunk: {e}")
                         if "429" in str(e):
                             # Only re-raise if we haven't yielded anything yet
-                            if not buffer:
-                                raise e
+                            if not has_yielded:
+                                raise
                             # Otherwise log and stop gracefully
                             logger.warning("Rate limited after partial response, stopping stream")
                             break

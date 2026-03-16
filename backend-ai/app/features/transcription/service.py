@@ -106,10 +106,12 @@ class TranscriptionService:
                     cancellation_details = evt.result.cancellation_details
                     logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
                     if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                        recognized_future.set_exception(RuntimeError(f"Azure Error: {cancellation_details.error_details}"))
-            
-            # Schedule update on asyncio event loop
-            asyncio.run_coroutine_threadsafe(_update_state(), loop).result()
+                        if not recognized_future.done():
+                            recognized_future.set_exception(
+                                RuntimeError(f"Azure Error: {cancellation_details.error_details}")
+                            )
+            # Schedule update on asyncio event loop thread-safely
+            loop.call_soon_threadsafe(_update_state)
 
 
         def on_session_stopped(evt):
@@ -117,7 +119,7 @@ class TranscriptionService:
                 logger.debug("Session stopped.")
                 if not recognized_future.done():
                     recognized_future.set_result(True)
-            asyncio.run_coroutine_threadsafe(_set_result(), loop).result()
+            loop.call_soon_threadsafe(_set_result)
 
         recognizer.recognized.connect(on_recognized)
         recognizer.session_stopped.connect(on_session_stopped)

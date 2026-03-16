@@ -30,20 +30,32 @@ export class LivekitController {
       // Room composite — start only once, with a small delay so the room exists
       if (!session.egressId) {
         setTimeout(async () => {
-          // Re-check to avoid TOCTOU race condition
-          const updatedSession = await this.prisma.conversationSession.findUnique({
-            where: { id: body.sessionId },
-          });
-          
-          if (updatedSession && !updatedSession.egressId) {
-            try {
-              await this.egressService.startRoomCompositeEgress(
-                roomName,
-                body.sessionId,
-              );
-            } catch (e) {
-              this.logger.error(`Room composite egress failed`, e);
+          try {
+            // Atomically claim egress start to avoid races between concurrent requests
+            const result =
+              await this.prisma.conversationSession.updateMany({
+                where: { id: body.sessionId, egressId: null },
+                data: { egressId: 'pending' },
+              });
+
+            if (result.count > 0) {
+              try {
+                await this.egressService.startRoomCompositeEgress(
+                  roomName,
+                  body.sessionId,
+                );
+              } catch (e) {
+                this.logger.error(
+                  `Room composite egress failed for session ${body.sessionId}`,
+                  e,
+                );
+              }
             }
+          } catch (e) {
+            this.logger.error(
+              `Room composite egress scheduling failed for session ${body.sessionId}`,
+              e,
+            );
           }
         }, 3000); // 3 second delay for room to be created
       }
@@ -54,27 +66,38 @@ export class LivekitController {
       );
       if (thisParticipant && !thisParticipant.participantEgressId) {
         setTimeout(async () => {
-          // Re-check to avoid race condition
-          const updatedSession = await this.prisma.conversationSession.findUnique({
-            where: { id: body.sessionId },
-            include: { participants: true },
-          });
-          
-          const updatedParticipant = updatedSession?.participants.find(
-            (p) => p.userId === body.userId,
-          );
-          
-          if (updatedParticipant && !updatedParticipant.participantEgressId) {
-            try {
-              await this.egressService.startParticipantTrackEgress(
-                roomName,
-                body.sessionId,
-                body.userId,
-                body.userId,
-              );
-            } catch (e) {
-              this.logger.error(`Track egress failed for ${body.userId}`, e);
+          try {
+            // Re-check to avoid race condition
+            const updatedSession =
+              await this.prisma.conversationSession.findUnique({
+                where: { id: body.sessionId },
+                include: { participants: true },
+              });
+
+            const updatedParticipant = updatedSession?.participants.find(
+              (p) => p.userId === body.userId,
+            );
+
+            if (updatedParticipant && !updatedParticipant.participantEgressId) {
+              try {
+                await this.egressService.startParticipantTrackEgress(
+                  roomName,
+                  body.sessionId,
+                  body.userId,
+                  body.userId,
+                );
+              } catch (e) {
+                this.logger.error(
+                  `Track egress failed for user ${body.userId} in session ${body.sessionId}`,
+                  e,
+                );
+              }
             }
+          } catch (e) {
+            this.logger.error(
+              `Participant egress scheduling failed for user ${body.userId} in session ${body.sessionId}`,
+              e,
+            );
           }
         }, 3000); // same 3 second delay
       }

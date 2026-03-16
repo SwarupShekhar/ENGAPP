@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Request
@@ -59,7 +60,7 @@ AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
 
 
-def _run_azure_pronunciation_assessment(
+async def _run_azure_pronunciation_assessment(
     audio_path: str,
     reference_text: str | None,
 ) -> dict[str, Any]:
@@ -88,8 +89,6 @@ def _run_azure_pronunciation_assessment(
     )
     pa_config.apply_to(recognizer)
 
-    import asyncio
-    
     try:
         result = await asyncio.to_thread(recognizer.recognize_once)
     except Exception as e:
@@ -236,7 +235,9 @@ async def assess_pronunciation(
                     pass_1_transcript = "hello"
                     logger.warning("Pass 1 STT failed or empty; using fallback 'hello'")
 
-            pass_2_result = _run_azure_pronunciation_assessment(tmp_wav, pass_1_transcript)
+            pass_2_result = await _run_azure_pronunciation_assessment(
+                tmp_wav, pass_1_transcript
+            )
             if pass_2_result.get("error"):
                 logger.warning("Azure PA returned error: %s", pass_2_result.get("error"))
             detector_reference = pass_1_transcript

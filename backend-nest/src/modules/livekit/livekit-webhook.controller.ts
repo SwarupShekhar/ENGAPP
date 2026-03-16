@@ -5,6 +5,7 @@ import {
   Headers,
   UnauthorizedException,
   Req,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { WebhookReceiver } from 'livekit-server-sdk';
@@ -65,7 +66,9 @@ export class LiveKitWebhookController {
     
     // Validate credentials before creating WebhookReceiver
     if (!apiKey || !apiSecret) {
-      throw new Error('LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be configured');
+      throw new InternalServerErrorException(
+        'LIVEKIT credentials not configured',
+      );
     }
     
     const receiver = new WebhookReceiver(apiKey, apiSecret);

@@ -476,9 +476,10 @@ Answer with JSON:
         vocab_data = self.vocab_analyzer.analyze_vocabulary(request.text)
         # Merge: prefer LLM fields where available, but add analyzer results
         if llm_vocab:
-            vocab_data["llm_advanced_words"] = llm_vocab.get("advanced_words", [])
-            vocab_data["llm_domain_terms"] = llm_vocab.get("domain_terms", [])
-            vocab_data["llm_collocation_errors"] = llm_vocab.get("collocation_errors", [])
+            llm_vocab_analysis = llm_vocab.get("vocabulary_analysis", {}) or {}
+            vocab_data["llm_advanced_words"] = llm_vocab_analysis.get("advanced_words", [])
+            vocab_data["llm_domain_terms"] = llm_vocab_analysis.get("domain_terms", [])
+            vocab_data["llm_collocation_errors"] = llm_vocab_analysis.get("collocation_errors", [])
         vocab_data["word_count"] = len(request.text.split())
         vocab_data["unique_words"] = len(set(request.text.lower().split()))
         vocab_data["justification"] = llm_vocab.get("justification", "Vocabulary enrichment and MTLD analysis complete.")

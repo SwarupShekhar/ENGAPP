@@ -19,6 +19,9 @@ from app.api.deps import get_logger
 
 logger = logging.getLogger(__name__)
 
+# Feature flag for debug endpoints
+ENABLE_DEBUG_ENDPOINTS = os.getenv("HINGLISH_DEBUG", "false").lower() == "true"
+
 router = APIRouter()
 
 
@@ -247,6 +250,9 @@ async def debug_phonemes(
                 request_id=getattr(request.state, "request_id", None),
             ),
         )
+    except HTTPException as http_exc:
+        log.exception("endpoint_debug_phonemes_failed_http")
+        raise http_exc
     except Exception as e:
         log.exception("endpoint_debug_phonemes_failed")
         raise HTTPException(status_code=500, detail="Debug failed")
