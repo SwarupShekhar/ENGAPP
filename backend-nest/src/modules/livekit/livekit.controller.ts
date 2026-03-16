@@ -30,13 +30,20 @@ export class LivekitController {
       // Room composite — start only once, with a small delay so the room exists
       if (!session.egressId) {
         setTimeout(async () => {
-          try {
-            await this.egressService.startRoomCompositeEgress(
-              roomName,
-              body.sessionId,
-            );
-          } catch (e) {
-            this.logger.error(`Room composite egress failed`, e);
+          // Re-check to avoid TOCTOU race condition
+          const updatedSession = await this.prisma.conversationSession.findUnique({
+            where: { id: body.sessionId },
+          });
+          
+          if (updatedSession && !updatedSession.egressId) {
+            try {
+              await this.egressService.startRoomCompositeEgress(
+                roomName,
+                body.sessionId,
+              );
+            } catch (e) {
+              this.logger.error(`Room composite egress failed`, e);
+            }
           }
         }, 3000); // 3 second delay for room to be created
       }
@@ -47,15 +54,27 @@ export class LivekitController {
       );
       if (thisParticipant && !thisParticipant.participantEgressId) {
         setTimeout(async () => {
-          try {
-            await this.egressService.startParticipantTrackEgress(
-              roomName,
-              body.sessionId,
-              body.userId,
-              body.userId,
-            );
-          } catch (e) {
-            this.logger.error(`Track egress failed for ${body.userId}`, e);
+          // Re-check to avoid race condition
+          const updatedSession = await this.prisma.conversationSession.findUnique({
+            where: { id: body.sessionId },
+            include: { participants: true },
+          });
+          
+          const updatedParticipant = updatedSession?.participants.find(
+            (p) => p.userId === body.userId,
+          );
+          
+          if (updatedParticipant && !updatedParticipant.participantEgressId) {
+            try {
+              await this.egressService.startParticipantTrackEgress(
+                roomName,
+                body.sessionId,
+                body.userId,
+                body.userId,
+              );
+            } catch (e) {
+              this.logger.error(`Track egress failed for ${body.userId}`, e);
+            }
           }
         }, 3000); // same 3 second delay
       }

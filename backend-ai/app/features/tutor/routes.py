@@ -1,7 +1,9 @@
 import time
 import base64
 import logging
+import os
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
+from app.core.config import settings
 from app.models.request import HinglishSTTRequest, HinglishTTSRequest
 from app.models.response import (
     HinglishSTTResponse,
@@ -142,7 +144,7 @@ async def assess_pronunciation(
         raise
     except Exception as e:
         log.error("endpoint_assess_pronunciation_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Assessment failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Assessment failed")
 
 
 # ─── NEW: STT with multipart (file upload) ───────────────────────
@@ -176,7 +178,7 @@ async def transcribe_hinglish_upload(
             response_data = HinglishSTTWithIntentResponse(
                 text=transcription.get("text", ""),
                 language=transcription.get("language"),
-                success=transcription.get("success", False),
+                success=bool(transcription.get("text")),
                 intent=transcription.get("intent", "none"),
                 intent_confidence=transcription.get("intent_confidence", 0.0),
                 is_command=transcription.get("is_command", False),
@@ -207,8 +209,10 @@ async def transcribe_hinglish_upload(
         raise
     except Exception as e:
         log.error("endpoint_stt_upload_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
-@router.post("/debug-phonemes")
+        raise HTTPException(status_code=500, detail="Transcription failed")
+
+
+@router.post("/debug-phonemes", response_model=StandardResponse[dict])
 async def debug_phonemes(
     request: Request,
     audio: UploadFile = File(...),
@@ -217,7 +221,11 @@ async def debug_phonemes(
 ):
     """
     Temporary debug endpoint to get raw phoneme scores and N-Best data.
+    Only enabled when HINGLISH_DEBUG=true environment variable is set.
     """
+    if not ENABLE_DEBUG_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="Debug endpoint not available")
+    
     log = get_logger(request)
     try:
         log.info("endpoint_debug_phonemes_started", reference_text=reference_text)
@@ -240,5 +248,5 @@ async def debug_phonemes(
             ),
         )
     except Exception as e:
-        log.error("endpoint_debug_phonemes_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
+        log.exception("endpoint_debug_phonemes_failed")
+        raise HTTPException(status_code=500, detail="Debug failed")

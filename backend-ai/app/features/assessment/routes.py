@@ -36,7 +36,6 @@ async def analyze_joint_text(
     body: JointAnalysisRequest,
     service: AnalysisService = Depends(lambda: analysis_service)
 ):
-    from app.models.response import JointAnalysisResponse
     log = get_logger(request)
     log.info("endpoint_analyze_joint_started", session_id=body.session_id)
     

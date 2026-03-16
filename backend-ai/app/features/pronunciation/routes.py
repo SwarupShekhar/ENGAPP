@@ -88,8 +88,10 @@ def _run_azure_pronunciation_assessment(
     )
     pa_config.apply_to(recognizer)
 
+    import asyncio
+    
     try:
-        result = recognizer.recognize_once()
+        result = await asyncio.to_thread(recognizer.recognize_once)
     except Exception as e:
         logger.warning("Azure PA recognize_once failed: %s", e)
         return {"Words": [], "error": str(e)}
@@ -161,7 +163,7 @@ async def assess_pronunciation(
     if not audio and not _audio_base64:
         raise HTTPException(400, "Provide audio file or JSON body with audio_base64")
 
-    if audio and audio.filename:
+    if audio:
         # Check size if available in headers, otherwise read in chunks or after read
         content = await audio.read()
         if len(content) > MAX_AUDIO_SIZE_BYTES:
@@ -204,12 +206,12 @@ async def assess_pronunciation(
             wav_ready = True
             logger.info("Converted audio to WAV: %s", tmp_wav)
         except Exception as e:
-            logger.error("Failed to convert audio via pydub: %s", e)
+            logger.error("Failed to convert audio via pydub: %s", e, exc_info=True)
             # Client usually sends m4a (Expo). pydub needs ffmpeg for m4a.
             raise HTTPException(
                 503,
-                "Audio conversion failed. Install ffmpeg (e.g. brew install ffmpeg) for m4a support: " + str(e),
-            ) from e
+                "Audio conversion failed; ensure ffmpeg is installed for m4a support.",
+            )
 
         if not wav_ready or not os.path.isfile(tmp_wav) or os.path.getsize(tmp_wav) == 0:
             raise HTTPException(400, "Could not produce valid WAV from audio")

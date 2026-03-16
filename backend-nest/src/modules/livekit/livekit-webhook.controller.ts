@@ -62,6 +62,12 @@ export class LiveKitWebhookController {
   async onEgress(@Req() req: Request, @Headers('authorization') auth?: string) {
     const apiKey = this.config.get<string>('LIVEKIT_API_KEY');
     const apiSecret = this.config.get<string>('LIVEKIT_API_SECRET');
+    
+    // Validate credentials before creating WebhookReceiver
+    if (!apiKey || !apiSecret) {
+      throw new Error('LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be configured');
+    }
+    
     const receiver = new WebhookReceiver(apiKey, apiSecret);
 
     // Get raw body

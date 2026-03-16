@@ -18,10 +18,10 @@ async def health_check():
         try:
             # Simple check
             if cache.redis:
-                 await cache.redis.set("health_check", "ok", ttl=10)
-                 checks["redis"] = "online"
+                await cache.redis.set("health_check", "ok", ttl=10)
+                checks["redis"] = "online"
             else:
-                 checks["redis"] = "disabled/unavailable"
+                checks["redis"] = "disabled/unavailable"
         except Exception:
             checks["redis"] = "offline"
             

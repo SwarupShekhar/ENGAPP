@@ -83,7 +83,16 @@ def detect_from_azure_result(
 
         pa = w.get("PronunciationAssessment", {})
         error_type = (pa.get("ErrorType") or "").strip()
-        accuracy = float(pa.get("AccuracyScore") or w.get("AccuracyScore") or 100)
+        # Explicitly check for None to preserve 0 scores
+        accuracy_score = pa.get("AccuracyScore")
+        if accuracy_score is not None:
+            accuracy = float(accuracy_score)
+        else:
+            w_accuracy = w.get("AccuracyScore")
+            if w_accuracy is not None:
+                accuracy = float(w_accuracy)
+            else:
+                accuracy = 100.0
 
         # --- Collect phoneme-level data ---
         phonemes = w.get("Phonemes", [])
@@ -91,7 +100,14 @@ def detect_from_azure_result(
         worst_phoneme_name = ""
         for p in phonemes:
             p_pa = p.get("PronunciationAssessment", {})
-            p_score = p_pa.get("AccuracyScore") or p.get("AccuracyScore") or p.get("Score")
+            # Explicitly check for None to preserve 0 scores
+            p_pa_score = p_pa.get("AccuracyScore")
+            if p_pa_score is not None:
+                p_score = p_pa_score
+            else:
+                p_score = p.get("AccuracyScore")
+                if p_score is None:
+                    p_score = p.get("Score")
             p_name = _normalize(p.get("Phoneme") or p.get("phoneme") or "")
             if p_score is not None:
                 score_f = float(p_score)

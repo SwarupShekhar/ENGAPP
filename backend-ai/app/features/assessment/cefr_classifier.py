@@ -5,11 +5,30 @@ from app.models.base import CEFRAssessment, CEFRLevel
 from app.core.logging import logger
 from app.core.config import settings
 
-# Ensure NLTK data is downloaded
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
+
+def _ensure_nltk_data():
+    """Lazy initializer for NLTK data - checks and downloads if needed."""
+    resources_to_check = [
+        'tokenizers/punkt',
+        'tokenizers/punkt_tab'
+    ]
+    
+    for resource in resources_to_check:
+        try:
+            nltk.data.find(resource)
+        except LookupError:
+            # Try to download the resource
+            try:
+                # Extract the base resource name for download
+                base_resource = resource.split('/')[0] if '/' in resource else resource
+                nltk.download(base_resource, quiet=True)
+            except Exception as e:
+                logger.warning(f"Failed to download NLTK resource {resource}: {e}")
+                raise RuntimeError(
+                    f"NLTK resource '{resource}' not available. "
+                    "Please pre-install with: python -c \"import nltk; nltk.download('punkt')\""
+                )
+
 
 class CEFRClassifier:
     """
@@ -19,6 +38,9 @@ class CEFRClassifier:
     """
 
     def __init__(self):
+        # Initialize NLTK data lazily on first use
+        _ensure_nltk_data()
+        
         # In a real application, these would be loaded from external files or a database
         self.vocab_lists = {
             CEFRLevel.A1: {"the", "be", "to", "of", "and", "a", "in", "that", "have", "I"},
@@ -58,18 +80,23 @@ class CEFRClassifier:
                 lexical_diversity = self._calculate_lexical_diversity(tokens)
                 sentence_complexity = self._calculate_sentence_complexity(text)
 
-                # This is a very basic scoring algorithm.
-                score = (lexical_diversity * 200) + (sentence_complexity * 2)
+                # Compute raw score from linguistic features
+                raw_score = (lexical_diversity * 200) + (sentence_complexity * 2)
 
-        if score <= settings.cefr_a1_max_score:
+        # Normalize the raw score to 0-100 range using CEFR C2 max threshold
+        cefr_c2_max = settings.cefr_c1_max_score + 15  # C2 threshold is typically 15 points above C1
+        normalized_score = (raw_score / cefr_c2_max) * 100 if cefr_c2_max > 0 else 0
+        normalized_score = max(0, min(100, normalized_score))  # Clamp between 0 and 100
+
+        if normalized_score <= settings.cefr_a1_max_score:
             level = CEFRLevel.A1
-        elif score <= settings.cefr_a2_max_score:
+        elif normalized_score <= settings.cefr_a2_max_score:
             level = CEFRLevel.A2
-        elif score <= settings.cefr_b1_max_score:
+        elif normalized_score <= settings.cefr_b1_max_score:
             level = CEFRLevel.B1
-        elif score <= settings.cefr_b2_max_score:
+        elif normalized_score <= settings.cefr_b2_max_score:
             level = CEFRLevel.B2
-        elif score <= settings.cefr_c1_max_score:
+        elif normalized_score <= settings.cefr_c1_max_score:
             level = CEFRLevel.C1
         else:
             level = CEFRLevel.C2
@@ -77,7 +104,7 @@ class CEFRClassifier:
         # Placeholder for strengths, weaknesses, and next level requirements
         return CEFRAssessment(
             level=level,
-            score=min(score, 100),
+            score=int(normalized_score),
             confidence=0.85,  # Placeholder confidence
             strengths=["-"],
             weaknesses=["-"],

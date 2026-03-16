@@ -2,7 +2,6 @@ import google.generativeai as genai
 from typing import AsyncGenerator
 import asyncio
 import re
-import os
 import logging
 from app.core.config import settings
 
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 class StreamingGeminiService:
     def __init__(self):
         if not settings.google_api_key:
-            logger.error("GOOGLE_API_KEY not found in settings")
+            raise RuntimeError("GOOGLE_API_KEY is required but not configured")
         
         genai.configure(api_key=settings.google_api_key)
         self.model_name = 'gemini-2.5-flash'
@@ -83,12 +82,19 @@ class StreamingGeminiService:
                                 yield sentence
                             
                             match = sentence_endings.search(buffer)
-                    except ValueError:
+                    except ValueError as ve:
+                        logger.warning(f"ValueError in chunk processing: {ve}")
                         continue
                     except Exception as e:
-                        if "429" in str(e) and attempt < max_retries:
-                            raise e # Trigger retry
-                        logger.error(f"Error processing chunk: {e}")
+                        # Log full exception with traceback instead of silently continuing
+                        logger.exception(f"Error processing chunk: {e}")
+                        if "429" in str(e):
+                            # Only re-raise if we haven't yielded anything yet
+                            if not buffer:
+                                raise e
+                            # Otherwise log and stop gracefully
+                            logger.warning("Rate limited after partial response, stopping stream")
+                            break
                         continue
                 
                 # If we got here, we're done

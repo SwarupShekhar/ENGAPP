@@ -470,11 +470,18 @@ Answer with JSON:
         grammar_data = self.grammar_classifier.classify_errors(gemini_grammar)
         grammar_data["justification"] = gemini_grammar.get("justification", "")
         
-        # Vocabulary: Use the specialized analyzer
+        # Vocabulary: Merge LLM analysis with specialized analyzer
+        # First preserve LLM-derived vocabulary results
+        llm_vocab = vocab_data.copy() if isinstance(vocab_data, dict) else {}
         vocab_data = self.vocab_analyzer.analyze_vocabulary(request.text)
+        # Merge: prefer LLM fields where available, but add analyzer results
+        if llm_vocab:
+            vocab_data["llm_advanced_words"] = llm_vocab.get("advanced_words", [])
+            vocab_data["llm_domain_terms"] = llm_vocab.get("domain_terms", [])
+            vocab_data["llm_collocation_errors"] = llm_vocab.get("collocation_errors", [])
         vocab_data["word_count"] = len(request.text.split())
         vocab_data["unique_words"] = len(set(request.text.lower().split()))
-        vocab_data["justification"] = "Vocabulary enrichment and MTLD analysis complete."
+        vocab_data["justification"] = llm_vocab.get("justification", "Vocabulary enrichment and MTLD analysis complete.")
         
         # Stage 3: Verify errors
         all_errors = gemini_grammar.get("grammatical_errors", [])
@@ -645,9 +652,14 @@ Answer with JSON:
         }
         
         # New prompt uses 'error_type', 'explanation' and 'severity' (TIERs)
+        # Handle None severity - coerce to empty string before .upper()
+        severity_value = error_dict.get("severity")
+        if severity_value is None:
+            severity_value = ""
+        
         return ErrorDetail(
             type=ErrorType.GRAMMAR,
-            severity=severity_map.get(error_dict.get("severity", "").upper(), ErrorSeverity.MINOR),
+            severity=severity_map.get(severity_value.upper(), ErrorSeverity.MINOR),
             original_text=error_dict.get("original", ""),
             corrected_text=error_dict.get("corrected", ""),
             explanation=error_dict.get("explanation") or error_dict.get("rule", ""),
@@ -687,7 +699,7 @@ Answer with JSON:
         for s in request.segments:
             segments_data.append(f"[{s.speaker_id} at {s.timestamp}s]: {s.text}")
         
-        transcript_block = "\\n".join(segments_data)
+        transcript_block = "\n".join(segments_data)
         
         return f"""You are a professional ESL Conversational Coach and Linguist.
 Analyze the following multi-speaker transcript of an English practice session.
@@ -828,12 +840,19 @@ Analyze the following multi-speaker transcript of an English practice session.
                 self._joint_error_to_detail(e) for e in ad.get("errors", [])
             ]
 
-            # Map to ParticipantAnalysis model
+            # Map to ParticipantAnalysis model - validate CEFR level safely
+            try:
+                cefr_level_str = ad.get("cefr_level", "B1")
+                cefr_level = CEFRLevel(cefr_level_str)
+            except (ValueError, AttributeError):
+                logger.warning(f"Invalid CEFR level '{cefr_level_str}' defaulting to B1")
+                cefr_level = CEFRLevel.B1
+            
             participant_analyses.append(ParticipantAnalysis(
                 participant_id=pa["participant_id"],
                 analysis=AnalysisResponse(
                     cefr_assessment=CEFRAssessment(
-                        level=CEFRLevel(ad.get("cefr_level", "B1")),
+                        level=cefr_level,
                         score=ai_scores.get("overall_score", 50),
                         confidence=0.9,
                         strengths=ad.get("strengths", []),

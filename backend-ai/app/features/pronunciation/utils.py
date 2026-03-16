@@ -78,7 +78,12 @@ def extract_detailed_errors(azure_result: Dict[str, Any]) -> Dict[str, Any]:
         for idx, word_data in enumerate(words):
             word = word_data.get("Word", "")
             pronunciation = word_data.get("PronunciationAssessment", {})
-            accuracy = pronunciation.get("AccuracyScore", 100)
+            # Use 0 as safer default instead of 100 for missing accuracy scores
+            accuracy = pronunciation.get("AccuracyScore") 
+            if accuracy is None:
+                accuracy = 0
+            else:
+                accuracy = int(accuracy)
             error_type = pronunciation.get("ErrorType", "None")
             
             # Store word-level score for UI display
@@ -244,7 +249,8 @@ def analyze_pronunciation_trends(
         return trends
     
     # Compare current problem sounds with historical data
-    current_problems = set(current_errors["problem_sounds"].keys())
+    current_errors_data = current_errors.get("problem_sounds", {})
+    current_problems = set(current_errors_data.keys()) if current_errors_data else set()
     
     # Get problem sounds from last 3 sessions
     recent_sessions = historical_errors[-3:]

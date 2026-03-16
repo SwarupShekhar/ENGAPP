@@ -47,10 +47,19 @@ export class MatchmakingService {
     if (!dbUserId) return { status: 'error' };
 
     const queueKey = `queue:${level}`;
-    await this.redisService.getClient().lrem(queueKey, 0, dbUserId);
-    await this.redisService.getClient().del(`user:${dbUserId}:meta`);
+    const redis = this.redisService.getClient();
+    
+    // Check if user was actually removed from the queue
+    const removedCount = await redis.lrem(queueKey, 0, dbUserId);
+    
+    // Only delete meta if the user was actually in the queue
+    if (removedCount > 0) {
+      await redis.del(`user:${dbUserId}:meta`);
+      this.logger.log(`User ${dbUserId} left queue for level ${level}`);
+    } else {
+      this.logger.log(`User ${dbUserId} was not in queue for level ${level}, skipping meta deletion`);
+    }
 
-    this.logger.log(`User ${dbUserId} manually left queue for level ${level}`);
     return { status: 'left' };
   }
 

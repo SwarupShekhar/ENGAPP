@@ -37,9 +37,10 @@ class PronunciationService:
 
     async def _analyze_prosody(self, audio_path: str) -> Dict[str, float]:
         """Deep Intelligence prosody analysis using librosa."""
+        import asyncio
         try:
-            # Load audio for analysis
-            y, sr = librosa.load(audio_path)
+            # Load audio for analysis - run blocking librosa call in thread pool
+            y, sr = await asyncio.to_thread(librosa.load, audio_path)
             
             # 1. Intonation (Pitch Variance)
             f0, voiced_flag, voiced_probs = librosa.pyin(
@@ -50,7 +51,9 @@ class PronunciationService:
             
             # 2. Timing (Speech Rate)
             duration = librosa.get_duration(y=y, sr=sr)
-            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+            tempo_result, _ = librosa.beat.beat_track(y=y, sr=sr)
+            # librosa returns tempo as numpy array in newer versions - convert to scalar
+            tempo = float(tempo_result) if hasattr(tempo_result, 'item') else float(tempo_result)
             
             # 3. Pause Analysis
             non_silent = librosa.effects.split(y, top_db=25)
@@ -62,14 +65,20 @@ class PronunciationService:
             
             return {
                 "prosody_score": min(100.0, float(prosody_score)),
-                "speech_rate_wpm": float(tempo),
+                "tempo_bpm": float(tempo),
                 "pitch_variance": float(pitch_std),
                 "energy_level": float(np.mean(librosa.feature.rms(y=y)) * 100), # Simple energy metric
                 "speaking_confidence": float(min(100.0, max(0.0, 100 - (pause_ratio * 100) - (pitch_std / 2)))) # Heuristic confidence
             }
         except Exception as e:
             logger.warning("prosody_analysis_failed", error=str(e))
-            return {"prosody_score": 0.0, "speech_rate_wpm": 0.0, "pitch_variance": 0.0}
+            return {
+                "prosody_score": 0.0, 
+                "tempo_bpm": 0.0, 
+                "pitch_variance": 0.0,
+                "energy_level": 50.0,  # Default neutral energy
+                "speaking_confidence": 50.0  # Default moderate confidence
+            }
 
     @cached(prefix="pronunciation", ttl=settings.cache_ttl_pronunciation)
     async def assess(self, request: PronunciationRequest) -> PronunciationResponse:
@@ -80,7 +89,9 @@ class PronunciationService:
             from app.features.transcription.async_azure_speech import azure_speech
             
             # 1. Get audio data: from base64 or download from URL
-            temp_path = tempfile.mktemp(suffix=".wav")
+            # Use secure temporary file creation
+            fd, temp_path = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)  # Close the file descriptor, we'll write manually
             if request.audio_base64:
                 try:
                     # Robust handling: Convert whatever format to WAV 16kHz via pydub/ffmpeg
@@ -226,7 +237,10 @@ class PronunciationService:
             )
 
         except Exception as e:
-            logger.error("pronunciation_failed", error=str(e), user_id=request.user_id)
+            import hashlib
+            # Create anonymized user ID for logging (first 8 chars of SHA256 hash)
+            anonymized_user_id = hashlib.sha256(request.user_id.encode()).hexdigest()[:8] if request.user_id else "unknown"
+            logger.error("pronunciation_failed", error=str(e), user_id=anonymized_user_id)
             raise
         finally:
             if temp_path and os.path.exists(temp_path):

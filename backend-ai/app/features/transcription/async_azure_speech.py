@@ -150,7 +150,10 @@ class AsyncAzureSpeech:
                     "confidence": confidence,
                     "words": words,
                     "duration": duration,
-                    "language": detailed.get("RecognitionStatus", "")
+                    # Extract actual language from SDK response
+                    "language": detailed.get("PrimaryLanguage", {}).get("Language", "") or \
+                                (detailed.get("NBest", [{}])[0].get("Locale", "") if detailed.get("NBest") else "") or \
+                                ""
                 }
         except Exception as e:
             logger.warning(f"Failed to parse detailed results: {e}")

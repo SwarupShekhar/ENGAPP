@@ -85,31 +85,39 @@ class TranscriptionService:
         total_duration = 0
         
         recognized_future = asyncio.Future()
+        loop = asyncio.get_event_loop()
 
         def on_recognized(evt):
-            nonlocal total_duration
-            if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
-                full_text.append(evt.result.text)
-                words = self._extract_words_from_result(evt.result)
-                # Adjust timestamps based on total duration so far
-                for word in words:
-                    word.start_time += total_duration
-                    word.end_time += total_duration
-                all_words.extend(words)
-                total_duration += evt.result.duration.total_seconds()
-            elif evt.result.reason == speechsdk.ResultReason.NoMatch:
-                logger.debug("No speech could be recognized.")
-            elif evt.result.reason == speechsdk.ResultReason.Canceled:
-                cancellation_details = evt.result.cancellation_details
-                logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
-                if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                    recognized_future.set_exception(RuntimeError(f"Azure Error: {cancellation_details.error_details}"))
+            # Marshal updates back to asyncio event loop
+            def _update_state():
+                nonlocal total_duration
+                if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                    full_text.append(evt.result.text)
+                    words = self._extract_words_from_result(evt.result)
+                    # Adjust timestamps based on total duration so far
+                    for word in words:
+                        word.start_time += total_duration
+                        word.end_time += total_duration
+                    all_words.extend(words)
+                    total_duration += evt.result.duration.total_seconds()
+                elif evt.result.reason == speechsdk.ResultReason.NoMatch:
+                    logger.debug("No speech could be recognized.")
+                elif evt.result.reason == speechsdk.ResultReason.Canceled:
+                    cancellation_details = evt.result.cancellation_details
+                    logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
+                    if cancellation_details.reason == speechsdk.CancellationReason.Error:
+                        recognized_future.set_exception(RuntimeError(f"Azure Error: {cancellation_details.error_details}"))
+            
+            # Schedule update on asyncio event loop
+            asyncio.run_coroutine_threadsafe(_update_state(), loop).result()
 
 
         def on_session_stopped(evt):
-            logger.debug("Session stopped.")
-            if not recognized_future.done():
-                recognized_future.set_result(True)
+            def _set_result():
+                logger.debug("Session stopped.")
+                if not recognized_future.done():
+                    recognized_future.set_result(True)
+            asyncio.run_coroutine_threadsafe(_set_result(), loop).result()
 
         recognizer.recognized.connect(on_recognized)
         recognizer.session_stopped.connect(on_session_stopped)
@@ -147,10 +155,9 @@ class TranscriptionService:
                     logger.info(f"Streamed {len(raw_data)} bytes of PCM audio for transcription")
                     
                 except Exception as e:
-                    logger.error(f"Audio conversion failed in transcription: {e}")
-                    # Fallback to raw bytes (might be M4A/WAV) - Azure might reject
-                    audio_bytes = base64.b64decode(request.audio_base64)
-                    push_stream.write(audio_bytes)
+                    logger.error("Audio conversion failed in transcription", exc_info=True)
+                    push_stream.close()
+                    raise RuntimeError(f"Audio conversion to PCM failed: {e}")
             else:
                 # Stream from URL
                 from app.features.transcription.audio_utils import stream_audio_content
@@ -162,8 +169,10 @@ class TranscriptionService:
         finally:
             push_stream.close()
 
-        await recognized_future
-        recognizer.stop_continuous_recognition()
+        try:
+            await recognized_future
+        finally:
+            recognizer.stop_continuous_recognition()
         
         # Calculate overall confidence
         confidence = sum(w.confidence for w in all_words) / len(all_words) if all_words else 0.0
