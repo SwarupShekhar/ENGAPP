@@ -49,6 +49,11 @@ export class LivekitController {
                   `Room composite egress failed for session ${body.sessionId}`,
                   e,
                 );
+                // Roll back pending egressId so future requests can retry
+                await this.prisma.conversationSession.updateMany({
+                  where: { id: body.sessionId, egressId: 'pending' },
+                  data: { egressId: null },
+                });
               }
             }
           } catch (e) {
@@ -67,30 +72,41 @@ export class LivekitController {
       if (thisParticipant && !thisParticipant.participantEgressId) {
         setTimeout(async () => {
           try {
-            // Re-check to avoid race condition
-            const updatedSession =
-              await this.prisma.conversationSession.findUnique({
-                where: { id: body.sessionId },
-                include: { participants: true },
+            // Atomically claim participant egress by setting a unique egress id
+            const participantEgressId = `participant_${body.sessionId}_${body.userId}`;
+
+            const claimResult =
+              await this.prisma.sessionParticipant.updateMany({
+                where: {
+                  sessionId: body.sessionId,
+                  userId: body.userId,
+                  participantEgressId: null,
+                },
+                data: { participantEgressId },
               });
 
-            const updatedParticipant = updatedSession?.participants.find(
-              (p) => p.userId === body.userId,
-            );
-
-            if (updatedParticipant && !updatedParticipant.participantEgressId) {
+            if (claimResult.count > 0) {
               try {
                 await this.egressService.startParticipantTrackEgress(
                   roomName,
                   body.sessionId,
                   body.userId,
-                  body.userId,
+                  participantEgressId,
                 );
               } catch (e) {
                 this.logger.error(
                   `Track egress failed for user ${body.userId} in session ${body.sessionId}`,
                   e,
                 );
+                // Roll back participantEgressId so another request can retry
+                await this.prisma.sessionParticipant.updateMany({
+                  where: {
+                    sessionId: body.sessionId,
+                    userId: body.userId,
+                    participantEgressId,
+                  },
+                  data: { participantEgressId: null },
+                });
               }
             }
           } catch (e) {

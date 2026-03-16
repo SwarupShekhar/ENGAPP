@@ -53,9 +53,9 @@ class StreamingGeminiService:
         buffer = ""
         sentence_endings = re.compile(r'[.!?]\s')
         
-        has_yielded = False
         max_retries = 3
         for attempt in range(max_retries + 1):
+            has_yielded = False
             try:
                 response = await self.model.generate_content_async(
                     content,

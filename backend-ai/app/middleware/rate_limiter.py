@@ -6,11 +6,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class RateLimiter:
     def __init__(self):
         self.user_requests: Dict[str, list] = {}
         self.active_sessions: Dict[str, int] = {}  # userId -> count
         self.cleanup_task = None
+        # Protect active_sessions against concurrent access
+        self._lock = asyncio.Lock()
     
     async def check_rate_limit(
         self,
@@ -54,19 +57,35 @@ class RateLimiter:
         
         # Record request
         self.user_requests[user_id].append(now)
-    
-    def start_session(self, user_id: str):
+
+    async def snapshot_active_sessions(self) -> Dict[str, int]:
+        """
+        Take a thread-safe snapshot of active_sessions.
+        """
+        async with self._lock:
+            return dict(self.active_sessions)
+
+    async def start_session(self, user_id: str):
         """Increment active session count"""
-        self.active_sessions[user_id] = self.active_sessions.get(user_id, 0) + 1
-        logger.info(f"User {user_id} started session. Active: {self.active_sessions[user_id]}")
-    
-    def end_session(self, user_id: str):
+        async with self._lock:
+            self.active_sessions[user_id] = self.active_sessions.get(user_id, 0) + 1
+            logger.info(
+                f"User {user_id} started session. Active: {self.active_sessions[user_id]}"
+            )
+
+    async def end_session(self, user_id: str):
         """Decrement active session count"""
-        if user_id in self.active_sessions:
-            self.active_sessions[user_id] = max(0, self.active_sessions[user_id] - 1)
-            logger.info(f"User {user_id} ended session. Active: {self.active_sessions[user_id]}")
-            if self.active_sessions[user_id] == 0:
-                del self.active_sessions[user_id]
+        async with self._lock:
+            if user_id in self.active_sessions:
+                self.active_sessions[user_id] = max(
+                    0, self.active_sessions[user_id] - 1
+                )
+                logger.info(
+                    f"User {user_id} ended session. Active: {self.active_sessions[user_id]}"
+                )
+                if self.active_sessions[user_id] == 0:
+                    del self.active_sessions[user_id]
+
 
 # Global instance
 rate_limiter = RateLimiter()

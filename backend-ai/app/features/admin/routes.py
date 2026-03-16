@@ -19,8 +19,8 @@ async def get_system_metrics():
     """
     Monitor system health and concurrency
     """
-    # Take an atomic snapshot to avoid concurrent modification issues
-    sessions_snapshot = dict(rate_limiter.active_sessions)
+    # Take a synchronized snapshot to avoid concurrent modification issues
+    sessions_snapshot = await rate_limiter.snapshot_active_sessions()
 
     # Hash user IDs for privacy-safe logging/metrics
     active_user_count = len(sessions_snapshot)
