@@ -8,7 +8,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { PrismaService } from './database/prisma/prisma.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Prisma migration guard: Check if 'example' column exists in 'Mistake' table
   const prismaService = app.get(PrismaService);
@@ -27,8 +27,23 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   // Increase payload limit for audio uploads (base64 audio can be large)
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ limit: '50mb', extended: true }));
+  app.use(
+    json({
+      limit: '50mb',
+      verify: (req: any, res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  app.use(
+    urlencoded({
+      limit: '50mb',
+      extended: true,
+      verify: (req: any, res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
 
   // Enable validation pipes
   app.useGlobalPipes(

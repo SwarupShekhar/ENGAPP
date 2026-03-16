@@ -1,11 +1,13 @@
 import {
-  Body,
   Controller,
   Logger,
   Post,
   Headers,
   UnauthorizedException,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
+import { WebhookReceiver } from 'livekit-server-sdk';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@app/prisma/prisma.service';
 import { BrainService } from '../brain/brain.service';
@@ -16,7 +18,10 @@ import {
 } from '../pronunciation/pronunciation.service';
 
 /** Human-readable tip for pronunciation issues (rule_category from detector). */
-function formatPronunciationSuggestion(ruleCategory: string, correctWord?: string): string {
+function formatPronunciationSuggestion(
+  ruleCategory: string,
+  correctWord?: string,
+): string {
   const tips: Record<string, string> = {
     w_to_v: 'Practice "w" vs "v" (e.g. "wine" vs "vine")',
     v_to_w_reversal: 'Practice "v" vs "w" (e.g. "very" vs "wery")',
@@ -30,7 +35,9 @@ function formatPronunciationSuggestion(ruleCategory: string, correctWord?: strin
     i_to_ee: 'Practice short "i" vs long "ee"',
     o_to_aa: 'Practice vowel in "go" vs "got"',
   };
-  const tip = tips[ruleCategory] || `Practice "${correctWord || ruleCategory.replace(/_/g, ' ')}"`;
+  const tip =
+    tips[ruleCategory] ||
+    `Practice "${correctWord || ruleCategory.replace(/_/g, ' ')}"`;
   return tip;
 }
 
@@ -52,29 +59,50 @@ export class LiveKitWebhookController {
   ) {}
 
   @Post('egress')
-  async onEgress(
-    @Body() body: unknown,
-    @Headers('authorization') auth?: string,
-  ) {
-    const secret = this.config.get<string>('LIVEKIT_WEBHOOK_SECRET');
-    if (secret && auth !== `Bearer ${secret}`) {
-      throw new UnauthorizedException('Invalid webhook secret');
+  async onEgress(@Req() req: Request, @Headers('authorization') auth?: string) {
+    const apiKey = this.config.get<string>('LIVEKIT_API_KEY');
+    const apiSecret = this.config.get<string>('LIVEKIT_API_SECRET');
+    const receiver = new WebhookReceiver(apiKey, apiSecret);
+
+    // Get raw body
+    const rawBody =
+      (req as any).rawBody ??
+      (await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk) => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
+      }));
+
+    if (!rawBody || rawBody.length === 0) {
+      this.logger.warn('Webhook received empty or missing body');
+      return { ok: true };
     }
 
-    const payload = body as {
-      event?: string;
-      egressInfo?: {
-        egressId?: string;
-        status?: string;
-        error?: string;
-        file?: { location?: string; filename?: string };
-        fileResults?: Array<{ filename?: string; location?: string }>;
-      };
+    let event: any;
+    try {
+      // LiveKit webhooks are signed JSON; use rawBody string for verification
+      event = receiver.receive(rawBody.toString(), auth ?? '');
+    } catch (e) {
+      this.logger.warn('Webhook signature validation failed or parse error', e);
+      return { ok: true };
+    }
+
+    const payload = {
+      event: event.event,
+      egressInfo: event.egressInfo,
     };
 
-    if (payload.event !== 'egress_ended') return { ok: true, ignored: true };
-
     const info = payload.egressInfo;
+    this.logger.log(
+      `Webhook received: event=${payload.event}, egressId=${info?.egressId}`,
+    );
+
+    if (payload.event !== 'egress_ended') {
+      this.logger.log(`Ignoring event type: ${payload.event}`);
+      return { ok: true, ignored: true };
+    }
+
     if (!info?.egressId) {
       this.logger.warn('egress_ended missing egressId');
       return { ok: true };
@@ -84,6 +112,8 @@ export class LiveKitWebhookController {
       info.file?.location ??
       (info.fileResults && info.fileResults[0]?.location) ??
       null;
+
+    this.logger.log(`Egress file location: ${fileLocation}`);
 
     if (!fileLocation || !fileLocation.startsWith('http')) {
       this.logger.warn(`Invalid file location for egressId=${info.egressId}`);
@@ -95,6 +125,12 @@ export class LiveKitWebhookController {
       {
         where: { participantEgressId: info.egressId },
       },
+    );
+
+    this.logger.log(
+      `Participant lookup for egressId=${info.egressId} returned: ${
+        participant ? 'found' : 'not found'
+      }`,
     );
 
     if (participant) {
@@ -136,10 +172,7 @@ export class LiveKitWebhookController {
         }
 
         if (analysis) {
-          if (
-            Array.isArray(flagged_errors) &&
-            flagged_errors.length > 0
-          ) {
+          if (Array.isArray(flagged_errors) && flagged_errors.length > 0) {
             await this.prisma.pronunciationIssue.createMany({
               data: flagged_errors.map((err: FlaggedPronunciationError) => ({
                 analysisId: analysis!.id,
@@ -152,7 +185,10 @@ export class LiveKitWebhookController {
                       ? 'medium'
                       : 'low',
                 confidence: err.confidence,
-                suggestion: formatPronunciationSuggestion(err.rule_category, err.correct),
+                suggestion: formatPronunciationSuggestion(
+                  err.rule_category,
+                  err.correct,
+                ),
               })),
               skipDuplicates: true,
             });
@@ -198,6 +234,12 @@ export class LiveKitWebhookController {
       where: { egressId: info.egressId },
       include: { participants: true },
     });
+
+    this.logger.log(
+      `Composite session lookup for egressId=${info.egressId} returned: ${
+        session ? 'found' : 'not found'
+      }`,
+    );
 
     if (!session) {
       this.logger.warn(`No session found for egressId=${info.egressId}`);

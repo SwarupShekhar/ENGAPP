@@ -6,9 +6,9 @@ import { RedisModule } from '../../redis/redis.module';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 
 @Module({
-    imports: [RedisModule, PrismaModule],
-    controllers: [MatchmakingController],
-    providers: [MatchmakingService, TieredMatchmakingService],
-    exports: [MatchmakingService, TieredMatchmakingService],
+  imports: [RedisModule, PrismaModule],
+  controllers: [MatchmakingController],
+  providers: [MatchmakingService, TieredMatchmakingService],
+  exports: [MatchmakingService, TieredMatchmakingService],
 })
-export class MatchmakingModule { }
+export class MatchmakingModule {}

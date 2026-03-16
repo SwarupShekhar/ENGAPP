@@ -2,32 +2,32 @@ import React from "react";
 import { View, Text, StyleSheet as RNStyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import AssessmentScreen from "../screens/AssessmentScreen";
-import ProgressScreen from "../screens/ProgressScreen";
-import ProfileScreen from "../screens/ProfileScreen";
-import FeedbackScreen from "../screens/FeedbackScreen";
-import CallScreen from "../screens/CallScreen";
-import CallPreferenceScreen from "../screens/CallPreferenceScreen";
-import PracticeScreen from "../screens/PracticeScreen";
-import CallFeedbackScreen from "../screens/CallFeedbackScreen";
-import NotificationScreen from "../screens/NotificationScreen";
-import ConversationsScreen from "../screens/ConversationsScreen";
-import CreateProfileScreen from "../screens/auth/CreateProfileScreen";
-import AssessmentIntroScreen from "../screens/assessment/AssessmentIntroScreen";
-import AssessmentSpeakingScreen from "../screens/assessment/AssessmentSpeakingScreen";
-import AssessmentResultScreen from "../screens/assessment/AssessmentResultScreen";
-import AITutorScreen from "../screens/AITutorScreen";
-import ChatScreen from "../screens/ChatScreen";
-import SocketDebugScreen from "../screens/SocketDebugScreen";
+import AssessmentScreen from "../features/assessment/screens/AssessmentScreen";
+import ProgressScreen from "../features/progress/screens/ProgressScreen";
+import ProfileScreen from "../features/profile/screens/ProfileScreen";
+import FeedbackScreen from "../features/feedback/screens/FeedbackScreen";
+import CallScreen from "../features/call/screens/CallScreen";
+import CallPreferenceScreen from "../features/call/screens/CallPreferenceScreen";
+import PracticeScreen from "../features/session/screens/PracticeScreen";
+import CallFeedbackScreen from "../features/call/screens/CallFeedbackScreen";
+import NotificationScreen from "../features/notification/screens/NotificationScreen";
+import ConversationsScreen from "../features/chat/screens/ConversationsScreen";
+import CreateProfileScreen from "../features/auth/screens/CreateProfileScreen";
+import AssessmentIntroScreen from "../features/assessment/screens/AssessmentIntroScreen";
+import AssessmentSpeakingScreen from "../features/assessment/screens/AssessmentSpeakingScreen";
+import AssessmentResultScreen from "../features/assessment/screens/AssessmentResultScreen";
+import AITutorScreen from "../features/tutor/screens/AITutorScreen";
+import ChatScreen from "../features/chat/screens/ChatScreen";
+import SocketDebugScreen from "../features/debug/screens/SocketDebugScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
-import EBitesScreen from "../screens/EBitesScreen";
-import HomeScreen from "../screens/HomeScreen";
+import EBitesScreen from "../features/reels/screens/EBitesScreen";
+import HomeScreen from "../features/home/screens/HomeScreen";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.
 let RealInCallScreen: React.ComponentType<any> | null = null;
 try {
-  RealInCallScreen = require("../screens/InCallScreen").default;
+  RealInCallScreen = require("../features/call/screens/InCallScreen").default;
 } catch (e) {
   console.error("[InCallScreen Load Error]:", e);
   console.warn(
@@ -139,8 +139,9 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
         options={{
           headerShown: false,
           presentation: "transparentModal",
-          animation: "none",
+          animation: "fade",
           contentStyle: { backgroundColor: "transparent" },
+          animationDuration: 350,
         }}
       />
 

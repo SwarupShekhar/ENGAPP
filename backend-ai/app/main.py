@@ -17,8 +17,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging, logger
 from app.core.middleware import RequestIDMiddleware
 from app.cache.manager import cache
-from app.api.routes import health, transcribe, analyze, pronunciation
-from app.utils.async_azure_speech import shutdown_executor
+from app.features.transcription.async_azure_speech import shutdown_executor
 from app.models.response import StandardResponse, ErrorResponse, Meta
 
 # 1. Initialize Sentry
@@ -112,15 +111,21 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 # 4. Routers
-from app.api.routes import health, transcribe, analyze, pronunciation, tutor, streaming_tutor, admin
-# ...
-app.include_router(health.router, prefix="/api", tags=["Health"])
-app.include_router(transcribe.router, prefix="/api", tags=["Transcribe"])
-app.include_router(analyze.router, prefix="/api", tags=["Analyze"])
-app.include_router(pronunciation.router, prefix="/api", tags=["Pronunciation"])
-app.include_router(tutor.router, prefix="/api/tutor", tags=["Tutor"])
-app.include_router(streaming_tutor.router, prefix="/api/tutor", tags=["Streaming"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+from app.features.health.routes import router as health_router
+from app.features.transcription.routes import router as transcribe_router
+from app.features.assessment.routes import router as analyze_router
+from app.features.pronunciation.routes import router as pronunciation_router
+from app.features.tutor.routes import router as tutor_router
+from app.features.tutor.streaming_routes import router as streaming_tutor_router
+from app.features.admin.routes import router as admin_router
+
+app.include_router(health_router, prefix="/api", tags=["Health"])
+app.include_router(transcribe_router, prefix="/api", tags=["Transcribe"])
+app.include_router(analyze_router, prefix="/api", tags=["Analyze"])
+app.include_router(pronunciation_router, prefix="/api", tags=["Pronunciation"])
+app.include_router(tutor_router, prefix="/api/tutor", tags=["Tutor"])
+app.include_router(streaming_tutor_router, prefix="/api/tutor", tags=["Streaming"])
+app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 
 # 5. Monitoring
 metrics_app = make_asgi_app()

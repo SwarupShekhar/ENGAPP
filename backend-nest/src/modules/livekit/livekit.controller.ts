@@ -27,47 +27,37 @@ export class LivekitController {
     });
 
     if (session) {
-      // Start room composite only once (mixed recording for Brain)
+      // Room composite — start only once, with a small delay so the room exists
       if (!session.egressId) {
-        try {
-          this.logger.log(
-            `Starting room composite egress for session ${session.id}`,
-          );
-          await this.egressService.startRoomCompositeEgress(
-            roomName,
-            body.sessionId,
-          );
-        } catch (e) {
-          this.logger.error(
-            `Failed to start room composite egress for session ${session.id}`,
-            e,
-          );
-        }
+        setTimeout(async () => {
+          try {
+            await this.egressService.startRoomCompositeEgress(
+              roomName,
+              body.sessionId,
+            );
+          } catch (e) {
+            this.logger.error(`Room composite egress failed`, e);
+          }
+        }, 3000); // 3 second delay for room to be created
       }
 
-      // Start track egress for THIS participant only (pronunciation)
-      // Gate on participantEgressId so we never start twice for the same person
+      // Track egress for this participant only
       const thisParticipant = session.participants.find(
         (p) => p.userId === body.userId,
       );
-
       if (thisParticipant && !thisParticipant.participantEgressId) {
-        try {
-          this.logger.log(
-            `Starting track egress for participant ${body.userId} session ${session.id}`,
-          );
-          await this.egressService.startParticipantTrackEgress(
-            roomName,
-            body.sessionId,
-            body.userId,
-            body.userId,
-          );
-        } catch (e) {
-          this.logger.error(
-            `Failed to start track egress for participant ${body.userId}`,
-            e,
-          );
-        }
+        setTimeout(async () => {
+          try {
+            await this.egressService.startParticipantTrackEgress(
+              roomName,
+              body.sessionId,
+              body.userId,
+              body.userId,
+            );
+          } catch (e) {
+            this.logger.error(`Track egress failed for ${body.userId}`, e);
+          }
+        }, 3000); // same 3 second delay
       }
     }
 

@@ -17,9 +17,7 @@ export class EgressService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    const host = this.config
-      .get<string>('LIVEKIT_HOST')
-      ?.replace(/^https?:\/\//, '');
+    const host = this.config.get<string>('LIVEKIT_HOST');
     const key = this.config.get<string>('LIVEKIT_API_KEY');
     const secret = this.config.get<string>('LIVEKIT_API_SECRET');
     if (!host || !key || !secret) {

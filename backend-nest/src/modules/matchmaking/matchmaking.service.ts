@@ -32,11 +32,26 @@ export class MatchmakingService {
       clerkId: userId, // Keep clerkId for reference if needed
     });
 
+    // Ensure uniqueness in the queue by removing any existing entries for this user
+    await this.redisService.getClient().lrem(queueKey, 0, dbUserId);
     await this.redisService.getClient().rpush(queueKey, dbUserId);
+
     this.logger.log(
       `User ${dbUserId} (Clerk: ${userId}) joined queue for level ${level} with topic ${topic}`,
     );
     return { status: 'queued' };
+  }
+
+  async leaveQueue(userId: string, level: string) {
+    const dbUserId = await this.resolveToUuid(userId);
+    if (!dbUserId) return { status: 'error' };
+
+    const queueKey = `queue:${level}`;
+    await this.redisService.getClient().lrem(queueKey, 0, dbUserId);
+    await this.redisService.getClient().del(`user:${dbUserId}:meta`);
+
+    this.logger.log(`User ${dbUserId} manually left queue for level ${level}`);
+    return { status: 'left' };
   }
 
   async checkMatch(userId: string, level: string) {

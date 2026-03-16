@@ -19,6 +19,11 @@ export class MatchmakingController {
         return this.matchmakingService.checkMatch(userId, level);
     }
 
+    @Post('leave')
+    async leaveQueue(@Body() body: { userId: string; level: string }) {
+        return this.matchmakingService.leaveQueue(body.userId, body.level);
+    }
+
     @Post('find-structured')
     async findStructuredMatch(@Body() body: { userId: string; structure: string }) {
         const result = await this.tieredMatchmakingService.findMatch(body.userId, body.structure);
