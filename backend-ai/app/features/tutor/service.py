@@ -5,7 +5,11 @@ from typing import AsyncGenerator
 import logging
 import os
 from .streaming_gemini_service import StreamingGeminiService
-from .optimized_tts_service import OptimizedTTSService
+
+try:
+    from .optimized_tts_service import OptimizedTTSService
+except ImportError:
+    OptimizedTTSService = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +21,7 @@ class StreamingTutorService:
         # Initialize sub-services
         self.gemini_service = StreamingGeminiService()
         try:
-            self.tts_service = OptimizedTTSService()
+            self.tts_service = OptimizedTTSService() if OptimizedTTSService else None
         except Exception as e:
             logger.error(f"Failed to initialize OptimizedTTSService: {e}")
             self.tts_service = None
