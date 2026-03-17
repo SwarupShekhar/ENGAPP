@@ -368,8 +368,6 @@ export class TasksService {
             orderBy: { createdAt: 'desc' },
             take: limit,
             include: {
-                mistakes: { include: { mistake: true } },
-                pronunciationIssues: { include: { pronunciationIssue: true } },
                 session: { select: { id: true, createdAt: true } },
             },
         });

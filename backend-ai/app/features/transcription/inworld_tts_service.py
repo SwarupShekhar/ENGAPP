@@ -3,7 +3,7 @@ import httpx
 import re
 from typing import Optional
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 
 class InworldTTSService:
     def __init__(self):
