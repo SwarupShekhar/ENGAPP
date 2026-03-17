@@ -282,6 +282,7 @@ model PronunciationIssue {
   confidence       Float?
   createdAt        DateTime @default(now())
   analysis         Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  tasks            TaskPronunciationIssue[]
 
   @@index([analysisId])
 }
@@ -302,6 +303,7 @@ model LearningTask {
   session          ConversationSession? @relation(fields: [sessionId], references: [id])
   user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   mistakes         TaskMistake[]
+  pronunciationIssues TaskPronunciationIssue[]
 
   @@index([userId])
   @@index([status])
@@ -314,6 +316,15 @@ model TaskMistake {
   task      LearningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@id([taskId, mistakeId])
+}
+
+model TaskPronunciationIssue {
+  taskId               String
+  pronunciationIssueId String
+  task                 LearningTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  pronunciationIssue   PronunciationIssue  @relation(fields: [pronunciationIssueId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, pronunciationIssueId])
 }
 
 model Feedback {

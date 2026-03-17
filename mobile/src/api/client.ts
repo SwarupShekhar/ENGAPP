@@ -8,7 +8,7 @@ const IS_PROD = !__DEV__;
 // For EAS distribution build set to false so the app uses the production API URL.
 // For EAS distribution builds, ALWAYS set this to false.
 // Use true only for temporary local testing on a physical device.
-const FORCE_LOCAL = true;
+const FORCE_LOCAL = false;
 
 // Your Mac's local IP address on the Wi-Fi network
 const LOCAL_IP = "192.168.1.34";

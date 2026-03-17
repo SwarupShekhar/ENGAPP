@@ -10,12 +10,12 @@ import {
   Text,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import EBiteVideoCard from "../../components/ebites/EBiteVideoCard";
-import EBiteActivityCard from "../../components/ebites/EBiteActivityCard";
+import EBiteVideoCard from "../../../components/ebites/EBiteVideoCard";
+import EBiteActivityCard from "../../../components/ebites/EBiteActivityCard";
 import { Ionicons } from "@expo/vector-icons";
-import { reelsApi, Reel } from "../../api/reels";
+import { reelsApi, Reel } from "../../../api/reels";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import FeedPrefetchService from "../services/feedPrefetchService";
+import FeedPrefetchService from "../../../services/feedPrefetchService";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 

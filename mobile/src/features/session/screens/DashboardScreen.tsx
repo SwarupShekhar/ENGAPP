@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useAppTheme } from "../../theme/useAppTheme";
+import { useAppTheme } from "../../../theme/useAppTheme";
 
 export default function DashboardScreen() {
   const theme = useAppTheme();

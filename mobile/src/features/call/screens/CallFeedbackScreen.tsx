@@ -17,14 +17,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useAppTheme } from "../../../theme/useAppTheme";
-import { getLevelColor } from "../../../shared/theme/colorUtils";
+import { getLevelColor } from "../../../theme/colorUtils";
 import { sessionsApi, ConversationSession } from "../../../api/sessions";
 
 // Feedback Components
-import { WordLevelBreakdown } from "./components/WordLevelBreakdown";
-import { PracticeTips } from "./components/PracticeTips";
-import { GrammarVocabBreakdown } from "./components/GrammarVocabBreakdown";
-import { ScoreBreakdownCard } from "./components/ScoreBreakdownCard";
+import { WordLevelBreakdown } from "../components/WordLevelBreakdown";
+import { PracticeTips } from "../components/PracticeTips";
+import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
+import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 

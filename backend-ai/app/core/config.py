@@ -3,7 +3,7 @@ Application configuration using Pydantic Settings.
 Loads from environment variables and .env file.
 """
 from typing import List, Optional, Any
-from pydantic import Field, field_validator, ConfigDict
+from pydantic import field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     azure_storage_connection_string: Optional[str] = None
     azure_storage_container: str = "audio-files"
     
+    # Inworld AI
+    inworld_api_key: Optional[str] = None
+    inworld_workspace: Optional[str] = None
+    inworld_scene: Optional[str] = None
+    inworld_character_id: Optional[str] = "Abby"
+    inworld_jwt_key: Optional[str] = None
+    inworld_jwt_secret: Optional[str] = None
+    inworld_enabled: bool = False
+    
     # Database
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/englivo"
     db_pool_size: int = 20
@@ -69,6 +78,7 @@ class Settings(BaseSettings):
     analysis_model: str = "gemini"
     pronunciation_model: str = "azure"
     cefr_model: str = "huggingface"
+    tts_provider: str = "azure"  # "azure" or "inworld"
     
     # Feature Flags
     enable_pronunciation_scoring: bool = True

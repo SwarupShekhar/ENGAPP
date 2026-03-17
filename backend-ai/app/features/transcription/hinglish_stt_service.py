@@ -5,7 +5,7 @@ import tempfile
 import azure.cognitiveservices.speech as speechsdk
 from pydub import AudioSegment
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 from app.models.response import (
     TutorPronunciationAssessmentResult,
     WordDetail,

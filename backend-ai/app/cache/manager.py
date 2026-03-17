@@ -9,7 +9,7 @@ from enum import Enum
 import redis.asyncio as redis
 from diskcache import Cache
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 import functools
 import hashlib
 

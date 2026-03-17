@@ -7,6 +7,7 @@ import AuthNavigator from "./navigation/AuthNavigator";
 import { StatusBar } from "expo-status-bar";
 import { tokenCache } from "./utils/tokenCache";
 import { setAuthTokenFetcher } from "./api/client";
+import { UIVariantProvider } from "./context/UIVariantContext";
 import {
   View,
   ActivityIndicator,
@@ -285,43 +286,45 @@ export default function App() {
           <SafeAreaProvider>
             <ThemeProvider>
               <AppErrorBoundary>
-                <View style={styles.appRoot}>
-                  <NavigationContainer
-                    ref={navigationRef}
-                    theme={{
-                      dark: false,
-                      colors: {
-                        primary: "#6C5CE7",
-                        background: "#F5F6FA",
-                        card: "#FFFFFF",
-                        text: "#1F2937",
-                        border: "#E5E7EB",
-                        notification: "#6C5CE7",
-                      },
-                      fonts: {
-                        regular: {
-                          fontFamily: "System",
-                          fontWeight: "400" as const,
-                        },
-                        medium: {
-                          fontFamily: "System",
-                          fontWeight: "500" as const,
-                        },
-                        bold: {
-                          fontFamily: "System",
-                          fontWeight: "700" as const,
-                        },
-                        heavy: {
-                          fontFamily: "System",
-                          fontWeight: "900" as const,
-                        },
-                      },
-                    }}
-                  >
-                    <StatusBar style="auto" />
-                    <AuthGate />
-                  </NavigationContainer>
-                </View>
+                 <View style={styles.appRoot}>
+                   <UIVariantProvider>
+                     <NavigationContainer
+                       ref={navigationRef}
+                       theme={{
+                         dark: false,
+                         colors: {
+                           primary: "#6C5CE7",
+                           background: "#F5F6FA",
+                           card: "#FFFFFF",
+                           text: "#1F2937",
+                           border: "#E5E7EB",
+                           notification: "#6C5CE7",
+                         },
+                         fonts: {
+                           regular: {
+                             fontFamily: "System",
+                             fontWeight: "400" as const,
+                           },
+                           medium: {
+                             fontFamily: "System",
+                             fontWeight: "500" as const,
+                           },
+                           bold: {
+                             fontFamily: "System",
+                             fontWeight: "700" as const,
+                           },
+                           heavy: {
+                             fontFamily: "System",
+                             fontWeight: "900" as const,
+                           },
+                         },
+                       }}
+                     >
+                       <StatusBar style="auto" />
+                       <AuthGate />
+                     </NavigationContainer>
+                   </UIVariantProvider>
+                 </View>
               </AppErrorBoundary>
             </ThemeProvider>
           </SafeAreaProvider>

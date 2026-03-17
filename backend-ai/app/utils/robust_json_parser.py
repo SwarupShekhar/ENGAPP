@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, ValidationError
-from app.core.logging import logger
+from app.core.logger import logger
 
 class RobustJSONParser:
     """

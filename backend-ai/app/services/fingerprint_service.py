@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from app.core.logging import logger
+from app.core.logger import logger
 from app.cache.manager import cache
 
 class FingerprintService:

@@ -6,7 +6,7 @@ import azure.cognitiveservices.speech as speechsdk
 from typing import List, Optional, Any
 
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 from app.models.base import Word
 from app.models.request import TranscriptionRequest
 from app.models.response import TranscriptionResponse

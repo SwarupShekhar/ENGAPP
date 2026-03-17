@@ -29,9 +29,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { sessionsApi, ConversationSession } from "../../api/sessions";
-import { connectionsApi, chatApi } from "../../api/connections";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { sessionsApi, ConversationSession } from "../../../api/sessions";
+import { connectionsApi, chatApi } from "../../../api/connections";
+import { useAppTheme } from "../../../theme/useAppTheme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 

@@ -1,4 +1,4 @@
-import { client, API_URL } from './client';
+import { client, API_URL } from "../../../api/client";
 
 export const tutorApi = {
     startSession: async (userId: string) => {

@@ -191,6 +191,29 @@ export class SessionsProcessor {
         segments,
       );
 
+      // Silent post-processing: after Analysis/Mistake rows exist, generate LearningTasks.
+      // This MUST NOT fail the overall session job; if it errors, we only log.
+      // Note: PronunciationIssue rows may be created later by LiveKit webhook; task generation is idempotent
+      // and can be re-run safely. We still run here to cover the common case where actionable mistakes exist.
+      try {
+        for (const participant of session.participants) {
+          try {
+            await this.tasksService.generateTasksForSession(
+              sessionId,
+              participant.userId,
+            );
+          } catch (e: any) {
+            this.logger.warn(
+              `[SessionsProcessor] Task generation failed (non-fatal) session=${sessionId} user=${participant.userId}: ${e?.message ?? e}`,
+            );
+          }
+        }
+      } catch (e: any) {
+        this.logger.warn(
+          `[SessionsProcessor] Task generation loop failed (non-fatal) session=${sessionId}: ${e?.message ?? e}`,
+        );
+      }
+
       // Handle session complete for streaks & achievements
       const sessionData = await this.prisma.conversationSession.findUnique({
         where: { id: sessionId },

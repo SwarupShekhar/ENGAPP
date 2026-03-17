@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface Props {

@@ -1,12 +1,13 @@
 import io
 import azure.cognitiveservices.speech as speechsdk
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
+from app.features.transcription.inworld_tts_service import inworld_tts_service, InworldTTSService
 
-class HinglishTTSService:
+class AzureHinglishTTSService:
     def __init__(self):
         if not settings.azure_speech_key or not settings.azure_speech_region:
-            logger.warning("Azure Speech credentials not configured for HinglishTTSService.")
+            logger.warning("Azure Speech credentials not configured for AzureHinglishTTSService.")
             self.speech_config = None
             return
 
@@ -56,4 +57,12 @@ class HinglishTTSService:
         
         return b""
 
-hinglish_tts_service = HinglishTTSService()
+# Factory initialization based on config
+if settings.tts_provider == "inworld":
+    logger.info("Initializing Inworld AI TTS service")
+    hinglish_tts_service = inworld_tts_service
+    HinglishTTSService = InworldTTSService
+else:
+    logger.info("Initializing Azure Neural TTS service")
+    hinglish_tts_service = AzureHinglishTTSService()
+    HinglishTTSService = AzureHinglishTTSService

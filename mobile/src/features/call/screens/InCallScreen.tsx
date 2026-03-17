@@ -34,7 +34,7 @@ import {
 } from "@livekit/react-native";
 import { Track, RoomEvent } from "livekit-client";
 import { io, Socket } from "socket.io-client";
-import SocketService from "./services/socketService";
+import SocketService from "../services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { livekitApi } from "../../../api/livekit";
 import { sessionsApi } from "../../../api/sessions";

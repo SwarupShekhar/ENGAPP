@@ -19,8 +19,8 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import { chatApi } from "../../api/connections";
-import SocketService from "../services/socketService";
+import { chatApi } from "../../../api/connections";
+import SocketService from "../../call/services/socketService";
 
 // ── Types ───────────────────────────────────────────────
 

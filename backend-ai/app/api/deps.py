@@ -1,7 +1,7 @@
 from typing import Generator, Any
 from fastapi import Request
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 
 def get_settings():
     return settings

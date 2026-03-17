@@ -13,8 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { connectionsApi } from "../api/connections";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { connectionsApi } from "../../../api/connections";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface FriendRequest {

@@ -15,9 +15,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { reliabilityApi, UserReliability } from "../../api/reliability";
-import { useTheme } from "../../theme/ThemeProvider";
-import { Theme } from "../../theme/types";
+import { useUIVariant } from "../../../context/UIVariantContext";
+import { reliabilityApi, UserReliability } from "../../../api/reliability";
+import { useTheme } from "../../../theme/ThemeProvider";
+import { Theme } from "../../../theme/types";
 
 // ─── Setting Row ───────────────────────────────────────────
 function SettingRow({
@@ -177,6 +178,7 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [practiceReminders, setPracticeReminders] = useState(true);
+  const { variant, setVariant } = useUIVariant();
   const [reliability, setReliability] = useState<UserReliability | null>(null);
 
   const meta = (user?.unsafeMetadata || {}) as any;
@@ -190,7 +192,7 @@ export default function ProfileScreen() {
         reliabilityApi
           .getUserReliability(user.id)
           .then(setReliability)
-          .catch((err) => console.error("Failed to fetch reliability", err));
+          .catch((err: any) => console.error("Failed to fetch reliability", err));
       }
     }, [user?.id]),
   );
@@ -376,6 +378,28 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Experimental Section */}
+        <SectionHeader title="Experimental" theme={theme} />
+        <View style={cardStyle}>
+          <SettingRow
+            icon="flask-outline"
+            label="New UI (Beta)"
+            subtitle="Preview the redesigned experience"
+            theme={theme}
+            rightElement={
+              <Switch
+                value={variant === "v2"}
+                onValueChange={(val) => setVariant(val ? "v2" : "v1")}
+                trackColor={{
+                  true: theme.colors.accent,
+                  false: theme.colors.border,
+                }}
+                thumbColor={theme.colors.surface}
+              />
+            }
+          />
+        </View>
+
         {/* Theme Selection Section */}
         <SectionHeader title="Theme" theme={theme} />
         <View style={cardStyle}>
@@ -384,7 +408,7 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.themeSelectorScroll}
           >
-            {availableThemes.map((t) => (
+            {availableThemes.map((t: any) => (
               <TouchableOpacity
                 key={t.id}
                 onPress={() => setTheme(t.id)}

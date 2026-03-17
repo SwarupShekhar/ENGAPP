@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import { useAuth } from "@clerk/clerk-expo";
 
 export default function AssessmentIntroScreen({ navigation }: any) {

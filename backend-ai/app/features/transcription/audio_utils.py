@@ -4,7 +4,7 @@ import aiofiles
 from urllib.parse import urlparse
 from typing import Tuple
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 
 async def validate_audio_url(url: str) -> Tuple[bool, str]:
     """

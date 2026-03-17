@@ -1,0 +1,11 @@
+{
+  "include": ["backend-ai"],
+  "exclude": ["**/node_modules", "**/__pycache__"],
+  "venvPath": ".",
+  "venv": "backend-ai/.venv",
+  "extraPaths": ["backend-ai"],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.14"
+}

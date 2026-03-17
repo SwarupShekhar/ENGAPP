@@ -1,10 +1,14 @@
 import { Controller, Post, Body, Put, Param, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { ClerkGuard } from '../auth/clerk.guard';
+import { TasksService } from '../tasks/tasks.service';
 
 @Controller('sessions')
 export class SessionsController {
-    constructor(private readonly sessionsService: SessionsService) { }
+    constructor(
+        private readonly sessionsService: SessionsService,
+        private readonly tasksService: TasksService,
+    ) { }
 
     @Post('start')
     async start(@Body() data: { matchId: string; participants: string[]; topic: string; estimatedDuration: number }) {
@@ -49,6 +53,13 @@ export class SessionsController {
         },
     ) {
         return this.sessionsService.endSession(sessionId, req.user.id, data);
+    }
+
+    @Post(':id/tasks/generate')
+    @UseGuards(ClerkGuard)
+    async generateTasks(@Param('id') sessionId: string, @Request() req: { user: { id: string } }) {
+        const tasks = await this.tasksService.generateTasksForSession(sessionId, req.user.id);
+        return { tasks };
     }
 
     @Post(':id/participant/:userId/audio')

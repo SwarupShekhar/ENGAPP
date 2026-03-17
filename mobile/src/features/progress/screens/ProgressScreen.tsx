@@ -13,13 +13,13 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { useTheme } from "../../theme/ThemeProvider";
-import { MetricCard } from "../components/progress/MetricCard";
-import { ProgressRing } from "../components/progress/ProgressRing";
-import { TrendIndicator } from "../components/progress/TrendIndicator";
-import { MiniChart } from "../components/progress/MiniChart";
+import { useTheme } from "../../../theme/ThemeProvider";
+import { MetricCard } from "../../../components/progress/MetricCard";
+import { ProgressRing } from "../../../components/progress/ProgressRing";
+import { TrendIndicator } from "../../../components/progress/TrendIndicator";
+import { MiniChart } from "../../../components/progress/MiniChart";
 import { Ionicons } from "@expo/vector-icons";
-import { client } from "../api/client";
+import { client } from "../../../api/client";
 import { useNavigation } from "@react-navigation/native";
 
 interface ProgressMetrics {

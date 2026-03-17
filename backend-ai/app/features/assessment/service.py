@@ -8,7 +8,7 @@ import re
 from collections import Counter
 
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 from app.models.request import AnalysisRequest, JointAnalysisRequest, SpeakerSegment
 from app.models.response import AnalysisResponse, AnalysisMetrics, JointAnalysisResponse, ParticipantAnalysis
 from app.models.base import CEFRAssessment, ErrorDetail, ErrorType, ErrorSeverity, CEFRLevel

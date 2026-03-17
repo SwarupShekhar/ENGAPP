@@ -10,20 +10,20 @@ import {
   Text,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import { getHomeData, HomeData } from "../services/homeApi";
-import { chatApi, connectionsApi } from "../api/connections";
+import { chatApi, connectionsApi } from "../../../api/connections";
 
 // Redesigned Components
-import PremiumHeader from "../../components/redesigned/PremiumHeader";
-import PremiumCTACard from "../../components/redesigned/PremiumCTACard";
+import PremiumHeader from "../../../components/redesigned/PremiumHeader";
+import PremiumCTACard from "../../../components/redesigned/PremiumCTACard";
 import PremiumSkillsCard, {
   SkillData,
-} from "../../components/redesigned/PremiumSkillsCard";
+} from "../../../components/redesigned/PremiumSkillsCard";
 import ContextualCardList, {
   ContextualCard,
-} from "../../components/redesigned/ContextualCardList";
-import WeeklyActivityGrid from "../../components/home/WeeklyActivityGrid";
+} from "../../../components/redesigned/ContextualCardList";
+import WeeklyActivityGrid from "../../../components/home/WeeklyActivityGrid";
 
 export default function HomeScreenRedesigned() {
   const { user, isLoaded } = useUser();

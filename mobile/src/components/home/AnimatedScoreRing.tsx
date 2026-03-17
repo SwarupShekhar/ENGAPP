@@ -1,14 +1,16 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TextInput } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedProps,
   withTiming,
   Easing,
+  withSpring,
 } from "react-native-reanimated";
 import { Svg, Circle, G } from "react-native-svg";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 interface Props {
   score: number; // 0-100
@@ -24,6 +26,7 @@ export default function AnimatedScoreRing({
   color = "#10B981",
 }: Props) {
   const progress = useSharedValue(0);
+  const animatedScore = useSharedValue(0);
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -33,11 +36,16 @@ export default function AnimatedScoreRing({
       duration: 800,
       easing: Easing.out(Easing.cubic),
     });
+    animatedScore.value = withSpring(score, { damping: 20, stiffness: 60 });
   }, [score]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: circumference * (1 - progress.value),
   }));
+
+  const textProps = useAnimatedProps(() => ({
+    text: `${Math.round(animatedScore.value)}`,
+  } as any));
 
   return (
     <View style={styles.container}>
@@ -69,7 +77,13 @@ export default function AnimatedScoreRing({
 
       {/* Center score label */}
       <View style={styles.centerLabel}>
-        <Text style={styles.scoreText}>{score}</Text>
+        <AnimatedTextInput
+          underlineColorAndroid="transparent"
+          editable={false}
+          value={`${Math.round(score)}`}
+          style={styles.scoreText}
+          animatedProps={textProps}
+        />
         <Text style={styles.maxText}>/100</Text>
       </View>
     </View>

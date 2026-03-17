@@ -1,4 +1,4 @@
-import { client } from "./client";
+import { client } from "../../../api/client";
 
 export interface HomeData {
   stage: number;
@@ -10,7 +10,10 @@ export interface HomeData {
     streak: number;
     percentile: string | null;
     specialBadge: string | null;
-    scoreDelta: string | null;
+    scoreDelta: number | null;
+    dailyGoalDone: number;
+    dailyGoalTarget: number;
+    xpToday: number;
     goalTarget: number;
     goalLabel: string;
     lastSessionDate: string | null;

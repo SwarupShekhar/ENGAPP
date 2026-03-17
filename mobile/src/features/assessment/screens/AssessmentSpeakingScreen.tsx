@@ -16,8 +16,8 @@ import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { assessmentApi } from "../services/assessment";
-import { API_URL } from "../../api/client";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { API_URL } from "../../../api/client";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 export default function AssessmentSpeakingScreen({ navigation, route }: any) {

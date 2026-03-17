@@ -12,9 +12,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { chatApi } from "../../api/connections";
-import SocketService from "../services/socketService";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { chatApi } from "../../../api/connections";
+import SocketService from "../../call/services/socketService";
+import { useAppTheme } from "../../../theme/useAppTheme";
 
 interface Conversation {
   conversationId: string;

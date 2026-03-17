@@ -14,7 +14,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from prometheus_client import make_asgi_app
 
 from app.core.config import settings
-from app.core.logging import configure_logging, logger
+from app.core.logger import configure_logging, logger
 from app.core.middleware import RequestIDMiddleware
 from app.cache.manager import cache
 from app.features.transcription.async_azure_speech import shutdown_executor

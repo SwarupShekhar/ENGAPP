@@ -9,7 +9,7 @@ from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 import azure.cognitiveservices.speech as speechsdk
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 from tenacity import (
     retry,
     stop_after_attempt,

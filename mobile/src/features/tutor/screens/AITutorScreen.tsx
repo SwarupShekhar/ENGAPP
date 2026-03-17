@@ -26,7 +26,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { Audio } from "expo-av";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import { tutorApi } from "../services/tutorApi";
 import { streamingTutor, StreamChunk } from "../../call/services/streamingTutorService";
 import { PronunciationBreakdown } from "../../../components/PronunciationBreakdown";

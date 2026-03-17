@@ -3,7 +3,7 @@ import uuid
 import asyncio
 import azure.cognitiveservices.speech as speechsdk
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 
 class ShadowingService:
     """Service to generate high-quality TTS for shadowing tasks."""

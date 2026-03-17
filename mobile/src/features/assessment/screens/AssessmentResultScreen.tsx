@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { useAppTheme } from "../../theme/useAppTheme";
+import { useAppTheme } from "../../../theme/useAppTheme";
 import { useUser } from "@clerk/clerk-expo";
 import { BenchmarkCard } from "../components/BenchmarkCard";
 import { RecurringErrorsCard } from "../components/RecurringErrorsCard";

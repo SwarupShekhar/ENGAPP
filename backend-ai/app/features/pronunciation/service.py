@@ -11,7 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import base64
 
 from app.core.config import settings
-from app.core.logging import logger
+from app.core.logger import logger
 from app.models.base import WordPronunciation, PhonemeScore
 from app.models.request import PronunciationRequest
 from app.models.response import PronunciationResponse

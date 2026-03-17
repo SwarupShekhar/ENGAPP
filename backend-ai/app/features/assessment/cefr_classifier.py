@@ -2,7 +2,7 @@ from typing import Dict, List
 import nltk
 from nltk.tokenize import word_tokenize, sent_tokenize
 from app.models.base import CEFRAssessment, CEFRLevel
-from app.core.logging import logger
+from app.core.logger import logger
 from app.core.config import settings
 
 

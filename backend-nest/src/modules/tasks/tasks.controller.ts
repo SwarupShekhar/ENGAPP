@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Request, UseGuards } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 
@@ -17,5 +17,11 @@ export class TasksController {
     @Post(':id/complete')
     async completeTask(@Param('id') id: string, @Body() body: { score: number }) {
         return this.tasksService.completeTask(id, body.score);
+    }
+
+    @UseGuards(ClerkGuard)
+    @Patch(':id/complete')
+    async completeTaskV2(@Param('id') id: string, @Request() req) {
+        return this.tasksService.completeTaskForUser(id, req.user.id);
     }
 }

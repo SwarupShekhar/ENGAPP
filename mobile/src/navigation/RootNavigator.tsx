@@ -20,8 +20,11 @@ import AITutorScreen from "../features/tutor/screens/AITutorScreen";
 import ChatScreen from "../features/chat/screens/ChatScreen";
 import SocketDebugScreen from "../features/debug/screens/SocketDebugScreen";
 import CustomTabBar from "../components/navigation/CustomTabBar";
+import FloatingTabBar from "../components/navigation/FloatingTabBar";
 import EBitesScreen from "../features/reels/screens/EBitesScreen";
-import HomeScreen from "../features/home/screens/HomeScreen";
+import { useUIVariant } from "../context/UIVariantContext";
+import HomeScreen from "../features/home/screens";
+import PracticeTaskScreen from "../screens/practice/PracticeTaskScreen";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.
@@ -80,9 +83,17 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
+  const { variant } = useUIVariant();
+
   return (
     <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
+      tabBar={(props) =>
+        variant === "v2" ? (
+          <FloatingTabBar {...props} />
+        ) : (
+          <CustomTabBar {...props} />
+        )
+      }
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -157,6 +168,9 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
       {/* Chat */}
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
+
+      {/* Practice Tasks */}
+      <Stack.Screen name="PracticeTask" component={PracticeTaskScreen} />
     </Stack.Navigator>
   );
 }
