@@ -136,6 +136,38 @@ export class SessionsService {
       }
     }
 
+    // Provide a merged transcript string for mobile (CallFeedbackScreen expects session.feedback.transcript
+    // or session.summaryJson.transcript). Feedback rows store per-participant segments; merge and sort by timestamp.
+    try {
+      type Seg = { speaker_id?: string; text?: string; timestamp?: number | string };
+      const merged: { speaker_id: string; text: string; timestamp: number }[] = [];
+      for (const fb of (session as any).feedbacks ?? []) {
+        const arr = Array.isArray(fb.transcript) ? (fb.transcript as Seg[]) : [];
+        for (const s of arr) {
+          const ts =
+            typeof s.timestamp === 'number'
+              ? s.timestamp
+              : typeof s.timestamp === 'string'
+                ? Number(s.timestamp) || 0
+                : 0;
+          merged.push({
+            speaker_id: String(s.speaker_id ?? fb.participantId ?? 'unknown'),
+            text: String(s.text ?? ''),
+            timestamp: ts,
+          });
+        }
+      }
+      merged.sort((a, b) => a.timestamp - b.timestamp);
+      const transcriptText = merged
+        .filter((s) => s.text.trim().length > 0)
+        .map((s) => `${s.speaker_id}: ${s.text.trim()}`)
+        .join('\n');
+      (session as any).feedback = { transcript: transcriptText };
+    } catch (e) {
+      // Non-fatal: keep response shape stable even if transcript merge fails
+      (session as any).feedback = { transcript: '' };
+    }
+
     return session;
   }
 

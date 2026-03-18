@@ -89,13 +89,31 @@ export class AzureService {
       // Backend-ai returns { flagged_errors, pronunciation_score } (no .data wrapper).
       // pronunciation_score is { score, cefr_cap, cap_reason, category_breakdown, dominant_errors }.
       const body = pronResponse.data?.data ?? pronResponse.data;
+      
+      // CRITICAL: Do NOT silently fallback to 50 - log error and throw if pronunciation fails
+      if (!body?.pronunciation_score || body.pronunciation_score === null) {
+        this.logger.error(
+          `Pronunciation assessment returned no score for session. Response: ${JSON.stringify(body)?.substring(0, 500)}`,
+        );
+        throw new Error('Pronunciation assessment failed - no score returned from AI engine');
+      }
+      
       const pronScore =
         typeof body?.pronunciation_score === 'object'
           ? body.pronunciation_score
-          : { score: body?.pronunciation_score ?? 50 };
+          : { score: body?.pronunciation_score };
 
-      const rawScore = Number(pronScore.score ?? 50);
-      const score = Number.isFinite(rawScore) ? rawScore : 50;
+      // Validate score is actually a valid number
+      const rawScore = Number(pronScore.score ?? NaN);
+      if (!Number.isFinite(rawScore)) {
+        this.logger.error(
+          `Pronunciation assessment returned invalid score: ${pronScore.score}. Response: ${JSON.stringify(body)?.substring(0, 500)}`,
+        );
+        throw new Error(`Pronunciation assessment returned invalid score: ${pronScore.score}`);
+      }
+
+      const score = rawScore;
+      this.logger.log(`Pronunciation assessment returned score: ${score} for session`);
 
       const words = body?.words ?? body?.flagged_errors ?? [];
       const wordCount = transcript

@@ -184,49 +184,26 @@ const PulsingAvatar = ({ imageUrl, initial, theme }: { imageUrl?: string; initia
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-const GoalProgress = ({ current, target, label, theme }: { current: number; target: number; label: string; theme: any }) => {
+const GoalProgressBar = ({ current, target, label }: { current: number; target: number; label: string }) => {
+  const percentage = Math.min((current / (target || 100)) * 100, 100);
   const progress = useSharedValue(0);
-  const percentage = Math.min((current / target) * 100, 100);
 
   useEffect(() => {
-    progress.value = withDelay(500, withSpring(percentage / 100, { damping: 20, stiffness: 60 }));
+    progress.value = withSpring(percentage / 100, { damping: 20, stiffness: 60 });
   }, [percentage]);
 
-  const animatedCircleProps = useAnimatedProps(() => {
-    const radius = 30;
-    const circumference = 2 * Math.PI * radius;
-    return {
-      strokeDashoffset: circumference * (1 - progress.value),
-      strokeDasharray: circumference,
-    } as any;
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    width: `${progress.value * 100}%`,
+  }));
 
   return (
-    <View style={{ alignItems: 'center', gap: 4 }}>
-      <View style={{ width: 70, height: 70, justifyContent: 'center', alignItems: 'center' }}>
-        <Svg width={70} height={70}>
-          <G rotation="-90" origin="35, 35">
-            <Circle cx="35" cy="35" r="30" stroke="rgba(255,255,255,0.15)" strokeWidth="6" fill="none" />
-            <AnimatedCircle
-              cx="35"
-              cy="35"
-              r="30"
-              stroke="#FFFFFF"
-              strokeWidth="6"
-              strokeLinecap="round"
-              fill="none"
-              animatedProps={animatedCircleProps}
-            />
-          </G>
-        </Svg>
-        <View style={{ position: 'absolute' }}>
-          <AnimatedNumber 
-            value={percentage} 
-            suffix="%" 
-            style={{ color: 'white', fontSize: 14, fontWeight: '800', textAlign: 'center' }} 
-          />
-        </View>
-      </View><Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700' }}>{label}</Text>
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 4 }}>
+      <View style={{ flex: 1, height: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, overflow: 'hidden' }}>
+        <Animated.View style={[{ height: '100%', backgroundColor: 'white' }, animatedStyle]} />
+      </View>
+      <Text style={{ color: 'white', fontSize: 10, opacity: 0.7, fontWeight: '600' }}>
+        {Math.round(percentage)}% to {label}
+      </Text>
     </View>
   );
 };
@@ -288,16 +265,9 @@ const SkeletonBanner = ({ theme, insets }: { theme: any; insets: any }) => (
         <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)' }} />
       </View>
     </View>
-    <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
-      <View style={{ alignItems: 'center', gap: 8 }}>
-        <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 8, borderColor: 'rgba(255,255,255,0.1)' }} />
-        <Shimmer width={60} height={10} style={{ opacity: 0.3 }} />
-      </View>
-      <View style={{ width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.1)' }} />
-      <View style={{ alignItems: 'center', gap: 8 }}>
-        <View style={{ width: 70, height: 70, borderRadius: 35, borderWidth: 6, borderColor: 'rgba(255,255,255,0.1)' }} />
-        <Shimmer width={50} height={10} style={{ opacity: 0.3 }} />
-      </View>
+    <View style={{ alignItems: 'center', gap: 8 }}>
+      <View style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 8, borderColor: 'rgba(255,255,255,0.1)' }} />
+      <Shimmer width={60} height={10} style={{ opacity: 0.3 }} />
     </View>
   </View>
 );
@@ -566,14 +536,41 @@ export default function HomeScreen() {
             </View>
             <View style={styles.heroContent}>
               <View style={styles.scoreRow}>
-                <View style={styles.ringWrapper}><AnimatedScoreRing score={header.score} size={88} /><Text style={styles.ringLabel}>Overall</Text></View><View style={styles.ringDivider} /><GoalProgress current={header.score} target={header.goalTarget || 100} label={header.goalLabel || "Target"} theme={theme} />
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    navigation.navigate("ScoreDetail", {
+                      score: header.score,
+                      level: header.level,
+                      skills: skills,
+                      percentile: header.percentile,
+                      pendingTaskType: pendingTasks?.[0]?.type,
+                    })
+                  }
+                  style={styles.ringWrapper}
+                >
+                  <AnimatedScoreRing score={header.score} size={88} />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text style={styles.ringLabel}>Overall</Text>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={12}
+                      color="white"
+                      style={{ opacity: 0.6 }}
+                    />
+                  </View>
+                </TouchableOpacity>
               </View>
               <View style={styles.levelRow}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }} accessibilityLabel={`Level ${header.level}, ${header.percentile || ''}`}>
+                <View 
+                  style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, marginRight: 16 }} 
+                  accessibilityLabel={`Level ${header.level || ''}, ${header.percentile || ''}`}
+                >
                   <SemanticLevelBadge level={(header.level?.toLowerCase() || "a1") as LevelType} pattern="tinted" size="small" />
                   {header.percentile && (
                     <View style={styles.percentileBadge}><Text style={styles.percentileText}>{header.percentile}</Text></View>
                   )}
+                  <GoalProgressBar current={header.score} target={header.goalTarget || 100} label={header.goalLabel || "Next Level"} />
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   {header.latestAssessmentId && (
@@ -848,7 +845,7 @@ const getStyles = (theme: any, insets: any) =>
     scoreRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-around",
+      justifyContent: "center",
       paddingHorizontal: theme.spacing.m,
       marginTop: theme.spacing.s,
       marginBottom: theme.spacing.s,
@@ -863,10 +860,12 @@ const getStyles = (theme: any, insets: any) =>
       fontWeight: "700",
       marginTop: 2,
     },
-    ringDivider: {
-      width: 1,
-      height: 40,
+    goalProgressBar: {
+      flex: 1,
+      height: 6,
       backgroundColor: "rgba(255,255,255,0.15)",
+      borderRadius: 3,
+      overflow: "hidden",
     },
     goalBarContainer: {
       flex: 1,

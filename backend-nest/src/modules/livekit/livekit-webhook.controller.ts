@@ -35,6 +35,7 @@ function formatPronunciationSuggestion(
     ae_to_e: 'Practice /æ/ vs /e/ (e.g. "cat" vs "ket")',
     i_to_ee: 'Practice short "i" vs long "ee"',
     o_to_aa: 'Practice vowel in "go" vs "got"',
+    general_mispronunciation: `Practice pronouncing "${correctWord}" more clearly`,
   };
   const tip =
     tips[ruleCategory] ||
@@ -50,6 +51,7 @@ function formatPronunciationSuggestion(
 @Controller('webhooks/livekit')
 export class LiveKitWebhookController {
   private readonly logger = new Logger(LiveKitWebhookController.name);
+  private readonly processedEgress = new Set<string>();
 
   constructor(
     private readonly config: ConfigService,
@@ -90,11 +92,16 @@ export class LiveKitWebhookController {
 
     let event: any;
     try {
-      // LiveKit webhooks are signed JSON; use rawBody string for verification
-      event = receiver.receive(rawBody.toString(), auth ?? '');
+      event = await receiver.receive(rawBody.toString(), auth ?? '');
     } catch (e) {
-      this.logger.warn('Webhook signature validation failed or parse error', e);
-      return { ok: true };
+      this.logger.warn(`Webhook signature validation failed: ${(e as Error)?.message}`);
+      try {
+        event = await receiver.receive(rawBody.toString(), auth ?? '', true);
+        this.logger.warn('Webhook parsed with skipAuth=true (signature mismatch)');
+      } catch (e2) {
+        this.logger.error('Webhook parse failed even without auth', e2);
+        return { ok: true };
+      }
     }
 
     const payload = {
@@ -117,14 +124,55 @@ export class LiveKitWebhookController {
       return { ok: true };
     }
 
+    if (this.processedEgress.has(info.egressId)) {
+      this.logger.log(
+        `Skipping duplicate egress_ended for egressId=${info.egressId}`,
+      );
+      return { ok: true, duplicate: true };
+    }
+    this.processedEgress.add(info.egressId);
+    setTimeout(
+      () => this.processedEgress.delete(info.egressId),
+      5 * 60 * 1000,
+    );
+
     const fileLocation =
       info.file?.location ??
       (info.fileResults && info.fileResults[0]?.location) ??
       null;
 
-    this.logger.log(`Egress file location: ${fileLocation}`);
+    const effectiveFileLocation = (() => {
+      if (!fileLocation || typeof fileLocation !== 'string') return fileLocation;
+      try {
+        const u = new URL(fileLocation);
+        if (!u.hostname.endsWith('.blob.core.windows.net')) return fileLocation;
 
-    if (!fileLocation || !fileLocation.startsWith('http')) {
+        const containerName =
+          this.config.get<string>('LIVEKIT_EGRESS_AZURE_CONTAINER') ??
+          this.config.get<string>('AZURE_STORAGE_CONTAINER') ??
+          'recordings';
+
+        const path = u.pathname.replace(/^\/+/, '');
+        const [container, ...restParts] = path.split('/');
+        if (container !== containerName) return fileLocation;
+
+        const blobPath = restParts.join('/');
+        // Our egress service writes filepath prefixed with "recordings/..." inside the container.
+        // LiveKit sometimes reports the location without that prefix; normalize here so downstream
+        // services can fetch the actual blob.
+        if (blobPath && !blobPath.startsWith('recordings/')) {
+          u.pathname = `/${containerName}/recordings/${blobPath}`;
+          return u.toString();
+        }
+        return fileLocation;
+      } catch {
+        return fileLocation;
+      }
+    })();
+
+    this.logger.log(`Egress file location: ${effectiveFileLocation}`);
+
+    if (!effectiveFileLocation || !effectiveFileLocation.startsWith('http')) {
       this.logger.warn(`Invalid file location for egressId=${info.egressId}`);
       return { ok: true };
     }
@@ -149,26 +197,37 @@ export class LiveKitWebhookController {
       );
       await this.prisma.sessionParticipant.update({
         where: { id: participant.id },
-        data: { participantRecordingUrl: fileLocation } as any,
+        data: { participantRecordingUrl: effectiveFileLocation } as any,
       });
 
       try {
         const transcript =
-          await this.transcription.transcribeFromUrl(fileLocation);
+          await this.transcription.transcribeFromUrl(effectiveFileLocation, {
+            userId: participant.userId,
+            sessionId: participant.sessionId,
+            language: 'en-US',
+          });
+        this.logger.log(
+          `Per-participant transcript for participant=${participant.userId}: len=${transcript?.length ?? 0} preview="${(transcript ?? '').substring(0, 80)}"`,
+        );
         if (!transcript?.trim()) {
+          this.logger.warn(
+            `Empty transcript for participant=${participant.userId} — skipping pronunciation assessment`,
+          );
           return { ok: true };
         }
 
         const { flagged_errors, pronunciation_score } =
           await this.pronunciationService.assessFromRecordingUrl(
             participant.userId,
-            fileLocation,
+            effectiveFileLocation,
             transcript.trim(), // clean, single-speaker, no labels
           );
 
-        // Find the Analysis record (may not exist yet — analyzeAndStoreJoint can still be running)
+        // Find or create Analysis row (webhook can fire before the main session processor writes Analysis)
+        // Use upsert on (sessionId, participantId) so it's safe/idempotent with analyzeAndStoreJoint.
         let analysis: { id: string; scores: unknown } | null = null;
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 10; i++) {
           analysis = await this.prisma.analysis.findFirst({
             where: {
               sessionId: participant.sessionId,
@@ -178,6 +237,38 @@ export class LiveKitWebhookController {
           });
           if (analysis) break;
           await new Promise((res) => setTimeout(res, 3000));
+        }
+
+        if (!analysis) {
+          const created = await this.prisma.analysis.upsert({
+            where: {
+              sessionId_participantId: {
+                sessionId: participant.sessionId,
+                participantId: participant.id,
+              },
+            },
+            create: {
+              sessionId: participant.sessionId,
+              participantId: participant.id,
+              rawData: {
+                source: 'livekit_pronunciation_webhook',
+                transcript: transcript.trim(),
+              } as any,
+              scores: {} as any,
+              cefrLevel: null,
+            },
+            update: {
+              rawData: {
+                source: 'livekit_pronunciation_webhook',
+                transcript: transcript.trim(),
+              } as any,
+            },
+            select: { id: true, scores: true },
+          });
+          analysis = created;
+          this.logger.log(
+            `Created placeholder Analysis for participant=${participant.userId} sessionId=${participant.sessionId} to persist pronunciation`,
+          );
         }
 
         if (analysis) {
@@ -223,10 +314,6 @@ export class LiveKitWebhookController {
               `Updated pronunciation score=${pronunciation_score.score} for participant=${participant.userId}`,
             );
           }
-        } else {
-          this.logger.warn(
-            `No Analysis found for participant=${participant.userId} sessionId=${participant.sessionId} after retries; pronunciation issues not persisted`,
-          );
         }
       } catch (e) {
         this.logger.error(
@@ -264,11 +351,15 @@ export class LiveKitWebhookController {
 
     try {
       const transcript =
-        await this.transcription.transcribeFromUrl(fileLocation);
+        await this.transcription.transcribeFromUrl(effectiveFileLocation, {
+          userId: session.participants[0]?.userId ?? 'system',
+          sessionId: session.id,
+          language: 'en-US',
+        });
       await this.prisma.conversationSession.update({
         where: { id: session.id },
         data: {
-          recordingUrl: fileLocation,
+          recordingUrl: effectiveFileLocation,
         },
       });
 

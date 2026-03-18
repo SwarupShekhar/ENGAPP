@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 def _compute_word_accuracy_average(azure_result: dict[str, Any]) -> float:
     """Average of all word-level AccuracyScore values from the Azure PA result. Default 100 if none."""
     words: list[dict] = []
-    if "Nbests" in azure_result and azure_result["Nbests"]:
-        first = azure_result["Nbests"][0]
+    nbests = azure_result.get("NBest") or azure_result.get("Nbests") or azure_result.get("nbest")
+    if nbests and isinstance(nbests, list) and len(nbests) > 0:
+        first = nbests[0]
         words = first.get("Words") or first.get("words") or []
     elif "Words" in azure_result:
         words = azure_result["Words"]
@@ -60,18 +61,18 @@ AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
 
 
-async def _run_azure_pronunciation_assessment(
+def _run_continuous_pa_sync(
     audio_path: str,
-    reference_text: str | None,
-) -> dict[str, Any]:
-    """Run Azure Pronunciation Assessment with enable_miscue=True; return raw result dict."""
-    try:
-        import azure.cognitiveservices.speech as speechsdk
-    except ImportError:
-        raise HTTPException(503, "Azure Speech SDK not installed")
-
-    if not AZURE_SPEECH_KEY:
-        raise HTTPException(503, "AZURE_SPEECH_KEY not set")
+    reference_text: str,
+) -> list[dict]:
+    """
+    Run Azure PA with continuous recognition so the ENTIRE audio file is assessed,
+    not just the first utterance.  Returns a flat list of word dicts with
+    PronunciationAssessment / Phonemes from every recognized segment.
+    """
+    import json as _json
+    import azure.cognitiveservices.speech as speechsdk
+    import threading
 
     speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
     speech_config.speech_recognition_language = "en-US"
@@ -79,38 +80,90 @@ async def _run_azure_pronunciation_assessment(
     audio_config = speechsdk.audio.AudioConfig(filename=audio_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
 
-    # Reference text: required for PA. Tutor = known script; P2P free speech may use first-pass transcript as ref in Phase 2.
-    ref = (reference_text or "").strip() or "hello"
     pa_config = speechsdk.PronunciationAssessmentConfig(
-        reference_text=ref,
+        reference_text=reference_text,
         grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
         granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
         enable_miscue=True,
     )
     pa_config.apply_to(recognizer)
 
-    try:
-        result = await asyncio.to_thread(recognizer.recognize_once)
-    except Exception as e:
-        logger.warning("Azure PA recognize_once failed: %s", e)
-        return {"Words": [], "error": str(e)}
+    all_words: list[dict] = []
+    done = threading.Event()
+    errors: list[str] = []
 
-    # Parse PronunciationAssessmentResult into Words with AccuracyScore for detector
-    words: list[dict] = []
-    if result.reason == speechsdk.ResultReason.RecognizedSpeech and result.properties:
-        import json as _json
+    def on_recognized(evt):
         try:
-            detail = result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
-            if detail:
-                data = _json.loads(detail)
-                # Azure returns NBest[0].Words with AccuracyScore, ErrorType, etc.
-                nbests = data.get("NBest") or data.get("nbest") or []
-                if nbests:
-                    words = nbests[0].get("Words") or nbests[0].get("words") or []
-                return {"Nbests": [{"Words": words}], "Words": words}
+            detail_str = evt.result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
+            if not detail_str:
+                return
+            data = _json.loads(detail_str)
+            nbests = data.get("NBest") or data.get("nbest") or []
+            if nbests:
+                segment_words = nbests[0].get("Words") or nbests[0].get("words") or []
+                all_words.extend(segment_words)
+                logger.info("PA segment: %d words (total so far: %d)", len(segment_words), len(all_words))
         except Exception as e:
-            logger.debug("Parse Azure PA JSON: %s", e)
-    return {"Words": [{"Word": result.text or "", "AccuracyScore": 50}], "Nbests": [{"Words": words}]}
+            logger.warning("PA on_recognized parse error: %s", e)
+
+    def on_canceled(evt):
+        if evt.cancellation_details.reason == speechsdk.CancellationReason.Error:
+            errors.append(evt.cancellation_details.error_details or "unknown cancellation error")
+        done.set()
+
+    def on_stopped(_evt):
+        done.set()
+
+    recognizer.recognized.connect(on_recognized)
+    recognizer.canceled.connect(on_canceled)
+    recognizer.session_stopped.connect(on_stopped)
+
+    recognizer.start_continuous_recognition()
+    done.wait(timeout=120)
+    recognizer.stop_continuous_recognition()
+
+    if errors:
+        logger.error("PA continuous recognition errors: %s", errors)
+
+    return all_words
+
+
+async def _run_azure_pronunciation_assessment(
+    audio_path: str,
+    reference_text: str | None,
+) -> dict[str, Any]:
+    """
+    Run Azure Pronunciation Assessment against the full audio file.
+
+    Strategy:
+    - Always use continuous recognition so ALL speech in the recording is assessed
+      (recognize_once only handles the first ~15s utterance).
+    - enable_miscue is applied so Azure does forced alignment against the reference.
+    - For continuous mode, Azure may not report Omission/Insertion ErrorType; the
+      detector compensates by comparing recognized words against the reference.
+    """
+    try:
+        import azure.cognitiveservices.speech as speechsdk  # noqa: F401
+    except ImportError:
+        raise HTTPException(503, "Azure Speech SDK not installed")
+
+    if not AZURE_SPEECH_KEY:
+        raise HTTPException(503, "AZURE_SPEECH_KEY not set")
+
+    ref = (reference_text or "").strip() or "hello"
+
+    try:
+        all_words = await asyncio.to_thread(_run_continuous_pa_sync, audio_path, ref)
+    except Exception as e:
+        logger.warning("Azure PA continuous failed: %s", e)
+        return {"Words": [], "error": str(e), "fallback": False}
+
+    if not all_words:
+        logger.error("Azure PA returned 0 words for audio %s (ref len=%d)", audio_path, len(ref))
+        return {"Words": [], "error": "No words recognized by Azure PA", "fallback": False}
+
+    logger.info("Azure PA assessed %d words total", len(all_words))
+    return {"Nbests": [{"Words": all_words}], "Words": all_words}
 
 
 @router.post("/assess")
@@ -119,12 +172,14 @@ async def assess_pronunciation(
     audio: UploadFile | None = File(None),
     reference_text: str | None = Form(None),
     azure_result: str | None = Form(None),
+    audio_url: str | None = Form(None),
 ):
     """
     POST /pronunciation/assess
     Accepts EITHER:
     1. Multipart Form Data: `audio` (file) and `reference_text`
-    2. JSON Body: `{"audio_base64": "...", "reference_text": "..."}` or `{"azure_result": {...}}`
+    2. Multipart Form Data: `audio_url` (URL) and `reference_text` — backend downloads the audio
+    3. JSON Body: `{"audio_base64": "...", "reference_text": "..."}` or `{"azure_result": {...}}`
     """
     content_type = request.headers.get("content-type", "")
     is_json = "application/json" in content_type.lower()
@@ -132,6 +187,7 @@ async def assess_pronunciation(
     _audio_base64 = None
     _reference_text = reference_text
     _azure_result = azure_result
+    _audio_url = audio_url
 
     if is_json:
         try:
@@ -139,6 +195,7 @@ async def assess_pronunciation(
             if "azure_result" in body:
                 _azure_result = body["azure_result"]
             _audio_base64 = body.get("audio_base64")
+            _audio_url = body.get("audio_url", _audio_url)
             _reference_text = body.get("reference_text", _reference_text)
         except Exception as e:
             raise HTTPException(400, f"Invalid JSON body: {e}")
@@ -156,30 +213,46 @@ async def assess_pronunciation(
         score_result = calculate_pronunciation_score(errors, azure_avg)
         return {"flagged_errors": errors, "pronunciation_score": score_result}
 
-    # Limit audio size to 10MB to prevent resource exhaustion
     MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024
 
-    if not audio and not _audio_base64:
-        raise HTTPException(400, "Provide audio file or JSON body with audio_base64")
+    content: bytes | None = None
 
     if audio:
-        # Check size if available in headers, otherwise read in chunks or after read
         content = await audio.read()
         if len(content) > MAX_AUDIO_SIZE_BYTES:
             raise HTTPException(413, "Audio file too large (max 10MB)")
     elif _audio_base64:
-        # Check base64 length (approximate byte size is 3/4 of base64 length)
         if len(_audio_base64) > (MAX_AUDIO_SIZE_BYTES * 4 / 3):
             raise HTTPException(413, "Audio base64 payload too large (max 10MB)")
-            
         import base64
         try:
             content = base64.b64decode(_audio_base64)
         except Exception as e:
             logger.warning("Invalid base64 audio: %s", e)
             raise HTTPException(400, "Invalid audio_base64") from e
+    elif _audio_url:
+        from app.features.transcription.audio_utils import download_audio_streamed
+        ext = os.path.splitext(_audio_url.split("?")[0])[-1] or ".mp4"
+        fd, tmp_dl = tempfile.mkstemp(suffix=ext)
+        os.close(fd)
+        try:
+            await download_audio_streamed(_audio_url, tmp_dl)
+            with open(tmp_dl, "rb") as f:
+                content = f.read()
+            logger.info("Downloaded audio from URL for PA: %d bytes", len(content))
+        except Exception as e:
+            logger.error("Failed to download audio_url for PA: %s", e, exc_info=True)
+            raise HTTPException(502, f"Could not download audio from URL: {e}")
+        finally:
+            try:
+                os.unlink(tmp_dl)
+            except OSError:
+                pass
     else:
-        raise HTTPException(400, "No audio provided")
+        raise HTTPException(400, "Provide audio file, audio_url, or JSON body with audio_base64")
+
+    if not content:
+        raise HTTPException(400, "No audio content received")
 
     # Expo/React Native typically sends m4a. Write to temp with extension so pydub can detect format.
     fd_in = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a")
@@ -203,7 +276,8 @@ async def assess_pronunciation(
             seg = seg.set_frame_rate(16000).set_channels(1).set_sample_width(2)
             seg.export(tmp_wav, format="wav")
             wav_ready = True
-            logger.info("Converted audio to WAV: %s", tmp_wav)
+            duration_s = len(seg) / 1000.0
+            logger.info("Converted audio to WAV: %s (%.1fs, %d samples)", tmp_wav, duration_s, len(seg.raw_data))
         except Exception as e:
             logger.error("Failed to convert audio via pydub: %s", e, exc_info=True)
             # Client usually sends m4a (Expo). pydub needs ffmpeg for m4a.

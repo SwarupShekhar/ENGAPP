@@ -13,17 +13,31 @@ const FORCE_LOCAL = false;
 // Your Mac's local IP address on the Wi-Fi network
 const LOCAL_IP = "192.168.1.34";
 
+// Optional override for internal builds / device testing.
+// Configure via app.json -> expo.extra.apiUrlOverride (or EAS env that populates extra).
+// Example: "http://192.168.1.34:3000"
+const EXTRA_API_URL_OVERRIDE =
+  (Constants.expoConfig as any)?.extra?.apiUrlOverride ||
+  (Constants.manifest as any)?.extra?.apiUrlOverride ||
+  null;
+
 // Determine the API URL based on environment.
 // Production builds (IS_PROD=true) will ALWAYS use the production URL.
-export const API_URL = IS_PROD
-  ? "https://engapp-3210.onrender.com"
-  : FORCE_LOCAL
-    ? `http://${LOCAL_IP}:3000`
-    : Platform.select({
-        ios: "http://localhost:3000",
-        android: "http://10.0.2.2:3000",
-        default: `http://${LOCAL_IP}:3000`,
-      });
+export const API_URL =
+  // 0) Explicit override wins (useful for EAS internal builds pointing to local backend)
+  (typeof EXTRA_API_URL_OVERRIDE === "string" && EXTRA_API_URL_OVERRIDE.trim()
+    ? EXTRA_API_URL_OVERRIDE.trim()
+    : null) ||
+  // 1) Default behavior
+  (IS_PROD
+    ? "https://engapp-3210.onrender.com"
+    : FORCE_LOCAL
+      ? `http://${LOCAL_IP}:3000`
+      : Platform.select({
+          ios: "http://localhost:3000",
+          android: "http://10.0.2.2:3000",
+          default: `http://${LOCAL_IP}:3000`,
+        }));
 
 if (__DEV__) console.log(`[API] Initializing client with URL: ${API_URL}`);
 

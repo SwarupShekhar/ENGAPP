@@ -117,6 +117,40 @@ export class SessionsProcessor {
       });
       segments.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
 
+      // Persist participant-level stats (SessionParticipant defaults are 0 otherwise)
+      // speakingTime: approximate from word count (0.5s/word), turnsTaken: count of segments
+      const statsByUser = new Map<
+        string,
+        { turnsTaken: number; wordCount: number }
+      >();
+      for (const seg of segments) {
+        const userId = seg.speaker_id;
+        const entry = statsByUser.get(userId) ?? { turnsTaken: 0, wordCount: 0 };
+        entry.turnsTaken += 1;
+        entry.wordCount += (seg.text || '')
+          .split(/\s+/)
+          .filter((w) => w.trim().length > 0).length;
+        statsByUser.set(userId, entry);
+      }
+
+      for (const participant of session.participants) {
+        const s = statsByUser.get(participant.userId) ?? {
+          turnsTaken: 0,
+          wordCount: 0,
+        };
+        const speakingTimeSeconds = Math.max(
+          0,
+          Math.round(s.wordCount * 0.5),
+        );
+        await this.prisma.sessionParticipant.update({
+          where: { id: participant.id },
+          data: {
+            turnsTaken: s.turnsTaken,
+            speakingTime: speakingTimeSeconds,
+          },
+        });
+      }
+
       // Log when one participant sent no segments (explains "errors not caught" / static feedback for that user)
       const segmentCountByUser = session.participants.map((p) => ({
         userId: p.userId,

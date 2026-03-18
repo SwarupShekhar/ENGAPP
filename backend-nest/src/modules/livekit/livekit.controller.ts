@@ -16,9 +16,32 @@ export class LivekitController {
   @Post('token')
   async getToken(@Body() body: { userId: string; sessionId: string }) {
     const roomName = `room_${body.sessionId}`;
+    this.logger.log(
+      `Token requested: clerkId=${body.userId} sessionId=${body.sessionId} room=${roomName}`,
+    );
+
+    // body.userId is the Clerk ID (e.g. "user_3ACm61sb...") — used as LiveKit participant identity
     const token = await this.livekitService.generateToken(
       roomName,
       body.userId,
+    );
+
+    // Resolve Clerk ID → internal UUID so we can match SessionParticipant records
+    const dbUser = await this.prisma.user.findFirst({
+      where: { clerkId: body.userId },
+      select: { id: true },
+    });
+
+    if (!dbUser) {
+      this.logger.warn(
+        `No DB user found for clerkId=${body.userId}; egress will not start`,
+      );
+      return { token, roomName };
+    }
+
+    const internalUserId = dbUser.id;
+    this.logger.log(
+      `Resolved clerkId=${body.userId} → userId=${internalUserId}`,
     );
 
     const session = await this.prisma.conversationSession.findUnique({
@@ -31,7 +54,6 @@ export class LivekitController {
       if (!session.egressId) {
         setTimeout(async () => {
           try {
-            // Atomically claim egress start to avoid races between concurrent requests
             const result =
               await this.prisma.conversationSession.updateMany({
                 where: { id: body.sessionId, egressId: null },
@@ -39,6 +61,9 @@ export class LivekitController {
               });
 
             if (result.count > 0) {
+              this.logger.log(
+                `Starting room composite egress for session=${body.sessionId}`,
+              );
               try {
                 await this.egressService.startRoomCompositeEgress(
                   roomName,
@@ -49,7 +74,6 @@ export class LivekitController {
                   `Room composite egress failed for session ${body.sessionId}`,
                   e,
                 );
-                // Roll back pending egressId so future requests can retry
                 await this.prisma.conversationSession.updateMany({
                   where: { id: body.sessionId, egressId: 'pending' },
                   data: { egressId: null },
@@ -62,48 +86,54 @@ export class LivekitController {
               e,
             );
           }
-        }, 3000); // 3 second delay for room to be created
+        }, 3000);
       }
 
-      // Track egress for this participant only
+      // Per-participant egress — records each user's audio separately for pronunciation assessment
       const thisParticipant = session.participants.find(
-        (p) => p.userId === body.userId,
+        (p) => p.userId === internalUserId,
       );
       if (thisParticipant && !thisParticipant.participantEgressId) {
+        this.logger.log(
+          `Scheduling participant egress for internalUserId=${internalUserId} clerkId=${body.userId} session=${body.sessionId}`,
+        );
         setTimeout(async () => {
           try {
-            // Atomically claim participant egress by setting a unique egress id
-            const participantEgressId = `participant_${body.sessionId}_${body.userId}`;
+            const placeholderEgressId = `pending_${body.sessionId}_${internalUserId}`;
 
             const claimResult =
               await this.prisma.sessionParticipant.updateMany({
                 where: {
                   sessionId: body.sessionId,
-                  userId: body.userId,
+                  userId: internalUserId,
                   participantEgressId: null,
                 },
-                data: { participantEgressId },
+                data: { participantEgressId: placeholderEgressId },
               });
 
             if (claimResult.count > 0) {
+              this.logger.log(
+                `Starting participant egress: internalUserId=${internalUserId} identity=${body.userId} room=${roomName}`,
+              );
               try {
+                // identity = Clerk ID (what LiveKit knows the participant as)
+                // userId = internal UUID (for DB lookups and file paths)
                 await this.egressService.startParticipantTrackEgress(
                   roomName,
                   body.sessionId,
                   body.userId,
-                  participantEgressId,
+                  internalUserId,
                 );
               } catch (e) {
                 this.logger.error(
-                  `Track egress failed for user ${body.userId} in session ${body.sessionId}`,
+                  `Participant egress failed for user ${internalUserId} in session ${body.sessionId}`,
                   e,
                 );
-                // Roll back participantEgressId so another request can retry
                 await this.prisma.sessionParticipant.updateMany({
                   where: {
                     sessionId: body.sessionId,
-                    userId: body.userId,
-                    participantEgressId,
+                    userId: internalUserId,
+                    participantEgressId: placeholderEgressId,
                   },
                   data: { participantEgressId: null },
                 });
@@ -111,11 +141,19 @@ export class LivekitController {
             }
           } catch (e) {
             this.logger.error(
-              `Participant egress scheduling failed for user ${body.userId} in session ${body.sessionId}`,
+              `Participant egress scheduling failed for user ${internalUserId} in session ${body.sessionId}`,
               e,
             );
           }
-        }, 3000); // same 3 second delay
+        }, 5000);
+      } else if (thisParticipant) {
+        this.logger.log(
+          `Participant egress already started for userId=${internalUserId} egressId=${thisParticipant.participantEgressId}`,
+        );
+      } else {
+        this.logger.warn(
+          `No SessionParticipant found for userId=${internalUserId} in session=${body.sessionId}. Participants: ${session.participants.map(p => p.userId).join(', ')}`,
+        );
       }
     }
 

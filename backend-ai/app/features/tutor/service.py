@@ -11,6 +11,11 @@ try:
 except ImportError:
     OptimizedTTSService = None  # type: ignore
 
+try:
+    from ..transcription.inworld_tts_service import InworldTTSService
+except ImportError:
+    InworldTTSService = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 class StreamingTutorService:
@@ -20,11 +25,31 @@ class StreamingTutorService:
         
         # Initialize sub-services
         self.gemini_service = StreamingGeminiService()
-        try:
-            self.tts_service = OptimizedTTSService() if OptimizedTTSService else None
-        except Exception as e:
-            logger.error(f"Failed to initialize OptimizedTTSService: {e}")
-            self.tts_service = None
+
+        # Determine the order of TTS services to try
+        use_inworld_primary = os.getenv('USE_INWORLD_TTS', 'false').lower() == 'true'
+
+        tts_service_candidates = []
+        if use_inworld_primary:
+            if InworldTTSService is not None:
+                tts_service_candidates.append(("InworldTTS", InworldTTSService))
+            if OptimizedTTSService is not None:
+                tts_service_candidates.append(("OptimizedTTS", OptimizedTTSService))
+        else:
+            if OptimizedTTSService is not None:
+                tts_service_candidates.append(("OptimizedTTS", OptimizedTTSService))
+            if InworldTTSService is not None:
+                tts_service_candidates.append(("InworldTTS", InworldTTSService))
+
+        self.tts_service = None
+        for service_name, service_class in tts_service_candidates:
+            try:
+                self.tts_service = service_class()
+                logger.info(f"Initialized {service_name} for TTS")
+                break
+            except Exception as e:
+                logger.error(f"Failed to initialize {service_name}: {e}")
+                self.tts_service = None
         
         if not self.speech_key or not self.speech_region:
             logger.warning("Azure Speech credentials not found. Streaming features will be disabled.")

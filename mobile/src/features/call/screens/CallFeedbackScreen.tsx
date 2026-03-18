@@ -18,7 +18,11 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { getLevelColor } from "../../../theme/colorUtils";
-import { sessionsApi, ConversationSession } from "../../../api/sessions";
+import {
+  sessionsApi,
+  ConversationSession,
+  parsePronunciationIssue,
+} from "../../../api/sessions";
 
 // Feedback Components
 import { WordLevelBreakdown } from "../components/WordLevelBreakdown";
@@ -69,98 +73,161 @@ function SkillBar({
   );
 }
 
-// ─── Build highlight ranges from transcript + mistakes ─────
-function getTranscriptHighlightRanges(
+// ─── Build highlight ranges from transcript + mistakes/pronunciation ─────
+type HighlightRange = { start: number; end: number; type: "grammar" | "pronunciation" };
+
+function buildHighlightRanges(
   transcript: string,
   mistakes: { original_text?: string; original?: string }[],
-): [number, number][] {
-  const phrases = mistakes
+  pronunciationIssues: { word?: string }[],
+): HighlightRange[] {
+  if (!transcript) return [];
+  const lower = transcript.toLowerCase();
+  const ranges: HighlightRange[] = [];
+
+  const grammarPhrases = mistakes
     .map((m) => (m.original_text ?? m.original ?? "").trim())
     .filter((p) => p.length >= 2);
-  if (!transcript || phrases.length === 0) return [];
-
-  const lower = transcript.toLowerCase();
-  const ranges: [number, number][] = [];
-
-  for (const phrase of phrases) {
-    if (!phrase) continue;
+  for (const phrase of grammarPhrases) {
     const phraseLower = phrase.toLowerCase();
     let i = 0;
     while (true) {
       const idx = lower.indexOf(phraseLower, i);
       if (idx === -1) break;
-      ranges.push([idx, idx + phrase.length]);
+      ranges.push({ start: idx, end: idx + phrase.length, type: "grammar" });
       i = idx + 1;
     }
   }
 
-  ranges.sort((a, b) => a[0] - b[0]);
-  const merged: [number, number][] = [];
-  for (const [s, e] of ranges) {
-    if (merged.length && s <= merged[merged.length - 1][1]) {
-      merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], e);
+  const pronWords = pronunciationIssues
+    .map((p) => (p.word ?? "").trim())
+    .filter((w) => w.length >= 2);
+  for (const word of pronWords) {
+    const wordLower = word.toLowerCase();
+    const wordRegex = new RegExp(`\\b${wordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, "gi");
+    let match: RegExpExecArray | null;
+    while ((match = wordRegex.exec(transcript)) !== null) {
+      ranges.push({ start: match.index, end: match.index + match[0].length, type: "pronunciation" });
+    }
+  }
+
+  ranges.sort((a, b) => a.start - b.start);
+  const merged: HighlightRange[] = [];
+  for (const r of ranges) {
+    if (merged.length && r.start < merged[merged.length - 1].end) {
+      const last = merged[merged.length - 1];
+      last.end = Math.max(last.end, r.end);
+      if (r.type === "grammar") last.type = "grammar";
     } else {
-      merged.push([s, e]);
+      merged.push({ ...r });
     }
   }
   return merged;
 }
 
-// ─── Transcript with mistake phrases highlighted ───────────
+// ─── Chat-style transcript with highlights ───────────────
 function TranscriptWithHighlights({
   transcript,
   mistakes,
+  pronunciationIssues,
 }: {
   transcript: string;
   mistakes: { original_text?: string; original?: string }[];
+  pronunciationIssues?: { word?: string }[];
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-  const ranges = getTranscriptHighlightRanges(transcript, mistakes);
-  const segments: { text: string; highlight: boolean }[] = [];
-  let pos = 0;
-  for (const [s, e] of ranges) {
-    if (s > pos) {
-      segments.push({
-        text: transcript.slice(pos, s),
-        highlight: false,
-      });
-    }
-    segments.push({
-      text: transcript.slice(s, e),
-      highlight: true,
-    });
-    pos = e;
-  }
-  if (pos < transcript.length) {
-    segments.push({
-      text: transcript.slice(pos),
-      highlight: false,
-    });
+  const ranges = buildHighlightRanges(transcript, mistakes, pronunciationIssues ?? []);
+
+  const lines = transcript.split("\n").filter((l) => l.trim().length > 0);
+  const hasSpeakerLabels = lines.some((l) => /^[^:]+:/.test(l));
+
+  if (!hasSpeakerLabels) {
+    return renderHighlightedText(transcript, ranges, styles, theme);
   }
 
-  if (segments.length === 0) {
+  return (
+    <View style={{ gap: 8 }}>
+      {lines.map((line, li) => {
+        const colonIdx = line.indexOf(":");
+        if (colonIdx === -1 || colonIdx > 40) {
+          return (
+            <Text key={li} style={styles.transcriptText}>
+              {line}
+            </Text>
+          );
+        }
+        const speaker = line.slice(0, colonIdx).trim();
+        const message = line.slice(colonIdx + 1).trim();
+        const isFirstSpeaker = lines.findIndex((l) => l.startsWith(speaker)) === li ||
+          lines.filter((l) => l.startsWith(speaker + ":")).length > 0;
+        const speakerColor = speaker === lines[0]?.split(":")[0]?.trim()
+          ? theme.colors.primary
+          : theme.colors.success;
+
+        return (
+          <View key={li} style={styles.chatBubbleWrap}>
+            <Text style={[styles.chatSpeaker, { color: speakerColor }]}>
+              {speaker}
+            </Text>
+            <View style={[styles.chatBubble, { borderLeftColor: speakerColor }]}>
+              {renderHighlightedText(message, ranges, styles, theme, getLineOffset(transcript, line, colonIdx + 1))}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function getLineOffset(fullText: string, line: string, extraOffset: number): number {
+  const idx = fullText.indexOf(line);
+  return idx === -1 ? 0 : idx + extraOffset;
+}
+
+function renderHighlightedText(
+  text: string,
+  allRanges: HighlightRange[],
+  styles: any,
+  theme: any,
+  textOffset = 0,
+): React.ReactElement {
+  const relevantRanges = allRanges
+    .filter((r) => r.end > textOffset && r.start < textOffset + text.length)
+    .map((r) => ({
+      ...r,
+      start: Math.max(0, r.start - textOffset),
+      end: Math.min(text.length, r.end - textOffset),
+    }));
+
+  if (relevantRanges.length === 0) {
     return (
       <Text style={styles.transcriptText} selectable>
-        {transcript}
+        {text}
       </Text>
     );
   }
 
+  const segments: { text: string; type: "grammar" | "pronunciation" | null }[] = [];
+  let pos = 0;
+  for (const r of relevantRanges) {
+    if (r.start > pos) segments.push({ text: text.slice(pos, r.start), type: null });
+    segments.push({ text: text.slice(r.start, r.end), type: r.type });
+    pos = r.end;
+  }
+  if (pos < text.length) segments.push({ text: text.slice(pos), type: null });
+
   return (
     <Text style={styles.transcriptText} selectable>
-      {segments.map((seg, i) =>
-        seg.highlight ? (
-          <Text
-            key={i}
-            style={[styles.transcriptText, styles.transcriptHighlight]}
-          >
+      {segments.map((seg, i) => {
+        if (!seg.type) return seg.text;
+        const hlStyle = seg.type === "grammar" ? styles.transcriptHighlight : styles.transcriptPronunciationHighlight;
+        return (
+          <Text key={i} style={[styles.transcriptText, hlStyle]}>
             {seg.text}
           </Text>
-        ) : (
-          seg.text
-        ),
-      )}
+        );
+      })}
     </Text>
   );
 }
@@ -303,6 +370,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [isFailed, setIsFailed] = useState(false);
   const [checkingAgain, setCheckingAgain] = useState(false);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(true);
+  const [pronPollCount, setPronPollCount] = useState(0);
   const insets = useSafeAreaInsets();
 
   const params = route?.params || {};
@@ -398,6 +466,30 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       isMounted = false;
     };
   }, [sessionId, retryCount]);
+
+  // Background re-fetch: pronunciation issues arrive after the main analysis
+  // (LiveKit egress → transcribe → PA is async and slower). Keep polling
+  // for ~90s after initial load to pick up late-arriving pronunciation data.
+  useEffect(() => {
+    if (loading || !sessionData || !sessionId) return;
+    const hasPronIssues =
+      (sessionData.analyses?.[0]?.pronunciationIssues?.length ?? 0) > 0;
+    if (hasPronIssues || pronPollCount >= 15) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const fresh = await sessionsApi.getSessionAnalysis(sessionId);
+        if (fresh.analyses && fresh.analyses.length > 0) {
+          setSessionData(fresh);
+        }
+      } catch {
+        // silent — main data is already showing
+      }
+      setPronPollCount((c) => c + 1);
+    }, 6000);
+
+    return () => clearTimeout(timer);
+  }, [loading, sessionData, sessionId, pronPollCount]);
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -744,17 +836,28 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
-        {/* Full conversation transcript (mistakes highlighted when available) */}
+        {/* Full conversation transcript (grammar + pronunciation highlighted) */}
         {(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
           <Animated.View
             entering={FadeInDown.delay(80).springify()}
             style={styles.transcriptSection}
           >
             <Text style={styles.sectionTitle}>Conversation</Text>
-            {data.mistakes.length > 0 && (
-              <Text style={styles.transcriptHint}>
-                Mistakes are highlighted below so you can see exactly where to improve.
-              </Text>
+            {(data.mistakes.length > 0 || data.pronunciationIssues.length > 0) && (
+              <View style={styles.transcriptLegend}>
+                {data.mistakes.length > 0 && (
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: theme.colors.error + "40" }]} />
+                    <Text style={styles.legendText}>Grammar</Text>
+                  </View>
+                )}
+                {data.pronunciationIssues.length > 0 && (
+                  <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: theme.colors.warning + "50" }]} />
+                    <Text style={styles.legendText}>Pronunciation</Text>
+                  </View>
+                )}
+              </View>
             )}
             <View style={styles.transcriptCard}>
               <ScrollView
@@ -769,6 +872,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                     ""
                   }
                   mistakes={data.mistakes}
+                  pronunciationIssues={data.pronunciationIssues}
                 />
               </ScrollView>
             </View>
@@ -922,25 +1026,59 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             </Text>
             <View style={styles.glassCard}>
               {data.pronunciationIssues?.length > 0 &&
-                data.pronunciationIssues.map((issue: any, i: number) => (
-                  <View key={issue.id || i} style={styles.pronunciationIssueRow}>
-                    <View style={styles.pronunciationIssueWord}>
-                      <Text style={styles.pronunciationIssueWordText}>{issue.word}</Text>
-                      {(issue.phoneticExpected || issue.phoneticActual) && (
-                        <Text style={styles.phoneticText}>
-                          {issue.phoneticActual
-                            ? `You: /${issue.phoneticActual}/ → Try: /${issue.phoneticExpected || "—"}/`
-                            : `Expected: /${issue.phoneticExpected || "—"}/`}
+                data.pronunciationIssues.map((issue: any, i: number) => {
+                  const parsed = parsePronunciationIssue(issue);
+                  const severityColor =
+                    issue.severity === "high"
+                      ? "#ef4444"
+                      : issue.severity === "medium"
+                        ? "#f59e0b"
+                        : "#22c55e";
+                  const accuracyPct = issue.confidence != null ? Math.round(issue.confidence) : null;
+                  return (
+                    <View key={issue.id || i} style={styles.pronunciationIssueRow}>
+                      <View style={styles.pronunciationIssueHeader}>
+                        <View style={styles.pronunciationIssueWord}>
+                          <Text style={styles.pronunciationIssueWordText}>
+                            {parsed.correctWord}
+                          </Text>
+                          {parsed.spokenWord !== parsed.correctWord && (
+                            <Text style={styles.phoneticText}>
+                              You said: "{parsed.spokenWord}"
+                            </Text>
+                          )}
+                        </View>
+                        <View style={styles.pronunciationIssueBadgeRow}>
+                          <View
+                            style={[
+                              styles.severityBadge,
+                              { backgroundColor: severityColor + "18" },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.severityBadgeText,
+                                { color: severityColor },
+                              ]}
+                            >
+                              {parsed.categoryLabel}
+                            </Text>
+                          </View>
+                          {accuracyPct != null && (
+                            <Text style={[styles.accuracyText, { color: severityColor }]}>
+                              {accuracyPct}%
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      {issue.suggestion && (
+                        <Text style={styles.pronunciationIssueSuggestion}>
+                          {issue.suggestion}
                         </Text>
                       )}
                     </View>
-                    {(issue.suggestion || issue.issueType) && (
-                      <Text style={styles.pronunciationIssueSuggestion}>
-                        {issue.suggestion || issue.issueType}
-                      </Text>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               {(data.pronunciationFlagged?.length ?? 0) > 0 &&
                 data.pronunciationIssues?.length === 0 &&
                 (data.pronunciationFlagged ?? []).map((item: any, i: number) => (
@@ -1435,12 +1573,18 @@ const getStyles = (theme: any) =>
       lineHeight: 20,
     },
     pronunciationIssueRow: {
-      paddingVertical: 10,
+      paddingVertical: 12,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
+    pronunciationIssueHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+    },
     pronunciationIssueWord: {
-      marginBottom: 4,
+      flex: 1,
+      marginRight: 8,
     },
     pronunciationIssueWordText: {
       fontSize: theme.typography.sizes.m,
@@ -1449,14 +1593,33 @@ const getStyles = (theme: any) =>
     },
     phoneticText: {
       fontSize: theme.typography.sizes.xs,
-      color: theme.colors.text.secondary,
-      marginTop: 2,
-      fontFamily: "monospace",
+      color: "#ef4444",
+      marginTop: 3,
+      fontStyle: "italic",
+    },
+    pronunciationIssueBadgeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    severityBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    severityBadgeText: {
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    accuracyText: {
+      fontSize: 12,
+      fontWeight: "700",
     },
     pronunciationIssueSuggestion: {
       fontSize: theme.typography.sizes.s,
-      color: theme.colors.primary,
-      marginTop: 4,
+      color: theme.colors.text.secondary,
+      marginTop: 6,
+      lineHeight: 18,
     },
     dominantErrorsWrap: {
       marginTop: theme.spacing.s,
@@ -1511,6 +1674,47 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.colors.error + "25",
       color: theme.colors.error,
       textDecorationLine: "underline",
+    },
+    transcriptPronunciationHighlight: {
+      backgroundColor: theme.colors.warning + "30",
+      color: theme.colors.warning,
+      textDecorationLine: "underline",
+      textDecorationStyle: "dotted" as const,
+    },
+    transcriptLegend: {
+      flexDirection: "row" as const,
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+      gap: 16,
+    },
+    legendItem: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+    },
+    legendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 3,
+    },
+    legendText: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      fontWeight: "500" as const,
+    },
+    chatBubbleWrap: {
+      gap: 2,
+    },
+    chatSpeaker: {
+      fontSize: 11,
+      fontWeight: "700" as const,
+      letterSpacing: 0.3,
+      textTransform: "uppercase" as const,
+    },
+    chatBubble: {
+      borderLeftWidth: 3,
+      paddingLeft: 10,
+      paddingVertical: 2,
     },
     transcriptHint: {
       fontSize: theme.typography.sizes.xs,

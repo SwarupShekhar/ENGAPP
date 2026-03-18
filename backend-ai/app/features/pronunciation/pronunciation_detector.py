@@ -11,7 +11,7 @@ from app.phoneme_loader import get_phoneme_map, get_reel_map
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ACCURACY_THRESHOLD = 65
+DEFAULT_ACCURACY_THRESHOLD = 55  # Lowered from 65 to catch more errors in call mode
 
 # These phonemes are the ONLY ones that indicate Indian English pattern errors.
 # Low scores on k, b, p, d, t alone are consonant-cluster noise — not pattern errors.
@@ -56,6 +56,19 @@ def detect_from_azure_result(
     by_approx (person said the correct word). Enables clean separation: "went" in reference → skip;
     "da" not in reference → flag.
     """
+    # Log input for debugging
+    logger.info(f"detect_from_azure_result called with accuracy_threshold={accuracy_threshold}")
+    logger.info(f"Reference text: {reference_text[:100] if reference_text else '(empty)'}")
+    
+    # Log Azure result structure
+    if azure_result:
+        _nb = azure_result.get('NBest') or azure_result.get('Nbests') or azure_result.get('nbest') or []
+        _nb_words = _nb[0].get('Words', []) if _nb and isinstance(_nb, list) and len(_nb) > 0 else []
+        word_count = len(azure_result.get('Words', []) or _nb_words)
+        logger.info(f"Azure result contains {word_count} words, keys={list(azure_result.keys())}")
+    else:
+        logger.warning("detect_from_azure_result received empty azure_result!")
+    
     phoneme_map = get_phoneme_map()
     reel_map = get_reel_map()
     by_approx: dict = phoneme_map.get("by_approximation") or {}
@@ -65,8 +78,9 @@ def detect_from_azure_result(
 
     # --- Extract word list from Azure result shape ---
     words: list[dict] = []
-    if "Nbests" in azure_result and azure_result["Nbests"]:
-        first = azure_result["Nbests"][0]
+    nbests = azure_result.get("NBest") or azure_result.get("Nbests") or azure_result.get("nbest")
+    if nbests and isinstance(nbests, list) and len(nbests) > 0:
+        first = nbests[0]
         words = first.get("Words") or first.get("words") or []
     elif "Words" in azure_result:
         words = azure_result["Words"]
@@ -74,6 +88,17 @@ def detect_from_azure_result(
         words = azure_result["words"]
 
     flagged: list[dict[str, Any]] = []
+
+    # Log per-word scores for debugging (only first 30 words to keep logs manageable)
+    _log_limit = min(len(words), 30)
+    for _i, _w in enumerate(words[:_log_limit]):
+        _wt = (_w.get("Word") or _w.get("word") or "?")
+        _pa = _w.get("PronunciationAssessment", {})
+        _et = _pa.get("ErrorType", "None")
+        _as = _pa.get("AccuracyScore", _w.get("AccuracyScore", "?"))
+        logger.info(f"  word[{_i}] '{_wt}' accuracy={_as} errorType={_et}")
+    if len(words) > _log_limit:
+        logger.info(f"  ... ({len(words) - _log_limit} more words not shown)")
 
     for w in words:
         word_text = w.get("Word") or w.get("word") or ""
@@ -83,7 +108,6 @@ def detect_from_azure_result(
 
         pa = w.get("PronunciationAssessment", {})
         error_type = (pa.get("ErrorType") or "").strip()
-        # Explicitly check for None to preserve 0 scores
         accuracy_score = pa.get("AccuracyScore")
         if accuracy_score is not None:
             accuracy = float(accuracy_score)
@@ -165,9 +189,10 @@ def detect_from_azure_result(
         elif accuracy < effective_threshold:
             # Word-level score below threshold
             is_bad = True
-        elif min_phoneme_score < 60 and worst_phoneme_name in INDIAN_ENGLISH_ERROR_PHONEMES:
-            # A specific Indian English phoneme scored very low
+        elif min_phoneme_score < 50 and worst_phoneme_name in INDIAN_ENGLISH_ERROR_PHONEMES:
+            # A specific Indian English phoneme scored very low (lowered from 60 to 50)
             is_bad = True
+            logger.info(f"Low phoneme score: {min_phoneme_score} for phoneme '{worst_phoneme_name}' in word '{word_lower}'")
 
         if not is_bad:
             continue
@@ -188,24 +213,27 @@ def detect_from_azure_result(
         correct_entry = by_correct.get(word_lower)
         if correct_entry:
             rule_category = (correct_entry.get("rule_category") or "").strip()
-            # The "spoken" form in two-pass is the approximation from the map
             spoken_approx = _normalize(correct_entry.get("approximation") or word_lower)
-            correct_word = word_lower  # reference word IS the correct word in two-pass
-        else:
-            # Word triggered is_bad but not in our map — log as unknown
-            rule_category = "unknown_substitution"
-            spoken_approx = word_lower
             correct_word = word_lower
+        else:
+            # Word triggered is_bad but is not in our phoneme map.
+            # If Azure explicitly flagged it as Mispronunciation, keep it — it's a
+            # genuine error Azure's forced aligner detected, just not in our dictionary.
+            if error_type == "Mispronunciation":
+                rule_category = "general_mispronunciation"
+                spoken_approx = f"[mispronounced: {word_lower}]"
+                correct_word = word_lower
+            else:
+                rule_category = "unknown_substitution"
+                spoken_approx = word_lower
+                correct_word = word_lower
 
         # Final guard: never flag when spoken == correct
-        if spoken_approx == correct_word:
+        # BUT allow through Azure-explicit Mispronunciation and unknown words with low scores
+        if spoken_approx == correct_word and error_type != "Mispronunciation" and accuracy >= effective_threshold:
             continue
 
-        # Unknown substitutions: log only, no reel
-        if rule_category == "unknown_substitution":
-            reel_id = None
-        else:
-            reel_id = reel_map.get(rule_category) or None
+        reel_id = reel_map.get(rule_category) or None
 
         flagged.append({
             "spoken": spoken_approx,
@@ -224,9 +252,10 @@ def detect_from_azure_result(
         if key not in seen or error["confidence"] < seen[key]["confidence"]:
             seen[key] = error
 
-    # Filter out unknown_substitution from final output (keep for logging only if needed)
+    # Filter out unknown_substitution but keep general_mispronunciation (Azure-flagged)
     result = [e for e in seen.values() if e["rule_category"] != "unknown_substitution"]
 
+    logger.info(f"detect_from_azure_result returning {len(result)} flagged errors: {result}")
     return result
 
 
