@@ -269,12 +269,15 @@ class AsyncAzureSpeech:
                 for word_data in detailed["NBest"][0].get("Words", []):
                     assessment = word_data.get("PronunciationAssessment", {})
                     
-                    # Extract phonemes
                     phonemes = []
                     for phoneme_data in word_data.get("Phonemes", []):
+                        p_pa = phoneme_data.get("PronunciationAssessment", {})
+                        p_score = p_pa.get("AccuracyScore")
+                        if p_score is None:
+                            p_score = phoneme_data.get("AccuracyScore", phoneme_data.get("Score", 0.0))
                         phonemes.append({
                             "phoneme": phoneme_data.get("Phoneme", ""),
-                            "accuracy_score": phoneme_data.get("Score", 0.0)
+                            "accuracy_score": p_score
                         })
                     
                     words.append({

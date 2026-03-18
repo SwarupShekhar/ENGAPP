@@ -25,6 +25,7 @@ import EBitesScreen from "../features/reels/screens/EBitesScreen";
 import { useUIVariant } from "../context/UIVariantContext";
 import HomeScreen from "../features/home/screens";
 import PracticeTaskScreen from "../screens/practice/PracticeTaskScreen";
+import ScoreDetailScreen from "../screens/score/ScoreDetailScreen";
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.
@@ -171,6 +172,8 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
 
       {/* Practice Tasks */}
       <Stack.Screen name="PracticeTask" component={PracticeTaskScreen} />
+
+      <Stack.Screen name="ScoreDetail" component={ScoreDetailScreen} />
     </Stack.Navigator>
   );
 }

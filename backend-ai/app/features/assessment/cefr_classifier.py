@@ -67,15 +67,27 @@ class CEFRClassifier:
         """
         Classifies the given text or metrics into a CEFR level.
         """
+        # Normalize to a 0-100 "normalized_score" regardless of input shape.
+        # NOTE: Some callers pass an object with an already-computed overall_score.
+        raw_score = 0.0
+        normalized_score = 0.0
+
+        # C2 threshold is typically 15 points above C1
+        cefr_c2_max = settings.cefr_c1_max_score + 15
+
         if hasattr(input_data, 'overall_score'):
-            score = input_data.overall_score
+            # Caller already computed a 0-100 score; treat it as normalized.
+            score = float(getattr(input_data, 'overall_score') or 0.0)
+            normalized_score = max(0.0, min(100.0, score))
+            # Back-compute a comparable raw_score for completeness/debuggability.
+            raw_score = (normalized_score / 100.0) * cefr_c2_max if cefr_c2_max > 0 else 0.0
         else:
             text = str(input_data)
             tokens = [word.lower() for word in word_tokenize(text) if word.isalpha()]
             num_words = len(tokens)
 
             if num_words < 5:
-                score = 10
+                raw_score = 10.0
             else:
                 lexical_diversity = self._calculate_lexical_diversity(tokens)
                 sentence_complexity = self._calculate_sentence_complexity(text)
@@ -83,10 +95,8 @@ class CEFRClassifier:
                 # Compute raw score from linguistic features
                 raw_score = (lexical_diversity * 200) + (sentence_complexity * 2)
 
-        # Normalize the raw score to 0-100 range using CEFR C2 max threshold
-        cefr_c2_max = settings.cefr_c1_max_score + 15  # C2 threshold is typically 15 points above C1
-        normalized_score = (raw_score / cefr_c2_max) * 100 if cefr_c2_max > 0 else 0
-        normalized_score = max(0, min(100, normalized_score))  # Clamp between 0 and 100
+            normalized_score = (raw_score / cefr_c2_max) * 100 if cefr_c2_max > 0 else 0.0
+            normalized_score = max(0.0, min(100.0, normalized_score))  # Clamp between 0 and 100
 
         if normalized_score <= settings.cefr_a1_max_score:
             level = CEFRLevel.A1

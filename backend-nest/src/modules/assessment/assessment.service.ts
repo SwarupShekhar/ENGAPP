@@ -1130,15 +1130,11 @@ export class AssessmentService {
     // 2. Call Joint AI Analysis
     const jointResult = await this.brain.analyzeJoint(sessionId, segments);
 
-    // 3. Store Interaction Metrics & Peer Comparison
-    await this.prisma.conversationSession.update({
-      where: { id: sessionId },
-      data: {
-        status: 'COMPLETED',
-        interactionMetrics: jointResult.interaction_metrics,
-        peerComparison: jointResult.peer_comparison,
-      },
-    });
+    // Build a readable transcript for UI/debugging (mobile expects session.feedback.transcript or session.summaryJson.transcript)
+    const transcriptText = segments
+      .map((s) => `${s.speaker_id}: ${s.text}`)
+      .join('\n')
+      .trim();
 
     // 4. Store Individual Analyses & Generate Tasks
     const participantsWithAnalysis = new Set<string>();
@@ -1156,6 +1152,10 @@ export class AssessmentService {
           sessionId,
           participantId: participant.id,
           rawData: {
+            transcript: {
+              transcript_text: transcriptText,
+              segments,
+            },
             azureEvidence: evidence,
             aiFeedback: feedback.feedback || '',
             strengths: feedback.strengths || [],
@@ -1215,6 +1215,10 @@ export class AssessmentService {
           sessionId,
           participantId: participant.id,
           rawData: {
+            transcript: {
+              transcript_text: transcriptText,
+              segments,
+            },
             aiFeedback: 'Analysis based on shared conversation.',
             strengths: [],
             improvementAreas: [],
@@ -1230,6 +1234,19 @@ export class AssessmentService {
         },
       });
     }
+
+    // 6. Store Interaction Metrics & Peer Comparison + transcript, then mark session completed
+    await this.prisma.conversationSession.update({
+      where: { id: sessionId },
+      data: {
+        status: 'COMPLETED',
+        interactionMetrics: jointResult.interaction_metrics,
+        peerComparison: jointResult.peer_comparison,
+        summaryJson: {
+          transcript: transcriptText,
+        } as any,
+      },
+    });
 
     return { status: 'COMPLETED', sessionId };
   }

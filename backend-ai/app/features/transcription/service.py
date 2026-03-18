@@ -1,3 +1,4 @@
+import os
 import time
 import json
 import asyncio
@@ -11,7 +12,7 @@ from app.models.base import Word
 from app.models.request import TranscriptionRequest
 from app.models.response import TranscriptionResponse
 from app.cache.manager import cached
-from app.features.transcription.audio_utils import validate_audio_url, download_audio_streamed
+from app.features.transcription.audio_utils import validate_audio_url
 
 class TranscriptionService:
     """
@@ -88,28 +89,35 @@ class TranscriptionService:
         loop = asyncio.get_event_loop()
 
         def on_recognized(evt):
-            # Marshal updates back to asyncio event loop
             def _update_state():
                 nonlocal total_duration
-                if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
-                    full_text.append(evt.result.text)
-                    words = self._extract_words_from_result(evt.result)
-                    # Adjust timestamps based on total duration so far
-                    for word in words:
-                        word.start_time += total_duration
-                        word.end_time += total_duration
-                    all_words.extend(words)
-                    total_duration += evt.result.duration.total_seconds()
-                elif evt.result.reason == speechsdk.ResultReason.NoMatch:
-                    logger.debug("No speech could be recognized.")
-                elif evt.result.reason == speechsdk.ResultReason.Canceled:
-                    cancellation_details = evt.result.cancellation_details
-                    logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
-                    if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                        if not recognized_future.done():
-                            recognized_future.set_exception(
-                                RuntimeError(f"Azure Error: {cancellation_details.error_details}")
-                            )
+                try:
+                    if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                        full_text.append(evt.result.text)
+                        words = self._extract_words_from_result(evt.result)
+                        for word in words:
+                            word.start_time += total_duration
+                            word.end_time += total_duration
+                        all_words.extend(words)
+                        dur = evt.result.duration
+                        if hasattr(dur, 'total_seconds'):
+                            total_duration += dur.total_seconds()
+                        elif isinstance(dur, (int, float)):
+                            total_duration += dur / 1e7
+                        else:
+                            total_duration += 0
+                    elif evt.result.reason == speechsdk.ResultReason.NoMatch:
+                        logger.debug("No speech could be recognized.")
+                    elif evt.result.reason == speechsdk.ResultReason.Canceled:
+                        cancellation_details = evt.result.cancellation_details
+                        logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
+                        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+                            if not recognized_future.done():
+                                recognized_future.set_exception(
+                                    RuntimeError(f"Azure Error: {cancellation_details.error_details}")
+                                )
+                except Exception as cb_err:
+                    logger.error(f"_update_state callback error: {cb_err}", exc_info=True)
             # Schedule update on asyncio event loop thread-safely
             loop.call_soon_threadsafe(_update_state)
 
@@ -128,46 +136,63 @@ class TranscriptionService:
         recognizer.start_continuous_recognition()
 
         try:
+            import io
+            from pydub import AudioSegment
+
             if has_base64:
                 if not request.audio_base64 or len(request.audio_base64) < 100:
                     logger.info("Empty or too small audio base64, returning empty transcript")
                     return TranscriptionResponse(text="", confidence=0.0, words=[], duration=0.0, processing_time=time.time() - start_time)
                 
                 try:
-                    # Robust handling: Convert to PCM 16kHz via pydub
-                    import io
-                    from pydub import AudioSegment
-                    
                     audio_bytes = base64.b64decode(request.audio_base64)
-                    
-                    # Convert to AudioSegment
                     audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
-                    
-                    # Normalize to 16kHz mono (Azure Default)
                     audio_segment = audio_segment.set_frame_rate(16000).set_channels(1).set_sample_width(2)
-                    
-                    # Get raw PCM data (no WAV header)
-                    chunk_size = 4096
                     raw_data = audio_segment.raw_data
                     
-                    # Write in chunks
+                    chunk_size = 4096
                     for i in range(0, len(raw_data), chunk_size):
                         push_stream.write(raw_data[i:i+chunk_size])
                         
-                    logger.info(f"Streamed {len(raw_data)} bytes of PCM audio for transcription")
+                    logger.info(f"Streamed {len(raw_data)} bytes of PCM audio for transcription (base64)")
                     
                 except Exception as e:
                     logger.error("Audio conversion failed in transcription", exc_info=True)
                     push_stream.close()
                     raise RuntimeError(f"Audio conversion to PCM failed: {e}")
             else:
-                # Stream from URL
-                from app.features.transcription.audio_utils import stream_audio_content
-                async for chunk in stream_audio_content(str(request.audio_url)):
-                    if chunk:
-                        push_stream.write(chunk)
-                    else:
-                        break
+                import tempfile
+                from app.features.transcription.audio_utils import download_audio_streamed
+                
+                audio_url = str(request.audio_url)
+                ext = os.path.splitext(audio_url.split("?")[0])[-1] or ".mp4"
+                fd, tmp_path = tempfile.mkstemp(suffix=ext)
+                os.close(fd)
+                try:
+                    await download_audio_streamed(audio_url, tmp_path)
+                    file_size = os.path.getsize(tmp_path)
+                    logger.info(f"Downloaded audio from URL: {file_size} bytes, ext={ext}")
+
+                    audio_segment = await asyncio.to_thread(
+                        AudioSegment.from_file, tmp_path
+                    )
+                    audio_segment = audio_segment.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+                    raw_data = audio_segment.raw_data
+
+                    chunk_size = 4096
+                    for i in range(0, len(raw_data), chunk_size):
+                        push_stream.write(raw_data[i:i+chunk_size])
+
+                    logger.info(f"Streamed {len(raw_data)} bytes of PCM audio for transcription (URL, converted from {ext})")
+                except Exception as e:
+                    logger.error(f"URL audio download/conversion failed: {e}", exc_info=True)
+                    push_stream.close()
+                    raise RuntimeError(f"Audio download/conversion from URL failed: {e}")
+                finally:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
         finally:
             push_stream.close()
 

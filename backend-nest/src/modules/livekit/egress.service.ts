@@ -4,6 +4,34 @@ import { EgressClient } from 'livekit-server-sdk';
 import { EncodedFileOutput, AzureBlobUpload } from '@livekit/protocol';
 import { PrismaService } from '@app/prisma/prisma.service';
 
+const MAX_EGRESS_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  logger: Logger,
+  label: string,
+  retries = MAX_EGRESS_RETRIES,
+): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const is503 =
+        err?.status === 503 ||
+        err?.message?.includes('no available server') ||
+        err?.message?.includes('Service Unavailable');
+      if (!is503 || attempt === retries) throw err;
+      const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
+      logger.warn(
+        `${label} attempt ${attempt}/${retries} got 503; retrying in ${delay}ms`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error('unreachable');
+}
+
 /**
  * Starts LiveKit Room Composite Egress (audio-only) for P2P/session recording.
  * Output is written to Azure Blob; egress_ended webhook will download → Azure Speech → transcript → AI feedback.
@@ -17,7 +45,9 @@ export class EgressService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    const host = this.config.get<string>('LIVEKIT_HOST');
+    const host =
+      this.config.get<string>('LIVEKIT_HOST') ??
+      this.config.get<string>('LIVEKIT_URL');
     const key = this.config.get<string>('LIVEKIT_API_KEY');
     const secret = this.config.get<string>('LIVEKIT_API_SECRET');
     if (!host || !key || !secret) {
@@ -73,10 +103,13 @@ export class EgressService {
     } as unknown as EncodedFileOutput;
 
     try {
-      const info = await this.egressClient.startRoomCompositeEgress(
-        roomName,
-        fileOutput,
-        { audioOnly: true },
+      const info = await withRetry(
+        () =>
+          this.egressClient!.startRoomCompositeEgress(roomName, fileOutput, {
+            audioOnly: true,
+          }),
+        this.logger,
+        `startRoomCompositeEgress session=${sessionId}`,
       );
       const egressId = info?.egressId;
       if (!egressId) {
@@ -95,7 +128,7 @@ export class EgressService {
       return egressId;
     } catch (e) {
       this.logger.error(
-        `startRoomCompositeEgress failed session=${sessionId}`,
+        `startRoomCompositeEgress failed session=${sessionId} (after ${MAX_EGRESS_RETRIES} attempts)`,
         e,
       );
       return null;
@@ -103,7 +136,8 @@ export class EgressService {
   }
 
   /**
-   * Start track composite egress for a specific participant's audio.
+   * Start per-participant egress (audio-only) for an individual user.
+   * Uses `startParticipantEgress` which auto-handles track publication, muting, etc.
    * Stores the participant's egressId on the SessionParticipant.
    */
   async startParticipantTrackEgress(
@@ -141,10 +175,16 @@ export class EgressService {
     } as unknown as EncodedFileOutput;
 
     try {
-      const info = await this.egressClient.startTrackCompositeEgress(
-        roomName,
-        fileOutput,
-        { audioTrackId: participantIdentity },
+      const info = await withRetry(
+        () =>
+          this.egressClient!.startParticipantEgress(
+            roomName,
+            participantIdentity,
+            { file: fileOutput },
+            { screenShare: false },
+          ),
+        this.logger,
+        `startParticipantTrackEgress session=${sessionId} user=${userId}`,
       );
 
       const egressId = info?.egressId;
@@ -156,12 +196,12 @@ export class EgressService {
       });
 
       this.logger.log(
-        `Track egress started session=${sessionId} user=${userId} egressId=${egressId}`,
+        `Participant egress started session=${sessionId} user=${userId} identity=${participantIdentity} egressId=${egressId}`,
       );
       return egressId;
     } catch (e) {
       this.logger.error(
-        `startParticipantTrackEgress failed session=${sessionId} user=${userId}`,
+        `startParticipantTrackEgress failed session=${sessionId} user=${userId} (after ${MAX_EGRESS_RETRIES} attempts)`,
         e,
       );
       return null;

@@ -29,7 +29,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Text as SvgText } from "react-native-svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { sessionsApi, ConversationSession } from "../../../api/sessions";
+import {
+  sessionsApi,
+  ConversationSession,
+  parsePronunciationIssue,
+} from "../../../api/sessions";
 import { connectionsApi, chatApi } from "../../../api/connections";
 import { useAppTheme } from "../../../theme/useAppTheme";
 
@@ -210,14 +214,23 @@ function mapSessionToCallSession(
     timestamp: undefined,
   }));
 
-  // Word-level data from pronunciation issues
+  // Word-level data from pronunciation issues — use real confidence when available
   const wordLevelData: WordScore[] = (analysis?.pronunciationIssues || []).map(
-    (p) => ({
-      word: p.word,
-      accuracy: p.severity === "high" ? 50 : p.severity === "medium" ? 70 : 90,
-      errorType:
-        p.issueType || (p.severity === "high" ? "Mispronunciation" : "None"),
-    }),
+    (p) => {
+      const parsed = parsePronunciationIssue(p);
+      return {
+        word: parsed.correctWord,
+        accuracy:
+          p.confidence != null
+            ? Math.round(p.confidence)
+            : p.severity === "high"
+              ? 50
+              : p.severity === "medium"
+                ? 70
+                : 90,
+        errorType: parsed.categoryLabel,
+      };
+    },
   );
 
   // ── Find the REAL partner (not self, not bot) ──────
@@ -956,28 +969,71 @@ function FeedbackBottomSheet({
                       </Text>
                       <View style={styles.pronunciationIssuesList}>
                         {session.feedback.pronunciationIssues?.map(
-                          (issue: any, i: number) => (
-                            <View key={i} style={styles.pIssueRow}>
-                              <View style={styles.pIssueWord}>
-                                <Text style={styles.pIssueWordText}>
-                                  {issue.word}
-                                </Text>
-                                {(issue.phoneticExpected ||
-                                  issue.phoneticActual) && (
-                                  <Text style={styles.pPhoneticText}>
-                                    {issue.phoneticActual
-                                      ? `You: /${issue.phoneticActual}/ → Try: /${issue.phoneticExpected || "—"}/`
-                                      : `Expected: /${issue.phoneticExpected || "—"}/`}
+                          (issue: any, i: number) => {
+                            const parsed = parsePronunciationIssue(issue);
+                            const severityColor =
+                              issue.severity === "high"
+                                ? "#ef4444"
+                                : issue.severity === "medium"
+                                  ? "#f59e0b"
+                                  : "#22c55e";
+                            const accuracyPct =
+                              issue.confidence != null
+                                ? Math.round(issue.confidence)
+                                : null;
+                            return (
+                              <View key={i} style={styles.pIssueRow}>
+                                <View style={styles.pIssueHeader}>
+                                  <View style={styles.pIssueWord}>
+                                    <Text style={styles.pIssueWordText}>
+                                      {parsed.correctWord}
+                                    </Text>
+                                    {parsed.spokenWord !==
+                                      parsed.correctWord && (
+                                      <Text style={styles.pPhoneticText}>
+                                        You said: "{parsed.spokenWord}"
+                                      </Text>
+                                    )}
+                                  </View>
+                                  <View style={styles.pIssueBadgeRow}>
+                                    <View
+                                      style={[
+                                        styles.pSeverityBadge,
+                                        {
+                                          backgroundColor:
+                                            severityColor + "18",
+                                        },
+                                      ]}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.pSeverityBadgeText,
+                                          { color: severityColor },
+                                        ]}
+                                      >
+                                        {parsed.categoryLabel}
+                                      </Text>
+                                    </View>
+                                    {accuracyPct != null && (
+                                      <Text
+                                        style={[
+                                          styles.pAccuracyText,
+                                          { color: severityColor },
+                                        ]}
+                                      >
+                                        {accuracyPct}%
+                                      </Text>
+                                    )}
+                                  </View>
+                                </View>
+                                {issue.suggestion && (
+                                  <Text style={styles.pIssueSuggestion}>
+                                    {issue.suggestion}
                                   </Text>
                                 )}
                               </View>
-                              {(issue.suggestion || issue.issueType) && (
-                                <Text style={styles.pIssueSuggestion}>
-                                  {issue.suggestion || issue.issueType}
-                                </Text>
-                              )}
-                            </View>
-                          ),
+                            );
+                          },
                         )}
                         {!session.feedback.pronunciationIssues?.length &&
                           session.feedback.pronunciationFlagged?.map(
@@ -2556,8 +2612,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#f1f5f9",
   },
+  pIssueHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
   pIssueWord: {
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
   },
   pIssueWordText: {
     fontSize: 15,
@@ -2566,15 +2628,33 @@ const styles = StyleSheet.create({
   },
   pPhoneticText: {
     fontSize: 11,
-    color: "#94a3b8",
-    fontFamily: "monospace",
-    marginTop: 2,
+    color: "#ef4444",
+    marginTop: 3,
+    fontStyle: "italic",
+  },
+  pIssueBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  pSeverityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  pSeverityBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  pAccuracyText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   pIssueSuggestion: {
     fontSize: 12,
-    color: "#7c3aed",
-    fontWeight: "600",
-    marginTop: 2,
+    color: "#64748b",
+    marginTop: 6,
+    lineHeight: 17,
   },
   dominantErrorsWrap: {
     marginTop: 16,

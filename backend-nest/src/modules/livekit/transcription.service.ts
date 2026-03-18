@@ -16,8 +16,12 @@ const execFileAsync = promisify(execFile);
 @Injectable()
 export class TranscriptionService {
   private readonly logger = new Logger(TranscriptionService.name);
+  private readonly aiEngineUrl: string;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) {
+    this.aiEngineUrl =
+      this.config.get<string>('AI_ENGINE_URL') || 'http://localhost:8001';
+  }
 
   /**
    * Transcribe audio file at local path (WAV 16kHz mono preferred). Returns full transcript text.
@@ -71,7 +75,39 @@ export class TranscriptionService {
   /**
    * Download audio from HTTPS URL to temp file, convert to WAV if needed (ffmpeg), then transcribe.
    */
-  async transcribeFromUrl(audioUrl: string): Promise<string> {
+  async transcribeFromUrl(
+    audioUrl: string,
+    opts?: { userId?: string; sessionId?: string; language?: string },
+  ): Promise<string> {
+    // Prefer AI engine ASR (backend-ai) so we don't depend on ffmpeg/Azure SDK in Nest runtime.
+    try {
+      const res = await fetch(`${this.aiEngineUrl}/api/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio_url: audioUrl,
+          language: opts?.language ?? 'en-US',
+          user_id: opts?.userId ?? 'system',
+          session_id: opts?.sessionId ?? 'system',
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`AI engine transcribe failed ${res.status}`);
+      }
+      const body: any = await res.json();
+      const text = body?.data?.text ?? body?.data?.data?.text;
+      if (typeof text === 'string') {
+        const trimmed = text.trim();
+        if (trimmed.length > 0) return trimmed;
+        return ''; // valid but empty transcript
+      }
+      throw new Error('AI engine transcribe returned unexpected payload');
+    } catch (e: any) {
+      this.logger.warn(
+        `AI engine /api/transcribe failed; falling back to local STT: ${e?.message ?? e}`,
+      );
+    }
+
     const tmpDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'eng-egress-'),
     );

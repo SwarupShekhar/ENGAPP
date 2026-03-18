@@ -42,6 +42,8 @@ INTELLIGIBILITY_WEIGHT: dict[str, float] = {
     "schwa_addition": LOW_IMPACT,
     "schwa_reduction": LOW_IMPACT,
     "schwa_prothesis": LOW_IMPACT,
+    # Azure-flagged mispronunciations not in our phoneme map
+    "general_mispronunciation": MEDIUM_IMPACT,
 }
 
 # Hard cap rules (evaluated after score calculation)

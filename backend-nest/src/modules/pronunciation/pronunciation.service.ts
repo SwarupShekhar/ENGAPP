@@ -74,24 +74,13 @@ export class PronunciationService {
     const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8001';
     const url = `${aiEngineUrl}/api/pronunciation/assess`;
     try {
-      const audioRes = await fetch(recordingUrl);
-      if (!audioRes.ok) {
-        this.logger.warn(
-          `assessFromRecordingUrl download failed ${recordingUrl} ${audioRes.status}`,
-        );
-        return { flagged_errors: [] };
-      }
-      const buf = Buffer.from(await audioRes.arrayBuffer());
-      const ext =
-        recordingUrl.split('.').pop()?.split('?')[0]?.toLowerCase() || 'mp4';
-      const filename = `recording.${ext}`;
       const form = new FormData();
-      form.append(
-        'audio',
-        new Blob([buf], { type: 'application/octet-stream' }),
-        filename,
-      );
+      form.append('audio_url', recordingUrl);
       if (referenceText) form.append('reference_text', referenceText);
+
+      this.logger.log(
+        `assessFromRecordingUrl sending audio_url to backend-ai: ${recordingUrl.substring(0, 80)}...`,
+      );
 
       const res = await fetch(url, { method: 'POST', body: form });
       if (!res.ok) {
