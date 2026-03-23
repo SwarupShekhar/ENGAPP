@@ -200,4 +200,10 @@ export const sessionsApi = {
   ): Promise<void> => {
     await client.post(`/sessions/${sessionId}/end`, data);
   },
+
+  /** Dev/admin: re-run pronunciation processing for an existing session. */
+  rerunPronunciation: async (sessionId: string): Promise<any> => {
+    const response = await client.post(`/sessions/${sessionId}/pronunciation/rerun`);
+    return response.data;
+  },
 };

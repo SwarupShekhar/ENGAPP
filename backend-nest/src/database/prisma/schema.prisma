@@ -57,6 +57,7 @@ model User {
   reelHistory            UserReelHistory[]
   reliability            UserReliability?
   topicScores            UserTopicScore[]
+  callQualityScores      CallQualityScore[]
 
   @@index([clerkId])
 }
@@ -205,6 +206,9 @@ model ConversationSession {
   tasks              LearningTask[]
   reviews            PartnerReview[]
   participants       SessionParticipant[]
+  callQualityScores  CallQualityScore[]
+  callDurationSeconds Float?
+  userSpokeSeconds    Float?
 }
 
 model SessionParticipant {
@@ -481,6 +485,28 @@ model RecurringErrorPattern {
 
   @@unique([userId, errorType])
   @@index([userId, status])
+}
+
+model CallQualityScore {
+  id                 String              @id @default(uuid())
+  sessionId         String
+  userId            String
+  cqs                Float // 0–100 overall CQS
+  pqs                Float // Pronunciation Quality Score
+  depthScore         Float // Depth Score
+  complexityScore    Float // Complexity Score
+  engagementScore    Float // Engagement Score
+  pronunciationDelta Float
+  fluencyDelta       Float
+  grammarDelta       Float
+  vocabularyDelta    Float
+  comprehensionDelta Float
+  computedAt         DateTime            @default(now())
+  session            ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([userId])
 }
 
 enum TalkStyle {

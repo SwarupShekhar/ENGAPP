@@ -18,6 +18,8 @@ import {
   PronunciationService,
 } from '../pronunciation/pronunciation.service';
 
+import { ScoringService } from '../scoring/scoring.service';
+
 /** Human-readable tip for pronunciation issues (rule_category from detector). */
 function formatPronunciationSuggestion(
   ruleCategory: string,
@@ -59,6 +61,7 @@ export class LiveKitWebhookController {
     private readonly brain: BrainService,
     private readonly transcription: TranscriptionService,
     private readonly pronunciationService: PronunciationService,
+    private readonly scoringService: ScoringService,
   ) {}
 
   @Post('egress')
@@ -171,6 +174,11 @@ export class LiveKitWebhookController {
     })();
 
     this.logger.log(`Egress file location: ${effectiveFileLocation}`);
+    
+    // PHASE 1 AUDIT LOG
+    this.logger.log(
+      `[PHASE 1 AUDIT] Webhook Received: egressId=${info.egressId}, egressType=${info.case || 'unknown'}, blobUrl=${effectiveFileLocation}`
+    );
 
     if (!effectiveFileLocation || !effectiveFileLocation.startsWith('http')) {
       this.logger.warn(`Invalid file location for egressId=${info.egressId}`);
@@ -194,6 +202,11 @@ export class LiveKitWebhookController {
       // ── Per-participant track recording ended → run pronunciation ──
       this.logger.log(
         `Track egress ended for participant=${participant.userId} sessionId=${participant.sessionId}`,
+      );
+      
+      // PHASE 1 AUDIT LOG FOR SEPARATION
+      this.logger.log(
+        `[PHASE 1 AUDIT] Speaker Separation Confirmed: participantId=${participant.userId}, sessionId=${participant.sessionId}, egressId=${info.egressId}`
       );
       await this.prisma.sessionParticipant.update({
         where: { id: participant.id },
@@ -297,6 +310,8 @@ export class LiveKitWebhookController {
             );
           }
 
+          /*
+          // Temporarily disabled for PHASE 1 verification
           if (pronunciation_score?.score != null) {
             const existingScores =
               (analysis.scores as Record<string, number>) || {};
@@ -314,6 +329,21 @@ export class LiveKitWebhookController {
               `Updated pronunciation score=${pronunciation_score.score} for participant=${participant.userId}`,
             );
           }
+
+          // Trigger authoritative CQS scoring (Phase 3)
+          const callDuration = (Number(info.endedAt) - Number(info.startedAt)) / 1_000_000_000; // Nanoseconds
+          const userSpokeSeconds = participant.speakingTime ?? (callDuration * 0.4); // Fallback
+
+          await this.scoringService.processCallQualityScore(
+            participant.sessionId,
+            participant.userId,
+            participant.id,
+            transcript.trim(),
+            (pronunciation_score as any)?.azure_result ? [(pronunciation_score as any).azure_result] : [],
+            callDuration,
+            userSpokeSeconds
+          );
+          */
         }
       } catch (e) {
         this.logger.error(

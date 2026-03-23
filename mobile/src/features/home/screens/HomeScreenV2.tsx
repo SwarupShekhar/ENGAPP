@@ -13,6 +13,8 @@ import {
 import { useUser } from '@clerk/clerk-expo';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
+import { withDelay } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
@@ -20,7 +22,12 @@ import Animated, {
   withSpring,
   FadeInDown,
   useAnimatedProps,
+  withRepeat,
+  withTiming,
+  withSequence,
+  interpolate,
 } from 'react-native-reanimated';
+
 import Svg, {
   Path,
   Circle,
@@ -36,6 +43,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getHomeData, HomeData } from '../services/homeApi';
 import { tokensV2 } from '../../../theme/tokensV2';
 
+// Safe Haptics fallback
+let Haptics: any = {
+  impactAsync: async () => {},
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+};
+try {
+  Haptics = require('expo-haptics');
+} catch (e) {}
+
 const { width } = Dimensions.get('window');
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -48,15 +64,128 @@ const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any
   </BlurView>
 );
 
+const PulseDot = ({ color = tokensV2.colors.accentMint, size = 10 }: { color?: string; size?: number }) => {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0.8);
+
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.4, { duration: 1000 }),
+        withTiming(1, { duration: 1000 })
+      ),
+      -1,
+      true
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.4, { duration: 1000 }),
+        withTiming(0.8, { duration: 1000 })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      <Animated.View
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color,
+            shadowColor: color,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: size,
+            elevation: 8,
+          },
+          animatedStyle,
+        ]}
+      />
+    </View>
+  );
+};
+
+const SkillBar = ({ label, score }: { label: string; score: number }) => (
+  <View style={styles.skillBarRow}>
+    <View style={styles.skillBarInfo}>
+      <Text style={styles.skillBarLabel}>{label}</Text>
+      <Text style={styles.skillBarPercent}>{score}%</Text>
+    </View>
+    <View style={styles.skillBarBg}>
+      <LinearGradient
+        colors={[tokensV2.colors.primaryViolet, tokensV2.colors.accentAmber] as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[styles.skillBarFill, { width: `${score}%` }]}
+      />
+    </View>
+  </View>
+);
+
+const MicroStatChip = ({ label, value, icon }: { label: string; value: string; icon: string }) => (
+  <BlurView intensity={40} tint="dark" style={styles.statChip}>
+    <Text style={styles.statIcon}>{icon}</Text>
+    <View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  </BlurView>
+);
+
+const SkeletonCard = ({ width: cardWidth = 150, height: cardHeight = 180 }) => {
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    shimmer.value = withRepeat(withTiming(1, { duration: 1500 }), -1);
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(shimmer.value, [0, 0.5, 1], [0.3, 0.7, 0.3]),
+  }));
+
+  return (
+    <Animated.View style={[styles.glassCard, { width: cardWidth, height: cardHeight, padding: 16, opacity: 0.6 }, animatedStyle]}>
+      <View style={{ width: 60, height: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6, marginBottom: 12 }} />
+      <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12 }} />
+    </Animated.View>
+  );
+};
+
+const SkeletonScreen = () => (
+  <View style={styles.loadingRoot}>
+    <View style={styles.skeletonHeader}>
+       <View style={{ width: 200, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+    </View>
+    <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={false}>
+       <View style={{ height: 60, width: '100%', borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: 24 }} />
+       <View style={{ height: 200, width: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.05)', alignSelf: 'center', marginBottom: 40 }} />
+       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 32 }}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+       </View>
+    </ScrollView>
+  </View>
+);
+
 // --- Score Ring ---
 
 const SIZE = 240;
 const STROKE_WIDTH = 16;
 const RADIUS = (SIZE - STROKE_WIDTH) / 2;
 const CENTER = SIZE / 2;
-const START_ANGLE = -220;
-const END_ANGLE = 40;
-const TOTAL_ANGLE = 260;
+const START_ANGLE = -120;
+const END_ANGLE = 120;
+const TOTAL_ANGLE = 240;
 const MAX_SCORE = 1000;
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -68,10 +197,10 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
 }
 
 function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const start = polarToCartesian(cx, cy, r, endAngle);
-  const end = polarToCartesian(cx, cy, r, startAngle);
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end = polarToCartesian(cx, cy, r, endAngle);
   const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -92,15 +221,19 @@ const ScoreRing = ({
   const arcLength = (Math.PI * TOTAL_ANGLE * RADIUS) / 180;
 
   useEffect(() => {
-    animatedProgress.value = withSpring(safeScore / MAX_SCORE, {
-      damping: 20,
-      stiffness: 60,
-    });
+    // Small delay to ensure layout is ready and animation is visible
+    animatedProgress.value = 0;
+    animatedProgress.value = withDelay(500, withTiming(safeScore / MAX_SCORE, {
+      duration: 1500,
+    }));
   }, [safeScore, animatedProgress]);
 
   const animatedArcProps = useAnimatedProps(() => {
+    // Offset goes from arcLength (empty) to 0 (full)
     const offset = arcLength * (1 - animatedProgress.value);
-    return { strokeDashoffset: offset } as any;
+    return { 
+      strokeDashoffset: offset,
+    } as any;
   });
 
   return (
@@ -120,13 +253,13 @@ const ScoreRing = ({
           fill="none"
         />
         <AnimatedPath
+          d={arcPath(CENTER, CENTER, RADIUS, START_ANGLE, END_ANGLE)}
           animatedProps={animatedArcProps}
           stroke="url(#scoreGradient)"
           strokeWidth={STROKE_WIDTH}
           strokeLinecap="round"
           fill="none"
           strokeDasharray={arcLength}
-          strokeDashoffset={arcLength}
         />
       </Svg>
 
@@ -282,21 +415,29 @@ const QuickActionButton = ({
   icon,
   colors,
   shadowColor,
+  onPress,
 }: {
   label: string;
   icon: React.ReactNode;
   colors: readonly any[];
   shadowColor: string;
+  onPress?: () => void;
 }) => {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    onPress?.();
+  };
+
   return (
     <Pressable
       onPressIn={() => (scale.value = withSpring(0.95))}
       onPressOut={() => (scale.value = withSpring(1))}
+      onPress={handlePress}
     >
       <Animated.View style={[styles.actionBtn, animatedStyle, { shadowColor }]}>
         <LinearGradient colors={colors as any} style={styles.actionGradient}>
@@ -345,12 +486,7 @@ export default function HomeScreenV2() {
   );
 
   if (!isLoaded || loading || !homeData || !header) {
-    return (
-      <View style={styles.loadingRoot}>
-        <ActivityIndicator size="large" color={tokensV2.colors.primaryViolet} />
-        <Text style={styles.loadingText}>Loading your home…</Text>
-      </View>
-    );
+    return <SkeletonScreen />;
   }
 
   const displayName = header.userName || user?.firstName || 'Friend';
@@ -378,12 +514,12 @@ export default function HomeScreenV2() {
         />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* HEADER */}
+      {/* FROZEN HEADER */}
+      <View style={styles.frozenHeader}>
         <BlurView intensity={60} tint="dark" style={styles.headerPill}>
           <View style={styles.headerLeft}>
             <View style={styles.avatarBorder}>
-              <View style={styles.avatar}>
+              <View style={styles.avatarPill}>
                 <Text style={styles.avatarInitials}>
                   {(displayName || 'A')
                     .split(' ')
@@ -394,12 +530,34 @@ export default function HomeScreenV2() {
                 </Text>
               </View>
             </View>
-            <Text style={styles.username}>{displayName}</Text>
+            <View>
+              <Text style={styles.greetingText}>Welcome back,</Text>
+              <Text style={styles.usernameText}>{displayName}</Text>
+            </View>
           </View>
-          <View style={styles.streakPill}>
-            <Text style={styles.streakText}>🔥 {streakCount || 0} day streak</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Conversations')}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Ionicons name="notifications-outline" size={22} color="#fff" />
+              <View style={styles.notificationDot} />
+            </TouchableOpacity>
+            <View style={styles.streakPillSmall}>
+              <Text style={styles.streakTextSmall}>🔥 {streakCount}</Text>
+            </View>
           </View>
         </BlurView>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={{ height: 80 }} /> {/* Spacer for frozen header */}
 
         {/* TODAY'S GOAL */}
         <GlassCard style={styles.goalCard}>
@@ -407,12 +565,10 @@ export default function HomeScreenV2() {
             <Text style={styles.goalTitle}>Today's Goal</Text>
             <Text style={styles.goalSubtitle}>Goal: {header.goalLabel}</Text>
           </View>
-          <View
-            style={[
-              styles.glowingDot,
-              { opacity: 1 },
-            ]}
-          />
+          <View style={styles.goalProgress}>
+            <Text style={styles.goalPercent}>{Math.round(progressToNext)}%</Text>
+            <PulseDot color={tokensV2.colors.accentMint} size={10} />
+          </View>
         </GlassCard>
 
         {/* SCORE RING */}
@@ -423,29 +579,55 @@ export default function HomeScreenV2() {
           progressToNext={progressToNext}
         />
 
+        {/* MICRO-STAT ROW */}
+        <View style={styles.microStatRow}>
+           <MicroStatChip icon="⚡️" label="Sessions" value="24" />
+           <MicroStatChip icon="🎯" label="Avg Score" value="782" />
+           <MicroStatChip icon="⏱️" label="Minutes" value="120" />
+        </View>
+
         {/* AI INSIGHT */}
         <Animated.View entering={FadeInDown.delay(200)}>
-          <GlassCard style={styles.insightCard}>
+          <LinearGradient
+            colors={['rgba(108,99,255,0.15)', 'rgba(255,179,71,0.05)'] as any}
+            style={styles.insightCardContainer}
+          >
             <View style={styles.insightHeader}>
-              <View style={styles.aiCircle}>
-                <Text style={styles.aiLabel}>AI</Text>
+              <View style={styles.mayaAvatarContainer}>
+                <Image 
+                  source={{ uri: 'https://api.dicebear.com/7.x/avataaars/png?seed=Maya&backgroundColor=6c63ff' }} 
+                  style={styles.mayaAvatar}
+                />
+                <View style={styles.mayaOnlineDot} />
               </View>
-              <Text style={styles.insightTitle}>AI Insight</Text>
+              <View>
+                <Text style={styles.insightTitle}>Maya's Insight</Text>
+                <Text style={styles.mayaStatus}>Active now</Text>
+              </View>
             </View>
-            {skills?.details?.maya_insight ? (
-              <Text style={styles.insightBody}>{skills.details.maya_insight.subtext}</Text>
-            ) : (
-              <Text style={styles.insightBody}>
-                Maya is learning from your recent sessions. Check back after your next call.
-              </Text>
-            )}
-          </GlassCard>
+            <View style={styles.insightBubble}>
+              {skills?.details?.maya_insight ? (
+                <Text style={styles.insightBody}>{skills.details.maya_insight.subtext}</Text>
+              ) : (
+                <Text style={styles.insightBody}>
+                  I'm still analyzing your recent patterns. Let's have another conversation soon!
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity 
+              style={styles.insightLink}
+              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})}
+            >
+              <Text style={styles.insightLinkText}>View detailed report →</Text>
+            </TouchableOpacity>
+          </LinearGradient>
         </Animated.View>
 
         {/* SUMMARY CAROUSEL */}
         <ScrollView
           horizontal
-          snapToInterval={width * 0.7 + 20}
+          snapToInterval={150 + 12}
+          decelerationRate="fast"
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.carouselContent}
         >
@@ -465,6 +647,14 @@ export default function HomeScreenV2() {
                   }}
                 />
               </View>
+              <View style={styles.skillBarsList}>
+                 <SkillBar label="Speaking" score={skills?.scores.speaking ?? 30} />
+                 <SkillBar label="Listening" score={skills?.scores.listening ?? 30} />
+                 <SkillBar label="Grammar" score={skills?.scores.grammar ?? 30} />
+                 <SkillBar label="Vocabulary" score={skills?.scores.vocabulary ?? 30} />
+                 <SkillBar label="Fluency" score={skills?.scores.fluency ?? 30} />
+                 <SkillBar label="Pronunciation" score={skills?.scores.pronunciation ?? 30} />
+              </View>
             </GlassCard>
           </Animated.View>
 
@@ -472,6 +662,11 @@ export default function HomeScreenV2() {
           <Animated.View entering={FadeInDown.delay(360)}>
             <GlassCard style={styles.summaryCard}>
               <Text style={styles.cardTitle}>This Week</Text>
+              <View style={styles.heatmapHeader}>
+                 {['M','T','W','T','F','S','S'].map((d, i) => (
+                    <Text key={i} style={styles.heatmapDay}>{d}</Text>
+                 ))}
+              </View>
               <View style={styles.heatmap}>
                 {Array.from({ length: 35 }).map((_, index) => {
                   const value = homeData.weeklyActivity?.[index] ?? 0;
@@ -494,11 +689,34 @@ export default function HomeScreenV2() {
             <GlassCard style={styles.summaryCard}>
               <Text style={styles.cardTitle}>Recent Call</Text>
               <View style={styles.recentCall}>
-                <View style={styles.callAvatar} />
-                <View style={styles.callInfo}>
-                  <Text style={styles.callText}>No recent calls yet</Text>
-                  <View style={styles.onlineDot} />
-                </View>
+                {header.lastSessionDate ? (
+                  <>
+                    <View style={styles.avatarBorder}>
+                      <View style={styles.avatarPill}>
+                        <Text style={styles.avatarInitials}>JS</Text>
+                      </View>
+                    </View>
+                    <View style={styles.callInfo}>
+                      <Text style={styles.callText}>15 mins</Text>
+                      <View style={styles.scoreChip}>
+                         <Text style={styles.scoreChipText}>7.5</Text>
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.emptyCall}>
+                    <Text style={styles.emptyIcon}>📞</Text>
+                    <TouchableOpacity 
+                      style={styles.emptyCta}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        navigation.navigate('CallPreference');
+                      }}
+                    >
+                      <Text style={styles.emptyCtaText}>Start your first call</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </GlassCard>
           </Animated.View>
@@ -508,7 +726,7 @@ export default function HomeScreenV2() {
             <GlassCard style={styles.summaryCard}>
                <Text style={styles.cardTitle}>Streak</Text>
                <View style={styles.streakCenter}>
-                  <Text style={styles.hugeEmoji}>🔥</Text>
+                  <PulseDot color="#FF4500" size={32} />
                   <Text style={styles.streakCount}>{streakCount || 0} Days</Text>
                   <View style={styles.dayRow}>
                      {[...Array(7)].map((_, i) => (
@@ -534,6 +752,7 @@ export default function HomeScreenV2() {
             }
             colors={tokensV2.gradients.callButton}
             shadowColor={tokensV2.shadows.violet.shadowColor}
+            onPress={() => navigation.navigate('CallPreference')}
           />
           <QuickActionButton
             label="Practice"
@@ -547,6 +766,7 @@ export default function HomeScreenV2() {
             }
             colors={tokensV2.gradients.practiceButton}
             shadowColor={tokensV2.shadows.amber.shadowColor}
+            onPress={() => navigation.navigate('PracticeHome')}
           />
           <QuickActionButton
             label="EBites"
@@ -557,6 +777,7 @@ export default function HomeScreenV2() {
             }
             colors={tokensV2.gradients.ebitesButton}
             shadowColor={tokensV2.shadows.mint.shadowColor}
+            onPress={() => navigation.navigate('EBites')}
           />
         </View>
 
@@ -578,12 +799,18 @@ export default function HomeScreenV2() {
                   colors={card.data?.gradient || ['#6C63FF', '#3F3D56']}
                   style={styles.topicGradient}
                 >
-                  <Text style={styles.topicTitle}>{card.data?.title}</Text>
-                  {card.data?.difficulty && (
-                    <View style={styles.topicPill}>
-                      <Text style={styles.topicPillText}>{card.data.difficulty}</Text>
-                    </View>
-                  )}
+                  <View style={styles.topicHeader}>
+                    <Text style={styles.topicTitle}>{card.data?.title}</Text>
+                    <Text style={styles.topicIcon}>{card.data?.icon || '📚'}</Text>
+                  </View>
+                  <View>
+                    {card.data?.difficulty && (
+                      <View style={styles.topicPill}>
+                        <Text style={styles.topicPillText}>{card.data.difficulty}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.topicDuration}>15 min</Text>
+                  </View>
                 </LinearGradient>
               </TouchableOpacity>
             ))}
@@ -634,7 +861,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: tokensV2.spacing.l,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -648,34 +875,73 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: tokensV2.colors.primaryViolet,
     padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  avatar: {
-    flex: 1,
-    borderRadius: 22,
+  avatarPill: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  greetingText: {
+    color: tokensV2.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
+    marginBottom: 0,
+  },
+  usernameText: {
+    color: tokensV2.colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF4B4B',
+    borderWidth: 1.5,
+    borderColor: '#1A1A1A',
+  },
+  streakPillSmall: {
+    backgroundColor: 'rgba(255,179,71,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,179,71,0.2)',
+  },
+  streakTextSmall: {
+    color: tokensV2.colors.accentAmber,
+    fontWeight: '800',
+    fontSize: 12,
+  },
   avatarInitials: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 16,
-  },
-  username: {
-    color: tokensV2.colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  streakPill: {
-    backgroundColor: tokensV2.colors.accentAmber,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: tokensV2.borderRadius.l,
-  },
-  streakText: {
-    color: '#000',
-    fontWeight: '700',
-    fontSize: 12,
+    fontSize: 14,
   },
   glassCard: {
     borderRadius: tokensV2.borderRadius.l,
@@ -715,10 +981,17 @@ const styles = StyleSheet.create({
   scoreRingContainer: {
     alignItems: 'center',
     paddingVertical: 24,
+    width: SIZE,
+    height: SIZE + 48,
+    alignSelf: 'center',
   },
   scoreOverlay: {
     position: 'absolute',
-    top: 90,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   badgePill: {
@@ -766,35 +1039,82 @@ const styles = StyleSheet.create({
   insightCard: {
     padding: tokensV2.spacing.m,
     marginBottom: tokensV2.spacing.l,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6C63FF',
+  },
+  insightCardContainer: {
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    position: 'relative',
+    overflow: 'hidden',
   },
   insightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 10,
+    marginBottom: 16,
   },
-  aiCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: tokensV2.colors.primaryViolet,
-    alignItems: 'center',
-    justifyContent: 'center',
+  mayaAvatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(108,99,255,0.2)',
+    padding: 2,
+    position: 'relative',
   },
-  aiLabel: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
+  mayaAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+  },
+  mayaOnlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#00E5A0',
+    borderWidth: 2,
+    borderColor: '#1A1B2E',
   },
   insightTitle: {
     color: tokensV2.colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 16,
+    fontWeight: '800',
+    fontSize: 18,
+    letterSpacing: -0.5,
+  },
+  mayaStatus: {
+    color: '#00E5A0',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: -2,
+  },
+  insightBubble: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderRadius: 20,
+    borderTopLeftRadius: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
   },
   insightBody: {
-    color: tokensV2.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#E0E0EF',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+  insightLink: {
+    alignSelf: 'flex-end',
+  },
+  insightLinkText: {
+    color: tokensV2.colors.primaryViolet,
+    fontSize: 13,
+    fontWeight: '700',
   },
   carouselContent: {
     paddingHorizontal: 16,
@@ -804,7 +1124,7 @@ const styles = StyleSheet.create({
   summaryCard: {
     width: 150,
     padding: tokensV2.spacing.m,
-    height: 140,
+    height: 180,
   },
   cardTitle: {
     color: tokensV2.colors.textPrimary,
@@ -938,13 +1258,146 @@ const styles = StyleSheet.create({
   },
   loadingRoot: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: tokensV2.colors.background,
   },
-  loadingText: {
-    marginTop: 12,
+  skeletonHeader: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  frozenHeader: {
+    position: 'absolute',
+    top: 48,
+    left: 20,
+    right: 20,
+    zIndex: 100,
+  },
+  goalProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  goalPercent: {
+    color: tokensV2.colors.accentMint,
+    fontWeight: '700',
     fontSize: 14,
+  },
+  microStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    marginBottom: 24,
+  },
+  statChip: {
+    width: (width - 48) / 3,
+    padding: 10,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  statIcon: {
+    fontSize: 16,
+  },
+  statValue: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  statLabel: {
+    color: tokensV2.colors.textMuted,
+    fontSize: 9,
+    textTransform: 'uppercase',
+  },
+  skillBarsList: {
+    marginTop: 8,
+    gap: 4,
+  },
+  skillBarRow: {
+    gap: 2,
+  },
+  skillBarInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skillBarLabel: {
     color: tokensV2.colors.textSecondary,
+    fontSize: 8,
+  },
+  skillBarPercent: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  skillBarBg: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+  },
+  skillBarFill: {
+    height: '100%',
+  },
+  heatmapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    marginBottom: 4,
+  },
+  heatmapDay: {
+    color: tokensV2.colors.textMuted,
+    fontSize: 8,
+    width: 11,
+    textAlign: 'center',
+  },
+  emptyCall: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  emptyIcon: {
+    fontSize: 24,
+    opacity: 0.5,
+  },
+  emptyCta: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  emptyCtaText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  scoreChip: {
+    backgroundColor: tokensV2.colors.accentMint,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  scoreChipText: {
+    color: '#000',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  topicHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  topicIcon: {
+    fontSize: 16,
+  },
+  topicDuration: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    marginTop: 4,
   },
 });

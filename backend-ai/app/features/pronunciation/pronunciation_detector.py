@@ -1,6 +1,11 @@
 """
-Pronunciation detector: consumes Azure Pronunciation Assessment result (per-word/phoneme scores),
-filters low-accuracy words, looks up phoneme_error_map, returns flagged errors with reel_id.
+Pronunciation detector — multi-layer analysis of Azure PA results.
+
+Layer 1 (Azure PA): flags words Azure explicitly marks + words below accuracy threshold.
+Layer 2 (Phoneme edit distance): catches real-word substitutions like barking→walking
+         that Azure PA scores 100 because the spoken word is phonetically valid.
+Layer 4 (STT confusion pairs): hardcoded Indian English ASR substitution patterns
+         where the ASR writes a different real word (e.g. "berry" when user said "very").
 """
 from __future__ import annotations
 
@@ -11,10 +16,10 @@ from app.phoneme_loader import get_phoneme_map, get_reel_map
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ACCURACY_THRESHOLD = 55  # Lowered from 65 to catch more errors in call mode
+DEFAULT_ACCURACY_THRESHOLD = 45  # Aggressive: catches borderline mispronunciations Azure PA is lenient on
+FUNCTION_WORD_THRESHOLD = 60     # Higher bar for function words (the/this/that) — common th_to_d errors
 
 # These phonemes are the ONLY ones that indicate Indian English pattern errors.
-# Low scores on k, b, p, d, t alone are consonant-cluster noise — not pattern errors.
 INDIAN_ENGLISH_ERROR_PHONEMES = {
     "w", "v", "h",          # w_to_v, v_to_w, h_dropping
     "th", "dh",              # th_to_t, th_to_d (Azure may use these)
@@ -27,9 +32,215 @@ INDIAN_ENGLISH_ERROR_PHONEMES = {
     "ng",                    # nasal errors (marning)
 }
 
-# Function words where th_to_d errors are extremely common.
-# Use a LOWER threshold so they are easier to flag.
 FUNCTION_WORDS_TH = {"the", "this", "that", "them", "they", "there", "then", "those", "these"}
+
+# ── Layer 4: STT Confusion Pairs ──────────────────────────────────────
+# When ASR writes word A but the user likely said word B (common Indian English swaps).
+# Format: transcribed_word → (intended_word, rule_category)
+STT_CONFUSION_PAIRS: dict[str, tuple[str, str]] = {
+    # v/w swaps (Indian English most common)
+    "berry": ("very", "v_to_w_reversal"),
+    "wary": ("very", "w_to_v"),
+    "vest": ("west", "v_to_w_reversal"),
+    "veil": ("whale", "v_to_w_reversal"),
+    "wile": ("vile", "w_to_v"),
+    "wine": ("vine", "w_to_v"),
+    "worse": ("voice", "w_to_v"),
+    "wiper": ("viper", "w_to_v"),
+    "vet": ("wet", "v_to_w_reversal"),
+    "vow": ("wow", "v_to_w_reversal"),
+    "wane": ("vain", "w_to_v"),
+    "wary": ("vary", "w_to_v"),
+    # th/d swaps
+    "den": ("then", "th_to_d"),
+    "dare": ("there", "th_to_d"),
+    "day": ("they", "th_to_d"),
+    "dose": ("those", "th_to_d"),
+    "dis": ("this", "th_to_d"),
+    "dough": ("though", "th_to_d"),
+    "doze": ("those", "th_to_d"),
+    "udder": ("other", "th_to_d"),
+    "mudder": ("mother", "th_to_d"),
+    "fadder": ("father", "th_to_d"),
+    "broder": ("brother", "th_to_d"),
+    "wid": ("with", "th_to_d"),
+    # th/t swaps
+    "tick": ("thick", "th_to_t"),
+    "tin": ("thin", "th_to_t"),
+    "tree": ("three", "th_to_t"),
+    "tank": ("thank", "th_to_t"),
+    "taught": ("thought", "th_to_t"),
+    "true": ("through", "th_to_t"),
+    "trow": ("throw", "th_to_t"),
+    "tread": ("thread", "th_to_t"),
+    "trust": ("thrust", "th_to_t"),
+    "bat": ("bath", "th_to_t"),
+    "mats": ("maths", "th_to_t"),
+    "wit": ("with", "th_to_t"),
+    "boat": ("both", "th_to_t"),
+    "moat": ("moth", "th_to_t"),
+    # Short/long vowel pairs
+    "ship": ("sheep", "i_to_ee"),
+    "bit": ("beat", "i_to_ee"),
+    "sit": ("seat", "i_to_ee"),
+    "fill": ("feel", "i_to_ee"),
+    "hill": ("heel", "i_to_ee"),
+    "lip": ("leap", "i_to_ee"),
+    "live": ("leave", "i_to_ee"),
+    "slip": ("sleep", "i_to_ee"),
+    "rich": ("reach", "i_to_ee"),
+    "dip": ("deep", "i_to_ee"),
+    "pull": ("pool", "o_to_aa"),
+    "full": ("fool", "o_to_aa"),
+    "look": ("Luke", "o_to_aa"),
+    # ae/e vowel confusion
+    "bed": ("bad", "ae_to_e"),
+    "set": ("sat", "ae_to_e"),
+    "men": ("man", "ae_to_e"),
+    "pet": ("pat", "ae_to_e"),
+    "den": ("dan", "ae_to_e"),
+    "pen": ("pan", "ae_to_e"),
+    "bet": ("bat", "ae_to_e"),
+    # h-dropping
+    "art": ("heart", "h_dropping"),
+    "air": ("hair", "h_dropping"),
+    "arm": ("harm", "h_dropping"),
+    "ear": ("hear", "h_dropping"),
+    "eat": ("heat", "h_dropping"),
+    "old": ("hold", "h_dropping"),
+    "ill": ("hill", "h_dropping"),
+    "all": ("hall", "h_dropping"),
+    # r variants (retroflex)
+    "barking": ("walking", "r_rolling"),
+    "bored": ("board", "r_rolling"),
+    "card": ("cod", "r_rolling"),
+    # zh/j confusion
+    "major": ("measure", "zh_to_j"),
+    "pledger": ("pleasure", "zh_to_j"),
+    "jure": ("sure", "zh_to_j"),
+}
+
+# Precomputed reverse lookup: intended → list of possible ASR outputs
+_STT_REVERSE: dict[str, list[tuple[str, str]]] = {}
+for _asr, (_intended, _cat) in STT_CONFUSION_PAIRS.items():
+    _STT_REVERSE.setdefault(_intended.lower(), []).append((_asr.lower(), _cat))
+
+
+# ── Layer 2: Phoneme Edit Distance ───────────────────────────────────
+_pronouncing_loaded = False
+_pronouncing_available = False
+
+
+def _ensure_pronouncing():
+    """Lazy-load the pronouncing package (CMU dict)."""
+    global _pronouncing_loaded, _pronouncing_available
+    if _pronouncing_loaded:
+        return _pronouncing_available
+    _pronouncing_loaded = True
+    try:
+        import pronouncing  # noqa: F401
+        import editdistance  # noqa: F401
+        _pronouncing_available = True
+    except ImportError:
+        logger.warning("pronouncing/editdistance not installed — Layer 2 disabled")
+        _pronouncing_available = False
+    return _pronouncing_available
+
+
+def _phoneme_edit_distance(word_a: str, word_b: str) -> int | None:
+    """
+    Compute phoneme-level edit distance between two English words using CMU dict.
+    Returns None if either word is not in CMU dict.
+    """
+    import pronouncing
+    import editdistance as ed
+
+    phones_a = pronouncing.phones_for_word(word_a.lower())
+    phones_b = pronouncing.phones_for_word(word_b.lower())
+    if not phones_a or not phones_b:
+        return None
+    # Use first pronunciation variant, strip stress markers
+    a_seq = [p.rstrip("012") for p in phones_a[0].split()]
+    b_seq = [p.rstrip("012") for p in phones_b[0].split()]
+    return ed.eval(a_seq, b_seq)
+
+
+def _run_phoneme_distance_pass(
+    recognized_words: list[str],
+    reference_words: set[str],
+) -> list[dict[str, Any]]:
+    """
+    Layer 2: For each recognized word, check if a phonetically similar but different word
+    in the reference set is a closer match — indicating a real-word substitution.
+    """
+    if not _ensure_pronouncing():
+        return []
+
+    extra_flags: list[dict[str, Any]] = []
+
+    for word in recognized_words:
+        wl = word.lower().strip()
+        if not wl or len(wl) < 3:
+            continue
+        # Skip if the word IS in the reference (correct match)
+        if wl in reference_words:
+            continue
+        # Check STT confusion pairs first (Layer 4) — fast lookup
+        if wl in STT_CONFUSION_PAIRS:
+            intended, cat = STT_CONFUSION_PAIRS[wl]
+            extra_flags.append({
+                "spoken": wl,
+                "correct": intended,
+                "rule_category": cat,
+                "reel_id": None,
+                "confidence": 30.0,  # Low confidence = severe issue
+            })
+            continue
+        # Phoneme edit distance against reference words
+        best_ref = None
+        best_dist = 999
+        for ref_w in reference_words:
+            if ref_w == wl:
+                continue
+            dist = _phoneme_edit_distance(wl, ref_w)
+            if dist is not None and dist <= 2 and dist < best_dist:
+                best_dist = dist
+                best_ref = ref_w
+        if best_ref and best_dist <= 2:
+            extra_flags.append({
+                "spoken": wl,
+                "correct": best_ref,
+                "rule_category": "phoneme_substitution",
+                "reel_id": None,
+                "confidence": max(20.0, 50.0 - best_dist * 15),
+            })
+    return extra_flags
+
+
+def _run_stt_confusion_check(
+    recognized_words: list[str],
+) -> list[dict[str, Any]]:
+    """
+    Layer 4 standalone: Flag any recognized word that appears in the STT confusion table.
+    Runs independently of Azure PA scores.
+    """
+    flags: list[dict[str, Any]] = []
+    seen = set()
+    for word in recognized_words:
+        wl = word.lower().strip()
+        if wl in seen:
+            continue
+        if wl in STT_CONFUSION_PAIRS:
+            seen.add(wl)
+            intended, cat = STT_CONFUSION_PAIRS[wl]
+            flags.append({
+                "spoken": wl,
+                "correct": intended,
+                "rule_category": cat,
+                "reel_id": None,
+                "confidence": 30.0,
+            })
+    return flags
 
 
 def _normalize(s: str) -> str:
@@ -174,9 +385,10 @@ def detect_from_azure_result(
         # then pull rule_category from by_correct_word.
         # ----------------------------------------------------------------
 
-        # Determine threshold — function words get a lower bar (easier to flag)
+        # Function words like "the/this/that" get a higher bar (easier to flag)
+        # because th_to_d errors are extremely common in Indian English
         if word_lower in FUNCTION_WORDS_TH:
-            effective_threshold = 60
+            effective_threshold = FUNCTION_WORD_THRESHOLD
         else:
             effective_threshold = accuracy_threshold
 
@@ -244,7 +456,37 @@ def detect_from_azure_result(
         })
 
     # ----------------------------------------------------------------
-    # STEP 5: Deduplicate by correct word — keep lowest confidence (most genuine)
+    # STEP 5: Layer 2 (phoneme edit distance) + Layer 4 (STT confusion pairs)
+    # Run independently of Azure PA — catches real-word substitutions.
+    # ----------------------------------------------------------------
+    recognized_word_list = [
+        _normalize(w.get("Word") or w.get("word") or "")
+        for w in words
+        if (w.get("Word") or w.get("word") or "").strip()
+    ]
+    already_flagged_words = {e["correct"] for e in flagged} | {e["spoken"] for e in flagged}
+
+    # Layer 4: STT confusion pairs (fast, no deps)
+    stt_flags = _run_stt_confusion_check(recognized_word_list)
+    for sf in stt_flags:
+        if sf["spoken"] not in already_flagged_words and sf["correct"] not in already_flagged_words:
+            flagged.append(sf)
+            already_flagged_words.add(sf["spoken"])
+            already_flagged_words.add(sf["correct"])
+            logger.info(f"  Layer 4 STT confusion: '{sf['spoken']}' → '{sf['correct']}' ({sf['rule_category']})")
+
+    # Layer 2: Phoneme edit distance (requires pronouncing + editdistance)
+    if reference_words:
+        ped_flags = _run_phoneme_distance_pass(recognized_word_list, reference_words)
+        for pf in ped_flags:
+            if pf["spoken"] not in already_flagged_words and pf["correct"] not in already_flagged_words:
+                flagged.append(pf)
+                already_flagged_words.add(pf["spoken"])
+                already_flagged_words.add(pf["correct"])
+                logger.info(f"  Layer 2 phoneme dist: '{pf['spoken']}' → '{pf['correct']}' ({pf['rule_category']})")
+
+    # ----------------------------------------------------------------
+    # STEP 6: Deduplicate by correct word — keep lowest confidence (most genuine)
     # ----------------------------------------------------------------
     seen: dict[str, dict] = {}
     for error in flagged:
@@ -252,7 +494,7 @@ def detect_from_azure_result(
         if key not in seen or error["confidence"] < seen[key]["confidence"]:
             seen[key] = error
 
-    # Filter out unknown_substitution but keep general_mispronunciation (Azure-flagged)
+    # Filter out unknown_substitution but keep everything else
     result = [e for e in seen.values() if e["rule_category"] != "unknown_substitution"]
 
     logger.info(f"detect_from_azure_result returning {len(result)} flagged errors: {result}")

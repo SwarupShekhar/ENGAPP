@@ -118,11 +118,13 @@ from app.features.pronunciation.routes import router as pronunciation_router
 from app.features.tutor.routes import router as tutor_router
 from app.features.tutor.streaming_routes import router as streaming_tutor_router
 from app.features.admin.routes import router as admin_router
+from app.features.scoring.routes import router as scoring_router
 
 app.include_router(health_router, prefix="/api", tags=["Health"])
 app.include_router(transcribe_router, prefix="/api", tags=["Transcribe"])
 app.include_router(analyze_router, prefix="/api", tags=["Analyze"])
 app.include_router(pronunciation_router, prefix="/api", tags=["Pronunciation"])
+app.include_router(scoring_router, prefix="/api", tags=["Scoring"])
 app.include_router(tutor_router, prefix="/api/tutor", tags=["Tutor"])
 app.include_router(streaming_tutor_router, prefix="/api/tutor", tags=["Streaming"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])

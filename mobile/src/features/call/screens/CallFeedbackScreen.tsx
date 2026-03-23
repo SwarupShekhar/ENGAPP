@@ -8,6 +8,8 @@ import {
   Dimensions,
   StatusBar,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import {
   SafeAreaView,
@@ -29,6 +31,8 @@ import { WordLevelBreakdown } from "../components/WordLevelBreakdown";
 import { PracticeTips } from "../components/PracticeTips";
 import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
 import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
+import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
+import { getCQSScore, CQSResults } from "../../../api/scoring";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -76,10 +80,87 @@ function SkillBar({
 // ─── Build highlight ranges from transcript + mistakes/pronunciation ─────
 type HighlightRange = { start: number; end: number; type: "grammar" | "pronunciation" };
 
+type PronIssueLike = {
+  // new pipeline shape
+  spoken?: string;
+  correct?: string;
+  rule_category?: string;
+  confidence?: number;
+  word_index?: number;
+  // legacy DB shape
+  word?: string;
+  issueType?: string;
+  severity?: string;
+  suggestion?: string;
+};
+
+type PronIssueNormalized = {
+  id: string;
+  correct: string;
+  spoken: string;
+  rule_category: string;
+  confidence?: number;
+  word_index?: number;
+  suggestion?: string;
+};
+
+function getPronUI(ruleCategory: string) {
+  const cat = (ruleCategory || "").trim();
+  const vowel =
+    cat === "i_to_ee" ||
+    cat === "ae_to_e" ||
+    cat === "o_to_aa" ||
+    cat.includes("vowel");
+
+  if (cat === "th_to_d") return { bg: "#FCEBEB", text: "#A32D2D", key: "TH" };
+  if (cat === "th_to_t") return { bg: "#FCEBEB", text: "#A32D2D", key: "TH" };
+  if (cat === "v_to_w" || cat === "v_to_b" || cat === "w_to_v" || cat === "v_to_w_reversal")
+    return { bg: "#FAEEDA", text: "#633806", key: "VW" };
+  if (vowel) return { bg: "#EEEDFE", text: "#3C3489", key: "V" };
+  if (cat === "r_rolling") return { bg: "#E1F5EE", text: "#085041", key: "R" };
+  return { bg: "#F1F5F9", text: "#475569", key: "PR" };
+}
+
+function getPronLabel(ruleCategory: string) {
+  const cat = (ruleCategory || "").trim();
+  if (cat === "th_to_d" || cat === "th_to_t") return "th sound";
+  if (cat === "v_to_b" || cat === "v_to_w" || cat === "w_to_v" || cat === "v_to_w_reversal")
+    return "v vs w/b";
+  if (cat === "i_to_ee" || cat.includes("vowel")) return "short i vowel";
+  if (cat === "r_rolling") return "r sound";
+  if (cat === "general_mispronunciation") return "mispronounced";
+  return cat ? cat.replace(/_/g, " ") : "pronunciation";
+}
+
+function getPronFix(ruleCategory: string) {
+  const cat = (ruleCategory || "").trim();
+  if (cat === "th_to_d" || cat === "th_to_t")
+    return "Place tongue tip lightly between teeth and breathe out.";
+  if (cat === "v_to_b" || cat === "v_to_w" || cat === "w_to_v" || cat === "v_to_w_reversal")
+    return "Touch upper teeth to lower lip, then vibrate.";
+  if (cat === "i_to_ee" || cat.includes("vowel"))
+    return "Keep the vowel short and relaxed, don't stretch it.";
+  if (cat === "r_rolling") return "Curl tongue back slightly, don't trill.";
+  return "Listen to a native speaker and repeat slowly.";
+}
+
+function _findWordRangeByIndex(text: string, wordIndex: number): { start: number; end: number } | null {
+  if (!text || wordIndex == null || Number.isNaN(wordIndex) || wordIndex < 0) return null;
+  const re = /\b[\w']+\b/g;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = re.exec(text)) !== null) {
+    if (i === wordIndex) return { start: m.index, end: m.index + m[0].length };
+    i += 1;
+  }
+  return null;
+}
+
 function buildHighlightRanges(
   transcript: string,
   mistakes: { original_text?: string; original?: string }[],
-  pronunciationIssues: { word?: string }[],
+  pronunciationIssues: PronIssueLike[],
 ): HighlightRange[] {
   if (!transcript) return [];
   const lower = transcript.toLowerCase();
@@ -99,15 +180,31 @@ function buildHighlightRanges(
     }
   }
 
-  const pronWords = pronunciationIssues
-    .map((p) => (p.word ?? "").trim())
-    .filter((w) => w.length >= 2);
-  for (const word of pronWords) {
-    const wordLower = word.toLowerCase();
-    const wordRegex = new RegExp(`\\b${wordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, "gi");
+  // Prefer word_index-based highlight (most reliable). Fallback to matching the correct word string.
+  for (const p of pronunciationIssues) {
+    const idx = typeof p.word_index === "number" ? p.word_index : null;
+    if (idx != null) {
+      const r = _findWordRangeByIndex(transcript, idx);
+      if (r) {
+        ranges.push({ start: r.start, end: r.end, type: "pronunciation" });
+        continue;
+      }
+    }
+    const target = (p.correct ?? p.word ?? "").trim();
+    if (target.length < 2) continue;
+    const wordLower = target.toLowerCase();
+    const wordRegex = new RegExp(
+      `\\b${wordLower.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\b`,
+      "gi",
+    );
     let match: RegExpExecArray | null;
+    // eslint-disable-next-line no-cond-assign
     while ((match = wordRegex.exec(transcript)) !== null) {
-      ranges.push({ start: match.index, end: match.index + match[0].length, type: "pronunciation" });
+      ranges.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type: "pronunciation",
+      });
     }
   }
 
@@ -130,10 +227,12 @@ function TranscriptWithHighlights({
   transcript,
   mistakes,
   pronunciationIssues,
+  participants,
 }: {
   transcript: string;
   mistakes: { original_text?: string; original?: string }[];
-  pronunciationIssues?: { word?: string }[];
+  pronunciationIssues?: PronIssueLike[];
+  participants?: any[];
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -141,6 +240,38 @@ function TranscriptWithHighlights({
 
   const lines = transcript.split("\n").filter((l) => l.trim().length > 0);
   const hasSpeakerLabels = lines.some((l) => /^[^:]+:/.test(l));
+
+  const resolveSpeakerName = (rawSpeaker: string): string => {
+    const s = (rawSpeaker || "").trim();
+    if (!s) return "User";
+    const lower = s.toLowerCase();
+    if (lower.includes("maya")) return "Maya";
+
+    const token = lower
+      .replace(/^user[_\s:-]*/i, "")
+      .replace(/^participant[_\s:-]*/i, "")
+      .trim();
+
+    const list = participants || [];
+    for (const p of list) {
+      const u = (p as any)?.user;
+      const fname = (u?.fname || "").trim();
+      if (!fname) continue;
+
+      const clerkId = (u?.clerkId || "").toLowerCase();
+      const internalUserId = ((p as any)?.userId || "").toLowerCase();
+      const internalUserUuid = (u?.id || "").toLowerCase();
+
+      if (token && (token === clerkId || token === internalUserId || token === internalUserUuid)) {
+        return fname;
+      }
+      if (lower === clerkId || lower === internalUserId || lower === internalUserUuid) {
+        return fname;
+      }
+    }
+    // fallback: show a friendlier label than "user_8349..."
+    return s.replace(/^user[_\s:-]*/i, "User ");
+  };
 
   if (!hasSpeakerLabels) {
     return renderHighlightedText(transcript, ranges, styles, theme);
@@ -158,6 +289,7 @@ function TranscriptWithHighlights({
           );
         }
         const speaker = line.slice(0, colonIdx).trim();
+        const displaySpeaker = resolveSpeakerName(speaker);
         const message = line.slice(colonIdx + 1).trim();
         const isFirstSpeaker = lines.findIndex((l) => l.startsWith(speaker)) === li ||
           lines.filter((l) => l.startsWith(speaker + ":")).length > 0;
@@ -168,7 +300,7 @@ function TranscriptWithHighlights({
         return (
           <View key={li} style={styles.chatBubbleWrap}>
             <Text style={[styles.chatSpeaker, { color: speakerColor }]}>
-              {speaker}
+              {displaySpeaker}
             </Text>
             <View style={[styles.chatBubble, { borderLeftColor: speakerColor }]}>
               {renderHighlightedText(message, ranges, styles, theme, getLineOffset(transcript, line, colonIdx + 1))}
@@ -177,6 +309,241 @@ function TranscriptWithHighlights({
         );
       })}
     </View>
+  );
+}
+
+function PronunciationTabs({
+  issues,
+  transcript,
+  onPractice,
+  enteringDelay = 400,
+}: {
+  issues: PronIssueNormalized[];
+  transcript: string;
+  onPractice: (ruleCategory: string) => void;
+  enteringDelay?: number;
+}) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+  const [tab, setTab] = useState<"issues" | "transcript" | "patterns">("issues");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [modalIssue, setModalIssue] = useState<PronIssueNormalized | null>(null);
+
+  const countsByCat: Record<string, number> = {};
+  for (const i of issues) {
+    const k = i.rule_category || "other";
+    countsByCat[k] = (countsByCat[k] || 0) + 1;
+  }
+  const groups = Object.entries(countsByCat)
+    .map(([rule_category, count]) => ({ rule_category, count }))
+    .sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(1, ...groups.map((g) => g.count));
+
+  const issueByIndex = new Map<number, PronIssueNormalized>();
+  issues.forEach((i) => {
+    if (typeof i.word_index === "number") issueByIndex.set(i.word_index, i);
+  });
+
+  const TabPill = ({
+    id,
+    label,
+  }: {
+    id: "issues" | "transcript" | "patterns";
+    label: string;
+  }) => {
+    const active = tab === id;
+    return (
+      <TouchableOpacity
+        onPress={() => setTab(id)}
+        activeOpacity={0.8}
+        style={[
+          styles.pronTabPill,
+          active ? styles.pronTabPillActive : styles.pronTabPillInactive,
+        ]}
+      >
+        <Text style={[styles.pronTabText, active ? styles.pronTabTextActive : styles.pronTabTextInactive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const IssueCard = ({ item }: { item: PronIssueNormalized }) => {
+    const expanded = expandedId === item.id;
+    const ui = getPronUI(item.rule_category);
+    const label = getPronLabel(item.rule_category);
+    const acc = item.confidence != null ? Math.round(item.confidence) : null;
+    return (
+      <View style={styles.pronIssueCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setExpandedId(expanded ? null : item.id)}
+          style={styles.pronIssueTop}
+        >
+          <View style={[styles.pronIssueAvatar, { backgroundColor: ui.bg, borderColor: ui.text + "55" }]}>
+            <Text style={[styles.pronIssueAvatarText, { color: ui.text }]}>{ui.key}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pronIssueWordRow} numberOfLines={2}>
+              <Text style={styles.pronIssueCorrect}>{item.correct}</Text>
+              <Text style={styles.pronIssueArrow}>{"  →  "}</Text>
+              <Text style={[styles.pronIssueSpoken, { color: ui.text }]}>{item.spoken}</Text>
+            </Text>
+            <Text style={styles.pronIssueMeta}>
+              {label}
+              {acc != null ? ` • ${acc}%` : ""}
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-down"
+            size={18}
+            color={theme.colors.text.secondary}
+            style={{ transform: [{ rotate: expanded ? "180deg" : "0deg" }] }}
+          />
+        </TouchableOpacity>
+
+        {expanded && (
+          <View style={styles.pronIssueExpanded}>
+            <Text style={styles.pronIssueFix}>{getPronFix(item.rule_category)}</Text>
+            <TouchableOpacity
+              style={[styles.pronPracticeBtn, { backgroundColor: ui.text }]}
+              activeOpacity={0.85}
+              onPress={() => onPractice(item.rule_category)}
+            >
+              <Text style={styles.pronPracticeBtnText}>Practice this sound</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderTranscriptTab = () => {
+    const text = (transcript || "").trim();
+    if (!text) return <Text style={styles.emptyTabText}>No transcript available.</Text>;
+
+    const parts = text.split(/(\s+)/);
+    let wordIdx = 0;
+    return (
+      <Text style={styles.pronTranscriptText}>
+        {parts.map((p, i) => {
+          if (!p) return null;
+          if (/^\s+$/.test(p)) return p;
+          const clean = p.replace(/[^\w']/g, "");
+          const idxMatch = issueByIndex.get(wordIdx);
+          const fallbackMatch =
+            !idxMatch &&
+            issues.find((iss) => iss.correct.toLowerCase() === clean.toLowerCase());
+          const match = idxMatch || fallbackMatch || null;
+          const currentWordIdx = wordIdx;
+          wordIdx += 1;
+          if (!match) return p;
+          const ui = getPronUI(match.rule_category);
+          return (
+            <Text
+              key={`${i}-${currentWordIdx}`}
+              onPress={() => setModalIssue(match)}
+              style={[styles.pronChip, { backgroundColor: ui.bg, borderColor: ui.text + "55", color: ui.text }]}
+            >
+              {p}
+            </Text>
+          );
+        })}
+        {"\n\n"}
+        <Text style={styles.pronLegend}>
+          <Text style={[styles.pronLegendDot, { color: "#f59e0b" }]}>●</Text> mispronounced
+        </Text>
+      </Text>
+    );
+  };
+
+  const renderPatternsTab = () => {
+    if (!groups.length) return <Text style={styles.emptyTabText}>No patterns yet.</Text>;
+    return (
+      <View style={{ gap: 10 }}>
+        {groups.map((g) => {
+          const ui = getPronUI(g.rule_category);
+          const sev = g.count >= 3 ? "High" : g.count === 2 ? "Medium" : "Low";
+          const sevColor = g.count >= 3 ? "#ef4444" : g.count === 2 ? "#f59e0b" : "#7c3aed";
+          return (
+            <View key={g.rule_category} style={styles.pronPatternRow}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={styles.pronPatternTitle}>
+                  {getPronLabel(g.rule_category)} <Text style={styles.pronPatternCount}>({g.count})</Text>
+                </Text>
+                <View style={[styles.pronSeverityPill, { backgroundColor: sevColor + "18" }]}>
+                  <Text style={[styles.pronSeverityText, { color: sevColor }]}>{sev}</Text>
+                </View>
+              </View>
+              <View style={styles.pronPatternBarBg}>
+                <View
+                  style={[
+                    styles.pronPatternBarFill,
+                    {
+                      width: `${Math.max(8, (g.count / maxCount) * 100)}%`,
+                      backgroundColor: ui.text,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          );
+        })}
+        <TouchableOpacity
+          style={[styles.pronPlanBtn, { backgroundColor: theme.colors.primary }]}
+          activeOpacity={0.85}
+          onPress={() => onPractice("all")}
+        >
+          <Text style={styles.pronPlanBtnText}>Build my practice plan</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.delay(enteringDelay).springify()}>
+      <Text style={styles.sectionTitle}>Pronunciation</Text>
+      <View style={styles.pronTabsBar}>
+        <TabPill id="issues" label={`Issues (${issues.length})`} />
+        <TabPill id="transcript" label="Transcript" />
+        <TabPill id="patterns" label="Patterns" />
+      </View>
+
+      <View style={styles.pronTabsBody}>
+        {tab === "issues" && (
+          <View style={{ gap: 10 }}>
+            {issues.map((it) => (
+              <IssueCard key={it.id} item={it} />
+            ))}
+          </View>
+        )}
+        {tab === "transcript" && <View style={styles.pronTranscriptWrap}>{renderTranscriptTab()}</View>}
+        {tab === "patterns" && renderPatternsTab()}
+      </View>
+
+      <Modal transparent visible={!!modalIssue} animationType="fade" onRequestClose={() => setModalIssue(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setModalIssue(null)}>
+          <Pressable style={styles.modalCard} onPress={() => null}>
+            {modalIssue && (
+              <>
+                <Text style={styles.modalTitle}>{modalIssue.correct}</Text>
+                <Text style={styles.modalSub}>
+                  You said: <Text style={{ fontWeight: "700" }}>{modalIssue.spoken}</Text>
+                </Text>
+                <Text style={styles.modalFix}>{getPronFix(modalIssue.rule_category)}</Text>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: theme.colors.primary }]}
+                  activeOpacity={0.85}
+                  onPress={() => onPractice(modalIssue.rule_category)}
+                >
+                  <Text style={styles.modalBtnText}>Practice this sound</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </Animated.View>
   );
 }
 
@@ -370,6 +737,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [isFailed, setIsFailed] = useState(false);
   const [checkingAgain, setCheckingAgain] = useState(false);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(true);
+  const [cqsData, setCqsData] = useState<CQSResults | null>(null);
   const [pronPollCount, setPronPollCount] = useState(0);
   const insets = useSafeAreaInsets();
 
@@ -428,6 +796,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           if (isMounted) {
             setSessionData(data);
             setLoading(false);
+            
+            // Also fetch CQS results
+            const cqs = await getCQSScore(sessionId);
+            setCqsData(cqs);
           }
         } else if (retryCount < 40) {
           // ~2 min total at 3s per poll (both users see feedback sooner)
@@ -474,7 +846,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     if (loading || !sessionData || !sessionId) return;
     const hasPronIssues =
       (sessionData.analyses?.[0]?.pronunciationIssues?.length ?? 0) > 0;
-    if (hasPronIssues || pronPollCount >= 15) return;
+    const MAX_PRON_POLLS = 18; // 18 * 5s = 90s
+    if (hasPronIssues || pronPollCount >= MAX_PRON_POLLS) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -486,7 +859,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         // silent — main data is already showing
       }
       setPronPollCount((c) => c + 1);
-    }, 6000);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [loading, sessionData, sessionId, pronPollCount]);
@@ -749,15 +1122,22 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     .map((m: any) => m.corrected_text ?? m.corrected)
     .filter(Boolean)
     .filter((t: string) => t.trim().length > 0);
-  const wordsFromPronunciation =
-    (data.pronunciationIssues || []).map((p: any) => p.word).filter(Boolean) ||
-    (data.pronunciationFlagged || []).map((p: any) => p.word ?? p.phoneme).filter(Boolean);
+  const wordsFromPronunciation = (data.pronunciationIssues || [])
+    .map((p: any) => {
+      // Prefer new pipeline fields
+      const correct = (p?.correct ?? "").trim();
+      if (correct) return `${correct} (pron)`;
+      // Legacy: parse out a usable correct word
+      const parsed = parsePronunciationIssue(p);
+      return parsed.correctWord ? `${parsed.correctWord} (pron)` : null;
+    })
+    .filter(Boolean);
   const advancedWords =
     ((rawData as any)?.ai_detailed_feedback?.vocabulary?.advanced_words as string[]) || []; 
   const wordsToLearn = Array.from(
     new Set([
       ...wordsFromMistakes.slice(0, 5),
-      ...wordsFromPronunciation.slice(0, 5),
+      ...wordsFromPronunciation.slice(0, 6),
       ...advancedWords.slice(0, 5),
     ]),
   ).filter(Boolean) as string[];
@@ -810,19 +1190,25 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         </View>
 
         {/* Cap notification banner: pronunciation is holding score back */}
-        {sessionData?.summaryJson?.pronunciation_cefr_cap && (
+        {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
+          (data?.scores?.pronunciation != null &&
+            data?.scores?.grammar != null &&
+            data.scores.pronunciation < data.scores.grammar - 15)) && (
           <Animated.View
             entering={FadeInDown.delay(80).springify()}
             style={styles.capBanner}
           >
             <View style={styles.capBannerContent}>
               <Text style={styles.capBannerTitle}>
-                Your grammar shows {sessionData.summaryJson.pronunciation_cefr_cap === "B1" ? "B1" : "higher"} potential!
+                Pronunciation is holding back your score
               </Text>
               <Text style={styles.capBannerSubtitle}>
-                {sessionData.summaryJson.dominant_pronunciation_errors?.length
-                  ? `Focus on ${sessionData.summaryJson.dominant_pronunciation_errors.slice(0, 2).join(" and ").replace(/_/g, " ")} to reach ${sessionData.summaryJson.pronunciation_cefr_cap}.`
-                  : `Fix pronunciation patterns to reach ${sessionData.summaryJson.pronunciation_cefr_cap}.`}
+                {sessionData?.summaryJson?.dominant_pronunciation_errors?.length
+                  ? `Focus on ${sessionData.summaryJson.dominant_pronunciation_errors
+                      .slice(0, 2)
+                      .join(" and ")
+                      .replace(/_/g, " ")} to level up.`
+                  : "Your pronunciation score is significantly lower than your grammar score. Practice the highlighted words to improve."}
               </Text>
               <TouchableOpacity
                 style={styles.capBannerCta}
@@ -873,6 +1259,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                   }
                   mistakes={data.mistakes}
                   pronunciationIssues={data.pronunciationIssues}
+                  participants={sessionData?.participants}
                 />
               </ScrollView>
             </View>
@@ -951,10 +1338,24 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Text>
         </Animated.View>
 
+        {cqsData && (
+          <CallQualityScoreCard 
+            cqs={cqsData.cqs} 
+            breakdown={cqsData.breakdown} 
+          />
+        )}
+
         {/* New Score Breakdown */}
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <ScoreBreakdownCard
             scores={data.scores}
+            // When pronunciation is still processing, older pipeline used to show 50 as a sentinel.
+            // If we ever see exactly 50, treat it as "arriving" rather than a real score.
+            pronunciationProcessing={
+              data.scores.pronunciation === 50 &&
+              (data.pronunciationIssues?.length ?? 0) === 0 &&
+              pronPollCount < 18
+            }
             justifications={{
               pronunciation: data.aiFeedback?.pronunciation?.justification,
               grammar: data.aiFeedback?.grammar?.justification,
@@ -973,6 +1374,31 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             {showDetailedAnalysis ? "📊 Hide" : "📊 Show"} Detailed Analysis
           </Text>
         </TouchableOpacity>
+
+        {/* Dev-only: re-run pronunciation for past sessions */}
+        {__DEV__ && !!sessionId && sessionId !== "session-id" && (
+          <TouchableOpacity
+            style={[styles.detailToggle, { marginTop: 10 }]}
+            onPress={async () => {
+              try {
+                setCheckingAgain(true);
+                await sessionsApi.rerunPronunciation(sessionId);
+                // force refresh
+                const fresh = await sessionsApi.getSessionAnalysis(sessionId);
+                setSessionData(fresh);
+                setPronPollCount(0);
+              } catch (e) {
+                console.warn("rerunPronunciation failed", e);
+              } finally {
+                setCheckingAgain(false);
+              }
+            }}
+          >
+            <Text style={styles.detailToggleText}>
+              {checkingAgain ? "⏳ Re-running pronunciation..." : "🔁 Re-run pronunciation (dev)"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {showDetailedAnalysis && (
           <Animated.View entering={FadeInDown.delay(350).springify()}>
@@ -1015,127 +1441,46 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
-        {/* Words to work on (pronunciation) – so user knows which words drove the score */}
-        {(data.pronunciationIssues?.length > 0 ||
-          (data.pronunciationFlagged?.length ?? 0) > 0 ||
-          data.dominantPronunciationErrors?.length > 0) && (
-          <Animated.View entering={FadeInDown.delay(400).springify()}>
-            <Text style={styles.sectionTitle}>Words to work on</Text>
-            <Text style={styles.wordsToWorkOnSubtitle}>
-              These words affected your pronunciation score. Practice saying them clearly.
-            </Text>
-            <View style={styles.glassCard}>
-              {data.pronunciationIssues?.length > 0 &&
-                data.pronunciationIssues.map((issue: any, i: number) => {
-                  const parsed = parsePronunciationIssue(issue);
-                  const severityColor =
-                    issue.severity === "high"
-                      ? "#ef4444"
-                      : issue.severity === "medium"
-                        ? "#f59e0b"
-                        : "#22c55e";
-                  const accuracyPct = issue.confidence != null ? Math.round(issue.confidence) : null;
-                  return (
-                    <View key={issue.id || i} style={styles.pronunciationIssueRow}>
-                      <View style={styles.pronunciationIssueHeader}>
-                        <View style={styles.pronunciationIssueWord}>
-                          <Text style={styles.pronunciationIssueWordText}>
-                            {parsed.correctWord}
-                          </Text>
-                          {parsed.spokenWord !== parsed.correctWord && (
-                            <Text style={styles.phoneticText}>
-                              You said: "{parsed.spokenWord}"
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.pronunciationIssueBadgeRow}>
-                          <View
-                            style={[
-                              styles.severityBadge,
-                              { backgroundColor: severityColor + "18" },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.severityBadgeText,
-                                { color: severityColor },
-                              ]}
-                            >
-                              {parsed.categoryLabel}
-                            </Text>
-                          </View>
-                          {accuracyPct != null && (
-                            <Text style={[styles.accuracyText, { color: severityColor }]}>
-                              {accuracyPct}%
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                      {issue.suggestion && (
-                        <Text style={styles.pronunciationIssueSuggestion}>
-                          {issue.suggestion}
-                        </Text>
-                      )}
-                    </View>
-                  );
-                })}
-              {(data.pronunciationFlagged?.length ?? 0) > 0 &&
-                data.pronunciationIssues?.length === 0 &&
-                (data.pronunciationFlagged ?? []).map((item: any, i: number) => (
-                  <View key={i} style={styles.pronunciationIssueRow}>
-                    <Text style={styles.pronunciationIssueWordText}>
-                      {item.word ?? item.phoneme ?? "—"}
-                    </Text>
-                    {item.error_type && (
-                      <Text style={styles.pronunciationIssueSuggestion}>{item.error_type}</Text>
-                    )}
-                  </View>
-                ))}
-              {data.dominantPronunciationErrors?.length > 0 && (
-                <View style={styles.dominantErrorsWrap}>
-                  <Text style={styles.dominantErrorsLabel}>Focus areas:</Text>
-                  <Text style={styles.dominantErrorsText}>
-                    {data.dominantPronunciationErrors
-                      .map((e: string) => e.replace(/_/g, " "))
-                      .join(" • ")}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        )}
+        {/* Pronunciation 3-tab component (replaces Words + Accent sections). */}
+        {(() => {
+          const rawIssues = data.pronunciationIssues || [];
+          const normalized: PronIssueNormalized[] = rawIssues.map((it: any, idx: number) => {
+            const parsed = parsePronunciationIssue(it);
+            return {
+              id: String(it.id ?? `${idx}`),
+              correct: (it.correct ?? parsed.correctWord ?? it.word ?? "").trim() || "—",
+              spoken: (it.spoken ?? parsed.spokenWord ?? it.word ?? "").trim() || "—",
+              rule_category: (it.rule_category ?? it.issueType ?? "").trim() || "general_mispronunciation",
+              confidence: it.confidence != null ? Number(it.confidence) : undefined,
+              word_index: typeof it.word_index === "number" ? it.word_index : undefined,
+              suggestion: it.suggestion,
+            };
+          });
 
-        {/* Accent & Pronunciation Analysis */}
-        {(data.accentNotes || data.pronunciationTip) && (
-          <Animated.View entering={FadeInDown.delay(750).springify()}>
-            <Text style={styles.sectionTitle}>Accent & Pronunciation</Text>
-            <View style={styles.glassCard}>
-              <View style={styles.accentHeader}>
-                <View style={styles.accentIconContainer}>
-                  <Ionicons
-                    name="globe-outline"
-                    size={20}
-                    color={theme.colors.primary}
-                  />
-                </View>
-                <Text style={styles.accentTitle}>Accent Analysis</Text>
-              </View>
-              {data.accentNotes && (
-                <Text style={styles.accentText}>{data.accentNotes}</Text>
-              )}
-              {data.pronunciationTip && (
-                <View style={styles.tipRow}>
-                  <Ionicons
-                    name="bulb-outline"
-                    size={14}
-                    color={theme.colors.warning}
-                  />
-                  <Text style={styles.tipText}>{data.pronunciationTip}</Text>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        )}
+          // While the pipeline is still finishing, show the tabs with zero issues and transcript.
+          const shouldShow =
+            normalized.length > 0 ||
+            (!!sessionData?.analyses?.length && pronPollCount < 18) ||
+            !!(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript);
+          if (!shouldShow) return null;
+
+          return (
+            <PronunciationTabs
+              issues={normalized}
+              transcript={
+                sessionData?.feedback?.transcript ??
+                sessionData?.summaryJson?.transcript ??
+                ""
+              }
+              onPractice={(ruleCategory) =>
+                navigation
+                  .getParent()
+                  ?.navigate("MainTabs", { screen: "eBites", params: { ruleCategory } })
+              }
+              enteringDelay={400}
+            />
+          );
+        })()}
 
         {/* Strengths & Areas to Improve */}
         {(data.strengths.length > 0 || data.improvementAreas.length > 0) && (
@@ -1808,6 +2153,230 @@ const getStyles = (theme: any) =>
       color: theme.colors.text.secondary,
       lineHeight: 18,
     },
+    // Pronunciation tabs
+    pronTabsBar: {
+      marginHorizontal: theme.spacing.l,
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: theme.spacing.s,
+    },
+    pronTabPill: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    pronTabPillActive: {
+      backgroundColor: theme.colors.info + "10",
+      borderColor: theme.colors.info + "40",
+    },
+    pronTabPillInactive: {
+      backgroundColor: "transparent",
+      borderColor: "rgba(15, 23, 42, 0.10)",
+    },
+    pronTabText: {
+      fontSize: theme.typography.sizes.xs,
+      fontWeight: "700",
+    },
+    pronTabTextActive: {
+      color: theme.colors.info,
+    },
+    pronTabTextInactive: {
+      color: theme.colors.text.secondary,
+    },
+    pronTabsBody: {
+      marginHorizontal: theme.spacing.l,
+      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      borderRadius: 16,
+      padding: theme.spacing.m,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.6)",
+      ...theme.shadows.medium,
+      marginBottom: theme.spacing.m,
+    },
+    pronIssueCard: {
+      backgroundColor: "#fff",
+      borderRadius: 14,
+      borderWidth: 0.5,
+      borderColor: "rgba(15, 23, 42, 0.12)",
+      overflow: "hidden",
+    },
+    pronIssueTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 12,
+    },
+    pronIssueAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      borderWidth: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pronIssueAvatarText: {
+      fontSize: 12,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+    },
+    pronIssueWordRow: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    pronIssueCorrect: {
+      color: theme.colors.text.primary,
+    },
+    pronIssueArrow: {
+      color: theme.colors.text.secondary,
+    },
+    pronIssueSpoken: {
+      fontWeight: "800",
+    },
+    pronIssueMeta: {
+      marginTop: 2,
+      fontSize: 12,
+      color: theme.colors.text.secondary,
+    },
+    pronIssueExpanded: {
+      paddingHorizontal: 12,
+      paddingBottom: 12,
+      gap: 10,
+    },
+    pronIssueFix: {
+      fontSize: 13,
+      color: theme.colors.text.secondary,
+      lineHeight: 18,
+    },
+    pronPracticeBtn: {
+      alignSelf: "flex-start",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+    },
+    pronPracticeBtnText: {
+      color: "#fff",
+      fontSize: 13,
+      fontWeight: "800",
+    },
+    pronTranscriptWrap: {
+      backgroundColor: "rgba(255,255,255,0.6)",
+      borderRadius: 14,
+      padding: 12,
+    },
+    pronTranscriptText: {
+      fontSize: 14,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+    },
+    pronChip: {
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+    },
+    pronLegend: {
+      fontSize: 12,
+      color: theme.colors.text.secondary,
+    },
+    pronLegendDot: {
+      fontSize: 12,
+    },
+    pronPatternRow: {
+      backgroundColor: "#fff",
+      borderRadius: 14,
+      borderWidth: 0.5,
+      borderColor: "rgba(15, 23, 42, 0.12)",
+      padding: 12,
+      gap: 8,
+    },
+    pronPatternTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.colors.text.primary,
+    },
+    pronPatternCount: {
+      color: theme.colors.text.secondary,
+      fontWeight: "700",
+    },
+    pronPatternBarBg: {
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: "rgba(15, 23, 42, 0.08)",
+      overflow: "hidden",
+    },
+    pronPatternBarFill: {
+      height: "100%",
+      borderRadius: 999,
+    },
+    pronSeverityPill: {
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+    },
+    pronSeverityText: {
+      fontSize: 11,
+      fontWeight: "800",
+    },
+    pronPlanBtn: {
+      marginTop: theme.spacing.s,
+      paddingVertical: 12,
+      borderRadius: 14,
+      alignItems: "center",
+    },
+    pronPlanBtnText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "800",
+    },
+    emptyTabText: {
+      fontSize: 13,
+      color: theme.colors.text.secondary,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.35)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    modalCard: {
+      width: "100%",
+      maxWidth: 420,
+      backgroundColor: "#fff",
+      borderRadius: 18,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: "rgba(15, 23, 42, 0.10)",
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: "900",
+      color: theme.colors.text.primary,
+      marginBottom: 6,
+    },
+    modalSub: {
+      fontSize: 13,
+      color: theme.colors.text.secondary,
+      marginBottom: 10,
+    },
+    modalFix: {
+      fontSize: 13,
+      color: theme.colors.text.secondary,
+      lineHeight: 18,
+      marginBottom: 12,
+    },
+    modalBtn: {
+      paddingVertical: 12,
+      borderRadius: 14,
+      alignItems: "center",
+    },
+    modalBtnText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "900",
+    },
     // Strengths & Improvements
     strengthsRow: {
       paddingHorizontal: theme.spacing.l,
@@ -1870,11 +2439,6 @@ const getStyles = (theme: any) =>
       fontSize: 11,
       fontWeight: "600",
       color: theme.colors.primary,
-    },
-    severityBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: theme.borderRadius.circle,
     },
     severityText: {
       fontSize: 11,

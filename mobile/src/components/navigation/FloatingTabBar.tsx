@@ -109,22 +109,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    marginBottom: 24,
-    marginHorizontal: 20,
+    marginBottom: 24, // Increased for spacing
+    marginHorizontal: 0,
     alignItems: 'center',
   },
   pill: {
     flexDirection: 'row',
     height: 64,
-    borderRadius: 40,
+    borderRadius: 24,
     paddingHorizontal: 16,
+    marginHorizontal: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(15,15,25,0.9)',
-    overflow: 'visible',
+    backgroundColor: 'rgba(15,15,25,0.95)', // Slightly more opaque
+    overflow: 'visible', // CRITICAL: to show floating button
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
+    width: width - 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
@@ -145,17 +146,18 @@ const styles = StyleSheet.create({
   callTabContainer: {
     marginTop: -40,
     zIndex: 10,
+    marginBottom: 10, // Add spacing to prevent bottom cropping
   },
   callGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 68, // Slightly larger
+    height: 68,
+    borderRadius: 34,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: tokensV2.colors.primaryViolet,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 12,
   },
 });

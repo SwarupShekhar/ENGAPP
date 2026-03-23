@@ -16,6 +16,7 @@ out/
 .vscode/
 *.swp
 *.swo
+*.md
 
 # Environment Variables
 .env

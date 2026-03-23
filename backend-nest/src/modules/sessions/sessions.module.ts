@@ -11,6 +11,7 @@ import { ReliabilityModule } from '../reliability/reliability.module';
 import { HomeModule } from '../home/home.module';
 import { BrainModule } from '../brain/brain.module';
 import { PronunciationModule } from '../pronunciation/pronunciation.module';
+import { LivekitModule } from '../livekit/livekit.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PronunciationModule } from '../pronunciation/pronunciation.module';
     HomeModule,
     BrainModule,
     PronunciationModule,
+    forwardRef(() => LivekitModule),
   ],
   controllers: [SessionsController],
   providers: [SessionsService, SessionsProcessor],

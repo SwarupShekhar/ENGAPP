@@ -86,9 +86,12 @@ def _run_continuous_pa_sync(
         granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
         enable_miscue=True,
     )
+    pa_config.enable_prosody_assessment = True
     pa_config.apply_to(recognizer)
 
     all_words: list[dict] = []
+    fluency_scores: list[float] = []
+    prosody_scores: list[float] = []
     done = threading.Event()
     errors: list[str] = []
 
@@ -100,9 +103,21 @@ def _run_continuous_pa_sync(
             data = _json.loads(detail_str)
             nbests = data.get("NBest") or data.get("nbest") or []
             if nbests:
-                segment_words = nbests[0].get("Words") or nbests[0].get("words") or []
+                first = nbests[0]
+                segment_words = first.get("Words") or first.get("words") or []
                 all_words.extend(segment_words)
-                logger.info("PA segment: %d words (total so far: %d)", len(segment_words), len(all_words))
+                # Capture fluency and prosody scores from the segment
+                pa_info = first.get("PronunciationAssessment") or data.get("PronunciationAssessment") or {}
+                if "FluencyScore" in pa_info:
+                    fluency_scores.append(float(pa_info["FluencyScore"]))
+                if "ProsodyScore" in pa_info:
+                    prosody_scores.append(float(pa_info["ProsodyScore"]))
+                logger.info(
+                    "PA segment: %d words (total: %d), fluency=%s, prosody=%s",
+                    len(segment_words), len(all_words),
+                    pa_info.get("FluencyScore", "N/A"),
+                    pa_info.get("ProsodyScore", "N/A"),
+                )
         except Exception as e:
             logger.warning("PA on_recognized parse error: %s", e)
 
@@ -125,7 +140,10 @@ def _run_continuous_pa_sync(
     if errors:
         logger.error("PA continuous recognition errors: %s", errors)
 
-    return all_words
+    avg_fluency = sum(fluency_scores) / len(fluency_scores) if fluency_scores else None
+    avg_prosody = sum(prosody_scores) / len(prosody_scores) if prosody_scores else None
+
+    return all_words, avg_fluency, avg_prosody
 
 
 async def _run_azure_pronunciation_assessment(
@@ -153,7 +171,9 @@ async def _run_azure_pronunciation_assessment(
     ref = (reference_text or "").strip() or "hello"
 
     try:
-        all_words = await asyncio.to_thread(_run_continuous_pa_sync, audio_path, ref)
+        all_words, avg_fluency, avg_prosody = await asyncio.to_thread(
+            _run_continuous_pa_sync, audio_path, ref
+        )
     except Exception as e:
         logger.warning("Azure PA continuous failed: %s", e)
         return {"Words": [], "error": str(e), "fallback": False}
@@ -162,8 +182,21 @@ async def _run_azure_pronunciation_assessment(
         logger.error("Azure PA returned 0 words for audio %s (ref len=%d)", audio_path, len(ref))
         return {"Words": [], "error": "No words recognized by Azure PA", "fallback": False}
 
-    logger.info("Azure PA assessed %d words total", len(all_words))
-    return {"Nbests": [{"Words": all_words}], "Words": all_words}
+    logger.info(
+        "Azure PA assessed %d words total, fluency=%.1f, prosody=%s",
+        len(all_words),
+        avg_fluency if avg_fluency is not None else -1,
+        f"{avg_prosody:.1f}" if avg_prosody is not None else "N/A",
+    )
+    result: dict[str, Any] = {
+        "Nbests": [{"Words": all_words}],
+        "Words": all_words,
+    }
+    if avg_fluency is not None:
+        result["fluency_score"] = avg_fluency
+    if avg_prosody is not None:
+        result["prosody_score"] = avg_prosody
+    return result
 
 
 @router.post("/assess")
@@ -210,7 +243,11 @@ async def assess_pronunciation(
         raw = data.get("azure_result") or data
         errors = detect_from_azure_result(raw)
         azure_avg = _compute_word_accuracy_average(raw)
-        score_result = calculate_pronunciation_score(errors, azure_avg)
+        fluency = raw.get("fluency_score")
+        prosody = raw.get("prosody_score")
+        score_result = calculate_pronunciation_score(
+            errors, azure_avg, fluency_score=fluency, prosody_score=prosody,
+        )
         return {"flagged_errors": errors, "pronunciation_score": score_result}
 
     MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024
@@ -317,7 +354,14 @@ async def assess_pronunciation(
             detector_reference = pass_1_transcript
             errors = detect_from_azure_result(pass_2_result, reference_text=detector_reference)
             azure_avg = _compute_word_accuracy_average(pass_2_result)
-            score_result = calculate_pronunciation_score(errors, azure_avg)
+            fluency = pass_2_result.get("fluency_score")
+            prosody = pass_2_result.get("prosody_score")
+            score_result = calculate_pronunciation_score(
+                errors,
+                azure_avg,
+                fluency_score=fluency,
+                prosody_score=prosody,
+            )
             return {
                 "flagged_errors": errors,
                 "pronunciation_score": score_result,

@@ -325,6 +325,46 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
     }
   }
 
+  /**
+   * Post-call authoritative scoring (CQS).
+   */
+  async computeCQS(body: {
+    user_turns: string[];
+    full_transcript: string;
+    azure_results: any[];
+    call_duration_seconds: number;
+    user_spoke_seconds: number;
+  }): Promise<any> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${this.aiEngineUrl}/api/scoring/cqs`, body, {
+          timeout: 15000,
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('BrainService computeCQS error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Real-time lightweight preview status.
+   */
+  async computePreview(userTurnsSoFar: string[]): Promise<any> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${this.aiEngineUrl}/api/scoring/preview`, {
+          user_turns_so_far: userTurnsSoFar,
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('BrainService computePreview error:', error);
+      return { status: 'neutral', signal: 0, hint: 'Calculation paused' };
+    }
+  }
+
   async analyzeJoint(sessionId: string, segments: any[]) {
     try {
       const response = await lastValueFrom(

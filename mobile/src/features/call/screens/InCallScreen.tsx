@@ -44,6 +44,7 @@ import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from "expo-speech-recognition";
+import { getCallPreview, PreviewData } from "../../../api/scoring";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // In a real app, these would come from environment variables
@@ -354,6 +355,40 @@ function ControlButton({
   );
 }
 
+// ─── Call Quality Pill ────────────────────────────────────
+function CallQualityPill({ data }: { data: PreviewData | null }) {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
+
+  if (!data || data.status === 'neutral') return null;
+
+  const config = {
+    strong: { color: theme.colors.success, icon: 'flash', label: 'Strong' },
+    good: { color: theme.colors.primary, icon: 'checkmark-circle', label: 'Good' },
+    needs_work: { color: theme.colors.warning, icon: 'trending-down', label: 'Needs work' },
+  }[data.status] || { color: theme.colors.text.secondary, icon: 'pulse', label: 'Analyzing' };
+
+  return (
+    <Animated.View 
+      entering={FadeIn.duration(400)}
+      style={[styles.qualityPill, { borderColor: config.color + '40' }]}
+    >
+      <LinearGradient
+        colors={[config.color + '15', config.color + '05']}
+        style={styles.qualityPillGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+      >
+        <Ionicons name={config.icon as any} size={14} color={config.color} />
+        <View style={styles.qualityTextCol}>
+          <Text style={[styles.qualityLabel, { color: config.color }]}>{config.label}</Text>
+          {data.hint ? <Text style={styles.qualityHint} numberOfLines={1}>{data.hint}</Text> : null}
+        </View>
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────
 export default function InCallScreen({ navigation, route }: any) {
   const theme = useAppTheme();
@@ -364,6 +399,7 @@ export default function InCallScreen({ navigation, route }: any) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [transcript, setTranscript] = useState<any[]>(INITIAL_TRANSCRIPT);
+  const [qualityPreview, setQualityPreview] = useState<PreviewData | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const durationRef = useRef(0);
   const transcriptRef = useRef<any[]>(INITIAL_TRANSCRIPT);
@@ -404,6 +440,24 @@ export default function InCallScreen({ navigation, route }: any) {
   const [callStatus, setCallStatus] = useState<
     "calling" | "connected" | "declined"
   >("calling");
+
+  // Real-time Quality Preview Loop
+  useEffect(() => {
+    if (callStatus !== 'connected' || hasEndedRef.current) return;
+
+    const interval = setInterval(async () => {
+      const userTurns = transcriptRef.current
+        .filter(t => t.speaker === 'user' && t.id !== 'pending-local')
+        .map(t => t.text);
+      
+      if (userTurns.length >= 2) {
+        const preview = await getCallPreview(userTurns);
+        setQualityPreview(preview);
+      }
+    }, 12000); // Check every 12 seconds
+
+    return () => clearInterval(interval);
+  }, [callStatus]);
 
   const [transcriptionStatus, setTranscriptionStatus] = useState<
     "idle" | "active" | "error" | "unavailable" | "muted"
@@ -1715,5 +1769,33 @@ const getStyles = (theme: any) =>
       fontWeight: "600",
       textTransform: "uppercase",
       letterSpacing: 0.5,
+    },
+    qualityPill: {
+      marginTop: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      overflow: 'hidden',
+      maxWidth: 160,
+    },
+    qualityPillGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      gap: 8,
+    },
+    qualityTextCol: {
+      flex: 1,
+    },
+    qualityLabel: {
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    },
+    qualityHint: {
+      fontSize: 10,
+      color: theme.colors.text.secondary,
+      fontWeight: '500',
     },
   });
