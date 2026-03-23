@@ -21,6 +21,8 @@ numpy>=1.26.0
 # ML/NLP
 nltk>=3.8.1
 lexical-diversity>=0.1.1
+pronouncing>=0.2.0
+editdistance>=0.8.1
 
 # Database
 asyncpg>=0.29.0
@@ -53,3 +55,8 @@ pytest-asyncio>=0.23.4
 # LiveKit Agents
 livekit-agents>=0.8.0
 livekit-plugins-azure>=0.5.0
+
+# NLP / Scoring
+spacy>=3.7.2
+wordfreq>=3.1.1
+cefr-level>=0.1.0

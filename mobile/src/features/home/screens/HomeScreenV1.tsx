@@ -106,13 +106,17 @@ const ScaleButton = ({
   onPress, 
   style, 
   accessibilityLabel, 
-  accessibilityRole = "button" 
+  accessibilityRole = "button",
+  hitSlop,
+  testID,
 }: { 
   children: React.ReactNode; 
   onPress?: () => void; 
   style?: any;
   accessibilityLabel?: string;
   accessibilityRole?: "button" | "header" | "link" | "menuitem" | "none";
+  hitSlop?: { top?: number; right?: number; bottom?: number; left?: number };
+  testID?: string;
 }) => {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -135,6 +139,8 @@ const ScaleButton = ({
       style={[style, animatedStyle]}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
+      hitSlop={hitSlop}
+      testID={testID}
     >
       {children}
     </AnimatedTouchableOpacity>
@@ -287,6 +293,27 @@ export default function HomeScreen() {
   const HERO_HEIGHT = 210;
   const BANNER_HEIGHT = 310 + insets.top;
   const SCROLL_THRESHOLD = 150;
+
+  const safeNavigate = useCallback(
+    (routeName: string, params?: any) => {
+      try {
+        if (__DEV__) {
+          const state = typeof navigation?.getState === "function" ? navigation.getState() : undefined;
+          console.log("[HomeScreenV1] navigate ->", routeName, { params, state });
+        }
+
+        if (typeof navigation?.navigate !== "function") {
+          console.error("[HomeScreenV1] navigation.navigate is not a function", navigation);
+          return;
+        }
+
+        navigation.navigate(routeName, params);
+      } catch (error: any) {
+        console.error("[HomeScreenV1] Navigation error:", error);
+      }
+    },
+    [navigation]
+  );
 
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
@@ -522,14 +549,18 @@ export default function HomeScreen() {
                   </View>
                 )}<ScaleButton
                   style={styles.notifBtn}
-                  onPress={() => { navigation.navigate("Conversations"); }}
+                  onPress={() => safeNavigate("Conversations")}
+                  hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                   accessibilityLabel="Open Chat"
+                  testID="home_header_chat_btn"
                 ><Ionicons name="chatbox-ellipses-outline" size={22} color="white" />{unreadCount > 0 && (
                     <View style={styles.badge} accessibilityLabel={`${unreadCount} unread messages`}><Text style={styles.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text></View>
                   )}</ScaleButton><ScaleButton
                   style={styles.notifBtn}
-                  onPress={() => { navigation.navigate("Notifications"); }}
+                  onPress={() => safeNavigate("Notifications")}
+                  hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                   accessibilityLabel="Open Notifications"
+                  testID="home_header_notifications_btn"
                 ><Ionicons name="notifications-outline" size={22} color="white" />{notifCount > 0 && (
                     <View style={styles.badge} accessibilityLabel={`${notifCount} new notifications`}><Text style={styles.badgeText}>{notifCount > 9 ? "9+" : notifCount}</Text></View>
                   )}</ScaleButton></View>

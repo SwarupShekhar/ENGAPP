@@ -1,5 +1,7 @@
 # EngR App - System Architecture & Context Report
 
+> **Structured architecture pack (ERD + API contracts):** see [`docs/architecture/`](docs/architecture/README.md) — [`SYSTEM-ARCHITECTURE-AND-API.md`](docs/architecture/SYSTEM-ARCHITECTURE-AND-API.md) and [`DATA-SCHEMA-AND-ERD.md`](docs/architecture/DATA-SCHEMA-AND-ERD.md).
+
 This document serves as a comprehensive overview of the EngR App ecosystem, detailing the architecture, components, and system designs for key features like Call Analysis, the AI Tutor, and the personalized eBites Reel Engine. This context is intended for LLMs and IDEs to understand the broader system design when generating or refactoring code.
 
 ---

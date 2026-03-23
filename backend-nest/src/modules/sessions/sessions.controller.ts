@@ -39,6 +39,13 @@ export class SessionsController {
         });
     }
 
+    @Post(':id/pronunciation/rerun')
+    @UseGuards(ClerkGuard)
+    async rerunPronunciation(@Param('id') sessionId: string, @Request() req) {
+        // Dev/admin convenience: only allow participants to trigger rerun.
+        return this.sessionsService.rerunPronunciationForSession(sessionId, req.user.id);
+    }
+
     @Post(':id/end')
     @UseGuards(ClerkGuard)
     async end(

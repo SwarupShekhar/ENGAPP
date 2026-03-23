@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 import { useAppTheme } from "../../../theme/useAppTheme";
 
 interface ScoreBreakdownCardProps {
@@ -9,6 +10,8 @@ interface ScoreBreakdownCardProps {
     vocabulary: number;
     fluency: number;
   };
+  /** Treat pronunciation=50 as "processing" sentinel and show spinner */
+  pronunciationProcessing?: boolean;
   justifications?: {
     pronunciation?: string;
     grammar?: string;
@@ -19,10 +22,56 @@ interface ScoreBreakdownCardProps {
 
 export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
   scores,
+  pronunciationProcessing,
   justifications,
 }) => {
   const theme = useAppTheme();
   const styles = getStyles(theme);
+
+  const PronunciationRing = ({ value }: { value: number }) => {
+    const size = 34;
+    const stroke = 4;
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const pct = Math.max(0, Math.min(100, value));
+    const dash = (pct / 100) * c;
+    const gap = c - dash;
+    const color =
+      value < 50 ? "#ef4444" : value < 75 ? "#f59e0b" : "#22c55e";
+    const showEllipsis = value === 50.0;
+    return (
+      <View style={styles.ringWrap}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={"rgba(15, 23, 42, 0.12)"}
+            strokeWidth={stroke}
+            fill="transparent"
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={color}
+            strokeWidth={stroke}
+            fill="transparent"
+            strokeDasharray={`${dash} ${gap}`}
+            strokeLinecap="round"
+            rotation="-90"
+            originX={size / 2}
+            originY={size / 2}
+          />
+        </Svg>
+        <View style={styles.ringLabel}>
+          <Text style={[styles.ringText, { color }]}>
+            {showEllipsis ? "..." : Math.round(value)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   const metrics = [
     {
@@ -75,9 +124,22 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
           <View style={styles.metricRow}>
             <Text style={styles.metricLabel}>{metric.label}</Text>
             <View style={styles.scoreContainer}>
-              <Text style={[styles.score, { color: metric.color }]}>
-                {metric.score}/100
-              </Text>
+              {metric.key === "pronunciation" ? (
+                pronunciationProcessing ? (
+                  <View style={styles.processingRow}>
+                    <ActivityIndicator size="small" color={metric.color} />
+                    <Text style={[styles.processingText, { color: metric.color }]}>
+                      Processing…
+                    </Text>
+                  </View>
+                ) : (
+                  <PronunciationRing value={metric.score} />
+                )
+              ) : (
+                <Text style={[styles.score, { color: metric.color }]}>
+                  {metric.score}/100
+                </Text>
+              )}
             </View>
           </View>
 
@@ -147,6 +209,34 @@ const getStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
+    },
+    processingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    processingText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+    },
+    ringWrap: {
+      width: 34,
+      height: 34,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    ringLabel: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    ringText: {
+      fontSize: 11,
+      fontWeight: "800",
     },
     score: {
       fontSize: theme.typography.sizes.m,

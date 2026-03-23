@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { IntegrationsModule } from '../../integrations/integrations.module';
 import { SessionsModule } from '../sessions/sessions.module';
@@ -12,16 +12,18 @@ import { TranscriptionService } from './transcription.service';
 import { LiveKitWebhookController } from './livekit-webhook.controller';
 import { BrainModule } from '../brain/brain.module';
 import { PronunciationModule } from '../pronunciation/pronunciation.module';
+import { ScoringModule } from '../scoring/scoring.module';
 
 @Module({
   imports: [
     ConfigModule,
     IntegrationsModule,
-    SessionsModule,
+    forwardRef(() => SessionsModule),
     AzureModule,
     PrismaModule,
     BrainModule,
     PronunciationModule,
+    ScoringModule,
   ],
   controllers: [LivekitController, LiveKitWebhookController],
   providers: [

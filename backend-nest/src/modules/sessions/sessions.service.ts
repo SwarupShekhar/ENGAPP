@@ -4,6 +4,8 @@ import { Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { ReliabilityService } from '../reliability/reliability.service';
+import { TranscriptionService } from '../livekit/transcription.service';
+import { PronunciationService, FlaggedPronunciationError } from '../pronunciation/pronunciation.service';
 
 @Injectable()
 export class SessionsService {
@@ -14,7 +16,118 @@ export class SessionsService {
     private azureStorage: AzureStorageService,
     private reliabilityService: ReliabilityService,
     @InjectQueue('sessions') private sessionsQueue: Queue,
+    private readonly transcription: TranscriptionService,
+    private readonly pronunciationService: PronunciationService,
   ) {}
+
+  async rerunPronunciationForSession(sessionId: string, requesterUserId: string) {
+    const session = await this.prisma.conversationSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        participants: true,
+      },
+    });
+    if (!session) {
+      throw new BadRequestException('Session not found');
+    }
+
+    const isParticipant = session.participants.some((p) => p.userId === requesterUserId);
+    if (!isParticipant) {
+      throw new BadRequestException('Not a participant in this session');
+    }
+
+    const results: any[] = [];
+    for (const p of session.participants as any[]) {
+      const recordingUrl = p.participantRecordingUrl as string | null;
+      if (!recordingUrl || !recordingUrl.startsWith('http')) {
+        results.push({ userId: p.userId, ok: false, reason: 'no_recording_url' });
+        continue;
+      }
+
+      try {
+        const transcript = await this.transcription.transcribeFromUrl(recordingUrl, {
+          userId: p.userId,
+          sessionId,
+          language: 'en-US',
+        });
+        if (!transcript?.trim()) {
+          results.push({ userId: p.userId, ok: false, reason: 'empty_transcript' });
+          continue;
+        }
+
+        const { flagged_errors, pronunciation_score } =
+          await this.pronunciationService.assessFromRecordingUrl(
+            p.userId,
+            recordingUrl,
+            transcript.trim(),
+          );
+
+        // Find or create Analysis row for this participant in this session
+        let analysis = await this.prisma.analysis.findFirst({
+          where: { sessionId, participant: { userId: p.userId } },
+          select: { id: true, scores: true },
+        });
+        if (!analysis) {
+          analysis = await this.prisma.analysis.create({
+            data: {
+              sessionId,
+              participantId: p.id,
+              cefrLevel: 'B1',
+              scores: { overall: 0, grammar: 0, vocabulary: 0, fluency: 0, pronunciation: 0 } as any,
+              rawData: {} as any,
+            } as any,
+            select: { id: true, scores: true },
+          });
+        }
+
+        // Replace pronunciation issues for this analysis
+        await this.prisma.pronunciationIssue.deleteMany({ where: { analysisId: analysis.id } });
+        if (Array.isArray(flagged_errors) && flagged_errors.length > 0) {
+          await this.prisma.pronunciationIssue.createMany({
+            data: (flagged_errors as FlaggedPronunciationError[]).map((err) => ({
+              analysisId: analysis!.id,
+              word: err.spoken,
+              issueType: err.rule_category,
+              severity:
+                err.confidence < 40
+                  ? 'high'
+                  : err.confidence < 65
+                    ? 'medium'
+                    : 'low',
+              confidence: err.confidence,
+              suggestion: `Practice ${err.correct}`,
+            })),
+          });
+        }
+
+        if (pronunciation_score?.score != null) {
+          const existingScores = (analysis.scores as Record<string, number>) || {};
+          await this.prisma.analysis.update({
+            where: { id: analysis.id },
+            data: {
+              scores: {
+                ...existingScores,
+                pronunciation: pronunciation_score.score,
+                pronunciation_score: pronunciation_score.score,
+              } as any,
+            },
+          });
+        }
+
+        results.push({
+          userId: p.userId,
+          ok: true,
+          issues: flagged_errors?.length ?? 0,
+          score: pronunciation_score?.score ?? null,
+        });
+      } catch (e: any) {
+        this.logger.warn(`rerunPronunciation failed userId=${p.userId}: ${e?.message ?? e}`);
+        results.push({ userId: p.userId, ok: false, reason: e?.message ?? 'error' });
+      }
+    }
+
+    return { ok: true, sessionId, results };
+  }
 
   async getSessionAnalysis(
     sessionId: string,
