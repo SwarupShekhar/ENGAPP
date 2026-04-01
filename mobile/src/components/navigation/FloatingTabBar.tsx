@@ -2,9 +2,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import { tokensV2 } from '../../theme/tokensV2';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tokensV2_603010 as tokensV2 } from '../../theme/tokensV2_603010';
 
 const { width } = Dimensions.get('window');
 
@@ -12,31 +13,52 @@ const TabIcon = ({ name, color, size = 24 }: { name: string; color: string; size
   return <Ionicons name={name as any} size={size} color={color} />;
 };
 
-export default function FloatingTabBar({ state, descriptors, navigation }: any) {
+const ENGLIVO_ACTIVE = '#E8A020';
+const ENGLIVO_MUTED = '#8B9AB0';
+
+export default function FloatingTabBar({
+  state,
+  descriptors,
+  navigation,
+  englivo,
+}: any) {
+  const insets = useSafeAreaInsets();
   const orderedRoutes = React.useMemo(() => {
-    const orderMap: Record<string, number> = {
-      Home: 0,
-      Feedback: 1,
-      Call: 2,
-      eBites: 3,
-      Progress: 4,
-    };
+    const orderMap: Record<string, number> = englivo
+      ? { Home: 0, Sessions: 1, Progress: 2, Profile: 3 }
+      : {
+          Home: 0,
+          Feedback: 1,
+          Call: 2,
+          eBites: 3,
+          Progress: 4,
+        };
     return [...state.routes].sort(
       (a, b) => (orderMap[a.name] ?? 99) - (orderMap[b.name] ?? 99),
     );
-  }, [state.routes]);
+  }, [state.routes, englivo]);
 
   return (
-    <View style={styles.container}>
-      <BlurView intensity={40} tint="dark" style={styles.pill}>
+    <View style={[styles.container, { bottom: Math.max(insets.bottom, 10) }]}>
+      <BlurView
+        intensity={40}
+        tint="dark"
+        style={[styles.pill, englivo && styles.pillEnglivo]}
+      >
         {orderedRoutes.map((route: any) => {
           const { options } = descriptors[route.key];
-          const label =
+          // Some navigators expose tabBarLabel as a function/component.
+          // Ensure we only render plain text labels inside <Text>.
+          const rawLabel =
             options.tabBarLabel !== undefined
               ? options.tabBarLabel
               : options.title !== undefined
               ? options.title
               : route.name;
+          const label =
+            typeof rawLabel === 'string' || typeof rawLabel === 'number'
+              ? String(rawLabel)
+              : String(route.name);
 
           const isFocused = state.routes[state.index]?.key === route.key;
 
@@ -52,7 +74,7 @@ export default function FloatingTabBar({ state, descriptors, navigation }: any) 
             }
           };
 
-          if (route.name === 'Call') {
+          if (route.name === 'Call' && !englivo) {
             return (
               <TouchableOpacity
                 key={route.key}
@@ -77,9 +99,21 @@ export default function FloatingTabBar({ state, descriptors, navigation }: any) 
 
           let iconName = 'home-outline';
           if (route.name === 'Home') iconName = isFocused ? 'home' : 'home-outline';
-          if (route.name === 'Feedback') iconName = isFocused ? 'chatbubbles' : 'chatbubbles-outline';
-          if (route.name === 'eBites') iconName = isFocused ? 'play-circle' : 'play-circle-outline';
-          if (route.name === 'Progress') iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
+          if (route.name === 'Sessions')
+            iconName = isFocused ? 'calendar' : 'calendar-outline';
+          if (!englivo && route.name === 'Feedback')
+            iconName = isFocused ? 'chatbubbles' : 'chatbubbles-outline';
+          if (!englivo && route.name === 'eBites')
+            iconName = isFocused ? 'play-circle' : 'play-circle-outline';
+          if (route.name === 'BookTutor')
+            iconName = isFocused ? 'school' : 'school-outline';
+          if (route.name === 'Progress')
+            iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
+          if (route.name === 'Profile')
+            iconName = isFocused ? 'person' : 'person-outline';
+
+          const activeColor = englivo ? ENGLIVO_ACTIVE : tokensV2.colors.primaryViolet;
+          const mutedColor = englivo ? ENGLIVO_MUTED : tokensV2.colors.textMuted;
 
           return (
             <TouchableOpacity
@@ -90,10 +124,12 @@ export default function FloatingTabBar({ state, descriptors, navigation }: any) 
             >
               <TabIcon
                 name={iconName}
-                color={isFocused ? tokensV2.colors.primaryViolet : tokensV2.colors.textMuted}
+                color={isFocused ? activeColor : mutedColor}
               />
               {isFocused && (
-                <Text style={styles.label}>{label}</Text>
+                <Text style={[styles.label, englivo && { color: ENGLIVO_ACTIVE }]}>
+                  {label}
+                </Text>
               )}
             </TouchableOpacity>
           );
@@ -106,10 +142,9 @@ export default function FloatingTabBar({ state, descriptors, navigation }: any) 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    marginBottom: 24, // Increased for spacing
+    marginBottom: 0,
     marginHorizontal: 0,
     alignItems: 'center',
   },
@@ -121,7 +156,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(15,15,25,0.95)', // Slightly more opaque
+    backgroundColor: 'rgba(30,17,40,0.92)',
     overflow: 'visible', // CRITICAL: to show floating button
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -159,5 +194,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 12,
+  },
+  pillEnglivo: {
+    overflow: 'hidden',
+    backgroundColor: 'rgba(8,12,20,0.96)',
+    borderColor: 'rgba(232,160,32,0.18)',
+    shadowColor: '#E8A020',
+    shadowOpacity: 0.15,
   },
 });

@@ -40,7 +40,7 @@ const HomeMainCarousel = () => {
   const navigation = useNavigation<any>();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
-  const autoAdvanceRef = useRef<NodeJS.Timeout | null>(null);
+  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Phrase of the day: from phrases.json, changes daily, no repeat for 200 days
   const dailyPhrase = useMemo(() => getPhraseOfTheDay(), []);

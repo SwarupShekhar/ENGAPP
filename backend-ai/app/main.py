@@ -29,28 +29,30 @@ if settings.sentry_dsn:
         traces_sample_rate=0.1 if settings.environment == "production" else 1.0,
     )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     configure_logging()
     logger.info("application_startup", app_name=settings.app_name)
-    
+
     await cache.initialize()
-    
+
     yield
-    
+
     # Shutdown
     logger.info("application_shutdown")
     await cache.close()
     await shutdown_executor()
 
+
 app = FastAPI(
-    title="EngR AI Backend", 
+    title="EngR AI Backend",
     version="1.1.0",
     lifespan=lifespan,
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url=None,
-    debug=False  # MUST be False so custom exception handlers work correctly
+    debug=False,  # MUST be False so custom exception handlers work correctly
 )
 
 # 2. Middleware Stack (Order matters: Bottom-up execution)
@@ -64,33 +66,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # 3. Global Exception Handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     error_msg = str(exc)
-    logger.error("unhandled_exception", error=error_msg, error_type=type(exc).__name__, path=request.url.path)
-    
+    logger.error(
+        "unhandled_exception",
+        error=error_msg,
+        error_type=type(exc).__name__,
+        path=request.url.path,
+    )
+
     # Provide a more specific message for HTTP errors (e.g., audio download failures)
     message = "An unexpected error occurred"
     if "HTTPStatusError" in type(exc).__name__:
         message = f"Failed to fetch remote resource: {error_msg[:200]}"
     elif "ConnectError" in type(exc).__name__:
         message = f"Could not connect to remote service: {error_msg[:200]}"
-    
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=StandardResponse(
             success=False,
-            error=ErrorResponse(
-                code="INTERNAL_SERVER_ERROR",
-                message=message
-            ),
+            error=ErrorResponse(code="INTERNAL_SERVER_ERROR", message=message),
             meta=Meta(
                 request_id=getattr(request.state, "request_id", None),
-                processing_time_ms=0
-            )
-        ).model_dump()
+                processing_time_ms=0,
+            ),
+        ).model_dump(),
     )
+
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
@@ -99,16 +105,14 @@ async def value_error_handler(request: Request, exc: ValueError):
         status_code=status.HTTP_400_BAD_REQUEST,
         content=StandardResponse(
             success=False,
-            error=ErrorResponse(
-                code="VALIDATION_ERROR",
-                message=str(exc)
-            ),
+            error=ErrorResponse(code="VALIDATION_ERROR", message=str(exc)),
             meta=Meta(
                 request_id=getattr(request.state, "request_id", None),
-                processing_time_ms=0
-            )
-        ).model_dump()
+                processing_time_ms=0,
+            ),
+        ).model_dump(),
     )
+
 
 # 4. Routers
 from app.features.health.routes import router as health_router
@@ -132,6 +136,7 @@ app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 # 5. Monitoring
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
+
 
 @app.get("/")
 async def root():

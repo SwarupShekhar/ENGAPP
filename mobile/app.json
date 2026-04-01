@@ -34,7 +34,11 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiUrlOverride": "http://192.168.1.34:3000",
+      "clerkPublishableKey": "pk_test_cmlnaHQtYmFzaWxpc2stOTEuY2xlcmsuYWNjb3VudHMuZGV2JA",
+      "apiUrlOverride": "http://192.168.1.34:3004",
+      "bridgeApiUrl": "http://192.168.1.34:3012",
+      "englivoApiUrlOverride": "http://192.168.1.34:3000",
+      "bridgeInternalSecret": "swarupshekhar171199",
       "eas": {
         "projectId": "2286e998-c3a9-4582-bf36-0cfde9a7dc57"
       }

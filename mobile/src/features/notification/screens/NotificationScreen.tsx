@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { connectionsApi } from "../../../api/connections";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -33,7 +34,7 @@ interface FriendRequest {
 export default function NotificationScreen() {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-const navigation = useNavigation();
+  const navigation = useNavigation();
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,7 +130,14 @@ const navigation = useNavigation();
             style={[styles.btn, styles.acceptBtn]}
             onPress={() => handleAccept(item.id, firstName)}
           >
-            <Text style={[styles.btnText, styles.acceptText]}>Accept</Text>
+            <LinearGradient
+              colors={theme.colors.gradients.primary as any}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.acceptGradient}
+            >
+              <Text style={[styles.btnText, styles.acceptText]}>Accept</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -138,7 +146,12 @@ const navigation = useNavigation();
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient
+        colors={theme.colors.gradients.surface as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}
@@ -149,8 +162,11 @@ const navigation = useNavigation();
             color={theme.colors.text.primary}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-      </View>
+        <View>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={styles.headerSubtitle}>Connection activity and updates</Text>
+        </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={styles.center}>
@@ -184,16 +200,15 @@ const navigation = useNavigation();
 const getStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FF",
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: theme.colors.border,
   },
   backBtn: {
     padding: 8,
@@ -202,7 +217,12 @@ const getStyles = (theme: any) => StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#0f172a",
+    color: theme.colors.text.primary,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    color: theme.colors.text.light,
   },
   center: {
     flex: 1,
@@ -220,19 +240,17 @@ const getStyles = (theme: any) => StyleSheet.create({
   emptyText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#94a3b8",
+    color: theme.colors.text.light,
     fontWeight: "500",
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.small,
   },
   cardHeader: {
     flexDirection: "row",
@@ -242,7 +260,7 @@ const getStyles = (theme: any) => StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#e0e7ff",
+    backgroundColor: `${theme.colors.primary}1E`,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -264,16 +282,16 @@ const getStyles = (theme: any) => StyleSheet.create({
   nameText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0f172a",
+    color: theme.colors.text.primary,
     marginBottom: 2,
   },
   subtitleText: {
     fontSize: 14,
-    color: "#64748b",
+    color: theme.colors.text.secondary,
   },
   dateText: {
     fontSize: 12,
-    color: "#94a3b8",
+    color: theme.colors.text.light,
     marginTop: 4,
   },
   actionRow: {
@@ -282,16 +300,20 @@ const getStyles = (theme: any) => StyleSheet.create({
   },
   btn: {
     flex: 1,
-    paddingVertical: 10,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  acceptBtn: {
-    backgroundColor: theme.colors.primary,
+  acceptBtn: {},
+  acceptGradient: {
+    width: "100%",
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   declineBtn: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: `${theme.colors.text.light}22`,
   },
   btnText: {
     fontWeight: "600",
@@ -301,6 +323,6 @@ const getStyles = (theme: any) => StyleSheet.create({
     color: "#fff",
   },
   declineText: {
-    color: "#64748b",
+    color: theme.colors.text.secondary,
   },
 });

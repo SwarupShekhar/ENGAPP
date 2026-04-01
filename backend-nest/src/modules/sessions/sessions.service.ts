@@ -324,6 +324,25 @@ export class SessionsService {
     });
   }
 
+  async getUserSessionsCount(userId: string): Promise<{ count: number }> {
+    const count = await this.prisma.conversationSession.count({
+      where: {
+        participants: {
+          some: {
+            userId: userId,
+          },
+        },
+      },
+    });
+    return { count };
+  }
+
+  async getUserUpcomingSession(userId: string): Promise<any | null> {
+    // For now, return null as there are no scheduled/upcoming sessions
+    // TODO: Implement when booking system is added
+    return null;
+  }
+
   async startSession(data: {
     matchId: string;
     participants: string[];

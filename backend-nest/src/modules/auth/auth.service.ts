@@ -27,9 +27,20 @@ export class AuthService {
           throw new Error('User not found in Clerk');
         }
 
+        const clerkEmail = clerkUser.emailAddresses?.[0];
+        const resolvedEmail = clerkEmail
+          ? clerkEmail.toString()
+          : `${clerkId}@engr.local`;
+        if (!clerkEmail) {
+          this.logger.warn(
+            `WARN: Clerk user ${clerkId} has no emailAddresses; using fallback email.`,
+          );
+        }
+
         user = await this.prisma.user.create({
           data: {
             clerkId,
+            email: resolvedEmail,
             fname: clerkUser.firstName || '',
             lname: clerkUser.lastName || '',
             nativeLang: 'english',
@@ -59,6 +70,7 @@ export class AuthService {
 
   async createUser(userData: {
     clerkId: string;
+    email?: string;
     fname: string;
     lname: string;
     gender?: string;
@@ -67,17 +79,27 @@ export class AuthService {
     level: string;
   }) {
     try {
+      const resolvedEmail = userData.email ?? `${userData.clerkId}@engr.local`;
+
       // Create user and profile in a single transaction (Prisma handles this via connectOrCreate or nested create)
+      const updateData: any = {
+        gender: userData.gender,
+        hobbies: userData.hobbies || [],
+        nativeLang: userData.nativeLang,
+        level: userData.level,
+      };
+
+      // Only overwrite email if the caller provided it.
+      if (userData.email) {
+        updateData.email = userData.email;
+      }
+
       const user = await this.prisma.user.upsert({
         where: { clerkId: userData.clerkId },
-        update: {
-          gender: userData.gender,
-          hobbies: userData.hobbies || [],
-          nativeLang: userData.nativeLang,
-          level: userData.level,
-        },
+        update: updateData,
         create: {
           clerkId: userData.clerkId,
+          email: resolvedEmail,
           fname: userData.fname,
           lname: userData.lname,
           gender: userData.gender,

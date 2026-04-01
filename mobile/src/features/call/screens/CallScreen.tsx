@@ -227,8 +227,8 @@ export default function CallScreen() {
   const userLevelNum = getLevelScore(userLevel);
 
   const navigation: any = useNavigation();
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {

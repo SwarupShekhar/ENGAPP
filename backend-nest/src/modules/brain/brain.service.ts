@@ -349,6 +349,27 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
   }
 
   /**
+   * Phase 2: Compute Pronunciation Quality Score (PQS).
+   */
+  async computePQS(body: {
+    session_id: string;
+    user_id: string;
+    pronunciation_result: any[];
+  }): Promise<any> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${this.aiEngineUrl}/api/scoring/pqs`, body, {
+          timeout: 10000,
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('BrainService computePQS error:', error);
+      return null;
+    }
+  }
+
+  /**
    * Real-time lightweight preview status.
    */
   async computePreview(userTurnsSoFar: string[]): Promise<any> {

@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { chatApi } from "../../../api/connections";
 import SocketService from "../../call/services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
@@ -38,6 +39,7 @@ interface Conversation {
 
 export default function ConversationsScreen() {
   const theme = useAppTheme();
+  const styles = getStyles(theme);
   const navigation = useNavigation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -201,26 +203,42 @@ export default function ConversationsScreen() {
         </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color="#4B5563" />
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={theme.colors.text.light}
+      />
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient
+        colors={theme.colors.gradients.surface as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={24} color="#FFF" />
+          <Ionicons
+            name="chevron-back"
+            size={20}
+            color={theme.colors.text.primary}
+          />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Messages</Text>
+        <View style={styles.headerTextWrap}>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <Text style={styles.headerSubtitle}>Stay in sync with your partners</Text>
+        </View>
         <View style={styles.headerRight} />
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -232,12 +250,16 @@ export default function ConversationsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#4F46E5"
+              tintColor={theme.colors.primary}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color="#9CA3AF" />
+              <Ionicons
+                name="chatbubbles-outline"
+                size={64}
+                color={theme.colors.text.light}
+              />
               <Text style={styles.emptyTitle}>No messages yet</Text>
               <Text style={styles.emptySubtitle}>
                 Connect with friends to start a conversation!
@@ -250,30 +272,44 @@ export default function ConversationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#4F46E5",
+    paddingHorizontal: theme.spacing.m,
+    paddingVertical: theme.spacing.s,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  headerTextWrap: {
+    flex: 1,
+    alignItems: "center",
   },
   backButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${theme.colors.primary}18`,
   },
   headerTitle: {
-    flex: 1,
-    textAlign: "center",
     fontSize: 18,
     fontWeight: "700",
-    color: "#FFF",
+    color: theme.colors.text.primary,
+  },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    color: theme.colors.text.light,
   },
   headerRight: {
-    width: 32,
+    width: 36,
   },
   centerContainer: {
     flex: 1,
@@ -286,10 +322,14 @@ const styles = StyleSheet.create({
   conversationItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#FFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    marginHorizontal: theme.spacing.m,
+    marginTop: theme.spacing.s,
+    padding: theme.spacing.m,
+    borderRadius: theme.borderRadius.l,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.small,
   },
   avatarContainer: {
     marginRight: 12,
@@ -314,14 +354,14 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: `${theme.colors.primary}1E`,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarInitial: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#6B7280",
+    color: theme.colors.text.secondary,
   },
   contentContainer: {
     flex: 1,
@@ -336,12 +376,12 @@ const styles = StyleSheet.create({
   partnerName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
+    color: theme.colors.text.primary,
     flex: 1,
   },
   timeText: {
     fontSize: 12,
-    color: "#6B7280",
+    color: theme.colors.text.light,
   },
   messageRow: {
     flexDirection: "row",
@@ -350,24 +390,24 @@ const styles = StyleSheet.create({
   },
   lastMessage: {
     fontSize: 14,
-    color: "#4B5563",
+    color: theme.colors.text.secondary,
     flex: 1,
     marginRight: 8,
   },
   unreadText: {
     fontWeight: "700",
-    color: "#111827",
+    color: theme.colors.text.primary,
   },
   unreadMessage: {
     fontWeight: "600",
-    color: "#1F2937",
+    color: theme.colors.text.primary,
   },
   unreadTime: {
-    color: "#4F46E5",
+    color: theme.colors.primary,
     fontWeight: "600",
   },
   unreadBadge: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: theme.colors.primary,
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -390,12 +430,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#374151",
+    color: theme.colors.text.secondary,
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: "#6B7280",
+    color: theme.colors.text.light,
     textAlign: "center",
     marginTop: 8,
   },

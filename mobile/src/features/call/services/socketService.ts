@@ -11,7 +11,7 @@ class SocketService {
   private sound: Audio.Sound | null = null;
   private tokenFetcher: (() => Promise<string | null>) | null = null;
   private localUserId: string | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatInterval: ReturnType<typeof setTimeout> | null = null;
   private joinedRooms = new Set<string>();
   private isConnecting = false;
   private connectErrorCount = 0;
@@ -58,7 +58,9 @@ class SocketService {
           const token = await tokenFetcher();
           cb({ token: token || "" });
         } catch (err) {
-          console.error("Socket auth error fetching token:", err);
+          // Missing/expired auth can happen during app boot or logout transitions.
+          // Keep this non-fatal and avoid noisy error logs.
+          console.warn("Socket auth token fetch failed:", err);
           cb({ token: "" });
         }
       },
@@ -99,6 +101,15 @@ class SocketService {
 
     this.socket.on("connect_error", (err) => {
       this.isConnecting = false;
+      const message = String(err?.message || "");
+      const isAuthError =
+        message.toLowerCase().includes("authenticate") ||
+        message.toLowerCase().includes("unauthorized");
+      if (isAuthError) {
+        console.warn("[Socket] Auth error, stopping reconnect loop until re-authenticated.");
+        this.disconnect();
+        return;
+      }
       this.connectErrorCount += 1;
       const now = Date.now();
       if (now - this.lastConnectErrorLog >= this.CONNECT_ERROR_LOG_THROTTLE_MS) {

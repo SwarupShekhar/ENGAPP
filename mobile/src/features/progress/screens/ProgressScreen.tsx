@@ -180,7 +180,7 @@ export default function ProgressScreen() {
               styles.profileButton,
               {
                 backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border + "30",
+                borderColor: theme.colors.border + "40",
               },
             ]}
           >
@@ -213,7 +213,7 @@ export default function ProgressScreen() {
               styles.overallCard,
               {
                 backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border + "20",
+                borderColor: theme.colors.border + "30",
               },
             ]}
           >
@@ -278,8 +278,8 @@ export default function ProgressScreen() {
               style={[
                 styles.weaknessCard,
                 {
-                  backgroundColor: theme.colors.deep,
-                  borderColor: theme.colors.accent + "30",
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border + "30",
                 },
               ]}
             >
@@ -300,10 +300,7 @@ export default function ProgressScreen() {
                   style={[
                     styles.weaknessTitle,
                     {
-                      color:
-                        theme.variation === "deep"
-                          ? "#FFFFFF"
-                          : theme.colors.text.primary,
+                      color: theme.colors.text.primary,
                     },
                   ]}
                 >
@@ -330,9 +327,7 @@ export default function ProgressScreen() {
                       fontWeight: "500",
                       lineHeight: 20,
                       color:
-                        theme.variation === "deep"
-                          ? "rgba(255,255,255,0.8)"
-                          : theme.colors.text.secondary,
+                        theme.colors.text.secondary,
                     }}
                   >
                     💡 {w.recommendation}
@@ -421,7 +416,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 14,
     paddingBottom: 16,
   },
   greeting: {
@@ -437,7 +432,7 @@ const styles = StyleSheet.create({
   profileButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -446,8 +441,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   overallCard: {
-    borderRadius: 24,
-    padding: 28,
+    borderRadius: 20,
+    padding: 24,
     alignItems: "center",
     borderWidth: 1,
     marginBottom: 28,
@@ -479,8 +474,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   weaknessCard: {
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
     marginTop: 8,
     borderWidth: 1,
@@ -524,12 +519,12 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 16,
+    padding: 18,
     alignItems: "center",
     borderWidth: 1,
     shadowColor: "#000",

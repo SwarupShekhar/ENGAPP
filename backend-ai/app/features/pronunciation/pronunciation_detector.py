@@ -273,7 +273,8 @@ def detect_from_azure_result(
     
     # Log Azure result structure
     if azure_result:
-        _nb = azure_result.get('NBest') or azure_result.get('Nbests') or azure_result.get('nbest') or []
+        # Handle both Azure NBest and our internal Nbests naming
+        _nb = azure_result.get('Nbests') or azure_result.get('NBest') or azure_result.get('nbest') or []
         _nb_words = _nb[0].get('Words', []) if _nb and isinstance(_nb, list) and len(_nb) > 0 else []
         word_count = len(azure_result.get('Words', []) or _nb_words)
         logger.info(f"Azure result contains {word_count} words, keys={list(azure_result.keys())}")
@@ -440,9 +441,13 @@ def detect_from_azure_result(
                 spoken_approx = word_lower
                 correct_word = word_lower
 
-        # Final guard: never flag when spoken == correct
-        # BUT allow through Azure-explicit Mispronunciation and unknown words with low scores
-        if spoken_approx == correct_word and error_type != "Mispronunciation" and accuracy >= effective_threshold:
+        # Guard B: prioritize STT confusion table IF word triggered as bad
+        if word_lower in STT_CONFUSION_PAIRS:
+            intended, cat = STT_CONFUSION_PAIRS[word_lower]
+            rule_category = cat
+            correct_word = intended
+            spoken_approx = word_lower
+        elif spoken_approx == correct_word and error_type != "Mispronunciation" and accuracy >= effective_threshold:
             continue
 
         reel_id = reel_map.get(rule_category) or None

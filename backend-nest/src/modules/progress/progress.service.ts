@@ -115,8 +115,8 @@ export class ProgressService {
 
   async getDetailedMetrics(userId: string) {
     try {
-      // 1. Get most recent completed sessions of both types
-      const [lastAssessment, lastConversation] = await Promise.all([
+      // 1. Get most recent completed sessions + latest per-user analysis
+      const [lastAssessment, lastConversation, latestAnalysis] = await Promise.all([
         this.prisma.assessmentSession
           .findFirst({
             where: { userId, status: 'COMPLETED' },
@@ -128,9 +128,23 @@ export class ProgressService {
             where: {
               participants: { some: { userId } },
               status: 'COMPLETED',
-              summaryJson: { not: null },
             },
             orderBy: { startedAt: 'desc' },
+            include: {
+              participants: {
+                where: { userId },
+                include: { analysis: true },
+              },
+            },
+          })
+          .catch(() => null),
+        this.prisma.analysis
+          .findFirst({
+            where: {
+              participant: { userId },
+              session: { status: 'COMPLETED' },
+            },
+            orderBy: { createdAt: 'desc' },
           })
           .catch(() => null),
       ]);
@@ -169,13 +183,18 @@ export class ProgressService {
               where: {
                 participants: { some: { userId } },
                 status: 'COMPLETED',
-                summaryJson: { not: null },
                 startedAt: {
                   lt: (currentSession as any).completedAt,
                   gt: previousSession?.completedAt || 0,
                 },
               },
               orderBy: { startedAt: 'desc' },
+              include: {
+                participants: {
+                  where: { userId },
+                  include: { analysis: true },
+                },
+              },
             });
           if (interConversation) previousSession = interConversation;
         } else if (currentSession) {
@@ -183,10 +202,15 @@ export class ProgressService {
             where: {
               participants: { some: { userId } },
               status: 'COMPLETED',
-              summaryJson: { not: null },
               startedAt: { lt: (currentSession as any).startedAt },
             },
             orderBy: { startedAt: 'desc' },
+            include: {
+              participants: {
+                where: { userId },
+                include: { analysis: true },
+              },
+            },
           });
           const interAssessment = await this.prisma.assessmentSession.findFirst(
             {
@@ -207,7 +231,11 @@ export class ProgressService {
         console.warn('Error fetching previous session:', err);
       }
 
-      const currentScores = this.extractScores(currentSession);
+      // Prefer latest Analysis row as authoritative for conversation-era scores.
+      // This avoids placeholder values from summary/assessment fallbacks.
+      const currentScores = latestAnalysis
+        ? this.extractScoresFromAnalysis(latestAnalysis)
+        : this.extractScores(currentSession);
       const previousScores = this.extractScores(previousSession);
 
       // 3. Calculate deltas (ensure numbers)
@@ -341,16 +369,94 @@ export class ProgressService {
           summary = {};
         }
       }
+
+      // Fallback to participant analysis scores when summaryJson is missing/stale.
+      const myParticipant = Array.isArray(session.participants)
+        ? session.participants.find((p: any) => !!p?.analysis)
+        : null;
+      const analysisScores: any = myParticipant?.analysis?.scores || {};
+      const parsedAnalysisScores =
+        typeof analysisScores === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(analysisScores);
+              } catch (_) {
+                return {};
+              }
+            })()
+          : analysisScores;
+
       return {
-        pronunciation: Math.round(Number(summary.pronunciation_score) || 0),
-        fluency: Math.round(Number(summary.fluency_score) || 0),
-        grammar: Math.round(Number(summary.grammar_score) || 0),
-        vocabulary: Math.round(Number(summary.vocabulary_score) || 0),
-        comprehension: Math.round(Number(summary.overall_score) || 0),
-        overallScore: Math.round(Number(summary.overall_score) || 0),
+        pronunciation: Math.round(
+          Number(
+            summary.pronunciation_score ??
+              parsedAnalysisScores.pronunciation ??
+              parsedAnalysisScores.pronunciation_score,
+          ) || 0,
+        ),
+        fluency: Math.round(
+          Number(
+            summary.fluency_score ??
+              parsedAnalysisScores.fluency ??
+              parsedAnalysisScores.fluency_score,
+          ) || 0,
+        ),
+        grammar: Math.round(
+          Number(
+            summary.grammar_score ??
+              parsedAnalysisScores.grammar ??
+              parsedAnalysisScores.grammar_score,
+          ) || 0,
+        ),
+        vocabulary: Math.round(
+          Number(
+            summary.vocabulary_score ??
+              parsedAnalysisScores.vocabulary ??
+              parsedAnalysisScores.vocabulary_score,
+          ) || 0,
+        ),
+        comprehension: Math.round(
+          Number(summary.overall_score ?? parsedAnalysisScores.overall ?? parsedAnalysisScores.overall_score) ||
+            0,
+        ),
+        overallScore: Math.round(
+          Number(summary.overall_score ?? parsedAnalysisScores.overall ?? parsedAnalysisScores.overall_score) ||
+            0,
+        ),
         cefrLevel: summary.cefr_score || 'B1',
       };
     }
+  }
+
+  private extractScoresFromAnalysis(analysis: any) {
+    let scores = analysis?.scores || {};
+    if (typeof scores === 'string') {
+      try {
+        scores = JSON.parse(scores);
+      } catch (_) {
+        scores = {};
+      }
+    }
+
+    const pronunciation = Math.round(
+      Number(scores.pronunciation ?? scores.pronunciation_score) || 0,
+    );
+    const fluency = Math.round(Number(scores.fluency ?? scores.fluency_score) || 0);
+    const grammar = Math.round(Number(scores.grammar ?? scores.grammar_score) || 0);
+    const vocabulary = Math.round(
+      Number(scores.vocabulary ?? scores.vocabulary_score) || 0,
+    );
+    const overallScore = Math.round(Number(scores.overall ?? scores.overall_score) || 0);
+
+    return {
+      pronunciation,
+      fluency,
+      grammar,
+      vocabulary,
+      comprehension: overallScore,
+      overallScore,
+      cefrLevel: analysis?.cefrLevel || 'B1',
+    };
   }
 
   private flattenSkills(breakdown: any) {

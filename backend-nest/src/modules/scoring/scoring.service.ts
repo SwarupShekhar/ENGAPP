@@ -29,88 +29,107 @@ export class ScoringService {
     callDurationSeconds: number,
     userSpokeSeconds: number,
   ) {
-    this.logger.log(`Processing CQS for userId=${userId} sessionId=${sessionId}`);
+    this.logger.log(`[PHASE 2] Processing PQS for userId=${userId} sessionId=${sessionId}`);
 
     try {
-      // 1. Get user turns (assuming transcript is single-speaker or we filter it)
-      // For now, treat the entire transcript as user turns (since it comes from participant-track egress)
-      const userTurns = [transcript]; 
-
-      // 2. Call backend-ai
-      const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8001';
-      const cqsData = await this.brain.computeCQS({
-        user_turns: userTurns,
-        full_transcript: transcript,
-        azure_results: azureResults,
-        call_duration_seconds: callDurationSeconds,
-        user_spoke_seconds: userSpokeSeconds,
+      // 1. Call backend-ai PQS endpoint
+      const pqsData = await this.brain.computePQS({
+        session_id: sessionId,
+        user_id: userId,
+        pronunciation_result: azureResults,
       });
 
-      if (!cqsData) {
-        this.logger.warn('Failed to get CQS from AI engine');
+      if (!pqsData) {
+        this.logger.warn('Failed to get PQS from AI engine');
         return null;
       }
 
-      // 3. Get current user pillar scores for delta calculation
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { level: true },
-      });
+      // 2. Get current user pillar scores
+      const metrics = await this.progress.getDetailedMetrics(userId);
+      const currentPronunciation = metrics.current.pronunciation || 0;
 
-      const currentMetrics = await this.progress.getDetailedMetrics(userId);
-      const currentScores = currentMetrics.current;
+      // 3. Calculate pronunciation delta based on Phase 2 spec
+      const baseDelta =
+        callDurationSeconds < 600
+          ? 0.8
+          : callDurationSeconds < 1200
+            ? 1.5
+            : callDurationSeconds < 1800
+              ? 2.0
+              : 2.5;
+      const dampingFactor = 1 - (currentPronunciation / 100) * 0.4;
+      const qualityMultiplier = 0.3 + (pqsData.pqs / 100) * 1.0;
+      const direction = pqsData.pqs > currentPronunciation ? 1 : -1;
+      const pillarAmplifier = 1.2;
 
-      const dampingFactor = 0.40;
-      const cefrMultiplier = this.getCefrMultiplier(user?.level || 'A1');
+      const rawPronunciationDelta =
+        direction *
+        baseDelta *
+        qualityMultiplier *
+        dampingFactor *
+        pillarAmplifier;
 
-      // Formula: P_delta = (CQS_pillar - Current_Pillar_Score) * damping_factor * multiplier
-      const calculateDelta = (cqsPillar: number, currentPillar: number) => {
-        return (cqsPillar - currentPillar) * dampingFactor * cefrMultiplier;
-      };
+      const pronunciationDelta = Math.max(
+        -currentPronunciation,
+        Math.min(100 - currentPronunciation, rawPronunciationDelta),
+      );
 
-      const pronunciationDelta = calculateDelta(cqsData.breakdown.pqs, currentScores.pronunciation);
-      const fluencyDelta = calculateDelta(cqsData.breakdown.pqs, currentScores.fluency); // Spec says PQS affects Fluency too
-      const grammarDelta = calculateDelta(cqsData.breakdown.ds, currentScores.grammar); // Depth affects Grammar/Vocab
-      const vocabularyDelta = calculateDelta(cqsData.breakdown.ds, currentScores.vocabulary);
-      const comprehensionDelta = calculateDelta(cqsData.breakdown.cs, currentScores.comprehension);
-
-      // 4. Persist CQS
+      // 4. Persist CQS record
       const cqsRecord = await this.prisma.callQualityScore.create({
         data: {
           sessionId,
           userId,
-          cqs: cqsData.cqs,
-          pqs: cqsData.breakdown.pqs,
-          depthScore: cqsData.breakdown.ds,
-          complexityScore: cqsData.breakdown.cs,
-          engagementScore: cqsData.breakdown.es,
+          cqs: pqsData.pqs, // Overall CQS is just PQS in Phase 2
+          pqs: pqsData.pqs,
+          depthScore: 0,
+          complexityScore: 0,
+          engagementScore: 0,
           pronunciationDelta,
-          fluencyDelta,
-          grammarDelta,
-          vocabularyDelta,
-          comprehensionDelta,
+          fluencyDelta: 0,
+          grammarDelta: 0,
+          vocabularyDelta: 0,
+          comprehensionDelta: 0,
+          phaseComputed: 'phase_2',
         },
       });
 
-      // 5. Update user topic scores / weaknesses (Integration with existing systems)
-      // This is usually handled by WeaknessService, but we can also record these deltas directly
-      // for the 5 core pillars if they are stored in a specific table.
-      // For now, we'll log them as "progressed".
+      // 4.5 Update Analysis table so Home screen shows correct scores
+      try {
+        await this.prisma.analysis.update({
+          where: { participantId },
+          data: {
+            scores: {
+              pronunciation: Math.round(pqsData.pqs),
+              fluency: Math.round(pqsData.mean_fluency),
+              grammar: 0,
+              vocabulary: 0,
+            } as any,
+          },
+        });
+      } catch (e) {
+        this.logger.warn(
+          `Could not update Analysis scores for participantId=${participantId}: ${e.message}`,
+        );
+      }
 
-      this.logger.log(`CQS processed: ${cqsData.cqs}. pronunciationDelta=${pronunciationDelta.toFixed(2)}`);
+      // 5. Apply progress authoritative
+      await this.progress.applyPillarDeltas(userId, {
+        pronunciation: pronunciationDelta,
+        fluency: 0,
+        grammar: 0,
+        vocabulary: 0,
+        comprehension: 0,
+      });
 
+      this.logger.log(
+        `[PHASE 2 SUCCESS] pqs=${pqsData.pqs}, delta=${pronunciationDelta.toFixed(4)}`,
+      );
       return cqsRecord;
+
     } catch (error) {
-      this.logger.error(`Error processing CQS: ${error.message}`, error.stack);
+      this.logger.error(`[PHASE 2 ERROR] userId=${userId}: ${error.message}`, error.stack);
       return null;
     }
   }
 
-  private getCefrMultiplier(level: string): number {
-    const l = level.toUpperCase();
-    if (l.startsWith('A1')) return 1.25;
-    if (l.startsWith('A2')) return 1.00;
-    if (l.startsWith('B1')) return 0.75;
-    return 0.50; // Higher levels grow slower
-  }
 }

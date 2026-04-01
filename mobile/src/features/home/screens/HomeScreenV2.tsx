@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { withDelay } from 'react-native-reanimated';
@@ -41,7 +41,9 @@ import Svg, {
 } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getHomeData, HomeData } from '../services/homeApi';
-import { tokensV2 } from '../../../theme/tokensV2';
+import { tokensV2_603010 as tokensV2 } from '../../../theme/tokensV2_603010';
+import { chatApi } from '../../../api/connections';
+import SocketService from '../../call/services/socketService';
 
 // Safe Haptics fallback
 let Haptics: any = {
@@ -241,8 +243,8 @@ const ScoreRing = ({
       <Svg width={SIZE} height={SIZE}>
         <Defs>
           <SvgGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor="#6C63FF" />
-            <Stop offset="100%" stopColor="#FFB347" />
+            <Stop offset="0%" stopColor={tokensV2.colors.primaryViolet} />
+            <Stop offset="100%" stopColor="rgba(197,232,77,0.35)" />
           </SvgGradient>
         </Defs>
         <Path
@@ -372,8 +374,8 @@ const RadarChart = ({ scores }: { scores?: { [key: string]: number } }) => {
 
         <Polygon
           points={dataPoints.map((p) => `${p.x},${p.y}`).join(' ')}
-          fill="rgba(108,99,255,0.45)"
-          stroke="#00D2FF"
+          fill="rgba(197,232,77,0.22)"
+          stroke="rgba(197,232,77,0.70)"
           strokeWidth={1.5}
         />
 
@@ -383,7 +385,7 @@ const RadarChart = ({ scores }: { scores?: { [key: string]: number } }) => {
             cx={p.x}
             cy={p.y}
             r={3}
-            fill="#6C63FF"
+            fill={tokensV2.colors.primaryViolet}
             stroke="#FFFFFF"
             strokeWidth={1}
           />
@@ -453,16 +455,19 @@ const QuickActionButton = ({
 
 export default function HomeScreenV2() {
   const { user, isLoaded } = useUser();
+  const { isSignedIn } = useAuth();
   const navigation: any = useNavigation();
   const [homeData, setHomeData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const socketService = useRef(SocketService.getInstance()).current;
 
   const header = homeData?.header;
   const skills = homeData?.skills;
 
   useFocusEffect(
     useCallback(() => {
-      if (!user) return;
+      if (!user || !isSignedIn) return;
       const fetchData = async () => {
         try {
           const cachedHome = await AsyncStorage.getItem('@home_data_cache');
@@ -482,7 +487,36 @@ export default function HomeScreenV2() {
       };
 
       fetchData();
-    }, [user]),
+    }, [user, isSignedIn]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+
+      const fetchUnread = async () => {
+        try {
+          const unread = await chatApi.getUnreadCount();
+          if (!alive) return;
+          setUnreadCount(Number(unread?.count ?? 0));
+        } catch (e) {
+          console.warn('[HomeScreenV2] unread count error', e);
+        }
+      };
+
+      void fetchUnread();
+
+      const onNewMessage = () => {
+        void fetchUnread();
+      };
+
+      socketService.onNewMessage(onNewMessage);
+
+      return () => {
+        alive = false;
+        socketService.offNewMessage(onNewMessage);
+      };
+    }, [socketService]),
   );
 
   if (!isLoaded || loading || !homeData || !header) {
@@ -501,13 +535,13 @@ export default function HomeScreenV2() {
       {/* AURORA BACKGROUND */}
       <View style={styles.auroraContainer}>
         <LinearGradient
-          colors={['rgba(108,99,255,0.2)', 'transparent'] as const}
+          colors={['rgba(197,232,77,0.14)', 'transparent'] as const}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.auroraLeft}
         />
         <LinearGradient
-          colors={['rgba(255,179,71,0.2)', 'transparent'] as const}
+          colors={['rgba(30,17,40,0.90)', 'transparent'] as const}
           start={{ x: 1, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.auroraRight}
@@ -541,6 +575,13 @@ export default function HomeScreenV2() {
               onPress={() => navigation.navigate('Conversations')}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff" />
+              {unreadCount > 0 && (
+                <View style={styles.chatBadge}>
+                  <Text style={styles.chatBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.headerIconBtn}
@@ -589,7 +630,7 @@ export default function HomeScreenV2() {
         {/* AI INSIGHT */}
         <Animated.View entering={FadeInDown.delay(200)}>
           <LinearGradient
-            colors={['rgba(108,99,255,0.15)', 'rgba(255,179,71,0.05)'] as any}
+            colors={['rgba(197,232,77,0.12)', 'rgba(30,17,40,0.25)'] as any}
             style={styles.insightCardContainer}
           >
             <View style={styles.insightHeader}>
@@ -672,11 +713,11 @@ export default function HomeScreenV2() {
                   const value = homeData.weeklyActivity?.[index] ?? 0;
                   let backgroundColor = 'rgba(255,255,255,0.08)';
                   if (value > 0 && value <= 0.33) {
-                    backgroundColor = 'rgba(0,229,160,0.3)';
+                    backgroundColor = 'rgba(197,232,77,0.25)';
                   } else if (value > 0.33 && value <= 0.66) {
-                    backgroundColor = 'rgba(0,229,160,0.6)';
+                    backgroundColor = 'rgba(197,232,77,0.55)';
                   } else if (value > 0.66) {
-                    backgroundColor = '#00E5A0';
+                    backgroundColor = '#C5E84D';
                   }
                   return <View key={index} style={[styles.heatSquare, { backgroundColor }]} />;
                 })}
@@ -796,7 +837,7 @@ export default function HomeScreenV2() {
                 onPress={() => navigation.navigate(card.data?.targetScreen || 'CallPreference')}
               >
                 <LinearGradient
-                  colors={card.data?.gradient || ['#6C63FF', '#3F3D56']}
+                  colors={card.data?.gradient || [tokensV2.colors.primaryViolet, '#1E1128']}
                   style={styles.topicGradient}
                 >
                   <View style={styles.topicHeader}>
@@ -923,18 +964,38 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#1A1A1A',
   },
+  chatBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: '#FF4B4B',
+    borderWidth: 1.5,
+    borderColor: '#1A1A1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 10,
+  },
   streakPillSmall: {
-    backgroundColor: 'rgba(255,179,71,0.15)',
+    backgroundColor: 'rgba(30,17,40,0.70)',
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,179,71,0.2)',
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   streakTextSmall: {
-    color: tokensV2.colors.accentAmber,
+    color: tokensV2.colors.primaryViolet,
     fontWeight: '800',
     fontSize: 12,
   },
@@ -1040,7 +1101,7 @@ const styles = StyleSheet.create({
     padding: tokensV2.spacing.m,
     marginBottom: tokensV2.spacing.l,
     borderLeftWidth: 3,
-    borderLeftColor: '#6C63FF',
+    borderLeftColor: tokensV2.colors.primaryViolet,
   },
   insightCardContainer: {
     borderRadius: 24,
@@ -1061,7 +1122,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(108,99,255,0.2)',
+    backgroundColor: 'rgba(197,232,77,0.14)',
     padding: 2,
     position: 'relative',
   },
@@ -1077,9 +1138,9 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#00E5A0',
+    backgroundColor: tokensV2.colors.primaryViolet,
     borderWidth: 2,
-    borderColor: '#1A1B2E',
+    borderColor: tokensV2.colors.background,
   },
   insightTitle: {
     color: tokensV2.colors.textPrimary,
@@ -1088,7 +1149,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   mayaStatus: {
-    color: '#00E5A0',
+    color: tokensV2.colors.primaryViolet,
     fontSize: 10,
     fontWeight: '600',
     marginTop: -2,
