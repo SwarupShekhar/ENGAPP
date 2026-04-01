@@ -83,3 +83,16 @@ client.interceptors.request.use(
     return Promise.reject(error);
   },
 );
+
+if (__DEV__) {
+  client.interceptors.response.use(
+    (response) => {
+      console.log(`[NestJS API] ${response.config.method?.toUpperCase()} ${response.config.url} -> ${response.status}`);
+      return response;
+    },
+    (error) => {
+      console.error(`[NestJS API] Error ${error.response?.status} on ${error.config?.url}:`, error.response?.data);
+      return Promise.reject(error);
+    },
+  );
+}

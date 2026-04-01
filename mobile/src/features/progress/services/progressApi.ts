@@ -1,4 +1,4 @@
-import { client } from './client';
+import { client } from '../../../api/client';
 
 // ─── Types ─────────────────────────────────────────────────
 export interface ProgressData {

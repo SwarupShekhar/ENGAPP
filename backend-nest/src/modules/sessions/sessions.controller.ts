@@ -27,6 +27,18 @@ export class SessionsController {
         return this.sessionsService.getUserSessions(req.user.id);
     }
 
+    @Get('count')
+    @UseGuards(ClerkGuard)
+    async getCount(@Request() req) {
+        return this.sessionsService.getUserSessionsCount(req.user.id);
+    }
+
+    @Get('upcoming')
+    @UseGuards(ClerkGuard)
+    async getUpcoming(@Request() req) {
+        return this.sessionsService.getUserUpcomingSession(req.user.id);
+    }
+
     @Get(':id/analysis')
     @UseGuards(ClerkGuard)
     async getAnalysis(

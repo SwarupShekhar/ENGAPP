@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { chatApi } from "../../../api/connections";
 import SocketService from "../../call/services/socketService";
+import { useAppTheme } from "../../../theme/useAppTheme";
 
 // ── Types ───────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ interface ChatMessage {
 // ── Main Component ──────────────────────────────────────
 
 export default function ChatScreen() {
+  const theme = useAppTheme();
+  const styles = getStyles(theme);
   const navigation = useNavigation();
   const route = useRoute<RouteProp<ChatRouteParams, "Chat">>();
   const { conversationId, partnerId, partnerName, partnerAvatar } =
@@ -343,7 +346,11 @@ export default function ChatScreen() {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={24} color="#FFF" />
+          <Ionicons
+            name="chevron-back"
+            size={20}
+            color={theme.colors.text.primary}
+          />
         </TouchableOpacity>
 
         <View style={styles.headerInfo}>
@@ -362,7 +369,7 @@ export default function ChatScreen() {
         </View>
 
         <TouchableOpacity style={styles.callButton} onPress={handleCall}>
-          <Ionicons name="call" size={22} color="#A78BFA" />
+          <Ionicons name="call" size={22} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -374,7 +381,7 @@ export default function ChatScreen() {
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#A78BFA" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Loading messages...</Text>
           </View>
         ) : (
@@ -423,7 +430,7 @@ export default function ChatScreen() {
             value={inputText}
             onChangeText={handleTextChange}
             placeholder="Type a message..."
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={theme.colors.text.light}
             multiline
             maxLength={1000}
           />
@@ -440,7 +447,7 @@ export default function ChatScreen() {
             <Ionicons
               name="send"
               size={20}
-              color={inputText.trim() ? "#FFF" : "#6B7280"}
+              color={inputText.trim() ? "#FFF" : theme.colors.text.light}
             />
           </TouchableOpacity>
         </View>
@@ -451,10 +458,11 @@ export default function ChatScreen() {
 
 // ── Styles ──────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F0F1A",
+    backgroundColor: theme.colors.background,
   },
   flex: {
     flex: 1,
@@ -466,11 +474,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "#161625",
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   backButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: `${theme.colors.primary}18`,
     marginRight: 8,
   },
   headerInfo: {
@@ -483,7 +496,7 @@ const styles = StyleSheet.create({
   headerName: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#FFF",
+    color: theme.colors.text.primary,
     marginRight: 8,
   },
   statusDot: {
@@ -493,13 +506,13 @@ const styles = StyleSheet.create({
   },
   headerStatus: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: theme.colors.text.light,
     marginTop: 2,
   },
   callButton: {
     padding: 10,
     borderRadius: 20,
-    backgroundColor: "rgba(167,139,250,0.15)",
+    backgroundColor: `${theme.colors.primary}1F`,
   },
 
   // Messages
@@ -524,12 +537,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   myBubble: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.colors.primary,
     borderBottomRightRadius: 4,
   },
   theirBubble: {
-    backgroundColor: "#1F1F35",
+    backgroundColor: theme.colors.surface,
     borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   messageText: {
     fontSize: 15,
@@ -539,7 +554,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
   theirMessageText: {
-    color: "#E5E7EB",
+    color: theme.colors.text.secondary,
   },
   messageTime: {
     fontSize: 10,
@@ -561,7 +576,7 @@ const styles = StyleSheet.create({
   },
   seenText: {
     fontSize: 10,
-    color: "#A78BFA",
+    color: theme.colors.primary,
     fontWeight: "600",
   },
 
@@ -576,14 +591,14 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: "rgba(167,139,250,0.1)",
+    backgroundColor: `${theme.colors.primary}18`,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.2)",
+    borderColor: `${theme.colors.primary}45`,
   },
   callInviteText: {
     fontSize: 13,
-    color: "#A78BFA",
+    color: theme.colors.primary,
   },
 
   // System message
@@ -593,7 +608,7 @@ const styles = StyleSheet.create({
   },
   systemText: {
     fontSize: 12,
-    color: "#6B7280",
+    color: theme.colors.text.light,
     fontStyle: "italic",
   },
 
@@ -606,11 +621,11 @@ const styles = StyleSheet.create({
   },
   typingText: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: theme.colors.text.light,
   },
   typingDots: {
     fontSize: 14,
-    color: "#A78BFA",
+    color: theme.colors.primary,
     fontWeight: "700",
   },
 
@@ -621,17 +636,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "#161625",
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   textInput: {
     flex: 1,
-    backgroundColor: "#1F1F35",
+    backgroundColor: theme.colors.background,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: "#FFF",
+    color: theme.colors.text.primary,
     maxHeight: 100,
   },
   sendButton: {
@@ -643,10 +658,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sendButtonActive: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.colors.primary,
   },
   sendButtonInactive: {
-    backgroundColor: "#1F1F35",
+    backgroundColor: `${theme.colors.primary}22`,
   },
 
   // Loading
@@ -657,7 +672,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: "#9CA3AF",
+    color: theme.colors.text.light,
     fontSize: 14,
   },
 
@@ -670,7 +685,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   emptyText: {
-    color: "#6B7280",
+    color: theme.colors.text.light,
     fontSize: 15,
     textAlign: "center",
   },

@@ -6,6 +6,7 @@ import {
   Processor,
 } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import axios from 'axios';
 import { Job, Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AssessmentService } from '../assessment/assessment.service';
@@ -225,6 +226,35 @@ export class SessionsProcessor {
         segments,
       );
 
+      const sessionDataForBridge = await this.prisma.conversationSession.findUnique(
+        {
+          where: { id: sessionId },
+          include: {
+            participants: {
+              include: { analysis: true },
+            },
+          },
+        },
+      );
+
+      if (sessionDataForBridge?.participants?.length) {
+        for (const participant of sessionDataForBridge.participants) {
+          const analysis = participant.analysis;
+          if (!analysis) continue;
+
+          const scores =
+            analysis.scores && typeof analysis.scores === 'object'
+              ? (analysis.scores as any)
+              : {};
+          const fluencyScore = Number(scores.overall_score ?? 0);
+          void this.syncCefrToBridge(
+            participant.userId,
+            analysis.cefrLevel,
+            fluencyScore,
+          );
+        }
+      }
+
       // Silent post-processing: after Analysis/Mistake rows exist, generate LearningTasks.
       // This MUST NOT fail the overall session job; if it errors, we only log.
       // Note: PronunciationIssue rows may be created later by LiveKit webhook; task generation is idempotent
@@ -317,6 +347,40 @@ export class SessionsProcessor {
         .catch(() => {});
 
       throw error; // Let Bull handle the retry
+    }
+  }
+
+  private async syncCefrToBridge(
+    userId: string,
+    cefrLevel: string,
+    fluencyScore: number,
+  ): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user?.clerkId) return;
+
+      const bridgeApiUrl = process.env.BRIDGE_API_URL;
+      const internalSecret = process.env.INTERNAL_SECRET;
+      if (!bridgeApiUrl || !internalSecret) return;
+
+      await axios.post(
+        `${bridgeApiUrl}/sync/cefr`,
+        {
+          clerkId: user.clerkId,
+          cefrLevel,
+          fluencyScore,
+          source: 'engr',
+        },
+        {
+          headers: {
+            'x-internal-secret': internalSecret,
+          },
+        },
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[SessionsProcessor] Failed to sync CEFR to Bridge user=${userId}: ${error?.message ?? error}`,
+      );
     }
   }
 }

@@ -13,6 +13,7 @@ import { LiveKitWebhookController } from './livekit-webhook.controller';
 import { BrainModule } from '../brain/brain.module';
 import { PronunciationModule } from '../pronunciation/pronunciation.module';
 import { ScoringModule } from '../scoring/scoring.module';
+import { RedisModule } from '../../redis/redis.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ScoringModule } from '../scoring/scoring.module';
     BrainModule,
     PronunciationModule,
     ScoringModule,
+    RedisModule,
   ],
   controllers: [LivekitController, LiveKitWebhookController],
   providers: [

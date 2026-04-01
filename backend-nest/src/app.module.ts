@@ -29,6 +29,7 @@ import { PronunciationModule } from './modules/pronunciation/pronunciation.modul
 import { ProgressModule } from './modules/progress/progress.module';
 import { HomeModule } from './modules/home/home.module';
 import { BrainModule } from './modules/brain/brain.module';
+import { InternalModule } from './modules/internal/internal.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { BrainModule } from './modules/brain/brain.module';
     ProgressModule,
     HomeModule,
     BrainModule,
+    InternalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

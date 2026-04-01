@@ -1,0 +1,24 @@
+{
+  "name": "super-app",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/englivo",
+      "packages/*"
+    ],
+    "nohoist": [
+      "**/expo",
+      "**/expo/**",
+      "**/@expo/*",
+      "**/@expo/**",
+      "**/react",
+      "**/react/**",
+      "**/react-native",
+      "**/react-native/**"
+    ]
+  },
+  "resolutions": {
+    "react": "19.1.0",
+    "react-native": "0.81.5"
+  }
+}

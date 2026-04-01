@@ -1,6 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { themes, defaultTheme, Theme } from "./index";
+import { themes, Theme } from "./index";
+import { useSuperApp } from "../context/SuperAppContext";
 
 interface ThemeContextType {
   theme: Theme;
@@ -13,7 +20,11 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [currentTheme, setCurrentTheme] = useState<Theme>(defaultTheme);
+  const { mode } = useSuperApp();
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  const [currentTheme, setCurrentTheme] = useState<Theme>(() => themes["engr"]);
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -25,9 +36,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (e) {
         console.warn("Failed to load theme preference:", e);
       }
+      setCurrentTheme(
+        modeRef.current === "ENGR" ? themes["engr"] : themes["englivo"],
+      );
     };
     loadTheme();
   }, []);
+
+  useEffect(() => {
+    setCurrentTheme(mode === "ENGR" ? themes["engr"] : themes["englivo"]);
+  }, [mode]);
 
   const setTheme = async (themeId: string) => {
     if (themes[themeId]) {

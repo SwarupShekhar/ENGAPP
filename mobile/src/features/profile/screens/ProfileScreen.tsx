@@ -173,7 +173,7 @@ function ReliabilityBadge({ score }: { score: number }) {
 export default function ProfileScreen() {
   const { user } = useUser();
   const { signOut } = useAuth();
-  const { theme, setTheme, availableThemes } = useTheme();
+  const { theme } = useTheme();
   const navigation = useNavigation();
   const [signingOut, setSigningOut] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -400,63 +400,6 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Theme Selection Section */}
-        <SectionHeader title="Theme" theme={theme} />
-        <View style={cardStyle}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.themeSelectorScroll}
-          >
-            {availableThemes.map((t: any) => (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => setTheme(t.id)}
-                style={[
-                  styles.themeOption,
-                  {
-                    borderColor:
-                      theme.id === t.id ? t.colors.accent : "transparent",
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.themePreview,
-                    { backgroundColor: t.colors.background },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.themePreviewAccent,
-                      { backgroundColor: t.colors.accent },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.themePreviewDeep,
-                      { backgroundColor: t.colors.deep },
-                    ]}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.themeLabel,
-                    {
-                      color:
-                        theme.id === t.id
-                          ? t.colors.accent
-                          : theme.colors.text.secondary,
-                    },
-                  ]}
-                >
-                  {t.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
         {/* Account Section */}
         <SectionHeader title="Account" theme={theme} />
         <View style={cardStyle}>
@@ -680,41 +623,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 32,
     opacity: 0.6,
-  },
-  themeSelectorScroll: {
-    padding: 16,
-    gap: 12,
-  },
-  themeOption: {
-    width: 80,
-    alignItems: "center",
-    padding: 8,
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  themePreview: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
-    overflow: "hidden",
-    padding: 6,
-    gap: 4,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
-  },
-  themePreviewAccent: {
-    width: "100%",
-    height: 12,
-    borderRadius: 4,
-  },
-  themePreviewDeep: {
-    width: "60%",
-    height: 12,
-    borderRadius: 4,
-  },
-  themeLabel: {
-    fontSize: 10,
-    fontWeight: "700",
   },
 });

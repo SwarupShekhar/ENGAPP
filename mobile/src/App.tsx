@@ -6,7 +6,9 @@ import { navigationRef, navigate } from "./navigation/navigationRef";
 import AuthNavigator from "./navigation/AuthNavigator";
 import { StatusBar } from "expo-status-bar";
 import { tokenCache } from "./utils/tokenCache";
-import { setAuthTokenFetcher } from "./api/client";
+import { setAuthTokenFetcher as setEngrTokenFetcher } from "./api/client";
+import { setAuthTokenFetcher as setEnglivoTokenFetcher } from "./api/englivoClient";
+import { setAuthTokenFetcher as setBridgeTokenFetcher } from "./api/bridgeClient";
 import { UIVariantProvider } from "./context/UIVariantContext";
 import {
   View,
@@ -19,9 +21,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
 import { ThemeProvider } from "./theme/ThemeProvider";
+import { SuperAppProvider } from "./context/SuperAppContext";
 
 class AppErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -59,16 +63,23 @@ class AppErrorBoundary extends Component<
   }
 }
 
-// Ideally this should be in an .env file, but for now hardcoding as retrieved
-const CLERK_PUBLISHABLE_KEY =
-  "pk_test_ZGVzdGluZWQtc3VuZmlzaC03OS5jbGVyay5hY2NvdW50cy5kZXYk";
+const CLERK_PUBLISHABLE_KEY = "pk_test_cmlnaHQtYmFzaWxpc2stOTEuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
+if (__DEV__) {
+  console.log(
+    "[Clerk] publishable key prefix:",
+    CLERK_PUBLISHABLE_KEY?.slice(0, 14),
+  );
+}
 
 function AuthTokenInjector({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
 
-  useEffect(() => {
-    setAuthTokenFetcher(getToken);
-  }, [getToken]);
+  // Set synchronously during render so child effects (e.g. SuperAppContext)
+  // always find a token fetcher already in place on first mount.
+  setEngrTokenFetcher(getToken);
+  setEnglivoTokenFetcher(getToken);
+  setBridgeTokenFetcher(getToken);
 
   return <>{children}</>;
 }
@@ -96,7 +107,7 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
 
     connectSocket();
 
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
+    const subscription = AppState.addEventListener("change", (nextAppState: string) => {
       if (nextAppState === "active" && isSignedIn) {
         connectSocket();
       }
@@ -192,7 +203,7 @@ function OnboardingGate() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
 
     if (!isLoaded || !user) {
       // If it takes more than 10s to load user data, show an error (likely API unreachable)
@@ -284,49 +295,51 @@ export default function App() {
       <AuthTokenInjector>
         <AppSocketHandler>
           <SafeAreaProvider>
-            <ThemeProvider>
-              <AppErrorBoundary>
-                 <View style={styles.appRoot}>
-                   <UIVariantProvider>
-                     <NavigationContainer
-                       ref={navigationRef}
-                       theme={{
-                         dark: false,
-                         colors: {
-                           primary: "#6C5CE7",
-                           background: "#F5F6FA",
-                           card: "#FFFFFF",
-                           text: "#1F2937",
-                           border: "#E5E7EB",
-                           notification: "#6C5CE7",
-                         },
-                         fonts: {
-                           regular: {
-                             fontFamily: "System",
-                             fontWeight: "400" as const,
-                           },
-                           medium: {
-                             fontFamily: "System",
-                             fontWeight: "500" as const,
-                           },
-                           bold: {
-                             fontFamily: "System",
-                             fontWeight: "700" as const,
-                           },
-                           heavy: {
-                             fontFamily: "System",
-                             fontWeight: "900" as const,
-                           },
-                         },
-                       }}
-                     >
-                       <StatusBar style="auto" />
-                       <AuthGate />
-                     </NavigationContainer>
-                   </UIVariantProvider>
-                 </View>
-              </AppErrorBoundary>
-            </ThemeProvider>
+            <SuperAppProvider>
+              <ThemeProvider>
+                <AppErrorBoundary>
+                  <View style={styles.appRoot}>
+                    <UIVariantProvider>
+                      <NavigationContainer
+                        ref={navigationRef}
+                        theme={{
+                          dark: false,
+                          colors: {
+                            primary: "#6C5CE7",
+                            background: "#F5F6FA",
+                            card: "#FFFFFF",
+                            text: "#1F2937",
+                            border: "#E5E7EB",
+                            notification: "#6C5CE7",
+                          },
+                          fonts: {
+                            regular: {
+                              fontFamily: "System",
+                              fontWeight: "400" as const,
+                            },
+                            medium: {
+                              fontFamily: "System",
+                              fontWeight: "500" as const,
+                            },
+                            bold: {
+                              fontFamily: "System",
+                              fontWeight: "700" as const,
+                            },
+                            heavy: {
+                              fontFamily: "System",
+                              fontWeight: "900" as const,
+                            },
+                          },
+                        }}
+                      >
+                        <StatusBar style="auto" />
+                        <AuthGate />
+                      </NavigationContainer>
+                    </UIVariantProvider>
+                  </View>
+                </AppErrorBoundary>
+              </ThemeProvider>
+            </SuperAppProvider>
           </SafeAreaProvider>
         </AppSocketHandler>
       </AuthTokenInjector>

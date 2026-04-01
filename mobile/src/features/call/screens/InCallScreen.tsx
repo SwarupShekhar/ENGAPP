@@ -45,6 +45,12 @@ import {
   useSpeechRecognitionEvent,
 } from "expo-speech-recognition";
 import { getCallPreview, PreviewData } from "../../../api/scoring";
+import {
+  addBridgePracticeMinutes,
+  hasBridgeInternalSecret,
+  incrementBridgeStreak,
+  syncBridgeCefr,
+} from "../../../api/bridgeClient";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // In a real app, these would come from environment variables
@@ -59,6 +65,7 @@ const IS_ANDROID = Platform.OS === "android";
 const MAX_CONSECUTIVE_STT_FAILURES = 6;
 const STT_INITIAL_BACKOFF_MS = 1500;
 const STT_MAX_BACKOFF_MS = 15000;
+let hasWarnedBridgeSyncSkipped = false;
 
 // ─── Data & Transcription Listener Component ───────────────────────────────
 function DataListener({
@@ -405,7 +412,7 @@ export default function InCallScreen({ navigation, route }: any) {
   const transcriptRef = useRef<any[]>(INITIAL_TRANSCRIPT);
   const roomRef = useRef<any>(null);
   const hasEndedRef = useRef(false);
-  const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const joinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sttRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
@@ -1123,6 +1130,50 @@ export default function InCallScreen({ navigation, route }: any) {
           await submitResult().catch((err) =>
             console.error("[InCall] All endSession retries failed:", err),
           );
+
+          // Fire-and-forget Bridge sync so user progress is shared across Pulse/Core.
+          const isBridgeSyncConfigured = hasBridgeInternalSecret();
+          if (!isBridgeSyncConfigured) {
+            if (!hasWarnedBridgeSyncSkipped) {
+              hasWarnedBridgeSyncSkipped = true;
+              console.warn(
+                "[Bridge Sync] Skipping protected Bridge sync in mobile: INTERNAL_SECRET not configured.",
+              );
+            }
+          } else {
+            const logBridgeSyncError = (label: string, err: any) => {
+              const status = err?.response?.status;
+              if (status === 401) {
+                console.warn(`[Bridge Sync] ${label} unauthorized (401).`);
+              } else {
+                console.warn(`[Bridge Sync] ${label} failed:`, err?.message || err);
+              }
+            };
+
+            const sessionDurationMinutes = Math.max(
+              1,
+              Math.round((durationRef.current || 0) / 60),
+            );
+            void addBridgePracticeMinutes(user.id, sessionDurationMinutes).catch(
+              (err) => logBridgeSyncError("minutes", err),
+            );
+            void incrementBridgeStreak(user.id).catch((err) =>
+              logBridgeSyncError("streak", err),
+            );
+
+            const newCefrLevel = route?.params?.newCefrLevel as string | undefined;
+            const newFluencyScore = route?.params?.newFluencyScore as
+              | number
+              | undefined;
+            if (newCefrLevel) {
+              void syncBridgeCefr({
+                clerkId: user.id,
+                cefrLevel: newCefrLevel,
+                fluencyScore: newFluencyScore,
+                source: "engr",
+              }).catch((err) => logBridgeSyncError("cefr", err));
+            }
+          }
         }
 
         // 3. Then tell the partner and disconnect (so they get a clean end)

@@ -361,10 +361,10 @@ Answer with JSON:
     ) -> Tuple[AnalysisMetrics, CEFRAssessment]:
         """Combine individual analyses into final metrics"""
         
-        grammar_score = min(max(grammar_data.get("score", 50), 0), 100)
-        vocab_score = min(max(vocab_data.get("score", 50), 0), 100)
-        fluency_score = min(max(fluency_data.get("score", 50), 0), 100)
-        pronunciation_score = min(max(pronunciation_data.get("score", 50), 0), 100)
+        grammar_score = min(max(grammar_data.get("grammar_score", 50), 0), 100)
+        vocab_score = min(max(vocab_data.get("vocabulary_score", 50), 0), 100)
+        fluency_score = min(max(fluency_data.get("fluency_score", 50), 0), 100)
+        pronunciation_score = min(max(pronunciation_data.get("pronunciation_score", 50), 0), 100)
         
         # Calculate overall score (weighted)
         overall_score = (

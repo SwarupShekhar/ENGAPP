@@ -34,8 +34,8 @@ export default function CallPreferenceScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [showAiOption, setShowAiOption] = useState(false);
 
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const insets = useSafeAreaInsets();
   const meta = (user?.unsafeMetadata || {}) as any;

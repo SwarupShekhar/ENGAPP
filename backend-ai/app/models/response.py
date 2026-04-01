@@ -30,6 +30,9 @@ class TranscriptionResponse(BaseModel):
     duration: float
     processing_time: float
 
+    def to_dict(self):
+        return self.model_dump()
+
 class AnalysisResponse(BaseModel):
     cefr_assessment: CEFRAssessment
     errors: List[ErrorDetail]
@@ -46,6 +49,9 @@ class AnalysisResponse(BaseModel):
     # Image Description Specifics
     relevance_score: Optional[float] = None
     talk_style: Optional[str] = None
+
+    def to_dict(self):
+        return self.model_dump()
 
 
 class MispronuncedWord(BaseModel):
@@ -118,6 +124,9 @@ class JointAnalysisResponse(BaseModel):
     interaction_metrics: Dict[str, Any]
     peer_comparison: Dict[str, Any]
     participant_analyses: List[ParticipantAnalysis]
+
+    def to_dict(self):
+        return self.model_dump()
 
 class HinglishSTTResponse(BaseModel):
     text: str

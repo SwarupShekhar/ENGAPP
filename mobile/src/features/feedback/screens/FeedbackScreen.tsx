@@ -1722,16 +1722,16 @@ export default function FeedbackScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9ff",
+    backgroundColor: "#070B1D",
   },
 
   // Header
   header: {
-    backgroundColor: "#fff",
+    backgroundColor: "#101636",
     paddingHorizontal: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f5",
+    borderBottomColor: "rgba(255,255,255,0.08)",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1747,13 +1747,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#F8FAFC",
     letterSpacing: -0.5,
   },
   avgBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ede9fe",
+    backgroundColor: "rgba(139,92,246,0.2)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1766,7 +1766,7 @@ const styles = StyleSheet.create({
   avgText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#7c3aed",
+    color: "#A78BFA",
   },
 
   // Filters
@@ -1780,7 +1780,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "transparent",
     borderWidth: 1.5,
-    borderColor: "#e2e8f0",
+    borderColor: "rgba(255,255,255,0.15)",
   },
   filterBtnActive: {
     backgroundColor: "#7c3aed",
@@ -1789,7 +1789,7 @@ const styles = StyleSheet.create({
   filterBtnText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#64748b",
+    color: "#94A3B8",
   },
   filterBtnTextActive: {
     color: "#fff",
@@ -1811,7 +1811,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#151C3F",
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
@@ -1821,7 +1821,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#f1f5f9",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   statCardMiddle: {
     borderColor: "#e9d5ff",
@@ -1829,12 +1829,12 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#0f172a",
+    color: "#F8FAFC",
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 11,
-    color: "#94a3b8",
+    color: "#94A3B8",
     textAlign: "center",
     fontWeight: "500",
     lineHeight: 15,
@@ -1844,7 +1844,7 @@ const styles = StyleSheet.create({
   listTitle: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#94a3b8",
+    color: "#94A3B8",
     marginBottom: 10,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -1852,7 +1852,7 @@ const styles = StyleSheet.create({
 
   // Session Card
   sessionCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#151C3F",
     borderRadius: 18,
     padding: 16,
     marginBottom: 12,
@@ -1864,7 +1864,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
     borderWidth: 1,
-    borderColor: "#f1f5f9",
+    borderColor: "rgba(255,255,255,0.08)",
   },
 
   // Avatar
@@ -1912,12 +1912,12 @@ const styles = StyleSheet.create({
   sessionTopic: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#F8FAFC",
     marginBottom: 3,
   },
   sessionPartner: {
     fontSize: 13,
-    color: "#64748b",
+    color: "#94A3B8",
     fontWeight: "500",
     marginBottom: 5,
   },
@@ -1929,7 +1929,7 @@ const styles = StyleSheet.create({
   },
   sessionMetaText: {
     fontSize: 12,
-    color: "#94a3b8",
+    color: "#94A3B8",
   },
   levelChip: {
     borderRadius: 6,
@@ -1982,11 +1982,11 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 12,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "rgba(255,255,255,0.1)",
     marginBottom: 3,
   },
   noScoreText: {
@@ -2023,12 +2023,12 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#F8FAFC",
     marginBottom: 8,
   },
   emptyStateSubtitle: {
     fontSize: 14,
-    color: "#94a3b8",
+    color: "#94A3B8",
     textAlign: "center",
     lineHeight: 20,
   },

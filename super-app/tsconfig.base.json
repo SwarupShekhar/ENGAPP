@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+      "strict": true,
+      "skipLibCheck": true,
+      "esModuleInterop": true,
+      "resolveJsonModule": true,
+      "moduleResolution": "bundler",
+      "jsx": "react-native",
+      "paths": {
+        "@super-app/types": ["./packages/shared-types/src/index.ts"],
+        "@super-app/theme": ["./packages/shared-theme/src/index.ts"],
+        "@super-app/ui": ["./packages/shared-ui/src/index.ts"],
+        "@super-app/api": ["./packages/shared-api/src/index.ts"]
+      }
+    }
+  }

@@ -69,6 +69,7 @@ export class PronunciationService {
       cap_reason: string | null;
       category_breakdown: Record<string, number>;
       dominant_errors: string[];
+      azure_result?: Record<string, unknown>;
     };
   }> {
     const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8001';
@@ -96,6 +97,7 @@ export class PronunciationService {
           category_breakdown: Record<string, number>;
           dominant_errors: string[];
         };
+        azure_result?: Record<string, unknown>;
       };
       const flagged = Array.isArray(data.flagged_errors)
         ? data.flagged_errors
@@ -103,7 +105,12 @@ export class PronunciationService {
       await this.processFlaggedErrors(userId, flagged);
       return {
         flagged_errors: flagged,
-        pronunciation_score: data.pronunciation_score ?? undefined,
+        pronunciation_score: data.pronunciation_score
+          ? {
+              ...data.pronunciation_score,
+              azure_result: data.azure_result,
+            }
+          : undefined,
       };
     } catch (e) {
       this.logger.error('assessFromRecordingUrl', e);

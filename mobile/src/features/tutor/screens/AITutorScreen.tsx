@@ -30,6 +30,7 @@ import { useAppTheme } from "../../../theme/useAppTheme";
 import { tutorApi } from "../services/tutorApi";
 import { streamingTutor, StreamChunk } from "../../call/services/streamingTutorService";
 import { PronunciationBreakdown } from "../../../components/PronunciationBreakdown";
+import { bridgeApi } from "../../../api/bridgeApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -201,6 +202,21 @@ export default function AITutorScreen({ navigation }: any) {
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const cefrSyncTriggeredRef = useRef(false);
+
+  const syncCefrLevelOnce = async () => {
+    if (cefrSyncTriggeredRef.current) return;
+    cefrSyncTriggeredRef.current = true;
+
+    const clerkId = user?.id;
+    if (!clerkId) return;
+
+    try {
+      await bridgeApi.syncCefrLevel({ clerkId });
+    } catch (e) {
+      console.warn("[AITutor] bridgeApi.syncCefrLevel failed:", e);
+    }
+  };
 
   // VAD Refs
   const silenceStartRef = useRef<number | null>(null);
@@ -315,12 +331,15 @@ export default function AITutorScreen({ navigation }: any) {
       // Trigger final analysis and save session
       if (sessionIdRef.current) {
         if (__DEV__) console.log("[AITutor] Ending session for analysis:", sessionIdRef.current);
-        tutorApi.endSession(sessionIdRef.current).catch((err) => {
-          console.warn(
-            "[AITutor] Failed to end session gracefully:",
-            err.message,
-          );
-        });
+        void tutorApi
+          .endSession(sessionIdRef.current)
+          .then(() => void syncCefrLevelOnce())
+          .catch((err) => {
+            console.warn(
+              "[AITutor] Failed to end session gracefully:",
+              err.message,
+            );
+          });
       }
     };
   }, []);
@@ -746,6 +765,7 @@ export default function AITutorScreen({ navigation }: any) {
               if (sessionIdRef.current) {
                 try {
                   await tutorApi.endSession(sessionIdRef.current);
+                  await syncCefrLevelOnce();
                   // Make sure we go to the feedback screen instead of just back
                   navigation.replace("CallFeedback", {
                     sessionId: sessionIdRef.current,

@@ -9,6 +9,7 @@ datasource db {
 model User {
   id                     String                    @id @default(uuid())
   clerkId                String                    @unique
+  email                  String                    @unique
   fname                  String
   lname                  String
   gender                 String?
@@ -501,6 +502,7 @@ model CallQualityScore {
   grammarDelta       Float
   vocabularyDelta    Float
   comprehensionDelta Float
+  phaseComputed      String? @map("phase_computed") // Track which phase generated the score
   computedAt         DateTime            @default(now())
   session            ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)

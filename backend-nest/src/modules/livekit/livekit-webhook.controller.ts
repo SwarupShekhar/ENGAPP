@@ -19,6 +19,7 @@ import {
 } from '../pronunciation/pronunciation.service';
 
 import { ScoringService } from '../scoring/scoring.service';
+import { RedisService } from '../../redis/redis.service';
 
 /** Human-readable tip for pronunciation issues (rule_category from detector). */
 function formatPronunciationSuggestion(
@@ -62,6 +63,7 @@ export class LiveKitWebhookController {
     private readonly transcription: TranscriptionService,
     private readonly pronunciationService: PronunciationService,
     private readonly scoringService: ScoringService,
+    private readonly redis: RedisService,
   ) {}
 
   @Post('egress')
@@ -204,10 +206,10 @@ export class LiveKitWebhookController {
         `Track egress ended for participant=${participant.userId} sessionId=${participant.sessionId}`,
       );
       
-      // PHASE 1 AUDIT LOG FOR SEPARATION
       this.logger.log(
-        `[PHASE 1 AUDIT] Speaker Separation Confirmed: participantId=${participant.userId}, sessionId=${participant.sessionId}, egressId=${info.egressId}`
+        `[PHASE 2 AUDIT] Speaker Separation Confirmed: participantId=${participant.userId}, sessionId=${participant.sessionId}, egressId=${info.egressId}`
       );
+
       await this.prisma.sessionParticipant.update({
         where: { id: participant.id },
         data: { participantRecordingUrl: effectiveFileLocation } as any,
@@ -220,119 +222,26 @@ export class LiveKitWebhookController {
             sessionId: participant.sessionId,
             language: 'en-US',
           });
-        this.logger.log(
-          `Per-participant transcript for participant=${participant.userId}: len=${transcript?.length ?? 0} preview="${(transcript ?? '').substring(0, 80)}"`,
-        );
+
         if (!transcript?.trim()) {
           this.logger.warn(
-            `Empty transcript for participant=${participant.userId} — skipping pronunciation assessment`,
+            `Empty transcript for participant=${participant.userId} — skipping PQS`,
           );
-          return { ok: true };
-        }
-
-        const { flagged_errors, pronunciation_score } =
-          await this.pronunciationService.assessFromRecordingUrl(
-            participant.userId,
-            effectiveFileLocation,
-            transcript.trim(), // clean, single-speaker, no labels
-          );
-
-        // Find or create Analysis row (webhook can fire before the main session processor writes Analysis)
-        // Use upsert on (sessionId, participantId) so it's safe/idempotent with analyzeAndStoreJoint.
-        let analysis: { id: string; scores: unknown } | null = null;
-        for (let i = 0; i < 10; i++) {
-          analysis = await this.prisma.analysis.findFirst({
-            where: {
-              sessionId: participant.sessionId,
-              participant: { userId: participant.userId },
-            },
-            select: { id: true, scores: true },
-          });
-          if (analysis) break;
-          await new Promise((res) => setTimeout(res, 3000));
-        }
-
-        if (!analysis) {
-          const created = await this.prisma.analysis.upsert({
-            where: {
-              sessionId_participantId: {
-                sessionId: participant.sessionId,
-                participantId: participant.id,
-              },
-            },
-            create: {
-              sessionId: participant.sessionId,
-              participantId: participant.id,
-              rawData: {
-                source: 'livekit_pronunciation_webhook',
-                transcript: transcript.trim(),
-              } as any,
-              scores: {} as any,
-              cefrLevel: null,
-            },
-            update: {
-              rawData: {
-                source: 'livekit_pronunciation_webhook',
-                transcript: transcript.trim(),
-              } as any,
-            },
-            select: { id: true, scores: true },
-          });
-          analysis = created;
-          this.logger.log(
-            `Created placeholder Analysis for participant=${participant.userId} sessionId=${participant.sessionId} to persist pronunciation`,
-          );
-        }
-
-        if (analysis) {
-          if (Array.isArray(flagged_errors) && flagged_errors.length > 0) {
-            await this.prisma.pronunciationIssue.createMany({
-              data: flagged_errors.map((err: FlaggedPronunciationError) => ({
-                analysisId: analysis!.id,
-                word: err.spoken,
-                issueType: err.rule_category,
-                severity:
-                  err.confidence < 40
-                    ? 'high'
-                    : err.confidence < 65
-                      ? 'medium'
-                      : 'low',
-                confidence: err.confidence,
-                suggestion: formatPronunciationSuggestion(
-                  err.rule_category,
-                  err.correct,
-                ),
-              })),
-              skipDuplicates: true,
-            });
-            this.logger.log(
-              `Wrote ${flagged_errors.length} pronunciation issues for participant=${participant.userId} sessionId=${participant.sessionId}`,
+        } else {
+          // 1. Get Azure pronunciation details
+          const { flagged_errors, pronunciation_score } =
+            await this.pronunciationService.assessFromRecordingUrl(
+              participant.userId,
+              effectiveFileLocation,
+              transcript.trim(),
             );
-          }
 
-          /*
-          // Temporarily disabled for PHASE 1 verification
-          if (pronunciation_score?.score != null) {
-            const existingScores =
-              (analysis.scores as Record<string, number>) || {};
-            await this.prisma.analysis.update({
-              where: { id: analysis.id },
-              data: {
-                scores: {
-                  ...existingScores,
-                  pronunciation: pronunciation_score.score,
-                  pronunciation_score: pronunciation_score.score,
-                } as object,
-              },
-            });
-            this.logger.log(
-              `Updated pronunciation score=${pronunciation_score.score} for participant=${participant.userId}`,
-            );
-          }
+          // 2. Persist Issues to DB
+          await this.savePronunciationIssues(participant.sessionId, participant.userId, participant.id, flagged_errors, transcript.trim());
 
-          // Trigger authoritative CQS scoring (Phase 3)
-          const callDuration = (Number(info.endedAt) - Number(info.startedAt)) / 1_000_000_000; // Nanoseconds
-          const userSpokeSeconds = participant.speakingTime ?? (callDuration * 0.4); // Fallback
+          // 3. Trigger Phase 2 Authoritative PQS Scoring
+          const callDuration = (Number(info.endedAt) - Number(info.startedAt)) / 1_000_000_000;
+          const userSpokeSeconds = participant.speakingTime || (callDuration * 0.4);
 
           await this.scoringService.processCallQualityScore(
             participant.sessionId,
@@ -343,8 +252,24 @@ export class LiveKitWebhookController {
             callDuration,
             userSpokeSeconds
           );
-          */
         }
+
+        // 4. Redis Tracking for Race Condition (Step 4 Fix)
+        const completedKey = `session:${participant.sessionId}:participants_done`;
+        const count = await this.redis.incr(completedKey);
+        await this.redis.expire(completedKey, 3600); // 1 hour TTL
+
+        this.logger.log(`[RACE FIX] Participant ${participant.userId} done. Count=${count}/2`);
+
+        if (count >= 2) {
+          await this.redis.set(`session:${participant.sessionId}:participants_ready`, 'true', 3600);
+          const compositeReady = await this.redis.get(`session:${participant.sessionId}:composite_ready`);
+          if (compositeReady === 'true') {
+            this.logger.log(`[RACE FIX] Triggering joint analysis from participant track end (last one)`);
+            await this.triggerJointAnalysis(participant.sessionId);
+          }
+        }
+
       } catch (e) {
         this.logger.error(
           `Pronunciation assessment failed participant=${participant.userId}`,
@@ -386,6 +311,7 @@ export class LiveKitWebhookController {
           sessionId: session.id,
           language: 'en-US',
         });
+      
       await this.prisma.conversationSession.update({
         where: { id: session.id },
         data: {
@@ -396,14 +322,14 @@ export class LiveKitWebhookController {
       if (transcript?.trim()) {
         const userId = session.participants[0]?.userId;
         if (userId) {
-          try {
-            await this.brain.analyzeSession(
-              session.id,
-              transcript.trim(),
-              userId,
-            );
-          } catch (e) {
-            this.logger.warn('analyzeSession is not available or failed', e);
+          await this.redis.set(`session:${session.id}:composite_ready`, 'true', 3600);
+          await this.redis.set(`session:${session.id}:composite_transcript`, transcript.trim(), 3600);
+          await this.redis.set(`session:${session.id}:primary_user_id`, userId, 3600);
+
+          const participantsReady = await this.redis.get(`session:${session.id}:participants_ready`);
+          if (participantsReady === 'true') {
+            this.logger.log(`[RACE FIX] Triggering joint analysis from composite end`);
+            await this.triggerJointAnalysis(session.id);
           }
         }
       }
@@ -415,5 +341,64 @@ export class LiveKitWebhookController {
     }
 
     return { ok: true };
+  }
+
+  private async triggerJointAnalysis(sessionId: string) {
+    try {
+      const transcript = await this.redis.get(`session:${sessionId}:composite_transcript`);
+      const userId = await this.redis.get(`session:${sessionId}:primary_user_id`);
+
+      if (transcript && userId) {
+        this.logger.log(`[RACE FIX] Actually running analyzeSession for sessionId=${sessionId}`);
+        await this.brain.analyzeSession(sessionId, transcript, userId);
+        
+        // Cleanup Redis (prevent multiple triggers if something retries)
+        await this.redis.del(`session:${sessionId}:composite_ready`);
+        await this.redis.del(`session:${sessionId}:participants_ready`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to trigger joint analysis for sessionId=${sessionId}:`, error);
+    }
+  }
+
+  private async savePronunciationIssues(
+    sessionId: string,
+    userId: string,
+    participantId: string,
+    flagged_errors: any[],
+    transcript: string,
+  ) {
+    // 1. Find Analysis row (wait up to 10s if needed, though with our race fix it should be better)
+    let analysis = await this.prisma.analysis.findFirst({
+      where: {
+        sessionId,
+        participantId,
+      },
+    });
+
+    if (!analysis) {
+      analysis = await this.prisma.analysis.create({
+        data: {
+          sessionId,
+          participantId,
+          rawData: { transcript } as any,
+          scores: {} as any,
+        },
+      });
+    }
+
+    if (Array.isArray(flagged_errors) && flagged_errors.length > 0) {
+      await this.prisma.pronunciationIssue.createMany({
+        data: flagged_errors.map((err) => ({
+          analysisId: analysis!.id,
+          word: err.spoken,
+          issueType: err.rule_category,
+          severity: err.confidence < 40 ? 'high' : err.confidence < 65 ? 'medium' : 'low',
+          confidence: err.confidence,
+          suggestion: formatPronunciationSuggestion(err.rule_category, err.correct),
+        })),
+        skipDuplicates: true,
+      });
+    }
   }
 }

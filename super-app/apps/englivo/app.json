@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Englivo",
+    "slug": "englivo",
+    "version": "1.0.0",
+    "scheme": "englivo",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.superapp.englivo",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "Englivo uses speech recognition to provide real-time pronunciation feedback and transcription."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.superapp.englivo"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-av",
+      "expo-speech-recognition"
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2286e998-c3a9-4582-bf36-0cfde9a7dc57"
+    },
+    "extra": {
+      "clerkPublishableKey": "pk_test_cmlnaHQtYmFzaWxpc2stOTEuY2xlcmsuYWNjb3VudHMuZGV2JA",
+      "apiUrlOverride": null,
+      "eas": {
+        "projectId": "6cec4b89-d913-4785-8840-257d5175882e"
+      }
+    },
+    "owner": "swarupshekhar"
+  }
+}

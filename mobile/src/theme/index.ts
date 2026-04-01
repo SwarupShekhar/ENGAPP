@@ -3,6 +3,8 @@ import { oceanic, abyss, aquasoft } from "./families/oceanDepth";
 import { dawn, ember, inferno } from "./families/sunsetEnergy";
 import { atlatitudeStandard, atlatitudeLight } from "./families/atlatitude";
 import { blueSkyStandard, blueSkyLight, blueSkyDeep } from "./families/blueSky";
+import { engrStandard } from "./families/engr";
+import { englivoStandard } from "./families/englivo";
 import { Theme } from "./types";
 
 export const themes: Record<string, Theme> = {
@@ -29,6 +31,9 @@ export const themes: Record<string, Theme> = {
   // Atlatitude Family
   "atlatitude-light": atlatitudeLight,
   "atlatitude": atlatitudeStandard,
+
+  engr: engrStandard,
+  englivo: englivoStandard,
 };
 
 export const defaultTheme = blueSkyStandard;
