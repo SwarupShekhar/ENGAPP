@@ -59,4 +59,3 @@ livekit-plugins-azure>=0.5.0
 # NLP / Scoring
 spacy>=3.7.2
 wordfreq>=3.1.1
-cefr-level>=0.1.0
