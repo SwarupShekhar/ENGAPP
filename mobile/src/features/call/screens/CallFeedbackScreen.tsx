@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
+import { fetchFeedbackNarration } from "../../../api/tts";
+import type { FeedbackSection } from "../../../api/tts";
 import {
   View,
   Text,
@@ -740,6 +744,16 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [cqsData, setCqsData] = useState<CQSResults | null>(null);
   const [pronPollCount, setPronPollCount] = useState(0);
   const insets = useSafeAreaInsets();
+  const [playingSection, setPlayingSection] = useState<string | null>(null);
+  const [loadingSection, setLoadingSection] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  // Clean up audio on unmount
+  useEffect(() => {
+    return () => {
+      soundRef.current?.unloadAsync().catch(() => {});
+    };
+  }, []);
 
   const params = route?.params || {};
   const sessionId = params.sessionId;
@@ -1167,6 +1181,106 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
   const overallColor = getScoreColor(data.overallScore, theme);
 
+  const handlePlay = useCallback(
+    async (section: string) => {
+      // Tap same section again → stop
+      if (playingSection === section) {
+        await soundRef.current?.stopAsync().catch(() => {});
+        await soundRef.current?.unloadAsync().catch(() => {});
+        soundRef.current = null;
+        setPlayingSection(null);
+        return;
+      }
+
+      // Stop whatever is currently playing
+      if (soundRef.current) {
+        await soundRef.current.stopAsync().catch(() => {});
+        await soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+        setPlayingSection(null);
+      }
+
+      setLoadingSection(section);
+
+      try {
+        const pronErrors = (data?.pronunciationIssues ?? []).slice(0, 2).map((p: any) => ({
+          spoken: p.spoken ?? p.word,
+          correct: p.correct ?? p.word,
+          rule_category: p.rule_category ?? p.issueType,
+        }));
+
+        const grammarErrors = (data?.mistakes ?? []).slice(0, 2).map((m: any) => ({
+          original_text: m.original_text ?? m.original,
+          corrected_text: m.corrected_text ?? m.corrected,
+        }));
+
+        const sectionErrors: Record<string, any[]> = {
+          pronunciation: pronErrors,
+          grammar: grammarErrors,
+          vocabulary: [],
+          fluency: [],
+        };
+
+        const sectionJustifications: Record<string, string | undefined> = {
+          pronunciation: data?.aiFeedback?.pronunciation?.justification,
+          grammar: data?.aiFeedback?.grammar?.justification,
+          vocabulary: data?.aiFeedback?.vocabulary?.justification,
+          fluency: data?.aiFeedback?.fluency?.justification,
+        };
+
+        const sectionScores: Record<string, number> = {
+          pronunciation: data?.scores?.pronunciation ?? 0,
+          grammar: data?.scores?.grammar ?? 0,
+          vocabulary: data?.scores?.vocabulary ?? 0,
+          fluency: data?.scores?.fluency ?? 0,
+        };
+
+        const result = await fetchFeedbackNarration({
+          section: section as FeedbackSection,
+          score: sectionScores[section] ?? 0,
+          justification: sectionJustifications[section],
+          errors: sectionErrors[section],
+        });
+
+        if (!result.audio_base64) {
+          console.warn("[FeedbackAudio] TTS returned empty audio for section:", section);
+          setLoadingSection(null);
+          return;
+        }
+
+        // Write base64 MP3 to temp file
+        const tmpUri = `${FileSystem.cacheDirectory}feedback_${section}_${Date.now()}.mp3`;
+        await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        // Configure audio session and play
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: tmpUri },
+          { shouldPlay: true },
+        );
+        soundRef.current = sound;
+        setLoadingSection(null);
+        setPlayingSection(section);
+
+        // Auto-reset state when playback finishes
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            sound.unloadAsync().catch(() => {});
+            soundRef.current = null;
+            setPlayingSection(null);
+          }
+        });
+      } catch (err) {
+        console.error("[FeedbackAudio] Error:", err);
+        setLoadingSection(null);
+        setPlayingSection(null);
+      }
+    },
+    [data, playingSection],
+  );
+
   return (
     <SafeAreaView edges={["bottom"]} style={styles.container}>
       <ScrollView
@@ -1174,20 +1288,36 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
+        <LinearGradient
+          colors={theme.colors.gradients.surface as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.headerGradient,
+            { paddingTop: Math.max(insets.top, 16) },
+          ]}
+        >
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.backChip}
             onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
           >
             <Ionicons
               name="arrow-back"
-              size={24}
+              size={22}
               color={theme.colors.text.primary}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Call Feedback</Text>
-          <View style={styles.backButton} />
-        </View>
+
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Call Feedback</Text>
+            <Text style={styles.headerSubtitle}>
+              Your session insights and corrections
+            </Text>
+          </View>
+
+          <View style={styles.backChipSpacer} />
+        </LinearGradient>
 
         {/* Cap notification banner: pronunciation is holding score back */}
         {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
@@ -1362,6 +1492,9 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               vocabulary: data.aiFeedback?.vocabulary?.justification,
               fluency: data.aiFeedback?.fluency?.justification,
             }}
+            playingSection={playingSection}
+            loadingSection={loadingSection}
+            onPlay={handlePlay}
           />
         </Animated.View>
 
@@ -1750,8 +1883,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   );
 }
 
-const getStyles = (theme: any) =>
-  StyleSheet.create({
+const getStyles = (theme: any) => {
+  // Dark themes (EngR/Englivo) use light text — hardcoded white "glass" made text invisible.
+  const glassBg = `${String(theme.colors.surface)}E8`;
+  const glassBorder = theme.colors.border;
+  const cardSolid = theme.colors.surface;
+
+  return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
@@ -1766,16 +1904,53 @@ const getStyles = (theme: any) =>
       paddingHorizontal: theme.spacing.m,
       paddingVertical: theme.spacing.s,
     },
+    headerGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: theme.spacing.m,
+      paddingBottom: theme.spacing.s,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.border + "20",
+      backgroundColor: "transparent",
+      ...theme.shadows.small,
+    },
     backButton: {
       width: 40,
       height: 40,
       justifyContent: "center",
       alignItems: "center",
     },
+    backChip: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.colors.primary + "12",
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "30",
+    },
+    backChipSpacer: {
+      width: 40,
+      height: 40,
+    },
     headerTitle: {
       fontSize: theme.typography.sizes.l,
       fontWeight: "bold",
       color: theme.colors.text.primary,
+    },
+    headerSubtitle: {
+      marginTop: 2,
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "600",
+      color: theme.colors.text.secondary,
+      lineHeight: 18,
+    },
+    headerCenter: {
+      flex: 1,
+      paddingHorizontal: theme.spacing.s,
     },
     metaRow: {
       flexDirection: "row",
@@ -1791,9 +1966,9 @@ const getStyles = (theme: any) =>
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: theme.borderRadius.circle,
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor: glassBorder,
     },
     metaText: {
       fontSize: theme.typography.sizes.xs,
@@ -1985,25 +2160,25 @@ const getStyles = (theme: any) =>
     },
     // Glassmorphism card used for all sections
     glassCard: {
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       marginHorizontal: theme.spacing.l,
       borderRadius: 16,
       padding: theme.spacing.m,
       gap: theme.spacing.m,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor: glassBorder,
       ...theme.shadows.medium,
     },
     transcriptSection: {
       marginBottom: theme.spacing.s,
     },
     transcriptCard: {
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       marginHorizontal: theme.spacing.l,
       borderRadius: 16,
       padding: theme.spacing.m,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor: glassBorder,
       ...theme.shadows.medium,
       maxHeight: 240,
     },
@@ -2172,7 +2347,7 @@ const getStyles = (theme: any) =>
     },
     pronTabPillInactive: {
       backgroundColor: "transparent",
-      borderColor: "rgba(15, 23, 42, 0.10)",
+      borderColor: glassBorder,
     },
     pronTabText: {
       fontSize: theme.typography.sizes.xs,
@@ -2186,19 +2361,19 @@ const getStyles = (theme: any) =>
     },
     pronTabsBody: {
       marginHorizontal: theme.spacing.l,
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       borderRadius: 16,
       padding: theme.spacing.m,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor: glassBorder,
       ...theme.shadows.medium,
       marginBottom: theme.spacing.m,
     },
     pronIssueCard: {
-      backgroundColor: "#fff",
+      backgroundColor: cardSolid,
       borderRadius: 14,
       borderWidth: 0.5,
-      borderColor: "rgba(15, 23, 42, 0.12)",
+      borderColor: glassBorder,
       overflow: "hidden",
     },
     pronIssueTop: {
@@ -2261,7 +2436,7 @@ const getStyles = (theme: any) =>
       fontWeight: "800",
     },
     pronTranscriptWrap: {
-      backgroundColor: "rgba(255,255,255,0.6)",
+      backgroundColor: `${String(theme.colors.surface)}99`,
       borderRadius: 14,
       padding: 12,
     },
@@ -2284,10 +2459,10 @@ const getStyles = (theme: any) =>
       fontSize: 12,
     },
     pronPatternRow: {
-      backgroundColor: "#fff",
+      backgroundColor: cardSolid,
       borderRadius: 14,
       borderWidth: 0.5,
-      borderColor: "rgba(15, 23, 42, 0.12)",
+      borderColor: glassBorder,
       padding: 12,
       gap: 8,
     },
@@ -2344,11 +2519,11 @@ const getStyles = (theme: any) =>
     modalCard: {
       width: "100%",
       maxWidth: 420,
-      backgroundColor: "#fff",
+      backgroundColor: cardSolid,
       borderRadius: 18,
       padding: 16,
       borderWidth: 1,
-      borderColor: "rgba(15, 23, 42, 0.10)",
+      borderColor: glassBorder,
     },
     modalTitle: {
       fontSize: 18,
@@ -2383,11 +2558,11 @@ const getStyles = (theme: any) =>
       gap: theme.spacing.s,
     },
     strengthCard: {
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       borderRadius: 16,
       padding: theme.spacing.m,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor: glassBorder,
       borderLeftWidth: 3,
       ...theme.shadows.medium,
     },
@@ -2409,13 +2584,13 @@ const getStyles = (theme: any) =>
     },
     // Mistake cards
     mistakeCard: {
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       marginHorizontal: theme.spacing.l,
       marginBottom: theme.spacing.s,
       borderRadius: 16,
       padding: theme.spacing.m,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor: glassBorder,
       ...theme.shadows.medium,
     },
     mistakeHeader: {
@@ -2528,9 +2703,9 @@ const getStyles = (theme: any) =>
     mayaCardInner: {
       padding: theme.spacing.m,
       borderRadius: 24,
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
+      backgroundColor: glassBg,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.7)",
+      borderColor: glassBorder,
     },
     mayaHeader: {
       flexDirection: "row",
@@ -2776,3 +2951,4 @@ const getStyles = (theme: any) =>
       fontWeight: "600",
     },
   });
+};

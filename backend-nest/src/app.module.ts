@@ -30,6 +30,7 @@ import { ProgressModule } from './modules/progress/progress.module';
 import { HomeModule } from './modules/home/home.module';
 import { BrainModule } from './modules/brain/brain.module';
 import { InternalModule } from './modules/internal/internal.module';
+import { TtsModule } from './modules/tts/tts.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { InternalModule } from './modules/internal/internal.module';
     HomeModule,
     BrainModule,
     InternalModule,
+    TtsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
