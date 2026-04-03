@@ -1,6 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native";
 import Svg, { Circle } from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../../../theme/useAppTheme";
 
 interface ScoreBreakdownCardProps {
@@ -18,12 +25,21 @@ interface ScoreBreakdownCardProps {
     vocabulary?: string;
     fluency?: string;
   };
+  /** Which section is currently playing audio. null = none. */
+  playingSection?: string | null;
+  /** Which section is loading audio. null = none. */
+  loadingSection?: string | null;
+  /** Called when user taps play/pause on a section card. */
+  onPlay?: (section: string) => void;
 }
 
 export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
   scores,
   pronunciationProcessing,
   justifications,
+  playingSection,
+  loadingSection,
+  onPlay,
 }) => {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -119,59 +135,84 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
     <View style={styles.container}>
       <Text style={styles.title}>Score Breakdown</Text>
 
-      {metrics.map((metric) => (
-        <View key={metric.key}>
-          <View style={styles.metricRow}>
-            <Text style={styles.metricLabel}>{metric.label}</Text>
-            <View style={styles.scoreContainer}>
-              {metric.key === "pronunciation" ? (
-                pronunciationProcessing ? (
-                  <View style={styles.processingRow}>
-                    <ActivityIndicator size="small" color={metric.color} />
-                    <Text style={[styles.processingText, { color: metric.color }]}>
-                      Processing…
-                    </Text>
-                  </View>
-                ) : (
-                  <PronunciationRing value={metric.score} />
-                )
-              ) : (
-                <Text style={[styles.score, { color: metric.color }]}>
-                  {metric.score}/100
-                </Text>
-              )}
-            </View>
-          </View>
+      {metrics.map((metric) => {
+        const isPlaying = playingSection === metric.key;
+        const isLoading = loadingSection === metric.key;
 
-          {/* Progress bar */}
-          <View style={styles.progressBarBg}>
+        return (
+          <View key={metric.key}>
+            <View style={styles.metricRow}>
+              <Text style={styles.metricLabel}>{metric.label}</Text>
+              <View style={styles.scoreContainer}>
+                {metric.key === "pronunciation" ? (
+                  pronunciationProcessing ? (
+                    <View style={styles.processingRow}>
+                      <ActivityIndicator size="small" color={metric.color} />
+                      <Text style={[styles.processingText, { color: metric.color }]}>
+                        Processing…
+                      </Text>
+                    </View>
+                  ) : (
+                    <PronunciationRing value={metric.score} />
+                  )
+                ) : (
+                  <Text style={[styles.score, { color: metric.color }]}>
+                    {metric.score}/100
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Progress bar */}
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${Math.min(100, Math.max(0, metric.score))}%`,
+                    backgroundColor: metric.color,
+                  },
+                ]}
+              />
+            </View>
+
             <View
               style={[
-                styles.progressBarFill,
-                {
-                  width: `${Math.min(100, Math.max(0, metric.score))}%`,
-                  backgroundColor: metric.color,
-                },
+                styles.justificationContainer,
+                { backgroundColor: metric.tint },
               ]}
-            />
+            >
+              <View style={styles.justificationHeader}>
+                <Text style={[styles.justificationLabel, { color: metric.color }]}>
+                  Why this score?
+                </Text>
+                {onPlay && (
+                  <TouchableOpacity
+                    onPress={() => onPlay(metric.key)}
+                    activeOpacity={0.7}
+                    style={styles.playButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color={metric.color} />
+                    ) : (
+                      <Ionicons
+                        name={isPlaying ? "pause-circle" : "play-circle-outline"}
+                        size={22}
+                        color={metric.color}
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={styles.justificationText}>
+                {metric.justification ||
+                  `Based on your ${metric.label.toLowerCase()} during the call. ${metric.score >= 70 ? "Keep it up." : "Focus on the tips below to improve."}`}
+              </Text>
+            </View>
           </View>
-
-          <View
-            style={[
-              styles.justificationContainer,
-              { backgroundColor: metric.tint },
-            ]}
-          >
-            <Text style={[styles.justificationLabel, { color: metric.color }]}>
-              Why this score?
-            </Text>
-            <Text style={styles.justificationText}>
-              {metric.justification ||
-                `Based on your ${metric.label.toLowerCase()} during the call. ${metric.score >= 70 ? "Keep it up." : "Focus on the tips below to improve."}`}
-            </Text>
-          </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 };
@@ -258,10 +299,21 @@ const getStyles = (theme: any) =>
       borderRadius: 8,
       marginBottom: 12,
     },
+    justificationHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 2,
+    },
     justificationLabel: {
       fontSize: 11,
       fontWeight: "600",
-      marginBottom: 2,
+    },
+    playButton: {
+      width: 24,
+      height: 24,
+      justifyContent: "center",
+      alignItems: "center",
     },
     justificationText: {
       fontSize: 12,

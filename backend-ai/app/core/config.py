@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     analysis_model: str = "gemini"
     pronunciation_model: str = "azure"
     cefr_model: str = "huggingface"
-    tts_provider: str = "azure"  # "azure" or "inworld"
+    tts_provider: str = "inworld"  # "azure" or "inworld"
     
     # Feature Flags
     enable_pronunciation_scoring: bool = True
