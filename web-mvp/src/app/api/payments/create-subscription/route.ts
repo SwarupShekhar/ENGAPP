@@ -21,18 +21,21 @@ export async function POST(req: NextRequest) {
   const existing = await db.subscription.findUnique({ where: { clerkId: userId } })
   if (existing && existing.status === 'ACTIVE') {
     const currentEffective = getEffectivePlan(existing) as Plan
-    if (isPlanHigherOrEqual(currentEffective, plan as Plan)) {
+    // Same plan → already subscribed
+    if (currentEffective === (plan as Plan)) {
       return NextResponse.json(
         { error: 'ALREADY_SUBSCRIBED', currentPlan: currentEffective },
         { status: 409 },
       )
     }
-    if (PLAN_TO_RAZORPAY_ID[currentEffective]) {
+    // Requesting a lower tier → downgrade not supported in Phase 1
+    if (isPlanHigherOrEqual(currentEffective, plan as Plan)) {
       return NextResponse.json(
         { error: 'DOWNGRADE_NOT_SUPPORTED', message: 'Contact support to downgrade.' },
         { status: 400 },
       )
     }
+    // currentEffective < plan → upgrade, fall through to create subscription
   }
 
   let razorpayCustomerId = existing?.razorpayCustomerId ?? null
