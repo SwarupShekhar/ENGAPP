@@ -24,6 +24,7 @@ import EnglivoBookingScreen from "../features/englivo/screens/EnglivoBookingScre
 import EnglivoSessionModeScreen from "../features/englivo/screens/EnglivoSessionModeScreen";
 import EnglivoAiConversationScreen from "../features/englivo/screens/EnglivoAiConversationScreen";
 import EnglivoActiveCallScreen from "../features/englivo/screens/EnglivoActiveCallScreen";
+import TutorConnectPreferenceScreen from '../features/englivo/screens/TutorConnectPreferenceScreen'
 
 // Safe wrapper for InCallScreen — LiveKit requires native modules
 // that are not available in Expo Go. This defers the import.
@@ -40,6 +41,36 @@ try {
 function InCallScreen(props: any) {
   if (RealInCallScreen) {
     return <RealInCallScreen {...props} />;
+  }
+  return (
+    <View style={expoGoFallback.container}>
+      <Text style={expoGoFallback.emoji}>📞</Text>
+      <Text style={expoGoFallback.title}>Calling Not Available</Text>
+      <Text style={expoGoFallback.subtitle}>
+        LiveKit requires a development build.{"\n"}
+        Run `npx expo run:ios` or `npx expo run:android` to test calls.
+      </Text>
+      <Text
+        style={expoGoFallback.back}
+        onPress={() => props.navigation.goBack()}
+      >
+        ← Go Back
+      </Text>
+    </View>
+  );
+}
+
+// Safe wrapper for EnglivoLiveCallScreen — same LiveKit constraint
+let RealEnglivoLiveCallScreen: React.ComponentType<any> | null = null;
+try {
+  RealEnglivoLiveCallScreen = require("../features/englivo/screens/EnglivoLiveCallScreen").default;
+} catch (e) {
+  console.warn("[LiveKit] EnglivoLiveCallScreen not available in Expo Go");
+}
+
+function EnglivoLiveCallScreen(props: any) {
+  if (RealEnglivoLiveCallScreen) {
+    return <RealEnglivoLiveCallScreen {...props} />;
   }
   return (
     <View style={expoGoFallback.container}>
@@ -145,6 +176,15 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
       <Stack.Screen name="EnglivoSessionMode" component={EnglivoSessionModeScreen} />
       <Stack.Screen name="EnglivoAiConversation" component={EnglivoAiConversationScreen} />
       <Stack.Screen name="EnglivoActiveCall" component={EnglivoActiveCallScreen} />
+      <Stack.Screen
+        name="TutorConnectPreference"
+        component={TutorConnectPreferenceScreen}
+      />
+      <Stack.Screen
+        name="EnglivoLiveCall"
+        component={EnglivoLiveCallScreen}
+        options={{ gestureEnabled: false }}
+      />
 
       {/* Chat */}
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
