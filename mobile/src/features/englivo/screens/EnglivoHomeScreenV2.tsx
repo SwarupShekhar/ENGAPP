@@ -44,9 +44,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { getMe } from "../../../api/englivo/user";
+import { getMe as getQuotaMe, type MeResponse } from "../../../api/englivo/quota";
 import { getBridgeUser, syncBridgeCefr } from "../../../api/bridgeClient";
+import UpgradeSheet from "../components/UpgradeSheet";
 import { getSessionsCount, getUpcomingSession } from "../../../api/englivoClient";
+import { joinSession, getInstantTutorToken } from "../../../api/englivoApi";
 import { ModeSwitcher } from "../../../components/navigation/ModeSwitcher";
+import { ENGLIVO_AI_TUTOR_TITLE } from "../constants";
 
 const { width } = Dimensions.get("window");
 
@@ -212,10 +216,10 @@ const tick = StyleSheet.create({
 });
 
 // ─── Session Ticket Card ──────────────────────────────────────────────────────
-function TicketCard({ session }: { session: any }) {
+function TicketCard({ session, onJoin }: { session: any; onJoin?: () => void }) {
   const timeStr = session?.dateTime ?? session?.time ?? "—";
   const tutor = session?.tutorName ?? "Tutor";
-  const type = session?.type === "AI" ? "AI Tutor" : "Human Tutor";
+  const type = session?.type === "AI" ? ENGLIVO_AI_TUTOR_TITLE : "Human Tutor";
 
   return (
     <View style={ticket.wrap}>
@@ -237,7 +241,7 @@ function TicketCard({ session }: { session: any }) {
         </View>
       </View>
       {/* Right — join btn */}
-      <TouchableOpacity style={ticket.joinBtn}>
+      <TouchableOpacity style={ticket.joinBtn} onPress={onJoin}>
         <Text style={ticket.joinText}>Join</Text>
       </TouchableOpacity>
     </View>
@@ -298,10 +302,14 @@ export default function EnglivoHomeScreenV2() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bridgeLoading, setBridgeLoading] = useState(false);
+  const [callingNow, setCallingNow] = useState(false);
+  const [quota, setQuota] = useState<MeResponse | null>(null);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [cefrLevel, setCefrLevel] = useState("A1");
   const [streak, setStreak] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
+  const [credits, setCredits] = useState<number | null>(null);
   const [sessionsCount, setSessionsCount] = useState(0);
   const [upcomingSession, setUpcomingSession] = useState<any | null>(null);
 
@@ -310,6 +318,8 @@ export default function EnglivoHomeScreenV2() {
       const [me] = await Promise.all([getMe()]);
       setFirstName(me?.firstName ?? clerkUser?.firstName ?? "");
       if (me?.totalMinutes) setTotalMinutes(me.totalMinutes);
+      if (me?.credits != null) setCredits(me.credits);
+      else if (me?.creditBalance != null) setCredits(me.creditBalance);
 
       // Sync Englivo CEFR level to bridge so Pulse/Core both see it
       if (me?.cefrLevel && clerkUser?.id) {
@@ -330,6 +340,14 @@ export default function EnglivoHomeScreenV2() {
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
+  useFocusEffect(
+    useCallback(() => {
+      getQuotaMe()
+        .then(setQuota)
+        .catch(console.error);
+    }, []),
+  );
+
   useEffect(() => {
     if (!clerkUser?.id) return;
     setBridgeLoading(true);
@@ -345,6 +363,25 @@ export default function EnglivoHomeScreenV2() {
   }, [clerkUser?.id]);
 
   const displayName = firstName || clerkUser?.firstName || "Learner";
+
+  const handleCallNow = async () => {
+    if (callingNow) return;
+    setCallingNow(true);
+    try {
+      const sessionToken = await getInstantTutorToken();
+      navigation.navigate("EnglivoLiveCall", {
+        token: sessionToken.token,
+        roomName: sessionToken.roomName,
+        tutorName: sessionToken.tutorName ?? "Your Tutor",
+        serverUrl: sessionToken.serverUrl,
+        freeMinutesRemaining: sessionToken.freeMinutesRemaining,
+      });
+    } catch (e) {
+      console.warn("[Englivo] getInstantTutorToken failed:", e);
+    } finally {
+      setCallingNow(false);
+    }
+  };
 
   return (
     <SafeAreaView style={s.root}>
@@ -390,6 +427,9 @@ export default function EnglivoHomeScreenV2() {
             <StatTick icon="chatbubbles-outline" value={`${sessionsCount}`} label="sessions" />
             <StatTick icon="time-outline" value={`${totalMinutes}m`} label="practiced" />
             <StatTick icon="ribbon-outline" value={cefrLevel} label="level" />
+            {credits !== null && (
+              <StatTick icon="wallet-outline" value={`${credits}`} label="credits" />
+            )}
           </ScrollView>
         </Animated.View>
 
@@ -414,7 +454,10 @@ export default function EnglivoHomeScreenV2() {
                 </View>
               </View>
 
-              <Text style={s.aiCardTitle}>Practice with{"\n"}AI Tutor</Text>
+              <Text style={s.aiCardTitle}>
+                Practice with{"\n"}
+                {ENGLIVO_AI_TUTOR_TITLE}
+              </Text>
               <Text style={s.aiCardSub}>Speak freely · Get real feedback</Text>
 
               <View style={s.aiCardBottom}>
@@ -424,6 +467,49 @@ export default function EnglivoHomeScreenV2() {
                 </View>
               </View>
             </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* ── CALL A TUTOR NOW ──────────────────────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(220).duration(500)} style={{ paddingHorizontal: 20, marginTop: 14 }}>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onPress={() => {
+              const isExhausted =
+                quota !== null &&
+                quota.plan === 'FREE' &&
+                quota.quota.remainingSeconds === 0;
+              if (isExhausted) {
+                setUpgradeVisible(true);
+              } else {
+                navigation.navigate('TutorConnectPreference');
+              }
+            }}
+            disabled={callingNow}
+            style={s.callNowCard}
+          >
+            <View style={s.callNowLeft}>
+              <View style={s.callNowIconRing}>
+                {callingNow ? (
+                  <Ionicons name="hourglass-outline" size={22} color={C.void} />
+                ) : quota?.plan === 'FREE' && quota?.quota.remainingSeconds === 0 ? (
+                  <Ionicons name="lock-closed" size={22} color={C.ash} />
+                ) : (
+                  <Ionicons name="call-outline" size={22} color={C.goldMid} />
+                )}
+              </View>
+              <View>
+                <Text style={s.callNowTitle}>
+                  {callingNow ? "Connecting…" : "Call a Tutor Now"}
+                </Text>
+                <Text style={s.callNowSub}>
+                  {credits !== null && credits > 0
+                    ? `${credits} credits · Instant connection`
+                    : "10 free minutes for new users"}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.void} style={{ opacity: 0.6 }} />
           </TouchableOpacity>
         </Animated.View>
 
@@ -480,7 +566,23 @@ export default function EnglivoHomeScreenV2() {
             onAction={() => navigation.navigate("EnglivoSessions")}
           />
           {upcomingSession ? (
-            <TicketCard session={upcomingSession} />
+            <TicketCard
+              session={upcomingSession}
+              onJoin={async () => {
+                try {
+                  const sessionToken = await joinSession(upcomingSession.id);
+                  navigation.navigate("EnglivoLiveCall", {
+                    token: sessionToken.token,
+                    roomName: sessionToken.roomName,
+                    tutorName: sessionToken.tutorName,
+                    serverUrl: sessionToken.serverUrl,
+                    freeMinutesRemaining: sessionToken.freeMinutesRemaining,
+                  });
+                } catch (e) {
+                  console.warn("[Englivo] joinSession failed:", e);
+                }
+              }}
+            />
           ) : (
             <View style={s.emptyTicket}>
               <Ionicons name="calendar-outline" size={24} color={C.ashDark} style={{ marginBottom: 8 }} />
@@ -520,6 +622,16 @@ export default function EnglivoHomeScreenV2() {
           </View>
         </Animated.View>
       </ScrollView>
+      <UpgradeSheet
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        onUpgraded={() => {
+          setUpgradeVisible(false);
+          getQuotaMe().then(setQuota).catch(console.error);
+        }}
+        userEmail={clerkUser?.primaryEmailAddress?.emailAddress}
+        userName={clerkUser?.fullName ?? undefined}
+      />
     </SafeAreaView>
   );
 }
@@ -657,4 +769,46 @@ const s = StyleSheet.create({
   },
   focusTitle: { fontSize: 16, fontWeight: "700", color: C.white, marginBottom: 6 },
   focusSub: { fontSize: 13, color: C.ash, lineHeight: 20 },
+
+  // Call a Tutor Now card
+  callNowCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.goldMid,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    shadowColor: C.goldMid,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  callNowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flex: 1,
+  },
+  callNowIconRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  callNowTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: C.void,
+    letterSpacing: -0.2,
+  },
+  callNowSub: {
+    fontSize: 12,
+    color: C.void,
+    opacity: 0.65,
+    marginTop: 2,
+  },
 });
