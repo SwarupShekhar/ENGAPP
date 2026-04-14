@@ -36,7 +36,7 @@ model UserQuota {
   clerkId            String    @unique
   weekStartDate      DateTime  // Monday 00:00 UTC of current window
   freeSecondsUsed    Int       @default(0)
-  rolledOverSeconds  Int       @default(0)  // carried from last week
+  rolledOverSeconds  Int       @default(0)  // carried from last week, consumed first
   aiCreditsGranted   Int       @default(0)
   aiCreditsUsed      Int       @default(0)
   creditMonthStart   DateTime?
@@ -78,12 +78,53 @@ enum Plan      { FREE STARTER PRO PREMIUM ENTERPRISE }
 enum SubStatus { ACTIVE CANCELLED PAST_DUE PAUSED }
 ```
 
-### 2.2 Quota resolution logic (server-side, not in DB)
+### 2.2 Quota resolution logic — `resolveQuota(clerkId)`
 
+**This is a shared server-side helper called from both `/api/me` and `/api/livekit/token`.** It runs the lazy weekly reset before returning quota data, so both endpoints always see the correct state.
+
+```ts
+// web-mvp/src/lib/resolveQuota.ts
+export async function resolveQuota(clerkId: string): Promise<ResolvedQuota> {
+  const sub  = await getOrCreateSubscription(clerkId)
+  const effectivePlan = getEffectivePlan(sub)  // see § 4.6 — CANCELLED past period → FREE
+  const quota = await getOrCreateQuota(clerkId)
+  const config = PLAN_QUOTAS[effectivePlan]
+
+  // Lazy weekly reset
+  const currentMonday = getMondayUTC(new Date())
+  if (quota.weekStartDate < currentMonday) {
+    const weeklyLimit = config.weeklyTutorSeconds  // null = unlimited
+    // Guard: unlimited plans (null) produce no rollover — no ceiling to carry
+    const unused = weeklyLimit !== null
+      ? Math.max(0, weeklyLimit - quota.freeSecondsUsed)
+      : 0
+    const maxRollover = weeklyLimit !== null
+      ? weeklyLimit * config.rolloverWeeks
+      : 0
+    const rollover = Math.min(unused, maxRollover)
+    await db.userQuota.update({
+      where: { clerkId },
+      data: {
+        freeSecondsUsed:   0,
+        rolledOverSeconds: rollover,
+        weekStartDate:     currentMonday,
+      },
+    })
+    quota.freeSecondsUsed   = 0
+    quota.rolledOverSeconds = rollover
+    quota.weekStartDate     = currentMonday
+  }
+
+  const weeklyLimit = config.weeklyTutorSeconds
+  const remaining = weeklyLimit === null
+    ? null  // unlimited
+    : Math.max(0, weeklyLimit - quota.freeSecondsUsed + quota.rolledOverSeconds)
+
+  return { effectivePlan, config, quota, remainingSeconds: remaining }
+}
 ```
-weeklyLimit(plan)  = PLAN_QUOTAS[plan].weeklyTutorSeconds   // null = unlimited
-availableSeconds   = weeklyLimit - freeSecondsUsed + rolledOverSeconds
-```
+
+`getEffectivePlan` handles the CANCELLED-but-still-in-period edge case (see § 4.6).
 
 ---
 
@@ -107,9 +148,9 @@ export const PLAN_QUOTAS = {
 All routes require Clerk auth (`auth()` from `@clerk/nextjs/server`).
 
 ### 4.1 `GET /api/me`
-Returns user profile + active plan + current quota status.
 
-Response:
+Calls `resolveQuota(clerkId)` first (runs lazy reset), then returns:
+
 ```json
 {
   "clerkId": "user_xxx",
@@ -136,62 +177,86 @@ Response:
 Query params: `?category=basics|general|business&mode=human|ai`
 
 Logic:
-1. Resolve user's plan + quota from DB.
+1. Call `resolveQuota(clerkId)` — this runs the lazy reset so quota is always fresh.
 2. If `mode=human`:
-   - Check `remainingSeconds > 0` (or plan is PREMIUM/ENTERPRISE).
-   - If quota exhausted → return `{ error: "QUOTA_EXHAUSTED", remainingSeconds: 0 }` (HTTP 402).
+   - If `remainingSeconds === 0` (and plan is not PREMIUM/ENTERPRISE) → return `{ error: "QUOTA_EXHAUSTED", remainingSeconds: 0 }` (HTTP 402).
 3. Issue LiveKit token for room on `wss://ssengst-174tfe9o.livekit.cloud`.
 4. Return `{ token, roomName, serverUrl, freeMinutesRemaining, tutorName?, creditsPerMinute? }`.
 
 ### 4.3 `POST /api/sessions/call-end`
 
-Body: `{ sessionId, durationSeconds: number }`
+Body: `{ sessionId: string, durationSeconds: number }`
+
+**Deduplication:** use `sessionId` as an idempotency key. Store processed session IDs on `UserQuota` (or a separate `ProcessedSession` set). If `sessionId` already processed, return 200 with current quota and skip deduction. This means the mobile fire-and-forget and the LiveKit webhook can both fire — only the first one deducts.
 
 Logic:
-1. Deduct `durationSeconds` from `UserQuota.freeSecondsUsed` (or `Organization.poolUsedSeconds` for enterprise).
-2. Cap: `freeSecondsUsed` cannot exceed `weeklyLimit`.
-3. Return updated quota.
-4. Trigger Bridge plan sync (fire-and-forget, non-blocking).
+1. Check `ProcessedSession` table for `sessionId`. If found → return current quota, done.
+2. Insert `sessionId` into `ProcessedSession`.
+3. Deduct `durationSeconds` from `UserQuota.freeSecondsUsed` (cap at `weeklyLimit`), or from `Organization.poolUsedSeconds` for ENTERPRISE.
+4. Return updated quota.
+5. Sync Bridge (fire-and-forget — call-end sync is informational, not plan-critical).
+
+```prisma
+// Add to schema
+model ProcessedSession {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique
+  clerkId       String
+  deductedSeconds Int
+  processedAt   DateTime @default(now())
+}
+```
 
 ### 4.4 Weekly quota reset
 
-Run on every `GET /api/me` and `GET /api/livekit/token` call:
+Handled entirely inside `resolveQuota()` — called lazily on `/api/me` and `/api/livekit/token`. No cron needed.
 
+**Rollover guard for unlimited plans:**
 ```
-currentMonday = getMondayUTC(now())
-if quota.weekStartDate < currentMonday:
-  compute rollover = min(unusedSeconds, rolloverLimit(plan))
-  reset freeSecondsUsed = 0
-  set rolledOverSeconds = rollover
-  set weekStartDate = currentMonday
+if weeklyLimit === null → rollover = 0
 ```
-
-No separate cron needed — lazy reset on access.
+Unlimited plans (PREMIUM, ENTERPRISE) never need rollover — matches spec table.
 
 ### 4.5 `POST /api/payments/create-subscription`
 
-Body: `{ plan: "STARTER"|"PRO"|"PREMIUM", billingCycle: "monthly"|"yearly" }`
+Body: `{ plan: "STARTER"|"PRO"|"PREMIUM", billingCycle: "monthly" }`
 
-Logic:
-1. Create or retrieve Razorpay customer for this `clerkId`.
-2. Create Razorpay Subscription on the matching plan ID.
-3. Return `{ subscriptionId, shortUrl }` — mobile opens `shortUrl` in Razorpay checkout.
+**Duplicate subscription guard:**
+1. Fetch existing `Subscription` for `clerkId`.
+2. If `status === ACTIVE` and `plan` is same or higher tier → return HTTP 409 `{ error: "ALREADY_SUBSCRIBED", currentPlan }`.
+3. If `status === ACTIVE` and requesting lower tier → return HTTP 400 `{ error: "DOWNGRADE_NOT_SUPPORTED" }`. Downgrades are manual in Phase 1.
+4. Otherwise: create/retrieve Razorpay customer, create Razorpay Subscription, return `{ subscriptionId, shortUrl }`.
+
+Note: yearly billing excluded from Phase 1 (added post-launch).
 
 ### 4.6 `POST /api/payments/webhook`
 
-Validates Razorpay webhook signature (`X-Razorpay-Signature`).
+Validates Razorpay webhook signature (`X-Razorpay-Signature` header).
+
+**`getEffectivePlan(sub)`** — used by `resolveQuota`:
+```ts
+function getEffectivePlan(sub: Subscription): Plan {
+  if (sub.status === 'CANCELLED' && sub.currentPeriodEnd && new Date() > sub.currentPeriodEnd) {
+    return 'FREE'
+  }
+  return sub.plan
+}
+```
 
 Events handled:
+
 | Event | Action |
 |---|---|
-| `subscription.activated` | Set plan + status ACTIVE, set `currentPeriodEnd`, sync Bridge |
-| `subscription.charged` | Renew `currentPeriodEnd`, grant monthly AI credits, sync Bridge |
-| `subscription.cancelled` | Set status CANCELLED, downgrade to FREE on `currentPeriodEnd`, sync Bridge |
-| `subscription.halted` | Set status PAST_DUE, sync Bridge |
+| `subscription.activated` | Set `plan`, `status=ACTIVE`, `currentPeriodEnd`. **Retry Bridge sync up to 3× (2s delay).** |
+| `subscription.charged` | Renew `currentPeriodEnd`, grant monthly AI credits. **Retry Bridge sync up to 3× (2s delay).** |
+| `subscription.cancelled` | Set `status=CANCELLED`, keep `plan` + `currentPeriodEnd` intact. User retains access until period end — `getEffectivePlan` downgrades to FREE after that. **Retry Bridge sync up to 3× (2s delay).** |
+| `subscription.halted` | Set `status=PAST_DUE`. Keep current plan values — Pulse not affected. Bridge sync fire-and-forget. |
+
+**Why retry on payment events but not call-end:** Bridge sync failure on a payment event means Pulse shows wrong plan (user paid but still sees call limit). That's a real UX bug. Call-end sync failure is informational only — Pulse plan status doesn't change.
 
 ### 4.7 `POST /api/payments/create-enterprise-order`
 
-Creates a Razorpay Order (one-time or recurring) for enterprise. Admin-only. Out of scope for Phase 1 mobile — managed via web dashboard.
+Out of scope for Phase 1 mobile — managed manually via web dashboard.
 
 ---
 
@@ -202,11 +267,10 @@ Creates a Razorpay Order (one-time or recurring) for enterprise. Admin-only. Out
 | Plan ID (slug) | Amount | Interval |
 |---|---|---|
 | `core_starter_monthly` | ₹39900 (paise) | monthly |
-| `core_starter_yearly` | ₹399900 | yearly |
 | `core_pro_monthly` | ₹59900 | monthly |
-| `core_pro_yearly` | ₹599900 | yearly |
 | `core_premium_monthly` | ₹89900 | monthly |
-| `core_premium_yearly` | ₹899900 | yearly |
+
+Yearly plans excluded from Phase 1.
 
 ### 5.2 Environment variables (`web-mvp/.env`)
 ```
@@ -216,7 +280,14 @@ RAZORPAY_WEBHOOK_SECRET=xxx
 ```
 
 ### 5.3 Mobile Razorpay checkout
-Use `react-native-razorpay` package. On plan selection, call `/api/payments/create-subscription`, receive `shortUrl`, open with `Razorpay.open({ subscription_id, ... })`. On success callback, poll `/api/me` until plan reflects upgrade (webhook may be slightly delayed — poll up to 10s with 2s interval).
+
+Use `react-native-razorpay` package. On plan selection:
+1. Call `/api/payments/create-subscription` → receive `{ subscriptionId, shortUrl }`.
+2. Open `Razorpay.open({ subscription_id: subscriptionId, ... })`.
+3. On success callback: poll `/api/me` every 3s up to 30s.
+4. Show "Verifying payment…" spinner after 10s so user knows it's still working (Razorpay webhook delivery can take 15–30s in production).
+5. On plan change detected in poll response → dismiss spinner, navigate to success state.
+6. If 30s elapsed without plan change → show "Payment received — your plan will activate shortly" (don't block the user).
 
 ---
 
@@ -235,18 +306,21 @@ Use `react-native-razorpay` package. On plan selection, call `/api/payments/crea
 }
 ```
 
-Bridge stores these on the user record. Existing `GET /user/:clerkId` response gains a `plan` field.
+Bridge stores these on the user record. Existing `GET /user/:clerkId` gains a `plan` field.
 
 ### 6.2 When Core syncs to Bridge
 
-- After `subscription.activated` webhook
-- After `subscription.charged` webhook
-- After `subscription.cancelled` (downgrade to FREE values)
-- After `subscription.halted` (keep current plan values, Pulse not affected)
+| Event | Sync behaviour |
+|---|---|
+| `subscription.activated` | Retry up to 3× with 2s delay |
+| `subscription.charged` | Retry up to 3× with 2s delay |
+| `subscription.cancelled` | Sync FREE values immediately (user is still on paid plan but Bridge reflects future state) — retry up to 3× |
+| `subscription.halted` | Fire-and-forget — plan values unchanged |
+| `call-end` | Fire-and-forget — informational only |
 
 ### 6.3 How Pulse uses Bridge plan data
 
-- `pulseCallsPerWeek: null` → unlimited. Pulse tracks call count in its own DB against this limit for free users.
+- `pulseCallsPerWeek: null` → unlimited. Pulse tracks call count against this limit for free users.
 - Pulse reads plan on session creation via existing `GET /user/:clerkId`.
 - Pulse does NOT call Core directly.
 
@@ -281,33 +355,33 @@ Three category cards:
 └─────────────────────────────────────┘
 ```
 
-Selected category is passed as `?category=basics|general|business` to `/api/livekit/token`.
+Selected category passed as `?category=basics|general|business` to `/api/livekit/token`.
 
 ### 7.2 Quota check before showing TutorConnect button
 
-`EnglivoHomeScreen` calls `GET /api/me` on mount. If `remainingSeconds === 0` and plan is FREE, the "Call a Tutor" button shows a lock icon. Tapping it opens the upgrade bottom sheet instead of navigating to TutorConnectPreference.
+`EnglivoHomeScreen` calls `GET /api/me` on mount. If `remainingSeconds === 0` and plan is FREE, the "Call a Tutor" button shows a lock icon. Tapping it opens `UpgradeSheet` instead of navigating to `TutorConnectPreference`.
 
 ### 7.3 Paywall bottom sheet (`UpgradeSheet`)
 
 Triggered when:
-- User taps locked "Call a Tutor" button (quota exhausted)
+- User taps locked "Call a Tutor" button
 - `/api/livekit/token` returns 402 `QUOTA_EXHAUSTED`
 
-Shows 3 plan cards (Starter / Pro / Premium) with monthly/yearly toggle. Yearly shown as `₹Xk/yr (save 20%)`. Tapping a plan calls `/api/payments/create-subscription` then opens Razorpay checkout.
+Shows 3 plan cards (Starter / Pro / Premium). Tapping a plan calls `/api/payments/create-subscription`, opens Razorpay checkout, then polls `/api/me` per § 5.3.
 
 ### 7.4 In-call free time warning
 
-Already implemented in `EnglivoLiveCallScreen` — shows warning at 2 minutes remaining. No changes needed here.
+Already implemented in `EnglivoLiveCallScreen` — shows warning at 2 minutes remaining. No changes needed.
 
 ### 7.5 Call-end deduction
 
-When `EnglivoLiveCallScreen` unmounts (call ended), POST to `/api/sessions/call-end` with actual elapsed seconds. Fire-and-forget from mobile; also call from server via LiveKit webhook for reliability.
+On `EnglivoLiveCallScreen` unmount: POST to `/api/sessions/call-end` with `{ sessionId, durationSeconds }` — fire-and-forget from mobile. LiveKit webhook also fires the same endpoint. Deduplication via `ProcessedSession` table (§ 4.3) ensures only one deduction occurs regardless of which arrives first.
 
 ---
 
 ## 8. Tutor Category Routing
 
-`/api/livekit/token?category=basics|general|business` passes category to the LiveKit room metadata. The tutor-side app reads room metadata to know which session type was requested. In Phase 1 there is no automated tutor matching by category — the category is stored on the session record and shown to the tutor when they join. Automated category-based matching is Phase 2.
+`/api/livekit/token?category=basics|general|business` passes category in LiveKit room metadata. Category is stored on the session record and shown to the tutor when they join. Automated category-based tutor matching is Phase 2.
 
 ---
 
@@ -315,16 +389,19 @@ When `EnglivoLiveCallScreen` unmounts (call ended), POST to `/api/sessions/call-
 
 - AI credit earn/spend loop (Phase 2 spec)
 - Automated tutor matching by category
-- Enterprise admin web portal (enterprise orders handled manually)
-- Yearly billing (monthly only for launch; yearly added after validating pricing)
+- Enterprise admin web portal (manual)
+- Yearly billing (added post-launch)
+- Downgrade self-service (manual only)
 - Referral credits or streak multipliers
 
 ---
 
 ## 10. Success Criteria
 
-- New user signs in → can immediately start a tutor call → call ends → seconds deducted from quota
-- After 30 min exhausted → lock icon on call button → upgrade sheet appears
-- User pays via Razorpay → plan updates within 10s (webhook + poll) → button unlocks
+- New user signs in → can immediately start a tutor call → call ends → seconds deducted from quota (exactly once — idempotency key prevents double deduction)
+- After 30 min exhausted → lock icon on call button → `UpgradeSheet` appears
+- User pays via Razorpay → plan updates within 30s (webhook + poll) → button unlocks
 - Bridge `GET /user/:clerkId` returns correct `plan` after upgrade → Pulse lifts call limit
-- `[Pulse] pulseCallsPerWeek=null` for any paid user
+- `pulseCallsPerWeek=null` for any paid user on Bridge
+- CANCELLED subscription: user retains access until `currentPeriodEnd`, then downgrades to FREE on next `/api/me` or `/api/livekit/token` call
+- PREMIUM user: `resolveQuota` returns `remainingSeconds=null`, rollover=0, no quota gate applied
