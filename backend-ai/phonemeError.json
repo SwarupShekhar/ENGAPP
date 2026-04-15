@@ -3981,5 +3981,82 @@
       "Indian_English_Phoneme": "/ʊl/",
       "Indian_Spelling_Approximation": "bet-tull",
       "Rule_Category": "syllabic_lengthening"
+    },
+    {
+      "Word": "english",
+      "Standard_Phoneme": "/ʃ/",
+      "Indian_English_Phoneme": "/s/",
+      "Indian_Spelling_Approximation": "englis",
+      "Rule_Category": "final_consonant_cluster"
+    },
+    {
+      "Word": "english",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/ɪ/",
+      "Indian_Spelling_Approximation": "inglish",
+      "Rule_Category": "final_consonant_cluster"
+    },
+    {
+      "Word": "english",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/e/",
+      "Indian_Spelling_Approximation": "engless",
+      "Rule_Category": "vowel_reduction"
+    },
+    {
+      "Word": "very",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/w/",
+      "Indian_Spelling_Approximation": "wery",
+      "Rule_Category": "v_to_w"
+    },
+    {
+      "Word": "very",
+      "Standard_Phoneme": "/v/",
+      "Indian_English_Phoneme": "/b/",
+      "Indian_Spelling_Approximation": "bery",
+      "Rule_Category": "b_to_v"
+    },
+    {
+      "Word": "people",
+      "Standard_Phoneme": "/iː/",
+      "Indian_English_Phoneme": "/e/",
+      "Indian_Spelling_Approximation": "pepul",
+      "Rule_Category": "vowel_substitution"
+    },
+    {
+      "Word": "people",
+      "Standard_Phoneme": "/iː/",
+      "Indian_English_Phoneme": "/iː/",
+      "Indian_Spelling_Approximation": "peeple",
+      "Rule_Category": "vowel_substitution"
+    },
+    {
+      "Word": "film",
+      "Standard_Phoneme": "/ɪ/",
+      "Indian_English_Phoneme": "/ʊ/",
+      "Indian_Spelling_Approximation": "fillum",
+      "Rule_Category": "vowel_insertion"
+    },
+    {
+      "Word": "explain",
+      "Standard_Phoneme": "/ks/",
+      "Indian_English_Phoneme": "/s/",
+      "Indian_Spelling_Approximation": "expain",
+      "Rule_Category": "consonant_cluster_reduction"
+    },
+    {
+      "Word": "explain",
+      "Standard_Phoneme": "/e/",
+      "Indian_English_Phoneme": "/ɛ/",
+      "Indian_Spelling_Approximation": "explen",
+      "Rule_Category": "consonant_cluster_reduction"
+    },
+    {
+      "Word": "college",
+      "Standard_Phoneme": "/dʒ/",
+      "Indian_English_Phoneme": "/ɡ/",
+      "Indian_Spelling_Approximation": "coleg",
+      "Rule_Category": "final_consonant_cluster"
     }
   ]

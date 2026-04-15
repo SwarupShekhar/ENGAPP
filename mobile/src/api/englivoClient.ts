@@ -1,6 +1,7 @@
 import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import { client as nestClient } from "./client";
 
 const IS_PROD = !__DEV__;
 const FORCE_LOCAL = false;
@@ -14,6 +15,8 @@ const EXTRA_API_URL_OVERRIDE =
   (Constants.manifest as any)?.extra?.englivoApiUrlOverride ||
   null;
 
+// Production: https://englivo.com — paths use /api/... prefix (Next.js BFF for profile, tutor, etc.)
+// Core session stats (count / upcoming) are served by Nest — see getSessionsCount / getUpcomingSession.
 export const API_URL =
   (typeof EXTRA_API_URL_OVERRIDE === "string" && EXTRA_API_URL_OVERRIDE.trim()
     ? EXTRA_API_URL_OVERRIDE.trim()
@@ -39,43 +42,16 @@ export const client = axios.create({
   timeout: 90000,
 });
 
-// Separate client for session endpoints that go to NestJS backend
-export const sessionClient = axios.create({
-  baseURL: API_URL.replace(/:\d+/, ':3004'), // Use port 3004 for NestJS
-  headers: {
-    "Content-Type": "application/json",
-    "X-Client": "app",
-  },
-  timeout: 90000,
-});
+// ── Auth pattern 1: static token string (set from top-level hook) ──────────────
+// Use setEnglivoAuthToken() from a component that has Clerk hook access.
+let _authToken: string | null = null;
 
-// Copy auth interceptor to session client
-sessionClient.interceptors.request.use(
-  async (config) => {
-    if (getToken) {
-      try {
-        const token = await getToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        } else {
-          console.warn(
-            `[Session API] getToken returned null for URL: ${config.url}`,
-          );
-        }
-      } catch (e) {
-        console.error(
-          `[Session API] Failed to retrieve token for URL: ${config.url}:`,
-          e,
-        );
-      }
-    } else {
-      console.warn(`[Session API] No token fetcher configured yet! URL: ${config.url}`);
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+export const setEnglivoAuthToken = (token: string | null) => {
+  _authToken = token;
+};
 
+// ── Auth pattern 2: async fetcher (preferred — always gets a fresh token) ──────
+// App.tsx wires this via AuthTokenInjector on startup.
 let getToken: (() => Promise<string | null>) | null = null;
 
 export const setAuthTokenFetcher = (fetcher: () => Promise<string | null>) => {
@@ -100,22 +76,27 @@ client.interceptors.request.use(
           e,
         );
       }
+    } else if (_authToken) {
+      // Fallback to static token if fetcher not configured yet
+      config.headers.Authorization = `Bearer ${_authToken}`;
     } else {
-      console.warn(`[Englivo API] No token fetcher configured yet! URL: ${config.url}`);
+      console.warn(`[Englivo API] No token configured yet! URL: ${config.url}`);
     }
     return config;
   },
   (error) => Promise.reject(error),
 );
 
+/** Conversation session counts — NestJS `GET /sessions/count` (not Englivo `/api`). */
 export async function getSessionsCount(): Promise<number> {
-  const r = await sessionClient.get<{ count: number }>("/sessions/count");
+  const r = await nestClient.get<{ count: number }>("/sessions/count");
   return r.data.count;
 }
 
+/** Next scheduled peer session — NestJS `GET /sessions/upcoming`. */
 export async function getUpcomingSession(): Promise<any | null> {
   try {
-    const r = await sessionClient.get("/sessions/upcoming");
+    const r = await nestClient.get("/sessions/upcoming");
     return r.data;
   } catch (error: any) {
     if (error.response?.status === 404) return null;
@@ -139,21 +120,4 @@ if (__DEV__) {
       return Promise.reject(error);
     },
   );
-
-  sessionClient.interceptors.response.use(
-    (response) => {
-      console.log(
-        `[Session API] ${response.config.method?.toUpperCase()} ${response.config.url} -> ${response.status}`,
-      );
-      return response;
-    },
-    (error) => {
-      console.error(
-        `[Session API] Error ${error.response?.status} on ${error.config?.url}:`,
-        error.response?.data,
-      );
-      return Promise.reject(error);
-    },
-  );
 }
-

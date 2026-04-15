@@ -275,11 +275,15 @@ model Mistake {
 model PronunciationIssue {
   id               String   @id @default(uuid())
   analysisId       String
-  word             String
+  word             String   // kept for compat — stores the spoken (mispronounced) word
+  spoken           String?  // what the user actually said (e.g. "pepul")
+  correct          String?  // correct pronunciation (e.g. "people")
+  ruleCategory     String?  // error category (e.g. "th_to_d", "w_to_v")
+  reelId           String?  // eBites reel ID matching this error category
   segmentId        String?
   phoneticExpected String?
   phoneticActual   String?
-  issueType        String?
+  issueType        String?  // legacy alias for ruleCategory
   severity         String   @default("medium")
   suggestion       String?
   audioStart       Float?

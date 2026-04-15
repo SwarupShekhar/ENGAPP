@@ -59,7 +59,7 @@ export class SkillsBuilder {
     const skillDetails = this.formatSkillDetails(latestAnalysis, currentScores);
 
     // Calculate deltas
-    let deltas: any = {
+    const deltas: any = {
       fluency: 0,
       grammar: 0,
       vocabulary: 0,
@@ -198,6 +198,12 @@ export class SkillsBuilder {
         .slice(0, 2)
         .map((m: any) => `${m.original} \u2192 ${m.corrected}`);
       details.grammar.subtext = `${grammarMistakes.length} errors found`;
+    } else if ((scores.grammar ?? 0) === 0) {
+      details.grammar.items = [
+        'No grammar score from your last analyzed session yet',
+        'End a call and wait for analysis, or complete an assessment',
+      ];
+      details.grammar.subtext = 'No grammar data yet — not necessarily 0 mistakes';
     } else if (scores.grammar >= 85) {
       details.grammar.items = [
         'Excellent sentence structure',
@@ -237,6 +243,12 @@ export class SkillsBuilder {
         .slice(0, 2)
         .map((i: any) => `Focus on: "${i.word}"`);
       details.pronunciation.subtext = `${pronIssues.length} sounds to refine`;
+    } else if ((scores.pronunciation ?? 0) === 0) {
+      details.pronunciation.items = [
+        'Pronunciation score updates after your call is analyzed',
+        'High scores can still appear before issues are listed',
+      ];
+      details.pronunciation.subtext = 'No pronunciation breakdown yet for this snapshot';
     } else if (scores.pronunciation >= 85) {
       details.pronunciation.items = [
         'Natural intonation',

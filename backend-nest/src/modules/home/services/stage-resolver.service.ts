@@ -65,7 +65,7 @@ export class StageResolverService {
 
   async getCachedStage(userId: string): Promise<UserStage> {
     const cacheKey = `user:${userId}:stage`;
-    let stageStr = await this.redis.get(cacheKey);
+    const stageStr = await this.redis.get(cacheKey);
 
     if (!stageStr) {
       const stage = await this.resolveUserStage(userId);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
-import { fetchFeedbackNarration } from "../../../api/tts";
+import { fetchFeedbackNarration, fetchFullFeedbackNarration } from "../../../api/tts";
 import type { FeedbackSection } from "../../../api/tts";
 import {
   View,
@@ -409,6 +409,27 @@ function PronunciationTabs({
         {expanded && (
           <View style={styles.pronIssueExpanded}>
             <Text style={styles.pronIssueFix}>{getPronFix(item.rule_category)}</Text>
+
+            {/* eBites recommendation card */}
+            {item.rule_category && item.rule_category !== "general_mispronunciation" && (
+              <TouchableOpacity
+                style={styles.ebitesRecommendCard}
+                activeOpacity={0.85}
+                onPress={() => onPractice(item.rule_category)}
+              >
+                <View style={styles.ebitesRecommendIcon}>
+                  <Ionicons name="play-circle" size={22} color="#7C3AED" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ebitesRecommendTitle}>Watch to fix this sound</Text>
+                  <Text style={styles.ebitesRecommendSub}>
+                    eBites has short videos targeting your {getPronLabel(item.rule_category)} error
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#7C3AED" />
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={[styles.pronPracticeBtn, { backgroundColor: ui.text }]}
               activeOpacity={0.85}
@@ -748,10 +769,16 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [loadingSection, setLoadingSection] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
 
+  // Full feedback audio state
+  const [isPlayingFullFeedback, setIsPlayingFullFeedback] = useState(false);
+  const [isLoadingFullFeedback, setIsLoadingFullFeedback] = useState(false);
+  const fullFeedbackSoundRef = useRef<Audio.Sound | null>(null);
+
   // Clean up audio on unmount
   useEffect(() => {
     return () => {
       soundRef.current?.unloadAsync().catch(() => {});
+      fullFeedbackSoundRef.current?.unloadAsync().catch(() => {});
     };
   }, []);
 
@@ -883,6 +910,203 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     const s = seconds % 60;
     return `${m}m ${s}s`;
   };
+
+  // handlePlay must be declared before any early returns to satisfy Rules of Hooks.
+  // It reads from sessionData (state) directly so it's safe to call from any render path.
+  const handlePlay = useCallback(
+    async (section: string) => {
+      // Tap same section again → stop
+      if (playingSection === section) {
+        await soundRef.current?.stopAsync().catch(() => {});
+        await soundRef.current?.unloadAsync().catch(() => {});
+        soundRef.current = null;
+        setPlayingSection(null);
+        return;
+      }
+
+      // Stop whatever is currently playing
+      if (soundRef.current) {
+        await soundRef.current.stopAsync().catch(() => {});
+        await soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+        setPlayingSection(null);
+      }
+
+      setLoadingSection(section);
+
+      try {
+        const currentAnalysis = sessionData?.analyses?.[0];
+        const rawData = currentAnalysis?.rawData;
+        const summary = sessionData?.summaryJson;
+        const aiFeedback = (rawData as any)?.ai_detailed_feedback || null;
+        const scores = currentAnalysis?.scores as Record<string, number> | undefined;
+
+        const pronErrors = (currentAnalysis?.pronunciationIssues ?? []).slice(0, 2).map((p: any) => ({
+          spoken: p.spoken ?? p.word,
+          correct: p.correct ?? p.word,
+          rule_category: p.rule_category ?? p.issueType,
+        }));
+
+        const grammarErrors = (currentAnalysis?.mistakes ?? []).slice(0, 2).map((m: any) => ({
+          original_text: m.original_text ?? m.original,
+          corrected_text: m.corrected_text ?? m.corrected,
+        }));
+
+        const sectionErrors: Record<string, any[]> = {
+          pronunciation: pronErrors,
+          grammar: grammarErrors,
+          vocabulary: [],
+          fluency: [],
+        };
+
+        const sectionJustifications: Record<string, string | undefined> = {
+          pronunciation: aiFeedback?.pronunciation?.justification,
+          grammar: aiFeedback?.grammar?.justification,
+          vocabulary: aiFeedback?.vocabulary?.justification,
+          fluency: aiFeedback?.fluency?.justification,
+        };
+
+        const sectionScores: Record<string, number> = {
+          pronunciation: Math.min(100, summary?.pronunciation_score ?? scores?.pronunciation ?? (scores as any)?.pronunciation_score ?? 0),
+          grammar: Math.min(100, summary?.grammar_score ?? scores?.grammar ?? (scores as any)?.grammar_score ?? 0),
+          vocabulary: Math.min(100, summary?.vocabulary_score ?? scores?.vocabulary ?? (scores as any)?.vocabulary_score ?? 0),
+          fluency: Math.min(100, summary?.fluency_score ?? scores?.fluency ?? (scores as any)?.fluency_score ?? 0),
+        };
+
+        const result = await fetchFeedbackNarration({
+          section: section as FeedbackSection,
+          score: sectionScores[section] ?? 0,
+          justification: sectionJustifications[section],
+          errors: sectionErrors[section],
+        });
+
+        if (!result.audio_base64) {
+          console.warn("[FeedbackAudio] TTS returned empty audio for section:", section);
+          setLoadingSection(null);
+          return;
+        }
+
+        // Write base64 MP3 to temp file
+        const tmpUri = `${FileSystem.cacheDirectory}feedback_${section}_${Date.now()}.mp3`;
+        await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        // Configure audio session and play
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: tmpUri },
+          { shouldPlay: true },
+        );
+        soundRef.current = sound;
+        setLoadingSection(null);
+        setPlayingSection(section);
+
+        // Auto-reset state when playback finishes
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            sound.unloadAsync().catch(() => {});
+            soundRef.current = null;
+            setPlayingSection(null);
+          }
+        });
+      } catch (err) {
+        console.error("[FeedbackAudio] Error:", err);
+        setLoadingSection(null);
+        setPlayingSection(null);
+      }
+    },
+    [sessionData, playingSection],
+  );
+
+  // ── "Listen to Feedback" — plays all mistakes sequentially as one audio ──
+  const handlePlayFullFeedback = useCallback(async () => {
+    // Toggle off if already playing
+    if (isPlayingFullFeedback) {
+      await fullFeedbackSoundRef.current?.stopAsync().catch(() => {});
+      await fullFeedbackSoundRef.current?.unloadAsync().catch(() => {});
+      fullFeedbackSoundRef.current = null;
+      setIsPlayingFullFeedback(false);
+      return;
+    }
+
+    // Stop any section audio still playing
+    if (soundRef.current) {
+      await soundRef.current.stopAsync().catch(() => {});
+      await soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+      setPlayingSection(null);
+    }
+
+    setIsLoadingFullFeedback(true);
+
+    try {
+      const currentAnalysis = sessionData?.analyses?.[0];
+      const rawData = currentAnalysis?.rawData;
+      const summary = sessionData?.summaryJson;
+      const aiFeedback = (rawData as any)?.ai_detailed_feedback || null;
+      const scores = currentAnalysis?.scores as Record<string, number> | undefined;
+
+      const pronunciationIssues = (currentAnalysis?.pronunciationIssues ?? []).map((p: any) => ({
+        spoken: p.spoken ?? p.word,
+        correct: p.correct ?? p.word,
+        rule_category: p.rule_category ?? p.issueType,
+      }));
+
+      const grammarMistakes = (currentAnalysis?.mistakes ?? []).map((m: any) => ({
+        original_text: m.original_text ?? m.original,
+        corrected_text: m.corrected_text ?? m.corrected,
+      }));
+
+      const result = await fetchFullFeedbackNarration({
+        pronunciation_issues: pronunciationIssues,
+        grammar_mistakes: grammarMistakes,
+        scores: {
+          pronunciation: Math.min(100, summary?.pronunciation_score ?? scores?.pronunciation ?? 0),
+          grammar: Math.min(100, summary?.grammar_score ?? scores?.grammar ?? 0),
+          vocabulary: Math.min(100, summary?.vocabulary_score ?? scores?.vocabulary ?? 0),
+          fluency: Math.min(100, summary?.fluency_score ?? scores?.fluency ?? 0),
+        },
+        justifications: {
+          pronunciation: aiFeedback?.pronunciation?.justification,
+          grammar: aiFeedback?.grammar?.justification,
+          vocabulary: aiFeedback?.vocabulary?.justification,
+          fluency: aiFeedback?.fluency?.justification,
+        },
+      });
+
+      if (!result.audio_base64) {
+        setIsLoadingFullFeedback(false);
+        return;
+      }
+
+      const tmpUri = `${FileSystem.cacheDirectory}full_feedback_${Date.now()}.mp3`;
+      await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: tmpUri },
+        { shouldPlay: true },
+      );
+      fullFeedbackSoundRef.current = sound;
+      setIsLoadingFullFeedback(false);
+      setIsPlayingFullFeedback(true);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if ((status as any).didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          fullFeedbackSoundRef.current = null;
+          setIsPlayingFullFeedback(false);
+        }
+      });
+    } catch (err) {
+      console.error("[FullFeedbackAudio] Error:", err);
+      setIsLoadingFullFeedback(false);
+      setIsPlayingFullFeedback(false);
+    }
+  }, [sessionData, isPlayingFullFeedback]);
 
   if (loading) {
     return (
@@ -1181,106 +1405,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
   const overallColor = getScoreColor(data.overallScore, theme);
 
-  const handlePlay = useCallback(
-    async (section: string) => {
-      // Tap same section again → stop
-      if (playingSection === section) {
-        await soundRef.current?.stopAsync().catch(() => {});
-        await soundRef.current?.unloadAsync().catch(() => {});
-        soundRef.current = null;
-        setPlayingSection(null);
-        return;
-      }
-
-      // Stop whatever is currently playing
-      if (soundRef.current) {
-        await soundRef.current.stopAsync().catch(() => {});
-        await soundRef.current.unloadAsync().catch(() => {});
-        soundRef.current = null;
-        setPlayingSection(null);
-      }
-
-      setLoadingSection(section);
-
-      try {
-        const pronErrors = (data?.pronunciationIssues ?? []).slice(0, 2).map((p: any) => ({
-          spoken: p.spoken ?? p.word,
-          correct: p.correct ?? p.word,
-          rule_category: p.rule_category ?? p.issueType,
-        }));
-
-        const grammarErrors = (data?.mistakes ?? []).slice(0, 2).map((m: any) => ({
-          original_text: m.original_text ?? m.original,
-          corrected_text: m.corrected_text ?? m.corrected,
-        }));
-
-        const sectionErrors: Record<string, any[]> = {
-          pronunciation: pronErrors,
-          grammar: grammarErrors,
-          vocabulary: [],
-          fluency: [],
-        };
-
-        const sectionJustifications: Record<string, string | undefined> = {
-          pronunciation: data?.aiFeedback?.pronunciation?.justification,
-          grammar: data?.aiFeedback?.grammar?.justification,
-          vocabulary: data?.aiFeedback?.vocabulary?.justification,
-          fluency: data?.aiFeedback?.fluency?.justification,
-        };
-
-        const sectionScores: Record<string, number> = {
-          pronunciation: data?.scores?.pronunciation ?? 0,
-          grammar: data?.scores?.grammar ?? 0,
-          vocabulary: data?.scores?.vocabulary ?? 0,
-          fluency: data?.scores?.fluency ?? 0,
-        };
-
-        const result = await fetchFeedbackNarration({
-          section: section as FeedbackSection,
-          score: sectionScores[section] ?? 0,
-          justification: sectionJustifications[section],
-          errors: sectionErrors[section],
-        });
-
-        if (!result.audio_base64) {
-          console.warn("[FeedbackAudio] TTS returned empty audio for section:", section);
-          setLoadingSection(null);
-          return;
-        }
-
-        // Write base64 MP3 to temp file
-        const tmpUri = `${FileSystem.cacheDirectory}feedback_${section}_${Date.now()}.mp3`;
-        await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        // Configure audio session and play
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: tmpUri },
-          { shouldPlay: true },
-        );
-        soundRef.current = sound;
-        setLoadingSection(null);
-        setPlayingSection(section);
-
-        // Auto-reset state when playback finishes
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            sound.unloadAsync().catch(() => {});
-            soundRef.current = null;
-            setPlayingSection(null);
-          }
-        });
-      } catch (err) {
-        console.error("[FeedbackAudio] Error:", err);
-        setLoadingSection(null);
-        setPlayingSection(null);
-      }
-    },
-    [data, playingSection],
-  );
-
   return (
     <SafeAreaView edges={["bottom"]} style={styles.container}>
       <ScrollView
@@ -1318,6 +1442,48 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
           <View style={styles.backChipSpacer} />
         </LinearGradient>
+
+        {/* ── Listen to Feedback button ── */}
+        <Animated.View entering={FadeInDown.delay(20).springify()} style={styles.listenBtnWrapper}>
+          <TouchableOpacity
+            style={[
+              styles.listenBtn,
+              isPlayingFullFeedback && styles.listenBtnPlaying,
+            ]}
+            onPress={handlePlayFullFeedback}
+            activeOpacity={0.85}
+            disabled={isLoadingFullFeedback}
+          >
+            <LinearGradient
+              colors={
+                isPlayingFullFeedback
+                  ? ["#7C3AED", "#5B21B6"]
+                  : (theme.colors.gradients.primary as any)
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            {isLoadingFullFeedback ? (
+              <ActivityIndicator color="#fff" size="small" style={{ marginRight: 8 }} />
+            ) : (
+              <Ionicons
+                name={isPlayingFullFeedback ? "stop-circle" : "headset"}
+                size={20}
+                color="#fff"
+                style={{ marginRight: 8 }}
+              />
+            )}
+            <Text style={styles.listenBtnText}>
+              {isLoadingFullFeedback
+                ? "Preparing audio..."
+                : isPlayingFullFeedback
+                ? "Stop"
+                : "Listen to Feedback"}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Cap notification banner: pronunciation is holding score back */}
         {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
@@ -1453,19 +1619,83 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </LinearGradient>
         </Animated.View>
 
-        {/* What your score means */}
+        {/* What your score means — theme-aware gradient card (readable on dark UI) */}
         <Animated.View
           entering={FadeInDown.delay(220).springify()}
-          style={styles.whatItMeansCard}
+          style={styles.whatItMeansWrap}
         >
-          <Text style={styles.whatItMeansTitle}>What this score means</Text>
-          <Text style={styles.whatItMeansText}>
-            {data.overallScore >= 80
-              ? `Strong performance (${data.cefrLevel})! You communicated clearly. Focus on the details below to reach the next level.`
-              : data.overallScore >= 60
-                ? `Good effort (${data.cefrLevel}). You're on the right track. Check the breakdown and word-level feedback below to see exactly where to improve.`
-                : `There’s room to grow. Your score reflects grammar, pronunciation, fluency, and vocabulary. Use the sections below to see which words and patterns to practice.`}
-          </Text>
+          <LinearGradient
+            colors={[
+              theme.theme.gradients.card[0],
+              theme.theme.gradients.card[1],
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.whatItMeansGradient}
+          >
+            <View
+              style={[
+                styles.whatItMeansAccentBar,
+                { backgroundColor: theme.colors.primary },
+              ]}
+            />
+            <View style={styles.whatItMeansInner}>
+              <View style={styles.whatItMeansHeader}>
+                <View
+                  style={[
+                    styles.whatItMeansIconBadge,
+                    {
+                      backgroundColor: theme.colors.primary + "18",
+                      borderColor: theme.colors.primary + "40",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="sparkles"
+                    size={22}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <View style={styles.whatItMeansHeaderText}>
+                  <Text style={styles.whatItMeansKicker}>
+                    {data.overallScore >= 80
+                      ? "Strong session"
+                      : data.overallScore >= 60
+                        ? "Solid progress"
+                        : "Growth focus"}
+                  </Text>
+                  <Text style={styles.whatItMeansTitle}>
+                    What this score means
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.whatItMeansCefrPill,
+                    {
+                      backgroundColor: theme.colors.primary + "20",
+                      borderColor: theme.colors.primary + "45",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.whatItMeansCefrText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
+                    {data.cefrLevel}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.whatItMeansText}>
+                {data.overallScore >= 80
+                  ? `At ${data.cefrLevel}, you communicated clearly and kept the conversation moving. Use the breakdown below to fine-tune pronunciation, grammar, and vocabulary.`
+                  : data.overallScore >= 60
+                    ? `At ${data.cefrLevel}, you’re building steady habits. The sections below highlight the highest-impact fixes so you can level up faster.`
+                    : `At ${data.cefrLevel}, every practice call counts. Your score blends pronunciation, grammar, fluency, and vocabulary — dig into the tabs below for concrete next steps.`}
+              </Text>
+            </View>
+          </LinearGradient>
         </Animated.View>
 
         {cqsData && (
@@ -1936,6 +2166,58 @@ const getStyles = (theme: any) => {
       width: 40,
       height: 40,
     },
+    ebitesRecommendCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#7C3AED10",
+      borderWidth: 1,
+      borderColor: "#7C3AED30",
+      borderRadius: theme.borderRadius.m,
+      padding: theme.spacing.s,
+      marginBottom: theme.spacing.s,
+      gap: theme.spacing.s,
+    },
+    ebitesRecommendIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "#7C3AED15",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    ebitesRecommendTitle: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: "#7C3AED",
+      marginBottom: 2,
+    },
+    ebitesRecommendSub: {
+      fontSize: 11,
+      color: theme.colors.text.secondary,
+      lineHeight: 15,
+    },
+    listenBtnWrapper: {
+      paddingHorizontal: theme.spacing.l,
+      paddingTop: theme.spacing.m,
+      paddingBottom: theme.spacing.xs,
+    },
+    listenBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: theme.borderRadius.l,
+      paddingVertical: 14,
+      overflow: "hidden",
+      ...theme.shadows.primaryGlow,
+    },
+    listenBtnPlaying: {
+      // tint handled via gradient colors above
+    },
+    listenBtnText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "700",
+    },
     headerTitle: {
       fontSize: theme.typography.sizes.l,
       fontWeight: "bold",
@@ -2057,25 +2339,80 @@ const getStyles = (theme: any) => {
       fontSize: theme.typography.sizes.m,
       fontWeight: "700",
     },
-    whatItMeansCard: {
+    whatItMeansWrap: {
       marginHorizontal: theme.spacing.l,
       marginBottom: theme.spacing.m,
+      borderRadius: theme.borderRadius.xl,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor:
+        typeof theme.colors.border === "string"
+          ? `${theme.colors.border}90`
+          : theme.colors.border,
+      ...theme.shadows.medium,
+    },
+    whatItMeansGradient: {
+      position: "relative",
+    },
+    whatItMeansAccentBar: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 4,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderBottomLeftRadius: theme.borderRadius.xl,
+    },
+    whatItMeansInner: {
       padding: theme.spacing.m,
-      borderRadius: 12,
-      backgroundColor: theme.colors.surface,
-      borderLeftWidth: 4,
-      borderLeftColor: theme.colors.primary,
+      paddingLeft: theme.spacing.m + 8,
+    },
+    whatItMeansHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: theme.spacing.s,
+      gap: theme.spacing.s,
+    },
+    whatItMeansIconBadge: {
+      width: 44,
+      height: 44,
+      borderRadius: theme.borderRadius.m,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+    },
+    whatItMeansHeaderText: {
+      flex: 1,
+      minWidth: 0,
+    },
+    whatItMeansKicker: {
+      fontSize: theme.typography.sizes.xs,
+      fontWeight: "700",
+      color: theme.colors.text.secondary,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 2,
     },
     whatItMeansTitle: {
-      fontSize: theme.typography.sizes.m,
-      fontWeight: "700",
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "800",
       color: theme.colors.text.primary,
-      marginBottom: 6,
+      letterSpacing: -0.2,
+    },
+    whatItMeansCefrPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: theme.borderRadius.circle,
+      borderWidth: 1,
+    },
+    whatItMeansCefrText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "800",
     },
     whatItMeansText: {
       fontSize: theme.typography.sizes.s,
       color: theme.colors.text.secondary,
-      lineHeight: 20,
+      lineHeight: 22,
     },
     sectionTitle: {
       fontSize: theme.typography.sizes.l,

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Dict, Any, Generic, TypeVar
 from app.models.base import (
     Word, CEFRAssessment, ErrorDetail, AnalysisMetrics, 
@@ -34,6 +34,8 @@ class TranscriptionResponse(BaseModel):
         return self.model_dump()
 
 class AnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
     cefr_assessment: CEFRAssessment
     errors: List[ErrorDetail]
     metrics: AnalysisMetrics
@@ -43,6 +45,16 @@ class AnalysisResponse(BaseModel):
     recommended_tasks: List[Dict[str, Any]]
     processing_time: float
     accent_notes: Optional[str] = None
+    # Post-call pronunciation (Pulse + mobile CallFeedback)
+    scores: Optional[Dict[str, Any]] = None
+    pronunciation_issues: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        serialization_alias="pronunciationIssues",
+    )
+    ai_feedback: Optional[Dict[str, Any]] = Field(
+        default=None,
+        serialization_alias="aiFeedback",
+    )
     # Deep Intelligence Additions
     linguistic_fingerprint_updates: Optional[Dict[str, Any]] = None
     shadowing_audio_url: Optional[str] = None
@@ -51,7 +63,7 @@ class AnalysisResponse(BaseModel):
     talk_style: Optional[str] = None
 
     def to_dict(self):
-        return self.model_dump()
+        return self.model_dump(by_alias=True)
 
 
 class MispronuncedWord(BaseModel):

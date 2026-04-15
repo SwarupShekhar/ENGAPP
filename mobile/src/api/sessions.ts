@@ -55,32 +55,42 @@ export interface SessionMistake {
 
 export interface SessionPronunciationIssue {
   id: string;
-  word: string;
+  word: string;           // legacy: stores the spoken word
+  spoken?: string;        // what user actually said (e.g. "pepul")
+  correct?: string;       // correct pronunciation (e.g. "people")
+  ruleCategory?: string;  // error category (e.g. "th_to_d")
+  reelId?: string;        // eBites reel ID for this error
   phoneticExpected?: string;
   phoneticActual?: string;
-  issueType?: string;
+  issueType?: string;     // legacy alias for ruleCategory
   severity: string;
   suggestion?: string;
   confidence?: number;
 }
 
 /**
- * Extract the correct (target) word from a PronunciationIssue row.
- * Backend stores `word = err.spoken` (e.g. "een", "[mispronounced: today]")
- * and `suggestion` embeds the correct word in certain patterns.
+ * Extract the correct (target) word and spoken form from a PronunciationIssue row.
+ * Prefers new `spoken`/`correct`/`ruleCategory` fields; falls back to legacy parsing.
  */
 export function parsePronunciationIssue(issue: SessionPronunciationIssue): {
   spokenWord: string;
   correctWord: string;
   categoryLabel: string;
 } {
-  const raw = issue.word ?? "";
+  // New pipeline: direct fields available — use them
+  if (issue.spoken && issue.correct) {
+    const ruleCategory = issue.ruleCategory ?? issue.issueType ?? "";
+    return {
+      spokenWord: issue.spoken,
+      correctWord: issue.correct,
+      categoryLabel: _categoryLabel(ruleCategory),
+    };
+  }
 
-  // "[mispronounced: today]" → correct = "today", spoken = "today" (we don't have the actual spoken form)
+  // Legacy fallback: parse from `word` field + suggestion text
+  const raw = issue.word ?? "";
   const bracketMatch = raw.match(/^\[mispronounced:\s*(.+)\]$/i);
 
-  // Try to extract the correct word from the suggestion text
-  // Patterns: 'Practice pronouncing "today" more clearly' or 'Practice "w" vs "v"'
   let correctFromSuggestion: string | null = null;
   if (issue.suggestion) {
     const pronouncingMatch = issue.suggestion.match(
@@ -88,6 +98,18 @@ export function parsePronunciationIssue(issue: SessionPronunciationIssue): {
     );
     if (pronouncingMatch) {
       correctFromSuggestion = pronouncingMatch[1];
+    }
+    if (!correctFromSuggestion) {
+      const egPairMatch = issue.suggestion.match(/e\.g\.\s*"([^"]+)"\s*vs\s*"([^"]+)"/i);
+      const genericPairMatch = !egPairMatch
+        ? issue.suggestion.match(/"([^"]+)"\s*vs\s*"([^"]+)"/i)
+        : null;
+      const ex1 = egPairMatch?.[1] ?? genericPairMatch?.[1] ?? null;
+      const ex2 = egPairMatch?.[2] ?? genericPairMatch?.[2] ?? null;
+      if (ex1 && ex2) {
+        const isCorrectSecond = (issue.issueType ?? "").trim() === "w_to_v";
+        correctFromSuggestion = isCorrectSecond ? ex2 : ex1;
+      }
     }
   }
 
@@ -105,6 +127,11 @@ export function parsePronunciationIssue(issue: SessionPronunciationIssue): {
     correctWord = raw;
   }
 
+  const ruleCategory = issue.ruleCategory ?? issue.issueType ?? "";
+  return { spokenWord, correctWord, categoryLabel: _categoryLabel(ruleCategory) };
+}
+
+function _categoryLabel(ruleCategory: string): string {
   const categoryLabels: Record<string, string> = {
     w_to_v: '"W" vs "V"',
     v_to_w_reversal: '"V" vs "W"',
@@ -114,17 +141,17 @@ export function parsePronunciationIssue(issue: SessionPronunciationIssue): {
     z_to_j: '"Z" vs "J"',
     h_dropping: 'Silent "H"',
     r_rolling: "R rolling",
-    ae_to_e: "Vowel /ae/ vs /e/",
+    ae_to_e: "Vowel /æ/ vs /e/",
     i_to_ee: 'Short "I" vs long "EE"',
-    o_to_aa: "Vowel /o/ vs /aa/",
+    o_to_aa: "Vowel /ɒ/ vs /ɑː/",
     general_mispronunciation: "Mispronunciation",
+    phoneme_substitution: "Phoneme substitution",
+    syllabic_lengthening: "Vowel lengthening",
+    schwa_addition: "Schwa addition",
+    schwa_reduction: "Schwa reduction",
+    schwa_prothesis: "Vowel prothesis",
   };
-
-  const categoryLabel =
-    categoryLabels[issue.issueType ?? ""] ??
-    (issue.issueType ?? "Pronunciation").replace(/_/g, " ");
-
-  return { spokenWord, correctWord, categoryLabel };
+  return categoryLabels[ruleCategory] ?? (ruleCategory || "Pronunciation").replace(/_/g, " ");
 }
 
 /** Session summary with pronunciation-enhanced scoring (from post-call processor). */

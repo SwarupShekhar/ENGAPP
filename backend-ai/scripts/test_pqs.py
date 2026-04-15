@@ -36,6 +36,31 @@ async def run_test():
     found_v_to_w = any(e["rule_category"] == "v_to_w_reversal" or e["rule_category"] == "w_to_v" for e in errors)
     print(f"Found v/w error: {found_v_to_w}")
 
+    # 4. TEST th/d swap — "den" should map to "then" (th_to_d)
+    print("\n--- TEST th/d confusion ---")
+    azure_result_den = {
+        "Words": [
+            {
+                "Word": "den",
+                "PronunciationAssessment": {
+                    "AccuracyScore": 10.0,
+                    "ErrorType": "Mispronunciation",
+                },
+                "Phonemes": [{"Phoneme": "dh", "AccuracyScore": 10.0}],
+            }
+        ],
+        "fluency_score": 45.0,
+        "prosody_score": 40.0,
+    }
+    errors_den = detect_from_azure_result(azure_result_den, reference_text="then")
+    print(f"Flagged Errors (den→then): {json.dumps(errors_den, indent=2)}")
+    found_th_to_d = any(e["rule_category"] == "th_to_d" for e in errors_den)
+    print(f"Found th_to_d error: {found_th_to_d}")
+    if not found_th_to_d:
+        print("th/d confusion test: FAILED")
+    else:
+        print("th/d confusion test: PASSED")
+
     # 3. TEST PQS CALCULATION
     print("\n--- TEST PQS CALCULATION ---")
     pqs_result = call_quality_service.compute_pronunciation_quality_score([azure_result])

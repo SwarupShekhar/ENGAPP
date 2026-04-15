@@ -1,8 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -30,22 +28,6 @@ type FeedbackSessionCard = {
   fluency: number;
   vocabulary: number;
   pronunciation: number;
-};
-
-type SessionDetail = {
-  sessionId: string;
-  partnerName: string;
-  topic: string;
-  overall: number;
-  grammar: number;
-  fluency: number;
-  vocabulary: number;
-  pronunciation: number;
-  aiSummary: string;
-  strengths: string[];
-  improvements: string[];
-  mistakes: Array<{ id: string; wrong: string; right: string; explanation: string }>;
-  pronunciationIssues: Array<{ word: string; issue: string; suggestion?: string; confidence?: number }>;
 };
 
 function formatDuration(seconds?: number | null): string {
@@ -107,50 +89,6 @@ function mapSessionToCard(
   };
 }
 
-function mapSessionToDetail(session: ConversationSession, currentClerkId?: string): SessionDetail {
-  const analysis = session.analyses?.[0];
-  const summary = session.summaryJson;
-  const raw = analysis?.rawData as any;
-  const scores = analysis?.scores;
-  const partner =
-    session.participants?.find((p) => p.user?.clerkId && p.user.clerkId !== currentClerkId) ||
-    session.participants?.find((p) => p.user) ||
-    null;
-  const partnerName = partner?.user
-    ? `${partner.user.fname || ""} ${partner.user.lname || ""}`.trim() || "Partner"
-    : "AI Tutor";
-
-  return {
-    sessionId: session.id,
-    partnerName,
-    topic: session.topic || "General Conversation",
-    overall: Math.round(summary?.overall_score ?? scores?.overall ?? scores?.overall_score ?? 0),
-    grammar: Math.round(summary?.grammar_score ?? scores?.grammar ?? scores?.grammar_score ?? 0),
-    fluency: Math.round(summary?.fluency_score ?? scores?.fluency ?? scores?.fluency_score ?? 0),
-    vocabulary: Math.round(
-      summary?.vocabulary_score ?? scores?.vocabulary ?? scores?.vocabulary_score ?? 0,
-    ),
-    pronunciation: Math.round(
-      summary?.pronunciation_score ?? scores?.pronunciation ?? scores?.pronunciation_score ?? 0,
-    ),
-    aiSummary: raw?.aiFeedback || "Feedback is still being generated.",
-    strengths: raw?.strengths || [],
-    improvements: raw?.improvementAreas || [],
-    mistakes: (analysis?.mistakes || []).map((m) => ({
-      id: m.id,
-      wrong: m.original || "",
-      right: m.corrected || "",
-      explanation: m.explanation || "",
-    })),
-    pronunciationIssues: (analysis?.pronunciationIssues || []).map((p: any) => ({
-      word: p.word || "",
-      issue: p.issueType || "pronunciation",
-      suggestion: p.suggestion || undefined,
-      confidence: p.confidence ?? undefined,
-    })),
-  };
-}
-
 const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any }) => (
   <BlurView intensity={70} tint="dark" style={[styles.glassCard, style]}>
     {children}
@@ -163,30 +101,6 @@ export default function FeedbackScreenV2() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sessions, setSessions] = useState<FeedbackSessionCard[]>([]);
-  const [selected, setSelected] = useState<FeedbackSessionCard | null>(null);
-  const [detail, setDetail] = useState<SessionDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "mistakes" | "pronunciation">(
-    "overview",
-  );
-  const tabFade = useState(new Animated.Value(1))[0];
-
-  const switchTab = useCallback((next: "overview" | "mistakes" | "pronunciation") => {
-    if (next === activeTab) return;
-    Animated.sequence([
-      Animated.timing(tabFade, {
-        toValue: 0.35,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-      Animated.timing(tabFade, {
-        toValue: 1,
-        duration: 160,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    setActiveTab(next);
-  }, [activeTab, tabFade]);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -287,19 +201,13 @@ export default function FeedbackScreenV2() {
               key={session.id}
               style={styles.sessionPressable}
               activeOpacity={0.88}
-              onPress={async () => {
-                setSelected(session);
-                setDetail(null);
-                setActiveTab("overview");
-                setLoadingDetail(true);
-                try {
-                  const full = await sessionsApi.getSessionAnalysis(session.id);
-                  setDetail(mapSessionToDetail(full, user?.id));
-                } catch (e) {
-                  console.warn("[FeedbackV2] Failed to load detail", e);
-                } finally {
-                  setLoadingDetail(false);
-                }
+              onPress={() => {
+                navigation.navigate("CallFeedback", {
+                  sessionId: session.id,
+                  partnerName: session.partnerName,
+                  topic: session.topic,
+                  duration: session.durationSeconds,
+                });
               }}
             >
               <GlassCard style={styles.sessionCard}>
@@ -336,160 +244,6 @@ export default function FeedbackScreenV2() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
-
-      <Modal
-        visible={!!selected}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setSelected(null);
-          setDetail(null);
-        }}
-      >
-        <View style={styles.modalBackdrop}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => {
-              setSelected(null);
-              setDetail(null);
-            }}
-          />
-          <View style={styles.modalSheet}>
-            <LinearGradient
-              colors={["rgba(197,232,77,0.12)", "transparent"] as const}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.modalAuroraTop}
-            />
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeaderRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>{selected?.partnerName}</Text>
-                <Text style={styles.modalSubtitle}>{selected?.topic}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (!selected) return;
-                  navigation.navigate("CallFeedback", {
-                    sessionId: selected.id,
-                    partnerName: selected.partnerName,
-                    topic: selected.topic,
-                  });
-                }}
-                style={styles.fullReportBtn}
-              >
-                <Text style={styles.fullReportBtnText}>Full Report</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loadingDetail ? (
-              <ActivityIndicator color={tokensV2.colors.primaryViolet} style={{ marginTop: 24 }} />
-            ) : detail ? (
-              <>
-                <View style={styles.detailScoreRow}>
-                  <Text style={styles.detailOverall}>{detail.overall}</Text>
-                  <View style={styles.detailPillWrap}>
-                    <Text style={styles.detailPill}>G {detail.grammar}</Text>
-                    <Text style={styles.detailPill}>F {detail.fluency}</Text>
-                    <Text style={styles.detailPill}>V {detail.vocabulary}</Text>
-                    <Text style={styles.detailPill}>P {detail.pronunciation}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.tabRow}>
-                  {[
-                    ["overview", "Overview"],
-                    ["mistakes", `Mistakes (${detail.mistakes.length})`],
-                    ["pronunciation", `Pronunciation (${detail.pronunciationIssues.length})`],
-                  ].map(([key, label]) => (
-                    <TouchableOpacity
-                      key={key}
-                      style={[styles.tabBtn, activeTab === key && styles.tabBtnActive]}
-                      onPress={() => switchTab(key as any)}
-                    >
-                      <Text style={[styles.tabBtnText, activeTab === key && styles.tabBtnTextActive]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Animated.View style={{ flex: 1, opacity: tabFade }}>
-                <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
-                  {activeTab === "overview" && (
-                    <>
-                      <GlassCard style={[styles.detailCard, styles.detailCardStrong]}>
-                        <Text style={styles.detailCardTitle}>AI Summary</Text>
-                        <Text style={styles.detailText}>{detail.aiSummary}</Text>
-                      </GlassCard>
-                      {detail.strengths.length > 0 && (
-                        <GlassCard style={styles.detailCard}>
-                          <Text style={styles.detailCardTitle}>Strengths</Text>
-                          {detail.strengths.map((s, i) => (
-                            <Text key={i} style={styles.detailBullet}>
-                              • {s}
-                            </Text>
-                          ))}
-                        </GlassCard>
-                      )}
-                      {detail.improvements.length > 0 && (
-                        <GlassCard style={styles.detailCard}>
-                          <Text style={styles.detailCardTitle}>Improvements</Text>
-                          {detail.improvements.map((s, i) => (
-                            <Text key={i} style={styles.detailBullet}>
-                              • {s}
-                            </Text>
-                          ))}
-                        </GlassCard>
-                      )}
-                    </>
-                  )}
-
-                  {activeTab === "mistakes" && (
-                    <>
-                      {detail.mistakes.length === 0 ? (
-                        <Text style={styles.emptyTabText}>No mistakes recorded for this call.</Text>
-                      ) : (
-                        detail.mistakes.map((m) => (
-                          <GlassCard key={m.id} style={[styles.detailCard, styles.detailCardStrong]}>
-                            <Text style={styles.mistakeWrong}>You said: "{m.wrong}"</Text>
-                            <Text style={styles.mistakeRight}>Better: "{m.right}"</Text>
-                            <Text style={styles.detailText}>{m.explanation}</Text>
-                          </GlassCard>
-                        ))
-                      )}
-                    </>
-                  )}
-
-                  {activeTab === "pronunciation" && (
-                    <>
-                      {detail.pronunciationIssues.length === 0 ? (
-                        <Text style={styles.emptyTabText}>No pronunciation issues flagged.</Text>
-                      ) : (
-                        detail.pronunciationIssues.map((p, idx) => (
-                          <GlassCard key={`${p.word}-${idx}`} style={[styles.detailCard, styles.detailCardStrong]}>
-                            <Text style={styles.detailCardTitle}>{p.word}</Text>
-                            <Text style={styles.detailText}>
-                              {p.issue.replace(/_/g, " ")}
-                              {typeof p.confidence === "number" ? ` · ${Math.round(p.confidence)}%` : ""}
-                            </Text>
-                            {p.suggestion ? <Text style={styles.detailText}>{p.suggestion}</Text> : null}
-                          </GlassCard>
-                        ))
-                      )}
-                    </>
-                  )}
-                  <View style={{ height: 40 }} />
-                </ScrollView>
-                </Animated.View>
-              </>
-            ) : (
-              <Text style={styles.emptyTabText}>Could not load detail for this session.</Text>
-            )}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

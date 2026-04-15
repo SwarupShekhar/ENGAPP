@@ -14,8 +14,13 @@ async def analyze_text(
     service: AnalysisService = Depends(lambda: analysis_service)
 ):
     log = get_logger(request)
-    log.info("endpoint_analyze_started", user_id=body.user_id)
-    
+    log.info(
+        "endpoint_analyze_started",
+        user_id=body.user_id,
+        session_id=body.session_id,
+        pronunciation_issues_in_request=len(body.pronunciation_issues or []),
+    )
+
     start_time = time.time()
     result = await service.analyze(body)
     

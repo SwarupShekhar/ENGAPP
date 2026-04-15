@@ -55,6 +55,10 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
     const color =
       value < 50 ? "#ef4444" : value < 75 ? "#f59e0b" : "#22c55e";
     const showEllipsis = value === 50.0;
+    const trackColor =
+      typeof theme.colors.border === "string"
+        ? `${theme.colors.border}99`
+        : "rgba(148, 163, 184, 0.35)";
     return (
       <View style={styles.ringWrap}>
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -62,7 +66,7 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
             cx={size / 2}
             cy={size / 2}
             r={r}
-            stroke={"rgba(15, 23, 42, 0.12)"}
+            stroke={trackColor}
             strokeWidth={stroke}
             fill="transparent"
           />
@@ -220,20 +224,24 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
 const getStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: "rgba(255, 255, 255, 0.85)",
-      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.l,
       padding: theme.spacing.m,
       marginBottom: theme.spacing.l,
       marginHorizontal: theme.spacing.l,
       ...theme.shadows.medium,
       borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.6)",
+      borderColor:
+        typeof theme.colors.border === "string"
+          ? `${theme.colors.border}88`
+          : theme.colors.border,
     },
     title: {
       fontSize: theme.typography.sizes.l,
-      fontWeight: "bold",
+      fontWeight: "800",
       color: theme.colors.text.primary,
-      marginBottom: theme.spacing.m,
+      marginBottom: theme.spacing.s,
+      letterSpacing: -0.3,
     },
     metricRow: {
       flexDirection: "row",
@@ -285,7 +293,10 @@ const getStyles = (theme: any) =>
     },
     progressBarBg: {
       height: 6,
-      backgroundColor: theme.colors.border,
+      backgroundColor:
+        typeof theme.colors.border === "string"
+          ? `${theme.colors.border}55`
+          : theme.colors.background,
       borderRadius: 3,
       marginBottom: 8,
       overflow: "hidden",
@@ -317,7 +328,8 @@ const getStyles = (theme: any) =>
     },
     justificationText: {
       fontSize: 12,
-      color: theme.colors.text.secondary,
+      color: theme.colors.text.primary,
       lineHeight: 18,
+      opacity: 0.92,
     },
   });

@@ -1,10 +1,12 @@
 # Core Free Time + Plans + Tutor Connect — Implementation Plan
 
+> **Deprecation note (2026-04-14):** `archive/web-mvp` is archived and not part of active runtime/deployment. Keep this plan only as historical implementation context.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add weekly free-time quota, 3 individual paid plans via Razorpay, a TutorConnect category-preference screen, and paywall on Core; sync plan status to Pulse via Bridge API.
 
-**Architecture:** Prisma is added to `web-mvp` (the Core Next.js backend at englivo.com). A shared `resolveQuota()` helper handles lazy weekly reset and is called by every quota-gated endpoint. Razorpay subscriptions drive plan upgrades; webhooks update the DB and retry-sync to Bridge. Mobile adds `TutorConnectPreferenceScreen` before every human-tutor call and an `UpgradeSheet` paywall.
+**Architecture:** Prisma is added to `archive/web-mvp` (the Core Next.js backend at englivo.com). A shared `resolveQuota()` helper handles lazy weekly reset and is called by every quota-gated endpoint. Razorpay subscriptions drive plan upgrades; webhooks update the DB and retry-sync to Bridge. Mobile adds `TutorConnectPreferenceScreen` before every human-tutor call and an `UpgradeSheet` paywall.
 
 **Tech Stack:** Next.js 16 (App Router), Prisma + PostgreSQL, Razorpay Node SDK, livekit-server-sdk, React Native + react-native-razorpay, Clerk v6.
 
@@ -13,24 +15,24 @@
 ## File Map
 
 **Created:**
-- `web-mvp/prisma/schema.prisma` — all 4 models
-- `web-mvp/src/lib/db.ts` — Prisma singleton
-- `web-mvp/src/lib/planConfig.ts` — PLAN_QUOTAS constant + helpers
-- `web-mvp/src/lib/resolveQuota.ts` — lazy reset + quota calc (shared)
-- `web-mvp/src/lib/razorpay.ts` — Razorpay client + plan ID maps
-- `web-mvp/src/lib/bridgeSync.ts` — syncPlanToBridge with 3× retry
-- `web-mvp/src/app/api/me/route.ts`
-- `web-mvp/src/app/api/livekit/token/route.ts`
-- `web-mvp/src/app/api/sessions/call-end/route.ts`
-- `web-mvp/src/app/api/payments/create-subscription/route.ts`
-- `web-mvp/src/app/api/payments/webhook/route.ts`
+- `archive/web-mvp/prisma/schema.prisma` — all 4 models
+- `archive/web-mvp/src/lib/db.ts` — Prisma singleton
+- `archive/web-mvp/src/lib/planConfig.ts` — PLAN_QUOTAS constant + helpers
+- `archive/web-mvp/src/lib/resolveQuota.ts` — lazy reset + quota calc (shared)
+- `archive/web-mvp/src/lib/razorpay.ts` — Razorpay client + plan ID maps
+- `archive/web-mvp/src/lib/bridgeSync.ts` — syncPlanToBridge with 3× retry
+- `archive/web-mvp/src/app/api/me/route.ts`
+- `archive/web-mvp/src/app/api/livekit/token/route.ts`
+- `archive/web-mvp/src/app/api/sessions/call-end/route.ts`
+- `archive/web-mvp/src/app/api/payments/create-subscription/route.ts`
+- `archive/web-mvp/src/app/api/payments/webhook/route.ts`
 - `mobile/src/api/englivo/quota.ts`
 - `mobile/src/features/englivo/screens/TutorConnectPreferenceScreen.tsx`
 - `mobile/src/features/englivo/components/UpgradeSheet.tsx`
 
 **Modified:**
-- `web-mvp/package.json` — add prisma, razorpay, livekit-server-sdk
-- `web-mvp/src/middleware.ts` — allow webhook route through without auth
+- `archive/web-mvp/package.json` — add prisma, razorpay, livekit-server-sdk
+- `archive/web-mvp/src/middleware.ts` — allow webhook route through without auth
 - `mobile/src/navigation/RootNavigator.tsx` — add TutorConnectPreference screen
 - `mobile/src/features/englivo/screens/EnglivoHomeScreenV2.tsx` — quota check + lock + route change
 - `mobile/src/features/englivo/screens/EnglivoLiveCallScreen.tsx` — call-end deduction on unmount
@@ -40,17 +42,17 @@
 
 ---
 
-## Task 1: Add Prisma to web-mvp and create schema
+## Task 1: Add Prisma to archive/web-mvp and create schema
 
 **Files:**
-- Create: `web-mvp/prisma/schema.prisma`
-- Modify: `web-mvp/package.json`
-- Create: `web-mvp/src/lib/db.ts`
+- Create: `archive/web-mvp/prisma/schema.prisma`
+- Modify: `archive/web-mvp/package.json`
+- Create: `archive/web-mvp/src/lib/db.ts`
 
 - [ ] **Step 1: Install dependencies**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npm install prisma @prisma/client
 npm install --save-dev prisma
 ```
@@ -58,7 +60,7 @@ npm install --save-dev prisma
 - [ ] **Step 2: Initialise Prisma**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npx prisma init --datasource-provider postgresql
 ```
 
@@ -66,7 +68,7 @@ This creates `prisma/schema.prisma` and adds `DATABASE_URL` to `.env`.
 
 - [ ] **Step 3: Replace generated schema with the full model**
 
-Write `web-mvp/prisma/schema.prisma`:
+Write `archive/web-mvp/prisma/schema.prisma`:
 
 ```prisma
 generator client {
@@ -136,7 +138,7 @@ enum SubStatus { ACTIVE CANCELLED PAST_DUE PAUSED }
 - [ ] **Step 4: Run migration**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npx prisma migrate dev --name init_quota_plans
 ```
 
@@ -144,7 +146,7 @@ Expected: migration file created, tables created in DB.
 
 - [ ] **Step 5: Create Prisma singleton**
 
-Write `web-mvp/src/lib/db.ts`:
+Write `archive/web-mvp/src/lib/db.ts`:
 
 ```ts
 import { PrismaClient } from '@prisma/client'
@@ -161,7 +163,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 - [ ] **Step 6: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add prisma/schema.prisma src/lib/db.ts package.json package-lock.json
 git commit -m "feat: add Prisma schema — UserQuota, Subscription, Organization, ProcessedSession"
 ```
@@ -171,11 +173,11 @@ git commit -m "feat: add Prisma schema — UserQuota, Subscription, Organization
 ## Task 2: Plan config and pure utility functions
 
 **Files:**
-- Create: `web-mvp/src/lib/planConfig.ts`
+- Create: `archive/web-mvp/src/lib/planConfig.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `web-mvp/src/__tests__/planConfig.test.ts`:
+Create `archive/web-mvp/src/__tests__/planConfig.test.ts`:
 
 ```ts
 import {
@@ -249,7 +251,7 @@ describe('PLAN_QUOTAS', () => {
 - [ ] **Step 2: Install Jest and run to confirm failure**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npm install --save-dev jest @types/jest ts-jest
 npx jest src/__tests__/planConfig.test.ts
 ```
@@ -258,7 +260,7 @@ Expected: FAIL — `Cannot find module '../lib/planConfig'`
 
 - [ ] **Step 3: Create planConfig.ts**
 
-Write `web-mvp/src/lib/planConfig.ts`:
+Write `archive/web-mvp/src/lib/planConfig.ts`:
 
 ```ts
 export const PLAN_QUOTAS = {
@@ -303,7 +305,7 @@ export function getEffectivePlan(sub: {
 
 - [ ] **Step 4: Add jest config to package.json and run tests**
 
-Add to `web-mvp/package.json`:
+Add to `archive/web-mvp/package.json`:
 
 ```json
 "jest": {
@@ -313,7 +315,7 @@ Add to `web-mvp/package.json`:
 ```
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npx jest src/__tests__/planConfig.test.ts
 ```
 
@@ -322,7 +324,7 @@ Expected: PASS — 7 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/lib/planConfig.ts src/__tests__/planConfig.test.ts package.json
 git commit -m "feat: add planConfig — PLAN_QUOTAS, getMondayUTC, getEffectivePlan"
 ```
@@ -332,12 +334,12 @@ git commit -m "feat: add planConfig — PLAN_QUOTAS, getMondayUTC, getEffectiveP
 ## Task 3: resolveQuota helper
 
 **Files:**
-- Create: `web-mvp/src/lib/resolveQuota.ts`
-- Create: `web-mvp/src/__tests__/resolveQuota.test.ts`
+- Create: `archive/web-mvp/src/lib/resolveQuota.ts`
+- Create: `archive/web-mvp/src/__tests__/resolveQuota.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
-Write `web-mvp/src/__tests__/resolveQuota.test.ts`:
+Write `archive/web-mvp/src/__tests__/resolveQuota.test.ts`:
 
 ```ts
 import { resolveQuota } from '../lib/resolveQuota'
@@ -433,7 +435,7 @@ describe('resolveQuota', () => {
 - [ ] **Step 2: Run test to confirm failure**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npx jest src/__tests__/resolveQuota.test.ts
 ```
 
@@ -441,7 +443,7 @@ Expected: FAIL — `Cannot find module '../lib/resolveQuota'`
 
 - [ ] **Step 3: Create resolveQuota.ts**
 
-Write `web-mvp/src/lib/resolveQuota.ts`:
+Write `archive/web-mvp/src/lib/resolveQuota.ts`:
 
 ```ts
 import { db } from './db'
@@ -526,7 +528,7 @@ export async function resolveQuota(clerkId: string): Promise<ResolvedQuota> {
 - [ ] **Step 4: Run tests**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npx jest src/__tests__/resolveQuota.test.ts
 ```
 
@@ -535,7 +537,7 @@ Expected: PASS — 3 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/lib/resolveQuota.ts src/__tests__/resolveQuota.test.ts
 git commit -m "feat: add resolveQuota helper — lazy weekly reset, rollover, unlimited guard"
 ```
@@ -545,11 +547,11 @@ git commit -m "feat: add resolveQuota helper — lazy weekly reset, rollover, un
 ## Task 4: GET /api/me route
 
 **Files:**
-- Create: `web-mvp/src/app/api/me/route.ts`
+- Create: `archive/web-mvp/src/app/api/me/route.ts`
 
 - [ ] **Step 1: Create the route**
 
-Write `web-mvp/src/app/api/me/route.ts`:
+Write `archive/web-mvp/src/app/api/me/route.ts`:
 
 ```ts
 import { auth } from '@clerk/nextjs/server'
@@ -598,9 +600,9 @@ export async function GET() {
 
 - [ ] **Step 2: Manual test**
 
-Start `web-mvp`:
+Start `archive/web-mvp`:
 ```bash
-cd web-mvp && npm run dev
+cd archive/web-mvp && npm run dev
 ```
 
 In a terminal with a valid Clerk session cookie:
@@ -613,7 +615,7 @@ Expected: `{"clerkId":"user_xxx","plan":"FREE","quota":{"weeklyLimitSeconds":180
 - [ ] **Step 3: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/app/api/me/route.ts
 git commit -m "feat: GET /api/me — user profile + plan + quota"
 ```
@@ -623,17 +625,17 @@ git commit -m "feat: GET /api/me — user profile + plan + quota"
 ## Task 5: GET /api/livekit/token route
 
 **Files:**
-- Create: `web-mvp/src/lib/livekit.ts`
-- Create: `web-mvp/src/app/api/livekit/token/route.ts`
+- Create: `archive/web-mvp/src/lib/livekit.ts`
+- Create: `archive/web-mvp/src/app/api/livekit/token/route.ts`
 
 - [ ] **Step 1: Install livekit-server-sdk**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npm install livekit-server-sdk
 ```
 
-- [ ] **Step 2: Add env vars to web-mvp/.env**
+- [ ] **Step 2: Add env vars to archive/web-mvp/.env**
 
 ```
 LIVEKIT_API_KEY=your_livekit_api_key
@@ -643,7 +645,7 @@ LIVEKIT_URL=wss://ssengst-174tfe9o.livekit.cloud
 
 - [ ] **Step 3: Create LiveKit token helper**
 
-Write `web-mvp/src/lib/livekit.ts`:
+Write `archive/web-mvp/src/lib/livekit.ts`:
 
 ```ts
 import { AccessToken } from 'livekit-server-sdk'
@@ -672,7 +674,7 @@ export function makeRoomName(userId: string, category: string): string {
 
 - [ ] **Step 4: Create the route**
 
-Write `web-mvp/src/app/api/livekit/token/route.ts`:
+Write `archive/web-mvp/src/app/api/livekit/token/route.ts`:
 
 ```ts
 import { auth } from '@clerk/nextjs/server'
@@ -760,7 +762,7 @@ Expected: HTTP 402 `{"error":"QUOTA_EXHAUSTED","remainingSeconds":0}`
 - [ ] **Step 7: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/lib/livekit.ts src/app/api/livekit/token/route.ts
 git commit -m "feat: GET /api/livekit/token — quota gate + LiveKit token generation"
 ```
@@ -770,11 +772,11 @@ git commit -m "feat: GET /api/livekit/token — quota gate + LiveKit token gener
 ## Task 6: POST /api/sessions/call-end route
 
 **Files:**
-- Create: `web-mvp/src/app/api/sessions/call-end/route.ts`
+- Create: `archive/web-mvp/src/app/api/sessions/call-end/route.ts`
 
 - [ ] **Step 1: Create the route**
 
-Write `web-mvp/src/app/api/sessions/call-end/route.ts`:
+Write `archive/web-mvp/src/app/api/sessions/call-end/route.ts`:
 
 ```ts
 import { auth } from '@clerk/nextjs/server'
@@ -883,7 +885,7 @@ Expected: `{"alreadyProcessed":true,"quota":{...}}` — seconds unchanged.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/app/api/sessions/call-end/route.ts
 git commit -m "feat: POST /api/sessions/call-end — idempotent deduction via ProcessedSession"
 ```
@@ -893,21 +895,21 @@ git commit -m "feat: POST /api/sessions/call-end — idempotent deduction via Pr
 ## Task 7: Razorpay client + create-subscription route
 
 **Files:**
-- Create: `web-mvp/src/lib/razorpay.ts`
-- Create: `web-mvp/src/app/api/payments/create-subscription/route.ts`
-- Modify: `web-mvp/src/middleware.ts`
+- Create: `archive/web-mvp/src/lib/razorpay.ts`
+- Create: `archive/web-mvp/src/app/api/payments/create-subscription/route.ts`
+- Modify: `archive/web-mvp/src/middleware.ts`
 
 - [ ] **Step 1: Install Razorpay SDK**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 npm install razorpay
 npm install --save-dev @types/razorpay
 ```
 
 - [ ] **Step 2: Add env vars**
 
-Add to `web-mvp/.env`:
+Add to `archive/web-mvp/.env`:
 ```
 RAZORPAY_KEY_ID=rzp_test_xxx
 RAZORPAY_KEY_SECRET=xxx
@@ -916,7 +918,7 @@ RAZORPAY_WEBHOOK_SECRET=xxx
 
 - [ ] **Step 3: Create Razorpay singleton + plan ID map**
 
-Write `web-mvp/src/lib/razorpay.ts`:
+Write `archive/web-mvp/src/lib/razorpay.ts`:
 
 ```ts
 import Razorpay from 'razorpay'
@@ -950,7 +952,7 @@ export function isPlanHigherOrEqual(a: Plan, b: Plan): boolean {
 
 - [ ] **Step 4: Create the route**
 
-Write `web-mvp/src/app/api/payments/create-subscription/route.ts`:
+Write `archive/web-mvp/src/app/api/payments/create-subscription/route.ts`:
 
 ```ts
 import { auth } from '@clerk/nextjs/server'
@@ -1021,7 +1023,7 @@ export async function POST(req: NextRequest) {
 
 - [ ] **Step 5: Update middleware to allow webhook through**
 
-Modify `web-mvp/src/middleware.ts`:
+Modify `archive/web-mvp/src/middleware.ts`:
 
 ```ts
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
@@ -1061,7 +1063,7 @@ Expected: `{"subscriptionId":"sub_xxx","shortUrl":"https://rzp.io/..."}`
 - [ ] **Step 7: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/lib/razorpay.ts src/app/api/payments/create-subscription/route.ts src/middleware.ts
 git commit -m "feat: Razorpay create-subscription + allow webhook route through Clerk middleware"
 ```
@@ -1071,12 +1073,12 @@ git commit -m "feat: Razorpay create-subscription + allow webhook route through 
 ## Task 8: Razorpay webhook + Bridge sync helper
 
 **Files:**
-- Create: `web-mvp/src/lib/bridgeSync.ts`
-- Create: `web-mvp/src/app/api/payments/webhook/route.ts`
+- Create: `archive/web-mvp/src/lib/bridgeSync.ts`
+- Create: `archive/web-mvp/src/app/api/payments/webhook/route.ts`
 
 - [ ] **Step 1: Add Bridge env vars**
 
-Add to `web-mvp/.env`:
+Add to `archive/web-mvp/.env`:
 ```
 BRIDGE_API_URL=http://localhost:3012
 BRIDGE_INTERNAL_SECRET=your_bridge_internal_secret
@@ -1084,7 +1086,7 @@ BRIDGE_INTERNAL_SECRET=your_bridge_internal_secret
 
 - [ ] **Step 2: Create bridgeSync helper**
 
-Write `web-mvp/src/lib/bridgeSync.ts`:
+Write `archive/web-mvp/src/lib/bridgeSync.ts`:
 
 ```ts
 import { PLAN_QUOTAS, type Plan } from './planConfig'
@@ -1125,7 +1127,7 @@ export async function syncPlanToBridge(clerkId: string, plan: Plan): Promise<voi
 
 - [ ] **Step 3: Create webhook route**
 
-Write `web-mvp/src/app/api/payments/webhook/route.ts`:
+Write `archive/web-mvp/src/app/api/payments/webhook/route.ts`:
 
 ```ts
 import { NextRequest, NextResponse } from 'next/server'
@@ -1256,7 +1258,7 @@ Expected: DB `Subscription.plan` updates, `[Bridge sync]` log appears.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd web-mvp
+cd archive/web-mvp
 git add src/lib/bridgeSync.ts src/app/api/payments/webhook/route.ts
 git commit -m "feat: Razorpay webhook handler + Bridge sync with 3x retry"
 ```

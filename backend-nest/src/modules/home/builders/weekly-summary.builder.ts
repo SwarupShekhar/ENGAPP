@@ -109,7 +109,7 @@ export class WeeklySummaryBuilder {
       let totalDuration = 0;
       let fillerWordCount = 0;
       const problemSounds = new Set<string>();
-      let newWordsUsed = new Set<string>();
+      const newWordsUsed = new Set<string>();
       const wordsToReview = new Set<string>();
 
       sessions.forEach((s) => {

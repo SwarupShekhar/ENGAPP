@@ -130,3 +130,94 @@ def build_narration_script(section: str, payload: dict) -> str:
     if not builder:
         return f"Your {section} score is {payload.get('score', 0)} out of 100."
     return builder(payload)
+
+
+def build_full_feedback_script(
+    pronunciation_issues: Optional[List[dict]] = None,
+    grammar_mistakes: Optional[List[dict]] = None,
+    vocabulary_issues: Optional[List[dict]] = None,
+    scores: Optional[dict] = None,
+    justifications: Optional[dict] = None,
+) -> str:
+    """
+    Builds one complete sequential feedback narration covering ALL sections.
+    This is played as a single audio on the feedback screen — the user hears
+    their entire feedback read aloud without needing to tap each section.
+
+    Kept under 300 words so TTS stays under ~2000ms.
+    """
+    parts: List[str] = []
+    scores = scores or {}
+    justifications = justifications or {}
+
+    parts.append("Here is your feedback from today's call.")
+
+    # ── Pronunciation ────────────────────────────────────────────────────
+    pron_score = int(scores.get("pronunciation", 0))
+    pron_issues = pronunciation_issues or []
+    if pron_score > 0 or pron_issues:
+        if pron_score >= 80:
+            parts.append(f"Pronunciation: Great job! Your score is {pron_score} out of 100.")
+        elif pron_score >= 55:
+            parts.append(f"Pronunciation: Your score is {pron_score} out of 100. A few areas to refine.")
+        else:
+            parts.append(f"Pronunciation: Your score is {pron_score} out of 100. Focus on these sounds.")
+
+        for err in pron_issues[:4]:
+            spoken = (err.get("spoken") or err.get("word") or "").strip()
+            correct = (err.get("correct") or "").strip()
+            rule = (err.get("rule_category") or "").strip()
+            if spoken and correct and spoken.lower() != correct.lower():
+                tip = _pron_tip(rule)
+                parts.append(
+                    f"You said '{spoken}' — the correct pronunciation is '{correct}'. {tip}"
+                )
+        jus = (justifications.get("pronunciation") or "").strip()
+        if jus and len(pron_issues) == 0:
+            parts.append(jus[:160])
+
+    # ── Grammar ──────────────────────────────────────────────────────────
+    grammar_score = int(scores.get("grammar", 0))
+    grammar_errors = grammar_mistakes or []
+    if grammar_score > 0 or grammar_errors:
+        if grammar_score >= 80:
+            parts.append(f"Grammar: Excellent! Your score is {grammar_score} out of 100.")
+        else:
+            parts.append(f"Grammar: Your score is {grammar_score} out of 100.")
+
+        for err in grammar_errors[:3]:
+            original = (err.get("original_text") or err.get("original") or "").strip()
+            corrected = (err.get("corrected_text") or err.get("corrected") or "").strip()
+            if original and corrected and original.lower() != corrected.lower():
+                parts.append(f"You said '{original}' — the correct form is '{corrected}'.")
+        jus = (justifications.get("grammar") or "").strip()
+        if jus and len(grammar_errors) == 0:
+            parts.append(jus[:160])
+
+    # ── Vocabulary ───────────────────────────────────────────────────────
+    vocab_score = int(scores.get("vocabulary", 0))
+    if vocab_score > 0:
+        jus = (justifications.get("vocabulary") or "").strip()
+        if vocab_score >= 80:
+            parts.append(f"Vocabulary: Impressive range — {vocab_score} out of 100.")
+        else:
+            parts.append(f"Vocabulary: Your score is {vocab_score} out of 100.")
+            if jus:
+                parts.append(jus[:140])
+
+    # ── Fluency ──────────────────────────────────────────────────────────
+    fluency_score = int(scores.get("fluency", 0))
+    if fluency_score > 0:
+        jus = (justifications.get("fluency") or "").strip()
+        if fluency_score >= 80:
+            parts.append(f"Fluency: You spoke smoothly — {fluency_score} out of 100.")
+        else:
+            parts.append(f"Fluency: Your score is {fluency_score} out of 100.")
+            if jus:
+                parts.append(jus[:140])
+
+    # ── Closing ──────────────────────────────────────────────────────────
+    overall = pron_score or grammar_score or vocab_score or fluency_score
+    parts.append(_closing(overall))
+
+    return " ".join(parts)

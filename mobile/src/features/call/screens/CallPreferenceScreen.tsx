@@ -9,6 +9,7 @@ import {
   Pressable,
   Platform,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, { SlideInDown, FadeIn, Easing } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import {
@@ -162,15 +163,25 @@ export default function CallPreferenceScreen() {
         {/* ── Content ── */}
         <View style={styles.grabber} />
         <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Call Preference</Text>
+          <LinearGradient
+            colors={theme.colors.gradients.surface as any}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
+          >
+            <View style={styles.headerLeft}>
+              <Text style={styles.title}>Call Preference</Text>
+              <Text style={styles.subtitle}>
+                Private session with another learner
+              </Text>
+            </View>
             <TouchableOpacity
               onPress={() => navigation.goBack()}
               style={styles.closeBtn}
             >
-              <Ionicons name="close" size={22} color="#0F172A" />
+              <Ionicons name="close" size={20} color={theme.colors.text.primary} />
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
 
           <View style={styles.content}>
             <Text style={styles.description}>
@@ -272,6 +283,14 @@ export default function CallPreferenceScreen() {
               activeOpacity={0.8}
               disabled={isSearching}
             >
+              <LinearGradient
+                colors={theme.colors.gradients.primary as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+              <View style={styles.actionBtnContent}>
               {isSearching ? (
                 <>
                   <ActivityIndicator
@@ -304,6 +323,7 @@ export default function CallPreferenceScreen() {
                   <Text style={styles.actionBtnText}>Find My Co-learner</Text>
                 </>
               )}
+              </View>
             </TouchableOpacity>
 
             {!isSearching && !showAiOption && (
@@ -359,13 +379,15 @@ const getStyles = (theme: any) =>
       justifyContent: "flex-end",
     },
     container: {
-      backgroundColor: "white", // Restored to solid white as requested
+      backgroundColor: theme.colors.surface,
       borderTopLeftRadius: 32,
       borderTopRightRadius: 32,
       height: "62%",
       width: "100%",
       paddingTop: 4,
       overflow: "hidden",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       ...Platform.select({
         ios: {
           shadowColor: "#000",
@@ -381,24 +403,30 @@ const getStyles = (theme: any) =>
     grabber: {
       width: 36,
       height: 4,
-      backgroundColor: "#E2E8F0",
+      backgroundColor: `${theme.colors.border}55`,
       borderRadius: 2,
       alignSelf: "center",
       marginTop: 8,
     },
-    header: {
+    headerGradient: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       paddingHorizontal: theme.spacing.l,
       paddingTop: theme.spacing.m,
       paddingBottom: theme.spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: `${theme.colors.border}20`,
+    },
+    headerLeft: {
+      flex: 1,
+      paddingRight: theme.spacing.s,
     },
     footer: {
       paddingHorizontal: theme.spacing.l,
       paddingBottom: theme.spacing.m,
       paddingTop: 0,
-      backgroundColor: "white",
+      backgroundColor: "transparent",
     },
     content: {
       paddingHorizontal: theme.spacing.l,
@@ -406,14 +434,26 @@ const getStyles = (theme: any) =>
       paddingBottom: theme.spacing.s,
     },
     title: {
-      fontSize: 20, // Reduced from theme.l
+      fontSize: 20,
       fontWeight: "bold",
       color: theme.colors.text.primary,
     },
+    subtitle: {
+      marginTop: 2,
+      fontSize: 12,
+      color: theme.colors.text.light,
+      lineHeight: 16,
+      fontWeight: "600",
+    },
     closeBtn: {
-      padding: 4,
-      backgroundColor: theme.colors.surface,
-      borderRadius: 10,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: `${theme.colors.primary}28`,
+      backgroundColor: `${theme.colors.primary}14`,
+      alignItems: "center",
+      justifyContent: "center",
     },
     description: {
       fontSize: 13, // Reduced
@@ -423,18 +463,18 @@ const getStyles = (theme: any) =>
     },
     warningBox: {
       flexDirection: "row",
-      backgroundColor: "#FEF3C750",
-      padding: 10, // Reduced from theme.m
+      backgroundColor: `${theme.colors.warning}20`,
+      padding: 10,
       borderRadius: theme.borderRadius.m,
       gap: theme.spacing.s,
       marginBottom: theme.spacing.s,
       borderWidth: 1,
-      borderColor: "#FDE68A40",
+      borderColor: `${theme.colors.warning}35`,
     },
     warningText: {
       flex: 1,
       fontSize: 12, // Reduced
-      color: "#92400E",
+      color: theme.colors.warning,
       lineHeight: 16,
     },
     label: {
@@ -457,16 +497,16 @@ const getStyles = (theme: any) =>
       borderRadius: theme.borderRadius.m,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: "white",
+      backgroundColor: theme.colors.background,
       gap: 6,
     },
     typeBtnActive: {
       borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.primary + "08",
+      backgroundColor: theme.colors.primary + "15",
     },
     typeBtnGroupActive: {
       borderColor: "#3B82F6",
-      backgroundColor: "#3B82F608",
+      backgroundColor: "#3B82F615",
     },
     btnText: {
       fontSize: 13, // Added
@@ -488,11 +528,11 @@ const getStyles = (theme: any) =>
       borderRadius: theme.borderRadius.circle,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: "white",
+      backgroundColor: theme.colors.background,
     },
     genderBtnActive: {
       borderColor: theme.colors.primary,
-      backgroundColor: "white",
+      backgroundColor: theme.colors.primary + "15",
     },
     genderText: {
       fontSize: 13, // Added
@@ -504,7 +544,6 @@ const getStyles = (theme: any) =>
       fontWeight: "600",
     },
     actionBtn: {
-      backgroundColor: "#1D4ED8",
       flexDirection: "row",
       justifyContent: "center",
       alignItems: "center",
@@ -513,6 +552,13 @@ const getStyles = (theme: any) =>
       marginTop: 4,
       marginBottom: 8,
       ...theme.shadows.primaryGlow,
+      overflow: "hidden",
+    },
+    actionBtnContent: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1,
     },
     actionBtnText: {
       color: "white",

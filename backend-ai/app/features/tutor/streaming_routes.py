@@ -3,12 +3,19 @@ import json
 import logging
 import time
 import asyncio
+import traceback
 
 from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from app.middleware.rate_limiter import rate_limiter
 from app.features.tutor.service import StreamingTutorService
+from app.features.tutor.pronunciation_capture import (
+    append_pronunciation_issues,
+    build_turn_capture,
+    session_captured_issue_count,
+    strip_pron_tags_for_mobile,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +50,8 @@ async def _generate_stream_response(
             # Already sent above; skip duplicate
             continue
         if chunk.get("type") == "sentence":
-            payload = {"type": "sentence", "text": chunk.get("text", "")}
+            raw_text = chunk.get("text", "") or ""
+            payload = {"type": "sentence", "text": strip_pron_tags_for_mobile(raw_text)}
             if chunk.get("audio"):
                 payload["audio"] = base64.b64encode(chunk["audio"]).decode("utf-8")
             yield payload
@@ -87,22 +95,19 @@ async def stream_tutor_response(
 @router.websocket("/ws/{session_id}")
 async def websocket_tutor_session(websocket: WebSocket, session_id: str):
     await websocket.accept()
-    
-    # In a real app, validate session/auth here. 
-    # For now, we assume session_id implies a user.
-    # Ideally extracting user_id from token query param or session lookup
-    user_id = "test_user" # Placeholder: extract real user_id
-    
-    # Extract user_id from query params if available
-    if "user_id" in websocket.query_params:
-        user_id = websocket.query_params["user_id"]
+    print(f"[Pulse DEBUG] WebSocket connected session_id={session_id}", flush=True)
+
+    # Derive a stable user/session identity for limiter/session accounting.
+    # Prefer explicit query param user_id; otherwise isolate by session id.
+    query_user_id = websocket.query_params.get("user_id")
+    user_id = (query_user_id or "").strip() or f"session:{session_id}"
     
     try:
         # Check rate limit (temporarily disabled for testing)
         # await rate_limiter.check_rate_limit(user_id)
         
         # Mark session as active
-        rate_limiter.start_session(user_id)
+        await rate_limiter.start_session(user_id)
         
         # Set idle timeout (auto-close after 10 min of inactivity)
         last_activity = time.time()
@@ -135,6 +140,11 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
             
             try:
                 message = json.loads(data)
+                print(
+                    f"[Pulse DEBUG] WS message received keys={list(message.keys())} "
+                    f"has_audio_base64={bool(message.get('audio_base64'))}",
+                    flush=True,
+                )
                 user_utterance = message.get("text")
                 phonetic_context = message.get("phonetic_context") # Optional context from assessment
                 audio_base64 = message.get("audio_base64") # Raw audio for Gemini pronunciation analysis
@@ -182,22 +192,53 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                     audio_base64
                 ):
                     # Convert bytes to base64 if audio present (JSON safe)
-                    if chunk.get('audio'):
+                    out_chunk = dict(chunk)
+                    if out_chunk.get('audio'):
                         import base64
-                        chunk['audio'] = base64.b64encode(chunk['audio']).decode('utf-8')
-                    
-                    if chunk.get('type') == 'sentence':
-                        full_response_text += (chunk.get('text', '') + " ")
-                        
-                    await websocket.send_json(chunk)
-                
-                # Store assistant turn after completion
+                        out_chunk['audio'] = base64.b64encode(chunk['audio']).decode('utf-8')
+
+                    if out_chunk.get('type') == 'sentence':
+                        raw_sentence = chunk.get('text', '') or ''
+                        full_response_text += raw_sentence + " "
+                        out_chunk['text'] = strip_pron_tags_for_mobile(raw_sentence)
+
+                    await websocket.send_json(out_chunk)
+
+                # Explicit end marker so clients can deterministically restart capture.
+                await websocket.send_json({"type": "done"})
+
+                # Store assistant turn after completion; capture pronunciation for post-call /analyze
                 if full_response_text:
-                     conversation_history.append({"role": "assistant", "content": full_response_text.strip()})
-                     
+                    assistant_raw = full_response_text.strip()
+                    assistant_clean = strip_pron_tags_for_mobile(assistant_raw)
+                    if audio_base64:
+                        print(
+                            f"[Pulse DEBUG] about to call build_turn_capture "
+                            f"audio_base64={'present' if audio_base64 else 'MISSING'} "
+                            f"phonetic_context={'present' if phonetic_context else 'MISSING'} "
+                            f"transcript='{(user_utterance or '')[:30] if user_utterance else 'NONE'}'",
+                            flush=True,
+                        )
+                        turn_issues = build_turn_capture(
+                            assistant_raw,
+                            (user_utterance or "").strip(),
+                            phonetic_context=phonetic_context or {},
+                            conversation_history=conversation_history,
+                        )
+                        if turn_issues:
+                            append_pronunciation_issues(session_id, turn_issues)
+                    conversation_history.append(
+                        {"role": "assistant", "content": assistant_clean}
+                    )
+
             except json.JSONDecodeError:
                 logger.error("Invalid JSON received")
             except Exception as e:
+                print(
+                    f"Error processing message: {type(e).__name__}: {e}",
+                    flush=True,
+                )
+                traceback.print_exc()
                 logger.error(f"Error processing message: {e}")
                 await websocket.send_json({"type": "error", "message": str(e)})
 
@@ -213,7 +254,21 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
         except:
             pass
     finally:
+        # End-of-session summary (verify capture before /analyze pops the store)
+        try:
+            n = session_captured_issue_count(session_id)
+            logger.info(
+                "[Pulse] pronunciation issues captured session_id=%s count=%s",
+                session_id,
+                n,
+            )
+            print(
+                f"[Pulse] pronunciation issues captured session_id={session_id} count={n}",
+                flush=True,
+            )
+        except Exception:
+            pass
         # Always decrement session count
-        rate_limiter.end_session(user_id)
+        await rate_limiter.end_session(user_id)
         if 'idle_task' in locals():
             idle_task.cancel()

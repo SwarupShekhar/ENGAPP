@@ -19,13 +19,19 @@ import Animated, {
   withSequence,
 } from "react-native-reanimated";
 import { useUser } from "@clerk/clerk-expo";
+import * as FileSystem from "expo-file-system/legacy";
 import { useAppTheme } from "../../../theme/useAppTheme";
-import {
-  transcribeAudio,
-  sendMessage,
-  textToSpeech,
-} from "../../../api/englivoAiTutor";
 import { bridgeApi } from "../../../api/bridgeApi";
+import {
+  streamingTutor,
+  type StreamChunk,
+} from "../../call/services/streamingTutorService";
+import {
+  ENGLIVO_AI_ASSISTANT_NAME,
+  ENGLIVO_AI_EMPTY_HINT,
+  ENGLIVO_AI_SPEAKING_LABEL,
+  ENGLIVO_AI_TUTOR_TITLE,
+} from "../constants";
 
 type VoiceLoopState = "IDLE" | "LISTENING" | "PROCESSING" | "SPEAKING" | "ENDED";
 
@@ -48,12 +54,16 @@ export default function AiConversationScreen({ navigation }: any) {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
+  const sessionIdRef = useRef<string>(`pulse-${Date.now()}`);
 
   // Breathing animation for mic
   const micScale = useSharedValue(1);
   const micOpacity = useSharedValue(1);
 
   const cefrSyncTriggeredRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   const syncCefrLevelOnce = async () => {
     if (cefrSyncTriggeredRef.current) return;
@@ -93,9 +103,74 @@ export default function AiConversationScreen({ navigation }: any) {
 
     return () => {
       cleanupAudio();
+      streamingTutor.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const uid = (user?.id || "").trim() || "anonymous";
+    const sid = sessionIdRef.current;
+
+    const onStreamMessage = (chunk: StreamChunk) => {
+      if (chunk.type === "error" || chunk.type === "timeout") {
+        setLoopState("IDLE");
+        return;
+      }
+
+      if ((chunk.type === "transcript" || chunk.type === "transcription") && chunk.text) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: chunk.text || "", timestamp: Date.now() },
+        ]);
+        return;
+      }
+
+      if (chunk.type === "sentence") {
+        if (chunk.text) {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === "assistant" && loopState === "SPEAKING") {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...last,
+                content: `${last.content} ${chunk.text}`.trim(),
+              };
+              return updated;
+            }
+            return [
+              ...prev,
+              {
+                role: "assistant",
+                content: chunk.text ?? "",
+                timestamp: Date.now(),
+                audioBase64: chunk.audio,
+              },
+            ];
+          });
+        }
+        if (chunk.audio) {
+          queueAudio(chunk.audio);
+        }
+        return;
+      }
+
+      if (chunk.type === "done") {
+        if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+          setLoopState("LISTENING");
+          void startListening();
+        }
+      }
+    };
+
+    streamingTutor.connect(sid, uid);
+    streamingTutor.onMessage(onStreamMessage);
+    return () => {
+      streamingTutor.offMessage(onStreamMessage);
+    };
+    // We intentionally keep one WS session for this screen lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => {
     if (loopState === "LISTENING") {
@@ -136,6 +211,27 @@ export default function AiConversationScreen({ navigation }: any) {
     }
   };
 
+  const queueAudio = (base64: string) => {
+    audioQueueRef.current.push(base64);
+    void playNextQueuedAudio();
+  };
+
+  const playNextQueuedAudio = async () => {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    const next = audioQueueRef.current.shift();
+    if (!next) return;
+    isPlayingRef.current = true;
+    setLoopState("SPEAKING");
+    await playAudio(next);
+    isPlayingRef.current = false;
+    if (audioQueueRef.current.length > 0) {
+      await playNextQueuedAudio();
+      return;
+    }
+    setLoopState("LISTENING");
+    await startListening();
+  };
+
   const startListening = async () => {
     setLoopState("LISTENING");
     try {
@@ -170,60 +266,13 @@ export default function AiConversationScreen({ navigation }: any) {
     }
 
     try {
-      const formData = new FormData();
-      formData.append("audio", {
-        uri,
-        type: "audio/m4a",
-        name: "recording.m4a",
-      } as any);
-
-      const { transcript } = await transcribeAudio(formData);
-      if (!transcript?.trim()) {
-        setLoopState("IDLE");
-        return;
-      }
-
-      const userMsg: TutorMessage = {
-        role: "user",
-        content: transcript,
-        timestamp: Date.now(),
-      };
-
-      const updatedMessages = [...messages, userMsg];
-      setMessages(updatedMessages);
-
-      const history = updatedMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      const { reply, audioBase64 } = await sendMessage({
-        message: transcript,
-        history,
+      // Pulse path: send raw audio to streaming tutor WS.
+      const audioBase64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64",
       });
-
-      let ttsAudio = audioBase64;
-      if (!ttsAudio) {
-        const ttsRes = await textToSpeech({ text: reply });
-        ttsAudio = ttsRes.audioBase64;
-      }
-
-      const assistantMsg: TutorMessage = {
-        role: "assistant",
-        content: reply,
-        audioBase64: ttsAudio,
-        timestamp: Date.now(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-
-      if (ttsAudio) {
-        setLoopState("SPEAKING");
-        await playAudio(ttsAudio);
-      }
-
-      setLoopState("LISTENING");
-      await startListening();
+      const rid = ++requestIdRef.current;
+      if (__DEV__) console.log("[AiConversation] sending audio turn", { rid, size: audioBase64.length });
+      streamingTutor.sendText(null, null, audioBase64);
     } catch (e: any) {
       console.error("[AiConversation] Pipeline error:", e);
       setLoopState("IDLE");
@@ -282,7 +331,7 @@ export default function AiConversationScreen({ navigation }: any) {
     const durationSeconds = Math.round(
       (Date.now() - sessionStartTime) / 1000,
     );
-    navigation.navigate("ActiveCall", {
+    navigation.navigate("EnglivoActiveCall", {
       messages,
       durationSeconds,
     });
@@ -297,7 +346,7 @@ export default function AiConversationScreen({ navigation }: any) {
       case "PROCESSING":
         return "Processing...";
       case "SPEAKING":
-        return "Priya is speaking...";
+        return ENGLIVO_AI_SPEAKING_LABEL;
       case "ENDED":
         return "Session Ended";
     }
@@ -314,7 +363,7 @@ export default function AiConversationScreen({ navigation }: any) {
             color={theme.colors.text.primary}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI Tutor — Priya</Text>
+        <Text style={styles.headerTitle}>{ENGLIVO_AI_TUTOR_TITLE}</Text>
         <TouchableOpacity style={styles.endButton} onPress={handleEndSession}>
           <Text style={styles.endButtonText}>End</Text>
         </TouchableOpacity>
@@ -336,9 +385,7 @@ export default function AiConversationScreen({ navigation }: any) {
               size={40}
               color={theme.colors.text.light}
             />
-            <Text style={styles.emptyHintText}>
-              Tap the mic to start speaking with Priya
-            </Text>
+            <Text style={styles.emptyHintText}>{ENGLIVO_AI_EMPTY_HINT}</Text>
           </View>
         )}
 

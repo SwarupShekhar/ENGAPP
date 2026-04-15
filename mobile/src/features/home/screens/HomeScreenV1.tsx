@@ -10,6 +10,7 @@ import {
   Image,
   Animated as RNAnimated,
   FlatList,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useUser } from '@clerk/clerk-expo';
@@ -34,6 +35,153 @@ import Animated, {
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
 import { getHomeData, HomeData } from '../services/homeApi';
+
+let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
+  impactAsync: async () => {},
+  ImpactFeedbackStyle: { Light: 'light' },
+};
+try {
+  Haptics = require('expo-haptics');
+} catch {
+  /* optional */
+}
+
+type SkillDetailKeyV1 = 'grammar' | 'pronunciation' | 'fluency' | 'vocabulary';
+type SkillSheetStateV1 =
+  | null
+  | { type: 'overall' }
+  | { type: 'skill'; label: string; detailKey: SkillDetailKeyV1 };
+
+function HomeSkillDetailModalV1({
+  visible,
+  onClose,
+  sheet,
+  skills,
+  headerScore,
+  goalLabel,
+  theme,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  sheet: SkillSheetStateV1;
+  skills: HomeData['skills'] | undefined;
+  headerScore: number;
+  goalLabel: string;
+  theme: any;
+}) {
+  if (!sheet || !skills) return null;
+
+  const c = theme.colors;
+  const deltas = skills.deltas || {};
+  const details = skills.details || {};
+  const scores = skills.scores || {};
+  const mastery = skills.masteryFlags;
+
+  const formatDelta = (k: string) => {
+    const d = deltas[k];
+    if (d == null || d === 0) return null;
+    const sign = d > 0 ? '+' : '';
+    return `${sign}${d}`;
+  };
+
+  const cardBg = c.surface ?? '#1a1520';
+  const border = c.border ?? 'rgba(255,255,255,0.1)';
+  const textPri = c.text?.primary ?? '#fff';
+  const textSec = c.text?.secondary ?? 'rgba(255,255,255,0.7)';
+  const textMut = c.text?.light ?? 'rgba(255,255,255,0.5)';
+  const accent = c.primary ?? '#8B5CF6';
+  const mint = c.success ?? '#86efac';
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={st.modalBackdrop} onPress={onClose}>
+        <Pressable
+          style={[st.modalCard, { backgroundColor: cardBg, borderColor: border }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {sheet.type === 'overall' ? (
+              <>
+                <Text style={[st.modalTitle, { color: textPri }]}>Overall score</Text>
+                <Text style={[st.modalBody, { color: textSec }]}>
+                  {headerScore > 100
+                    ? 'This ring is your EngR progress (0–1000) toward your next milestone. It combines your skills from your latest analyzed session — not a single test.'
+                    : 'This score reflects your overall EngR progress toward your next milestone, based on your latest analyzed session.'}
+                </Text>
+                <Text style={[st.modalMeta, { color: textMut }]}>
+                  Current: {headerScore <= 0 ? '—' : Math.round(headerScore)}
+                  {headerScore > 100 ? ' pts' : ''} · Goal: {goalLabel || 'next level'}
+                </Text>
+                {skills.deltaLabel ? (
+                  <Text style={[st.modalHint, { color: mint }]}>
+                    Trend: {skills.deltaLabel}
+                    {skills.avgDelta !== 0
+                      ? ` · avg ${skills.avgDelta > 0 ? '+' : ''}${skills.avgDelta} pts`
+                      : ''}
+                  </Text>
+                ) : null}
+                <Text style={[st.modalSection, { color: textPri }]}>Skill snapshot (0–100)</Text>
+                {(['grammar', 'pronunciation', 'fluency', 'vocabulary'] as const).map((k) => (
+                  <View
+                    key={k}
+                    style={[st.modalRow, { borderBottomColor: `${border}99` }]}
+                  >
+                    <Text style={[st.modalRowLabel, { color: textSec }]}>
+                      {k.charAt(0).toUpperCase() + k.slice(1)}
+                    </Text>
+                    <Text style={[st.modalRowVal, { color: textPri }]}>
+                      {scores[k] ?? '—'}%{formatDelta(k) ? ` (${formatDelta(k)})` : ''}
+                    </Text>
+                  </View>
+                ))}
+                <Text style={[st.modalFoot, { color: textMut }]}>
+                  Tap a skill chip below for mistakes, wins, and what the number means.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[st.modalTitle, { color: textPri }]}>{sheet.label}</Text>
+                <Text style={[st.modalScoreLine, { color: textPri }]}>
+                  Score: {scores[sheet.detailKey] ?? '—'}%
+                  {formatDelta(sheet.detailKey) ? (
+                    <Text style={{ color: mint, fontWeight: '600' }}>
+                      {' '}
+                      ({formatDelta(sheet.detailKey)} vs baseline)
+                    </Text>
+                  ) : null}
+                </Text>
+                <Text style={[st.modalSub, { color: textSec }]}>{details[sheet.detailKey]?.subtext ?? ''}</Text>
+                {(details[sheet.detailKey]?.items || []).map((line, i) => (
+                  <View key={i} style={st.modalBulletRow}>
+                    <Text style={[st.modalBullet, { color: accent }]}>•</Text>
+                    <Text style={[st.modalBulletText, { color: textPri }]}>{line}</Text>
+                  </View>
+                ))}
+                {mastery && mastery[sheet.detailKey] ? (
+                  <View style={[st.modalBadge, { backgroundColor: `${mint}18` }]}>
+                    <Text style={[st.modalBadgeText, { color: mint }]}>
+                      Achievement: mastery-level in this area (85+)
+                    </Text>
+                  </View>
+                ) : null}
+                {skills.hottestSkill === sheet.detailKey ? (
+                  <Text style={[st.modalFoot, { color: textMut }]}>This is your strongest recent gain.</Text>
+                ) : null}
+              </>
+            )}
+          </ScrollView>
+          <TouchableOpacity
+            style={[st.modalDone, { backgroundColor: accent }]}
+            onPress={onClose}
+            activeOpacity={0.85}
+          >
+            <Text style={st.modalDoneText}>Got it</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
 import { getPhraseOfTheDay } from '../../../data/phraseOfTheDay';
 import { chatApi } from '../../../api/connections';
 import SocketService from '../../call/services/socketService';
@@ -177,32 +325,87 @@ function AssessmentNudge({ theme, onPress }: { theme: any; onPress: () => void }
 }
 
 // ─── Skill Chip ───────────────────────────────────────────────────────────────
-function SkillChip({ label, score, color }: { label: string; score: number; color: string }) {
-  return (
-    <View style={[st.skillChip, { backgroundColor: `${color}12`, borderColor: `${color}30` }]}>
+function SkillChip({
+  label,
+  score,
+  color,
+  onPress,
+}: {
+  label: string;
+  score: number;
+  color: string;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
       <View style={[st.skillDot, { backgroundColor: color }]} />
       <Text style={[st.skillLabel, { color }]}>{label}</Text>
       <Text style={[st.skillScore, { color }]}>{score}</Text>
-    </View>
+      {onPress ? (
+        <Ionicons name="information-circle-outline" size={12} color={color} style={{ opacity: 0.7, marginLeft: 2 }} />
+      ) : null}
+    </>
+  );
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          onPress();
+        }}
+        style={({ pressed }) => [
+          st.skillChip,
+          { backgroundColor: `${color}12`, borderColor: `${color}30`, opacity: pressed ? 0.88 : 1 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${label} score details`}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={[st.skillChip, { backgroundColor: `${color}12`, borderColor: `${color}30` }]}>{content}</View>
   );
 }
 
 // ─── Score Card ───────────────────────────────────────────────────────────────
-function ScoreCard({ score, level, progress, goalLabel, skills, theme, onResults, onRetake }: {
-  score: number; level: string; progress: number; goalLabel: string;
-  skills: Record<string,number>;
-  theme: any; onResults: () => void; onRetake: () => void;
+function ScoreCard({
+  score,
+  level,
+  progress,
+  goalLabel,
+  skills,
+  theme,
+  onResults,
+  onRetake,
+  onPressOverall,
+  onPressSkill,
+}: {
+  score: number;
+  level: string;
+  progress: number;
+  goalLabel: string;
+  skills: Record<string, number>;
+  theme: any;
+  onResults: () => void;
+  onRetake: () => void;
+  onPressOverall?: () => void;
+  onPressSkill?: (detailKey: SkillDetailKeyV1, label: string) => void;
 }) {
   const c = theme.colors;
   const sk = theme.tokens.skill as any;
   const lk = cefrKey(level);
   const lvlColor = (theme.tokens.level as any)?.[lk] ?? c.primary;
 
-  const chips = [
-    { key: 'grammar',      label: 'Grammar',  color: sk?.grammar      ?? c.primary },
-    { key: 'pronunciation', label: 'Pronun.', color: sk?.pronunciation ?? c.accent  },
-    { key: 'fluency',      label: 'Fluency',  color: sk?.fluency      ?? c.success  },
-    { key: 'vocabulary',   label: 'Vocab',    color: sk?.vocabulary   ?? c.warning  },
+  const ringArcScore = score > 100 ? Math.min(100, (score / 1000) * 100) : Math.min(score, 100);
+  const scoreDenom = score > 100 ? '/1000' : '/100';
+
+  const chips: { key: SkillDetailKeyV1; label: string; color: string }[] = [
+    { key: 'grammar', label: 'Grammar', color: sk?.grammar ?? c.primary },
+    { key: 'pronunciation', label: 'Pronun.', color: sk?.pronunciation ?? c.accent },
+    { key: 'fluency', label: 'Fluency', color: sk?.fluency ?? c.success },
+    { key: 'vocabulary', label: 'Vocab', color: sk?.vocabulary ?? c.warning },
   ];
 
   return (
@@ -212,12 +415,25 @@ function ScoreCard({ score, level, progress, goalLabel, skills, theme, onResults
       style={[st.scoreCard, { borderColor: `${c.primary}28`, borderRadius: theme.borderRadius.xl }]}
     >
       {/* Top: ring + right-side info */}
-      <View style={st.scoreTop}>
+      <Pressable
+        onPress={
+          onPressOverall
+            ? () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                onPressOverall();
+              }
+            : undefined
+        }
+        disabled={!onPressOverall}
+        style={({ pressed }) => [st.scoreTop, onPressOverall && pressed && { opacity: 0.92 }]}
+        accessibilityRole={onPressOverall ? 'button' : undefined}
+        accessibilityLabel={onPressOverall ? 'Overall score details' : undefined}
+      >
         <View style={st.ringWrap}>
-          <Ring score={score} primary={c.primary} accent={c.accent} track={`${c.border}80`} />
+          <Ring score={ringArcScore} primary={c.primary} accent={c.accent} track={`${c.border}80`} />
           <View style={st.ringInner} pointerEvents="none">
-            <Text style={[st.scoreNum, { color: c.text.primary }]}>{score}</Text>
-            <Text style={[st.scoreDenom, { color: c.text.light }]}>/100</Text>
+            <Text style={[st.scoreNum, { color: c.text.primary }]}>{Math.round(score)}</Text>
+            <Text style={[st.scoreDenom, { color: c.text.light }]}>{scoreDenom}</Text>
           </View>
         </View>
 
@@ -235,11 +451,23 @@ function ScoreCard({ score, level, progress, goalLabel, skills, theme, onResults
             <LinearGradient colors={[c.primary, c.accent] as any} start={{ x:0,y:0 }} end={{ x:1,y:0 }} style={[st.progressFill, { width: `${Math.min(progress,100)}%` }]} />
           </View>
         </View>
-      </View>
+      </Pressable>
 
       {/* Skill chips 2×2 */}
       <View style={st.skillGrid}>
-        {chips.map(ch => <SkillChip key={ch.key} label={ch.label} score={skills[ch.key] ?? 0} color={ch.color} />)}
+        {chips.map((ch) => (
+          <SkillChip
+            key={ch.key}
+            label={ch.label}
+            score={skills[ch.key] ?? 0}
+            color={ch.color}
+            onPress={
+              onPressSkill
+                ? () => onPressSkill(ch.key, ch.label === 'Pronun.' ? 'Pronunciation' : ch.label)
+                : undefined
+            }
+          />
+        ))}
       </View>
 
       {/* Buttons */}
@@ -365,6 +593,7 @@ export default function HomeScreen() {
   const [loadingPhrase, setLoadingPhrase] = useState(true);
   const [phraseIdx, setPhraseIdx]     = useState(0);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
 
   const c = theme.colors;
 
@@ -509,9 +738,16 @@ export default function HomeScreen() {
         ) : hasData ? (
           <Animated.View entering={FadeInDown.delay(130).duration(400).springify()}>
             <ScoreCard
-              score={score} level={levelForUi} progress={progress} goalLabel={goalLabel}
-              skills={skills} theme={theme}
-              onResults={goResults} onRetake={goRetake}
+              score={score}
+              level={levelForUi}
+              progress={progress}
+              goalLabel={goalLabel}
+              skills={skills}
+              theme={theme}
+              onResults={goResults}
+              onRetake={goRetake}
+              onPressOverall={() => setSkillSheet({ type: 'overall' })}
+              onPressSkill={(detailKey, label) => setSkillSheet({ type: 'skill', detailKey, label })}
             />
           </Animated.View>
         ) : (
@@ -557,6 +793,16 @@ export default function HomeScreen() {
           )}
         </Animated.View>
       </ScrollView>
+
+      <HomeSkillDetailModalV1
+        visible={skillSheet !== null}
+        onClose={() => setSkillSheet(null)}
+        sheet={skillSheet}
+        skills={homeData?.skills}
+        headerScore={score}
+        goalLabel={goalLabel}
+        theme={theme}
+      />
     </View>
   );
 }
@@ -664,4 +910,96 @@ const st = StyleSheet.create({
   // Pagination
   paginationRow: { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:5 },
   pagDot: { height:6, borderRadius:3 },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 28,
+    maxHeight: '78%',
+    borderWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    marginBottom: 10,
+    letterSpacing: -0.3,
+  },
+  modalBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 12,
+  },
+  modalMeta: {
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  modalHint: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  modalSection: {
+    fontWeight: '700',
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalRowLabel: { fontSize: 14 },
+  modalRowVal: { fontSize: 14, fontWeight: '600' },
+  modalFoot: {
+    fontSize: 12,
+    marginTop: 14,
+    lineHeight: 17,
+  },
+  modalScoreLine: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  modalSub: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  modalBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  modalBullet: { fontSize: 15, marginTop: 1 },
+  modalBulletText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  modalBadge: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 10,
+  },
+  modalBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalDone: {
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalDoneText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
 });

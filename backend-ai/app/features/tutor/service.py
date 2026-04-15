@@ -5,9 +5,10 @@ from typing import AsyncGenerator
 import logging
 import os
 from .streaming_gemini_service import StreamingGeminiService
+from .pronunciation_capture import strip_pron_tags_for_mobile
 
 try:
-    from .optimized_tts_service import OptimizedTTSService
+    from ..transcription.optimized_tts_service import OptimizedTTSService
 except ImportError:
     OptimizedTTSService = None  # type: ignore
 
@@ -156,9 +157,10 @@ class StreamingTutorService:
             audio_base64,
         ):
             audio_bytes = None
+            tts_input = strip_pron_tags_for_mobile(sentence)
             if self.tts_service:
                 try:
-                    audio_bytes = await self.tts_service.synthesize_sentence(sentence)
+                    audio_bytes = await self.tts_service.synthesize_sentence(tts_input)
                 except Exception as e:
                     logger.error("TTS synthesis failed for sentence: %s", e)
             yield {

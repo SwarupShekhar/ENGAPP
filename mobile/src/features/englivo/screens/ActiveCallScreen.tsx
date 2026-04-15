@@ -14,10 +14,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import {
+  buildAiTutorReportPayload,
   generateReport,
   saveSession,
   type SessionReport,
 } from "../../../api/englivoAiTutor";
+import { ENGLIVO_AI_ASSISTANT_NAME } from "../constants";
 
 type TutorMessage = {
   role: "user" | "assistant";
@@ -50,14 +52,17 @@ export default function ActiveCallScreen() {
   const generate = async () => {
     setPhase("generating");
     try {
-      const rep = await generateReport({
-        sessionId: `session_${Date.now()}`,
-        messages: messages.map((m: TutorMessage) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        durationSeconds,
-      });
+      const sessionId = `session_${Date.now()}`;
+      const rep = await generateReport(
+        buildAiTutorReportPayload({
+          sessionId,
+          messages: messages.map((m: TutorMessage) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          durationSeconds,
+        }),
+      );
       setReport(rep);
       setPhase("report");
     } catch (e: any) {
@@ -76,6 +81,8 @@ export default function ActiveCallScreen() {
           role: m.role,
           content: m.content,
         })),
+        duration: durationSeconds,
+        durationSeconds,
       });
       setPhase("done");
     } catch (e: any) {
@@ -218,7 +225,7 @@ export default function ActiveCallScreen() {
                 {messages.map((msg: TutorMessage, idx: number) => (
                   <View key={idx} style={styles.transcriptRow}>
                     <Text style={styles.transcriptRole}>
-                      {msg.role === "user" ? "You" : "Priya"}:
+                      {msg.role === "user" ? "You" : ENGLIVO_AI_ASSISTANT_NAME}:
                     </Text>
                     <Text style={styles.transcriptText}>{msg.content}</Text>
                   </View>

@@ -26,6 +26,7 @@ import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { SuperAppProvider } from "./context/SuperAppContext";
+import { SplashAnimation } from "./components/SplashAnimation";
 
 class AppErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -287,6 +288,8 @@ function AuthGate() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <ClerkProvider
       publishableKey={CLERK_PUBLISHABLE_KEY}
@@ -298,7 +301,12 @@ export default function App() {
             <SuperAppProvider>
               <ThemeProvider>
                 <AppErrorBoundary>
-                  <View style={styles.appRoot}>
+                  <View
+                    style={[
+                      styles.appRoot,
+                      { backgroundColor: showSplash ? "#0F0F1A" : "#F5F6FA" },
+                    ]}
+                  >
                     <UIVariantProvider>
                       <NavigationContainer
                         ref={navigationRef}
@@ -332,9 +340,15 @@ export default function App() {
                           },
                         }}
                       >
-                        <StatusBar style="auto" />
+                        <StatusBar style={showSplash ? "light" : "auto"} />
                         <AuthGate />
                       </NavigationContainer>
+
+                      {showSplash && (
+                        <SplashAnimation
+                          onFinish={() => setShowSplash(false)}
+                        />
+                      )}
                     </UIVariantProvider>
                   </View>
                 </AppErrorBoundary>

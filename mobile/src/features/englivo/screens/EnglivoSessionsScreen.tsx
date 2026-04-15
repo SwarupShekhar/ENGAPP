@@ -13,10 +13,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { useUser } from "@clerk/clerk-expo";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+
 import { client } from "../../../api/englivoClient";
-import { getBridgeUser } from "../../../api/bridgeClient";
+import { getEnglivoMe } from "../../../api/englivoApi";
+import { ENGLIVO_AI_TUTOR_TITLE } from "../constants";
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -56,6 +57,7 @@ interface PastSession {
 
 interface Slot {
   id: string;
+  tutorId?: string;
   date: string;
   time: string;
   tutorName: string;
@@ -78,8 +80,24 @@ const TOPICS = [
 
 export default function EnglivoSessionsScreen() {
   const navigation = useNavigation<any>();
-  const { user: clerkUser } = useUser();
-  const clerkId = clerkUser?.id ?? "";
+  const route = useRoute<any>();
+
+  // If navigated here with a joinToken (from Home screen's "Join" button),
+  // jump straight to the live call screen without showing the sessions list.
+  useEffect(() => {
+    const { joinToken, roomName, tutorName, serverUrl, freeMinutesRemaining } =
+      route.params ?? {};
+    if (joinToken && roomName) {
+      navigation.navigate("EnglivoLiveCall", {
+        token: joinToken,
+        roomName,
+        tutorName,
+        serverUrl,
+        freeMinutesRemaining,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Browse state
   const [upcoming, setUpcoming] = useState<UpcomingSession[]>([]);
@@ -189,24 +207,22 @@ export default function EnglivoSessionsScreen() {
   const goStep3 = async () => {
     if (!selectedSlot) return;
     setWizardStep(3);
-    if (clerkId) {
-      try {
-        const bridgeUser = await getBridgeUser(clerkId);
-        setUserCredits(bridgeUser?.englivo_credits ?? 0);
-      } catch {
-        setUserCredits(null);
-      }
+    try {
+      const me = await getEnglivoMe();
+      setUserCredits(me?.credits ?? me?.creditBalance ?? null);
+    } catch {
+      setUserCredits(null);
     }
   };
 
   const confirmBooking = async () => {
-    if (!selectedSlot || !selectedTopic || !clerkId) return;
+    if (!selectedSlot || !selectedTopic) return;
     setBooking(true);
     try {
-      await client.post("/api/bookings", {
+      await client.post("/api/sessions/book", {
+        topicId: selectedTopic,
         slotId: selectedSlot.id,
-        topic: selectedTopic,
-        clerkId,
+        tutorId: selectedSlot.tutorId ?? selectedSlot.id,
       });
       closeWizard();
       showToast("Session booked! Check your upcoming sessions.");
@@ -272,7 +288,9 @@ export default function EnglivoSessionsScreen() {
           <View>
             <Text style={s.title}>Sessions</Text>
             {!wizardActive && (
-              <Text style={s.subtitle}>Practice with AI or book a human tutor</Text>
+              <Text style={s.subtitle}>
+                Practice with {ENGLIVO_AI_TUTOR_TITLE} or book a human tutor
+              </Text>
             )}
           </View>
         </View>
@@ -295,7 +313,9 @@ export default function EnglivoSessionsScreen() {
                 style={s.aiCardGradient}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={s.aiCardTitle}>Practice with AI Tutor</Text>
+                  <Text style={s.aiCardTitle}>
+                    Practice with {ENGLIVO_AI_TUTOR_TITLE}
+                  </Text>
                   <Text style={s.aiCardSub}>Instant. Speak freely. Get feedback.</Text>
                 </View>
                 <View style={s.aiCardIcon}>
