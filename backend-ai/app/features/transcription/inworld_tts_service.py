@@ -94,5 +94,9 @@ class InworldTTSService:
             logger.error(f"Inworld TTS async error: {e}")
             return b""
 
+    async def synthesize_sentence(self, text: str) -> bytes:
+        """Alias for synthesize_async — called by StreamingTutorService."""
+        return await self.synthesize_async(text)
+
 
 inworld_tts_service = InworldTTSService()

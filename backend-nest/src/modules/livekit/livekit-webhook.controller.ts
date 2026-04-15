@@ -228,13 +228,22 @@ export class LiveKitWebhookController {
             `Empty transcript for participant=${participant.userId} — skipping PQS`,
           );
         } else {
-          // 1. Get Azure pronunciation details
+          // 1. Get Azure pronunciation details.
+          // Pass no reference_text so backend-ai runs in free-speech mode —
+          // passing transcript.trim() here creates a self-reference trap where
+          // Azure compares speech against itself and returns 100% accuracy.
           const { flagged_errors, pronunciation_score } =
             await this.pronunciationService.assessFromRecordingUrl(
               participant.userId,
               effectiveFileLocation,
-              transcript.trim(),
             );
+          const wordsChecked: number =
+            (pronunciation_score as any)?.azure_result?.Words?.length ??
+            (pronunciation_score as any)?.azure_result?.Nbests?.[0]?.Words?.length ??
+            0;
+          this.logger.log(
+            `[Core PA] session=${participant.sessionId} issues=${flagged_errors.length} words_checked=${wordsChecked}`,
+          );
 
           // 2. Persist Issues to DB
           await this.savePronunciationIssues(participant.sessionId, participant.userId, participant.id, flagged_errors, transcript.trim());
@@ -388,17 +397,30 @@ export class LiveKitWebhookController {
     }
 
     if (Array.isArray(flagged_errors) && flagged_errors.length > 0) {
+      const sample = flagged_errors[0];
       await this.prisma.pronunciationIssue.createMany({
         data: flagged_errors.map((err) => ({
           analysisId: analysis!.id,
-          word: err.spoken,
-          issueType: err.rule_category,
+          word: err.spoken,           // legacy compat
+          spoken: err.spoken,         // what user actually said
+          correct: err.correct,       // correct pronunciation
+          ruleCategory: err.rule_category,
+          reelId: err.reel_id || null,
+          issueType: err.rule_category, // legacy compat
           severity: err.confidence < 40 ? 'high' : err.confidence < 65 ? 'medium' : 'low',
           confidence: err.confidence,
           suggestion: formatPronunciationSuggestion(err.rule_category, err.correct),
         })),
         skipDuplicates: true,
       });
+
+      this.logger.log(
+        `[Pronunciation] Saved ${flagged_errors.length} pronunciation issues: ` +
+          `sample=${sample?.spoken ?? '—'}→${sample?.correct ?? sample?.rule_category ?? '—'} ` +
+          `(rule_types=${Array.from(
+            new Set(flagged_errors.map((e) => e.rule_category)),
+          ).slice(0, 5).join(', ')})`,
+      );
     }
   }
 }

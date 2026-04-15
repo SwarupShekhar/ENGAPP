@@ -19,6 +19,13 @@ export class ReelsService {
   >();
   private readonly FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+  // ─── Strapi response cache (fallback when Strapi is cold/down) ───
+  private readonly strapiCache = new Map<
+    string,
+    { data: any[]; savedAt: number }
+  >();
+  private readonly STRAPI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
@@ -31,6 +38,24 @@ export class ReelsService {
 
     // Periodic cleanup of expired cache entries (every 10 min)
     setInterval(() => this.cleanExpiredCache(), 10 * 60 * 1000);
+
+    // Keep Strapi alive — ping every 4 min to prevent Render free-tier sleep
+    setInterval(() => this.keepStrapiAlive(), 4 * 60 * 1000);
+  }
+
+  /** Pings Strapi health endpoint to prevent cold starts on Render free tier. */
+  private async keepStrapiAlive() {
+    if (!this.strapiBaseUrl) return;
+    try {
+      await firstValueFrom(
+        this.httpService.get(`${this.strapiBaseUrl}/_health`, {
+          timeout: 10000,
+        }),
+      );
+      this.logger.debug('Strapi keep-alive ping OK');
+    } catch {
+      // Ignore — the point is just to wake it up
+    }
   }
 
   private cleanExpiredCache() {
@@ -290,6 +315,7 @@ export class ReelsService {
 
   /**
    * Fetch reels from Strapi filtered by topic tags and difficulty.
+   * Falls back to the last cached Strapi response if the instance is cold/down.
    */
   private async fetchReelsFromStrapi(
     tags: string[],
@@ -310,6 +336,8 @@ export class ReelsService {
     //   url += `&filters[difficulty_level][$eq]=${difficulty}`;
     // }
 
+    const cacheKey = `general:${tags.sort().join(',')}`;
+
     try {
       const response = await firstValueFrom(
         this.httpService.get(url, {
@@ -317,18 +345,31 @@ export class ReelsService {
           timeout: 60000, // 60s timeout for Render free-tier cold starts
         }),
       );
-      return response.data.data || [];
+      const data = response.data.data || [];
+      // Persist fresh result so future cold-start requests can fall back to it
+      this.strapiCache.set(cacheKey, { data, savedAt: Date.now() });
+      return data;
     } catch (error) {
       this.logger.error(`Strapi request failed: ${error.message}`);
+      // Return last good response if available and not stale
+      const fallback = this.strapiCache.get(cacheKey);
+      if (fallback && Date.now() - fallback.savedAt < this.STRAPI_CACHE_TTL_MS) {
+        this.logger.warn(
+          `Strapi offline — using cached reels (age: ${Math.round((Date.now() - fallback.savedAt) / 60000)}m)`,
+        );
+        return fallback.data;
+      }
       return [];
     }
   }
 
   /**
    * Fetch editorially featured reels.
+   * Falls back to the last cached Strapi response if the instance is cold/down.
    */
   private async fetchFeaturedReels(limit: number) {
     const url = `${this.strapiBaseUrl}/api/reels?populate=*&pagination[limit]=${limit}&filters[is_featured][$eq]=true`;
+    const cacheKey = 'featured';
     try {
       const response = await firstValueFrom(
         this.httpService.get(url, {
@@ -336,9 +377,18 @@ export class ReelsService {
           timeout: 60000,
         }),
       );
-      return response.data.data || [];
+      const data = response.data.data || [];
+      this.strapiCache.set(cacheKey, { data, savedAt: Date.now() });
+      return data;
     } catch (error) {
       this.logger.error(`Strapi featured request failed: ${error.message}`);
+      const fallback = this.strapiCache.get(cacheKey);
+      if (fallback && Date.now() - fallback.savedAt < this.STRAPI_CACHE_TTL_MS) {
+        this.logger.warn(
+          `Strapi offline — using cached featured reels (age: ${Math.round((Date.now() - fallback.savedAt) / 60000)}m)`,
+        );
+        return fallback.data;
+      }
       return [];
     }
   }

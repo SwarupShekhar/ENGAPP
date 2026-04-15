@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, HttpUrl
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from app.models.base import AnalysisTaskType
 
 class TranscriptionRequest(BaseModel):
@@ -17,6 +17,8 @@ class AnalysisRequest(BaseModel):
     context: Optional[str] = None
     user_native_language: Optional[str] = None
     task_type: AnalysisTaskType = AnalysisTaskType.GENERAL
+    # Optional: Pulse live-tutor captures; merged with WebSocket store in analyze()
+    pronunciation_issues: Optional[List[Dict[str, Any]]] = None
 
 class PronunciationRequest(BaseModel):
     audio_url: Optional[str] = None

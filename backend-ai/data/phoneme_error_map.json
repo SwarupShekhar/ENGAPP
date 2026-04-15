@@ -12,18 +12,6 @@
       "correct_word": "wood",
       "rule_category": "w_to_v"
     },
-    "bill": {
-      "correct_word": "will",
-      "rule_category": "w_to_v"
-    },
-    "been": {
-      "correct_word": "win",
-      "rule_category": "w_to_v"
-    },
-    "bijan": {
-      "correct_word": "vision",
-      "rule_category": "zh_to_j"
-    },
     "vaalk": {
       "correct_word": "walk",
       "rule_category": "w_to_v"
@@ -482,6 +470,10 @@
     },
     "teep": {
       "correct_word": "tip",
+      "rule_category": "i_to_ee"
+    },
+    "been": {
+      "correct_word": "bin",
       "rule_category": "i_to_ee"
     },
     "seen": {
@@ -2247,6 +2239,50 @@
     "bet-tull": {
       "correct_word": "battle",
       "rule_category": "syllabic_lengthening"
+    },
+    "englis": {
+      "correct_word": "english",
+      "rule_category": "final_consonant_cluster"
+    },
+    "inglish": {
+      "correct_word": "english",
+      "rule_category": "final_consonant_cluster"
+    },
+    "engless": {
+      "correct_word": "english",
+      "rule_category": "vowel_reduction"
+    },
+    "wery": {
+      "correct_word": "very",
+      "rule_category": "v_to_w"
+    },
+    "bery": {
+      "correct_word": "very",
+      "rule_category": "b_to_v"
+    },
+    "pepul": {
+      "correct_word": "people",
+      "rule_category": "vowel_substitution"
+    },
+    "peeple": {
+      "correct_word": "people",
+      "rule_category": "vowel_substitution"
+    },
+    "fillum": {
+      "correct_word": "film",
+      "rule_category": "vowel_insertion"
+    },
+    "expain": {
+      "correct_word": "explain",
+      "rule_category": "consonant_cluster_reduction"
+    },
+    "explen": {
+      "correct_word": "explain",
+      "rule_category": "consonant_cluster_reduction"
+    },
+    "coleg": {
+      "correct_word": "college",
+      "rule_category": "final_consonant_cluster"
     }
   },
   "by_correct_word": {
@@ -2754,6 +2790,10 @@
       "approximation": "beeg",
       "rule_category": "i_to_ee"
     },
+    "bill": {
+      "approximation": "beel",
+      "rule_category": "i_to_ee"
+    },
     "bring": {
       "approximation": "breeng",
       "rule_category": "i_to_ee"
@@ -2783,8 +2823,8 @@
       "rule_category": "i_to_ee"
     },
     "film": {
-      "approximation": "filam",
-      "rule_category": "schwa_addition"
+      "approximation": "fillum",
+      "rule_category": "vowel_insertion"
     },
     "finish": {
       "approximation": "feenish",
@@ -2880,7 +2920,7 @@
     },
     "morning": {
       "approximation": "maarning",
-      "rule_category": "o_to_aa"
+      "rule_category": "r_rolling"
     },
     "coffee": {
       "approximation": "cawfee",
@@ -2955,8 +2995,8 @@
       "rule_category": "o_to_aa"
     },
     "college": {
-      "approximation": "caalege",
-      "rule_category": "o_to_aa"
+      "approximation": "coleg",
+      "rule_category": "final_consonant_cluster"
     },
     "common": {
       "approximation": "caamon",
@@ -3399,8 +3439,8 @@
       "rule_category": "r_rolling"
     },
     "very": {
-      "approximation": "verry",
-      "rule_category": "r_rolling"
+      "approximation": "bery",
+      "rule_category": "b_to_v"
     },
     "park": {
       "approximation": "paark",
@@ -3427,8 +3467,8 @@
       "rule_category": "syllabic_lengthening"
     },
     "people": {
-      "approximation": "pee-pull",
-      "rule_category": "syllabic_lengthening"
+      "approximation": "peeple",
+      "rule_category": "vowel_substitution"
     },
     "little": {
       "approximation": "lit-tull",
@@ -4485,6 +4525,14 @@
     "battle": {
       "approximation": "bet-tull",
       "rule_category": "syllabic_lengthening"
+    },
+    "english": {
+      "approximation": "engless",
+      "rule_category": "vowel_reduction"
+    },
+    "explain": {
+      "approximation": "explen",
+      "rule_category": "consonant_cluster_reduction"
     }
   },
   "by_category": {
@@ -5061,7 +5109,9 @@
       "zoo",
       "zoom"
     ],
-    "schwa_reduction": ["breakfast"],
+    "schwa_reduction": [
+      "breakfast"
+    ],
     "schwa_addition": [
       "arm",
       "charm",
@@ -5078,6 +5128,34 @@
       "risk",
       "term"
     ],
-    "schwa_prothesis": ["school", "smile", "special", "speech", "station"]
+    "schwa_prothesis": [
+      "school",
+      "smile",
+      "special",
+      "speech",
+      "station"
+    ],
+    "final_consonant_cluster": [
+      "college",
+      "english"
+    ],
+    "vowel_reduction": [
+      "english"
+    ],
+    "v_to_w": [
+      "very"
+    ],
+    "b_to_v": [
+      "very"
+    ],
+    "vowel_substitution": [
+      "people"
+    ],
+    "vowel_insertion": [
+      "film"
+    ],
+    "consonant_cluster_reduction": [
+      "explain"
+    ]
   }
 }

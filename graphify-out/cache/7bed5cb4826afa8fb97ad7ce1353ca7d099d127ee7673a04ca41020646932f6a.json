@@ -1,0 +1,1 @@
+{"nodes": [{"id": "web_mvp_next_config_ts", "label": "next.config.ts", "file_type": "code", "source_file": "web-mvp/next.config.ts", "source_location": "L1"}], "edges": [{"source": "web_mvp_next_config_ts", "target": "next", "relation": "imports_from", "confidence": "EXTRACTED", "source_file": "web-mvp/next.config.ts", "source_location": "L1", "weight": 1.0}]}

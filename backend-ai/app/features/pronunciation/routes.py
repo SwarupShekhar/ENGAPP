@@ -97,26 +97,48 @@ def _run_continuous_pa_sync(
 
     def on_recognized(evt):
         try:
+            if evt.result.reason != speechsdk.ResultReason.RecognizedSpeech:
+                return
             detail_str = evt.result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)
             if not detail_str:
                 return
             data = _json.loads(detail_str)
             nbests = data.get("NBest") or data.get("nbest") or []
+            # Prefer SDK object — ProsodyScore is at full-text level and is often populated here
+            # when JSON omits or nests it differently (continuous recognition).
+            fluency_val: float | None = None
+            prosody_val: float | None = None
+            try:
+                pa_sdk = speechsdk.PronunciationAssessmentResult(evt.result)
+                fluency_val = float(pa_sdk.fluency_score)
+                # Available with enable_prosody_assessment + SDK >= 1.35
+                prosody_val = float(pa_sdk.prosody_score)
+            except Exception:
+                pass
+
             if nbests:
                 first = nbests[0]
                 segment_words = first.get("Words") or first.get("words") or []
                 all_words.extend(segment_words)
-                # Capture fluency and prosody scores from the segment
-                pa_info = first.get("PronunciationAssessment") or data.get("PronunciationAssessment") or {}
-                if "FluencyScore" in pa_info:
-                    fluency_scores.append(float(pa_info["FluencyScore"]))
-                if "ProsodyScore" in pa_info:
-                    prosody_scores.append(float(pa_info["ProsodyScore"]))
+                pa_info = (
+                    first.get("PronunciationAssessment")
+                    or data.get("PronunciationAssessment")
+                    or {}
+                )
+                if fluency_val is None and "FluencyScore" in pa_info:
+                    fluency_val = float(pa_info["FluencyScore"])
+                if prosody_val is None and "ProsodyScore" in pa_info:
+                    prosody_val = float(pa_info["ProsodyScore"])
+                if fluency_val is not None:
+                    fluency_scores.append(fluency_val)
+                if prosody_val is not None:
+                    prosody_scores.append(prosody_val)
                 logger.info(
                     "PA segment: %d words (total: %d), fluency=%s, prosody=%s",
-                    len(segment_words), len(all_words),
-                    pa_info.get("FluencyScore", "N/A"),
-                    pa_info.get("ProsodyScore", "N/A"),
+                    len(segment_words),
+                    len(all_words),
+                    fluency_val if fluency_val is not None else pa_info.get("FluencyScore", "N/A"),
+                    prosody_val if prosody_val is not None else pa_info.get("ProsodyScore", "N/A"),
                 )
         except Exception as e:
             logger.warning("PA on_recognized parse error: %s", e)
@@ -168,7 +190,7 @@ async def _run_azure_pronunciation_assessment(
     if not AZURE_SPEECH_KEY:
         raise HTTPException(503, "AZURE_SPEECH_KEY not set")
 
-    ref = (reference_text or "").strip() or "hello"
+    ref = (reference_text or "").strip()  # empty = free-speech mode
 
     try:
         all_words, avg_fluency, avg_prosody = await asyncio.to_thread(
@@ -328,23 +350,20 @@ async def assess_pronunciation(
 
         try:
             import azure.cognitiveservices.speech as speechsdk
-            pass_1_transcript = _clean_reference_text(_reference_text or "")
-            if pass_1_transcript and pass_1_transcript != "hello":
-                logger.info("Using cleaned reference_text for Pass 2: %.60s...", pass_1_transcript)
+            # Use caller-supplied reference_text for read-aloud tasks.
+            # When empty/absent, use "" (free-speech mode) — do NOT run STT first
+            # and feed the transcript back as reference: that creates a self-reference
+            # trap where Azure compares speech against itself and returns 100% scores.
+            if _reference_text and _reference_text.strip():
+                pass_1_transcript = _clean_reference_text(_reference_text)
             else:
-                if not AZURE_SPEECH_KEY:
-                    logger.error("AZURE_SPEECH_KEY not set; cannot run Pass 1 STT")
-                    raise HTTPException(503, "Pronunciation assessment not configured (AZURE_SPEECH_KEY)")
-                speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
-                audio_config = speechsdk.audio.AudioConfig(filename=tmp_wav)
-                recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-                stt_result = recognizer.recognize_once()
-                if stt_result.reason == speechsdk.ResultReason.RecognizedSpeech and (stt_result.text or "").strip():
-                    pass_1_transcript = _clean_reference_text(stt_result.text or "")
-                    logger.info("Pass 1 (STT) transcript: %s", pass_1_transcript)
-                else:
-                    pass_1_transcript = "hello"
-                    logger.warning("Pass 1 STT failed or empty; using fallback 'hello'")
+                pass_1_transcript = ""
+
+            logger.info(
+                "[PA] reference_text='%s' audio_len=%d",
+                pass_1_transcript[:60] if pass_1_transcript else "(free-speech mode)",
+                len(content),
+            )
 
             pass_2_result = await _run_azure_pronunciation_assessment(
                 tmp_wav, pass_1_transcript

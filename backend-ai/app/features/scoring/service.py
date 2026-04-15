@@ -43,14 +43,17 @@ class CallQualityService:
                 "pqs": 0.0,
                 "mean_accuracy": 0.0,
                 "mean_fluency": 0.0,
+                "mean_prosody": 0.0,
                 "mispronunciation_rate": 0.0,
-                "word_count": 0
+                "word_count": 0,
             }
 
         # Signal 1: Mean word accuracy
         all_word_accuracy_scores: List[float] = []
         # Signal 2: Mean fluency
         fluency_scores: List[float] = []
+        # Signal 3: Prosody (distinct from fluency — do not duplicate into both slots)
+        prosody_scores: List[float] = []
         # Signal 4: Mispronunciation rate
         total_words: int = 0
         mispronounced_words: int = 0
@@ -68,12 +71,17 @@ class CallQualityService:
                 logger.warning(f"NBest[0] is not a dict: {type(first)}")
                 continue
             
-            # Fluency at utterance level
+            # Fluency / prosody at utterance (segment) level — same layer as Azure JSON
             pa_info = first.get("PronunciationAssessment") or {}
             if "FluencyScore" in pa_info:
                 fluency_scores.append(float(pa_info["FluencyScore"]))
             elif utt.get("fluency_score") is not None:
                 fluency_scores.append(float(utt["fluency_score"]))
+
+            if "ProsodyScore" in pa_info:
+                prosody_scores.append(float(pa_info["ProsodyScore"]))
+            elif utt.get("prosody_score") is not None:
+                prosody_scores.append(float(utt["prosody_score"]))
             
             # Word level metrics
             words = first.get("Words", [])
@@ -93,27 +101,35 @@ class CallQualityService:
 
         mean_accuracy = float(mean(all_word_accuracy_scores)) if all_word_accuracy_scores else 0.0
         mean_fluency = float(mean(fluency_scores)) if fluency_scores else 0.0
-        
-        # Signal 3: Prosody (Proxy to fluency per spec)
-        prosody = mean_fluency
-        
-        # Signal 4: Mispronunciation Score
+
         mispron_rate = float(mispronounced_words) / float(total_words) if total_words > 0 else 0.0
         mispron_score = float(max(0.0, float(100.0 - (mispron_rate * 200.0))))
 
-        pqs = (
-            (mean_accuracy * 0.35) +
-            (mean_fluency * 0.30) +
-            (prosody * 0.20) +
-            (mispron_score * 0.15)
-        )
+        # Prosody: use Azure ProsodyScore when present. If absent, fold the 20% prosody weight
+        # into fluency so we do not count the same fluency signal twice (30% + 20%).
+        if prosody_scores:
+            mean_prosody = float(mean(prosody_scores))
+            pqs = (
+                (mean_accuracy * 0.35)
+                + (mean_fluency * 0.30)
+                + (mean_prosody * 0.20)
+                + (mispron_score * 0.15)
+            )
+        else:
+            mean_prosody = mean_fluency
+            pqs = (
+                (mean_accuracy * 0.35)
+                + (mean_fluency * 0.50)
+                + (mispron_score * 0.15)
+            )
 
         return {
             "pqs": round(float(min(100.0, max(0.0, pqs))), 2),
             "mean_accuracy": round(mean_accuracy, 2),
             "mean_fluency": round(mean_fluency, 2),
+            "mean_prosody": round(mean_prosody, 2),
             "mispronunciation_rate": round(mispron_rate, 4),
-            "word_count": total_words
+            "word_count": total_words,
         }
 
     def compute_depth_score(self, user_turns: List[str]) -> float:

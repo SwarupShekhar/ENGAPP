@@ -1,0 +1,1 @@
+{"nodes": [{"id": "mobile_src_api_reels_ts", "label": "reels.ts", "file_type": "code", "source_file": "mobile/src/api/reels.ts", "source_location": "L1"}], "edges": [{"source": "mobile_src_api_reels_ts", "target": "mobile_src_api_client", "relation": "imports_from", "confidence": "EXTRACTED", "source_file": "mobile/src/api/reels.ts", "source_location": "L1", "weight": 1.0}]}

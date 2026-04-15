@@ -5,12 +5,12 @@ import { useAppTheme } from "../../../theme/useAppTheme";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
 interface CallQualityScoreCardProps {
-  cqs: number;
-  breakdown: {
-    pqs: number;
-    ds: number;
-    cs: number;
-    es: number;
+  cqs?: number;
+  breakdown?: {
+    pqs?: number;
+    ds?: number;
+    cs?: number;
+    es?: number;
   };
 }
 
@@ -21,18 +21,26 @@ export const CallQualityScoreCard: React.FC<CallQualityScoreCardProps> = ({
   const theme = useAppTheme();
   const styles = getStyles(theme);
 
+  const safeCqs = typeof cqs === "number" ? cqs : 0;
+  const safeBreakdown = {
+    pqs: typeof breakdown?.pqs === "number" ? breakdown.pqs : 0,
+    ds: typeof breakdown?.ds === "number" ? breakdown.ds : 0,
+    cs: typeof breakdown?.cs === "number" ? breakdown.cs : 0,
+    es: typeof breakdown?.es === "number" ? breakdown.es : 0,
+  };
+
   const dimensions = [
-    { label: "Pronunciation Clearity", score: breakdown.pqs, icon: "mic", color: "#3B82F6" },
-    { label: "Topic Depth", score: breakdown.ds, icon: "layers", color: "#8B5CF6" },
-    { label: "Grammar & Complexity", score: breakdown.cs, icon: "construct", color: "#EC4899" },
-    { label: "Interactive Engagement", score: breakdown.es, icon: "people", color: "#F59E0B" },
+    { label: "Pronunciation clarity", score: safeBreakdown.pqs, icon: "mic", color: "#3B82F6" },
+    { label: "Topic Depth", score: safeBreakdown.ds, icon: "layers", color: "#8B5CF6" },
+    { label: "Grammar & Complexity", score: safeBreakdown.cs, icon: "construct", color: "#EC4899" },
+    { label: "Interactive Engagement", score: safeBreakdown.es, icon: "people", color: "#F59E0B" },
   ];
 
   return (
     <Animated.View entering={FadeInUp.delay(300).springify()} style={styles.container}>
       <View style={styles.header}>
         <View style={styles.cqsCircle}>
-          <Text style={styles.cqsValue}>{Math.round(cqs)}</Text>
+          <Text style={styles.cqsValue}>{Math.round(safeCqs)}</Text>
           <Text style={styles.cqsLabel}>CQS</Text>
         </View>
         <View style={styles.headerText}>
@@ -67,14 +75,17 @@ export const CallQualityScoreCard: React.FC<CallQualityScoreCardProps> = ({
 const getStyles = (theme: any) =>
   StyleSheet.create({
     container: {
-      backgroundColor: "white",
-      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.xl,
       padding: 20,
       marginHorizontal: 20,
       marginBottom: 20,
       ...theme.shadows.medium,
       borderWidth: 1,
-      borderColor: theme.colors.border + "10",
+      borderColor:
+        typeof theme.colors.border === "string"
+          ? `${theme.colors.border}88`
+          : theme.colors.border,
     },
     header: {
       flexDirection: "row",
@@ -123,11 +134,14 @@ const getStyles = (theme: any) =>
     },
     dimCard: {
       width: "48%",
-      backgroundColor: theme.colors.surface,
-      borderRadius: 16,
+      backgroundColor: theme.colors.background,
+      borderRadius: theme.borderRadius.l,
       padding: 12,
       borderWidth: 1,
-      borderColor: theme.colors.border + "10",
+      borderColor:
+        typeof theme.colors.border === "string"
+          ? `${theme.colors.border}66`
+          : theme.colors.border,
     },
     dimIcon: {
       width: 32,
@@ -146,7 +160,10 @@ const getStyles = (theme: any) =>
     },
     dimBarBg: {
       height: 4,
-      backgroundColor: theme.colors.border + "20",
+      backgroundColor:
+        typeof theme.colors.border === "string"
+          ? `${theme.colors.border}55`
+          : theme.colors.border,
       borderRadius: 2,
       marginBottom: 6,
       overflow: "hidden",

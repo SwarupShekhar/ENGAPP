@@ -5,9 +5,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useUser } from "@clerk/clerk-expo";
 import { useAppTheme } from "../../../theme/useAppTheme";
-import { generateReport, saveSession } from "../../../api/englivo/aiTutor";
+import {
+  buildAiTutorReportPayload,
+  generateReport,
+  saveSession,
+} from "../../../api/englivo/aiTutor";
 import { SessionReport, TutorMessage } from "../../../types/aiTutor";
-import { syncBridgeCefr } from "../../../api/bridgeClient";
+import { syncBridgeCefr, updateLastActiveApp } from "../../../api/bridgeClient";
 
 export default function EnglivoActiveCallScreen() {
   const theme = useAppTheme();
@@ -16,32 +20,58 @@ export default function EnglivoActiveCallScreen() {
   const route = useRoute<any>();
   const { user: clerkUser } = useUser();
   const { messages = [], durationSeconds = 0 } = route.params || {};
-  const [phase, setPhase] = useState<"generating" | "report" | "done">("generating");
+  const [phase, setPhase] = useState<"generating" | "report" | "error" | "done">("generating");
   const [report, setReport] = useState<SessionReport | null>(null);
 
   useEffect(() => {
-    generateReport({
-      sessionId: `session_${Date.now()}`,
-      messages: messages.map((m: TutorMessage) => ({ role: m.role, content: m.content })),
+    const sessionId = `session_${Date.now()}`;
+    const reportBody = buildAiTutorReportPayload({
+      sessionId,
+      messages: messages.map((m: TutorMessage) => ({
+        role: m.role,
+        content: m.content,
+      })),
       durationSeconds,
-    }).then((rep) => {
-      setReport(rep);
-      setPhase("report");
-      if (rep.cefrLevel && clerkUser?.id) {
-        syncBridgeCefr({
-          clerkId: clerkUser.id,
-          cefrLevel: rep.cefrLevel,
-          fluencyScore: rep.fluencyScore,
-          source: "englivo",
-        }).catch((err) => console.warn("[Englivo] CEFR sync failed:", err));
-      }
     });
+    generateReport(reportBody)
+      .then((rep) => {
+        setReport(rep);
+        setPhase("report");
+        if (rep.cefrLevel && clerkUser?.id) {
+          syncBridgeCefr({
+            clerkId: clerkUser.id,
+            cefrLevel: rep.cefrLevel,
+            fluencyScore: rep.fluencyScore,
+            source: "englivo",
+          }).catch((err) => console.warn("[Englivo] CEFR sync failed:", err));
+        }
+      })
+      .catch((err) => {
+        console.error("[Englivo] generateReport failed:", err);
+        setPhase("error");
+      });
   }, [durationSeconds, messages]);
 
   if (phase === "generating") {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (phase === "error") {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Text style={[styles.summaryText, { textAlign: "center", marginBottom: 20 }]}>
+          Could not generate your session report. Your session has ended.
+        </Text>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={() => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })}
+        >
+          <Text style={styles.saveButtonText}>Return Home</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -64,7 +94,18 @@ export default function EnglivoActiveCallScreen() {
           style={styles.saveButton}
           onPress={async () => {
             if (!report) return;
-            await saveSession({ report, messages });
+            await saveSession({
+              report,
+              messages: messages.map((m: TutorMessage) => ({
+                role: m.role,
+                content: m.content,
+              })),
+              duration: durationSeconds,
+              durationSeconds,
+            });
+            if (clerkUser?.id) {
+              updateLastActiveApp(clerkUser.id, "CORE").catch(() => {});
+            }
             setPhase("done");
             navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
           }}

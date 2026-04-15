@@ -1,4 +1,4 @@
-import { sessionClient } from "../englivoClient";
+import { client as sessionClient } from "../englivoClient";
 
 export interface PerformanceHistory {
   streak: number;
@@ -8,7 +8,7 @@ export interface PerformanceHistory {
 
 export async function getPerformanceHistory(): Promise<PerformanceHistory> {
   try {
-    const r = await sessionClient.get("/progress/detailed-metrics");
+    const r = await sessionClient.get("/api/progress/detailed-metrics");
     console.log('[Progress API] Response:', r.data);
     // Map the response to our expected format
     return {

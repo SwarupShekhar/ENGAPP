@@ -78,7 +78,7 @@ def calculate_pronunciation_score(
     1. Start at 100 (or Azure average if lower, as a ceiling)
     2. Subtract weighted penalties per flagged error
     3. Apply fluency multiplier: score × (0.7 + 0.3 × fluency/100)
-    4. Apply prosody penalty if prosody_score < 50
+    4. Blend with prosody: 0.56×score + 0.44×prosody_score when prosody is available
     5. Floor at 10, never return exactly 50 (that's the fallback sentinel)
 
     Returns:
@@ -114,11 +114,17 @@ def calculate_pronunciation_score(
         score = score * fluency_mult
         logger.info("Fluency multiplier: %.2f (fluency_score=%.1f)", fluency_mult, fluency_score)
 
-    # Prosody penalty: if rhythm/stress is poor, subtract extra
-    if prosody_score is not None and prosody_score < 50:
-        prosody_penalty = (50.0 - prosody_score) * 0.15
-        score -= prosody_penalty
-        logger.info("Prosody penalty: -%.1f (prosody_score=%.1f)", prosody_penalty, prosody_score)
+    # Prosody blend: Azure word accuracy can stay high while stress/rhythm is weak.
+    # Mixing ~45% toward ProsodyScore prevents inflated scores when only prosody is poor.
+    if prosody_score is not None:
+        before = score
+        score = 0.56 * score + 0.44 * float(prosody_score)
+        logger.info(
+            "Prosody blend: %.1f -> %.1f (prosody_score=%.1f)",
+            before,
+            score,
+            prosody_score,
+        )
 
     score = max(10.0, min(100.0, round(score, 1)))
 

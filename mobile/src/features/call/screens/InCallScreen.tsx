@@ -1282,7 +1282,7 @@ export default function InCallScreen({ navigation, route }: any) {
           { justifyContent: "center", alignItems: "center" },
         ]}
       >
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle="light-content" />
         <View
           style={[
             styles.background,
@@ -1320,7 +1320,7 @@ export default function InCallScreen({ navigation, route }: any) {
         video={false}
         onDisconnected={() => handleEndCall(true)}
       >
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle="light-content" />
         <RoomHandler
           onRoomReady={(room) => {
             console.log("[InCall] Room Ready. State:", room.state);
@@ -1365,20 +1365,31 @@ export default function InCallScreen({ navigation, route }: any) {
 
           {/* Header: Topic and Timer */}
           <Animated.View entering={FadeIn.delay(200)} style={styles.header}>
-            <View style={styles.headerGlass}>
-              <View style={styles.topicPill}>
-                <Ionicons
-                  name="chatbubbles"
-                  size={14}
-                  color={theme.colors.primary}
-                />
-                <Text style={styles.topicText}>{topic}</Text>
+            <LinearGradient
+              colors={theme.colors.gradients.surface as any}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.headerGlass as any}
+            >
+              <View style={styles.headerLeftCol}>
+                <Text style={styles.headerTitle}>Live Session</Text>
+                <View style={styles.topicPill}>
+                  <Ionicons
+                    name="chatbubbles"
+                    size={14}
+                    color={theme.colors.primary}
+                  />
+                  <Text style={styles.topicText}>{topic}</Text>
+                </View>
+                <Text style={styles.headerSubtitle}>Transcribing in real-time</Text>
               </View>
               <View style={styles.timerContainer}>
                 <View style={styles.liveDot} />
-                <Text style={styles.timerText}>{formatDuration(duration)}</Text>
+                <Text style={styles.timerText}>
+                  {formatDuration(duration)}
+                </Text>
               </View>
-            </View>
+            </LinearGradient>
           </Animated.View>
 
           {/* Partner Section */}
@@ -1389,7 +1400,7 @@ export default function InCallScreen({ navigation, route }: any) {
             <View style={styles.avatarGlowContainer}>
               <Animated.View style={[styles.avatarPulse, animatedPulseStyle]} />
               <LinearGradient
-                colors={theme.colors.gradients.premium}
+                colors={theme.colors.gradients.premium as any}
                 style={styles.partnerAvatar}
               >
                 <Text style={styles.partnerInitial}>
@@ -1503,8 +1514,11 @@ export default function InCallScreen({ navigation, route }: any) {
   );
 }
 
-const getStyles = (theme: any) =>
-  StyleSheet.create({
+const getStyles = (theme: any) => {
+  const partnerBubbleBg = theme.colors.surface;
+  const dockBg = theme.colors.surface;
+
+  return StyleSheet.create({
     container: {
       flex: 1,
     },
@@ -1528,23 +1542,44 @@ const getStyles = (theme: any) =>
       alignItems: "center",
       justifyContent: "space-between",
       width: "100%",
-      backgroundColor: theme.colors.surface,
       paddingHorizontal: 16,
       paddingVertical: 10,
       borderRadius: 20,
       borderWidth: 1,
       borderColor: theme.colors.border + "20",
+      backgroundColor: "transparent",
+      overflow: "hidden",
       ...theme.shadows.small,
+    },
+    headerLeftCol: {
+      flex: 1,
+      gap: 6,
+    },
+    headerTitle: {
+      color: theme.colors.text.primary,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+    headerSubtitle: {
+      color: theme.colors.text.secondary,
+      fontSize: 12,
+      fontWeight: "600",
     },
     topicPill: {
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "30",
+      backgroundColor: theme.colors.primary + "12",
     },
     topicText: {
       color: theme.colors.text.primary,
-      fontSize: 14,
-      fontWeight: "600",
+      fontSize: 13,
+      fontWeight: "700",
     },
     waitingOverlay: {
       marginTop: 40,
@@ -1581,7 +1616,7 @@ const getStyles = (theme: any) =>
       justifyContent: "center",
       alignItems: "center",
       borderWidth: 2,
-      borderColor: "white",
+      borderColor: theme.colors.border,
       ...theme.shadows.medium,
     },
     partnerInitial: {
@@ -1609,6 +1644,8 @@ const getStyles = (theme: any) =>
       paddingVertical: 4,
       borderRadius: 12,
       gap: 6,
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "30",
     },
     liveDot: {
       width: 6,
@@ -1700,10 +1737,10 @@ const getStyles = (theme: any) =>
       ...theme.shadows.primaryGlow,
     },
     bubblePartner: {
-      backgroundColor: "white",
+      backgroundColor: partnerBubbleBg,
       borderBottomLeftRadius: 4,
       borderWidth: 1,
-      borderColor: theme.colors.border + "20",
+      borderColor: theme.colors.border,
     },
     bubbleLabel: {
       fontSize: 11,
@@ -1746,12 +1783,12 @@ const getStyles = (theme: any) =>
     controlsDock: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: "white",
+      backgroundColor: dockBg,
       paddingHorizontal: 16,
       paddingVertical: 14,
       borderRadius: 32,
       borderWidth: 1,
-      borderColor: theme.colors.border + "20",
+      borderColor: theme.colors.border,
       gap: 12,
       ...theme.shadows.large,
     },
@@ -1850,3 +1887,4 @@ const getStyles = (theme: any) =>
       fontWeight: '500',
     },
   });
+};

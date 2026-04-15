@@ -635,29 +635,42 @@ class HinglishSTTService:
         if not text or len(text.split()) < 1:
             return {**transcription, "phonetic_insights": None}
         
-        # Pass 2: Phoneme-level pronunciation assessment
+        # Pass 2: Phoneme-level pronunciation assessment (free-speech mode)
         phoneme_insights = None
+        raw_words: list[dict] = []
         if len(text.split()) >= 2:  # Need >= 2 words for meaningful analysis
             try:
-                phoneme_insights = self._soft_pronunciation_pass(audio_data, text)
+                pron_result = self._soft_pronunciation_pass(audio_data, text)
+                if isinstance(pron_result, dict) and "insights" in pron_result:
+                    phoneme_insights = pron_result.get("insights")
+                    raw_words = pron_result.get("raw_words") or []
+                elif pron_result is not None:
+                    # backwards compat: old callers returning insights directly
+                    phoneme_insights = pron_result
             except Exception as e:
                 logger.warning(f"Soft pronunciation pass failed (non-fatal): {e}")
-        
+
         # Pass 3: Text-based detection (complementary)
         text_insights = self._detect_text_mispronunciations(text)
-        
+
         # Merge insights from both passes
         merged = self._merge_insights(phoneme_insights, text_insights)
-        
+
         has_meaningful_errors = bool(
             merged.get("indian_english_patterns") or
             merged.get("critical_errors") or
             merged.get("minor_errors")
         )
-        
-        pi = merged if has_meaningful_errors else None
-        logger.info(f"DUAL-PASS ASSESSMENT: text='{text}', has_errors={has_meaningful_errors}, phoneme_pass={'yes' if phoneme_insights else 'no'}, insights={pi}")
-        
+
+        # Always include raw_words in phonetic_insights so Layer A and Layer D
+        # in pronunciation_capture can access pre-normalization word data.
+        if raw_words:
+            pi: dict | None = {**(merged if has_meaningful_errors else {}), "words": raw_words}
+        else:
+            pi = merged if has_meaningful_errors else None
+
+        logger.info(f"DUAL-PASS ASSESSMENT: text='{text}', has_errors={has_meaningful_errors}, raw_words={len(raw_words)}, phoneme_pass={'yes' if phoneme_insights else 'no'}")
+
         return {
             **transcription,
             "phonetic_insights": pi
@@ -791,16 +804,13 @@ class HinglishSTTService:
 
     def _soft_pronunciation_pass(self, audio_data: bytes, recognized_text: str) -> dict | None:
         """
-        Run Azure Pronunciation Assessment using the recognized text as reference.
-        Extracts N-Best phoneme data to detect actual sound substitutions.
-        
-        KEY INSIGHT: Even with self-reference text, Azure's N-Best phoneme candidates 
-        reveal what was ACTUALLY spoken at the phoneme level. For example:
-        - User says "vater" → Azure STT transcribes "water" (auto-corrected)
-        - But Pronunciation Assessment's N-Best shows the first phoneme was 'v' not 'w'
-        - Our _classify_pronunciation_errors catches this as v_w_confusion
-        
-        This is the critical layer that text-based detection misses.
+        Run Azure Pronunciation Assessment in free-speech mode (empty reference_text).
+        Extracts raw spoken words (pre-normalization), AccuracyScore, ErrorType, and
+        phoneme breakdown. Returns {"insights": ..., "raw_words": [...]}.
+
+        Using empty reference_text prevents the self-reference trap where "vater"→"water"
+        (STT-normalized) is compared against itself, inflating scores to 100.
+        In free-speech mode Azure returns the RAW spoken word and genuine AccuracyScores.
         """
         if not self.speech_config:
             return None
@@ -808,8 +818,10 @@ class HinglishSTTService:
         try:
             wav_bytes = self._convert_to_wav(audio_data)
 
+            # Empty referenceText = free-speech mode: no self-reference trap.
+            # Azure returns raw spoken words and genuine AccuracyScores.
             config_json = {
-                "referenceText": recognized_text,
+                "referenceText": "",
                 "gradingSystem": "HundredMark",
                 "granularity": "Phoneme",
                 "enableMiscue": True,
@@ -843,6 +855,10 @@ class HinglishSTTService:
                 logger.info(f"Soft pronunciation pass: no speech recognized ({result.reason})")
                 return None
 
+            import os as _os
+            if _os.getenv("PRON_DEBUG") == "1":
+                logger.info(f"[Azure raw] {result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)}")
+
             raw_json_str = result.properties.get(
                 speechsdk.PropertyId.SpeechServiceResponse_JsonResult, "{}"
             )
@@ -851,6 +867,7 @@ class HinglishSTTService:
 
             # Extract word and phoneme data
             words_data: list[WordDetail] = []
+            raw_words: list[dict] = []  # Raw Azure word entries for phonetic_context
             nbest = raw_json.get("NBest", [])
             if not nbest:
                 return None
@@ -860,6 +877,14 @@ class HinglishSTTService:
                 wp = word_raw.get("PronunciationAssessment", {})
                 word_accuracy = wp.get("AccuracyScore", 0)
                 word_error = wp.get("ErrorType", "None")
+
+                # Collect raw word entry for Layer A / Layer D consumption
+                raw_words.append({
+                    "Word": word_text,
+                    "AccuracyScore": word_accuracy,
+                    "ErrorType": word_error,
+                    "Phonemes": word_raw.get("Phonemes", []),
+                })
 
                 phonemes = []
                 for p in word_raw.get("Phonemes", []):
@@ -891,14 +916,14 @@ class HinglishSTTService:
 
             # Run pattern classification on extracted phoneme data
             insights = self._classify_pronunciation_errors(words_data)
-            
+
             detected_count = (
                 len(insights.get("indian_english_patterns", []))
                 + len(insights.get("critical_errors", []))
                 + len(insights.get("minor_errors", []))
             )
-            logger.info(f"SOFT PA RESULT: {detected_count} issue(s) found in '{recognized_text}'")
-            return insights
+            logger.info(f"SOFT PA RESULT: {detected_count} issue(s) found, raw_words={len(raw_words)}")
+            return {"insights": insights, "raw_words": raw_words}
 
         except Exception as e:
             logger.warning(f"Soft pronunciation pass error (non-fatal): {e}")

@@ -1,5 +1,7 @@
 # Core Free Time + Plans + Tutor Connect — Design Spec
 
+> **Deprecation note (2026-04-14):** `archive/web-mvp` is archived and not part of active runtime/deployment. Keep this spec only as historical design context.
+
 > **For agentic workers:** Use superpowers:writing-plans to implement this spec task-by-task.
 
 **Goal:** Give every user 30 minutes of free weekly human-tutor time on Core, enforce it via a quota system, offer 3 individual upgrade plans (₹399/₹599/₹899) plus enterprise team plans via Razorpay, propagate plan status to Pulse through the Bridge API, and add the Tutor Connect preference screen (3 session categories) on mobile.
@@ -26,7 +28,7 @@
 
 ---
 
-## 2. Data Model (`web-mvp` — Prisma)
+## 2. Data Model (`archive/web-mvp` — Prisma)
 
 ### 2.1 Schema additions
 
@@ -83,7 +85,7 @@ enum SubStatus { ACTIVE CANCELLED PAST_DUE PAUSED }
 **This is a shared server-side helper called from both `/api/me` and `/api/livekit/token`.** It runs the lazy weekly reset before returning quota data, so both endpoints always see the correct state.
 
 ```ts
-// web-mvp/src/lib/resolveQuota.ts
+// archive/web-mvp/src/lib/resolveQuota.ts
 export async function resolveQuota(clerkId: string): Promise<ResolvedQuota> {
   const sub  = await getOrCreateSubscription(clerkId)
   const effectivePlan = getEffectivePlan(sub)  // see § 4.6 — CANCELLED past period → FREE
@@ -128,7 +130,7 @@ export async function resolveQuota(clerkId: string): Promise<ResolvedQuota> {
 
 ---
 
-## 3. Plan Config (`web-mvp/src/lib/planConfig.ts`)
+## 3. Plan Config (`archive/web-mvp/src/lib/planConfig.ts`)
 
 ```ts
 export const PLAN_QUOTAS = {
@@ -143,7 +145,7 @@ export const PLAN_QUOTAS = {
 
 ---
 
-## 4. Backend API Routes (`web-mvp/src/app/api/`)
+## 4. Backend API Routes (`archive/web-mvp/src/app/api/`)
 
 All routes require Clerk auth (`auth()` from `@clerk/nextjs/server`).
 
@@ -272,7 +274,7 @@ Out of scope for Phase 1 mobile — managed manually via web dashboard.
 
 Yearly plans excluded from Phase 1.
 
-### 5.2 Environment variables (`web-mvp/.env`)
+### 5.2 Environment variables (`archive/web-mvp/.env`)
 ```
 RAZORPAY_KEY_ID=rzp_test_xxx
 RAZORPAY_KEY_SECRET=xxx

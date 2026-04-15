@@ -36,6 +36,9 @@ export interface User {
     totalSessions: number;
     totalMinutes: number;
     createdAt: string;
+    /** Englivo /api/me may expose either naming for tutor credits. */
+    credits?: number;
+    creditBalance?: number;
 }
 
 export interface SessionHistory {

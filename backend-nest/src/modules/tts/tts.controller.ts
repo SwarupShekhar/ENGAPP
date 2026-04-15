@@ -47,4 +47,26 @@ export class TtsController {
       );
     }
   }
+
+  @Post('full-feedback-narration')
+  async getFullFeedbackNarration(@Body() body: any) {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/tts/full-feedback-narration`,
+          body,
+          { timeout: 20000 }, // Full narration takes longer
+        ),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(
+        `TTS full-feedback-narration proxy failed: ${error?.message}`,
+      );
+      throw new HttpException(
+        { message: 'TTS service unavailable', audio_base64: '', text: '' },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
 }

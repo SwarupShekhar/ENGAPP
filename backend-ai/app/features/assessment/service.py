@@ -2,6 +2,7 @@
 import time
 import json
 import asyncio
+import uuid
 from typing import Dict, Any, List, Optional, Tuple
 import google.generativeai as genai
 import re
@@ -18,6 +19,62 @@ from app.utils.robust_json_parser import robust_json_parser
 from app.assessment.scoring.grammar_classifier import GrammarErrorClassifier
 from app.assessment.scoring.vocabulary_analyzer import VocabularyAnalyzer
 from app.assessment.scoring.confidence_calculator import ConfidenceCalculator
+from app.features.tutor.pronunciation_capture import (
+    extend_from_body_and_pop_store,
+    merge_issue_batches,
+)
+
+
+def _pronunciation_penalty_from_severities(issues: List[Dict[str, Any]]) -> int:
+    penalty = 0
+    for it in issues:
+        s = str(it.get("severity") or "medium").lower()
+        if s == "high":
+            penalty += 15
+        elif s == "low":
+            penalty += 3
+        else:
+            penalty += 8
+    return penalty
+
+
+def _justification_from_captured_pron(deduped: List[Dict[str, Any]]) -> str:
+    if not deduped:
+        return ""
+    bits: List[str] = []
+    for it in deduped[:6]:
+        w = str(it.get("word") or "").strip()
+        h = str(it.get("heard") or "").strip()
+        rc = str(it.get("rule_category") or "").strip()
+        if h and h.lower() != w.lower():
+            bits.append(f"'{h}' → '{w}'" + (f" ({rc})" if rc else ""))
+        elif w:
+            bits.append(w)
+    return (
+        "You had a few pronunciation substitutions to work on: "
+        + "; ".join(bits)
+        + "."
+        if bits
+        else ""
+    )
+
+
+def _pronunciation_issues_api_shape(deduped: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for it in deduped:
+        out.append(
+            {
+                "id": str(uuid.uuid4()),
+                "word": it.get("word"),
+                "issueType": it.get("issueType", "substitution"),
+                "severity": it.get("severity", "medium"),
+                "suggestion": str(it.get("suggestion") or ""),
+                "confidence": float(it.get("confidence") or 0.8),
+                "rule_category": it.get("rule_category"),
+                "heard": it.get("heard"),
+            }
+        )
+    return out
 
 
 PHASE_3_ANALYSIS_PROMPT = """
@@ -424,6 +481,11 @@ Answer with JSON:
         
         # Stage 1: Baseline CEFR
         cefr_assessment = cefr_classifier.classify(request.text)
+
+        captured_for_pron = extend_from_body_and_pop_store(
+            request.session_id,
+            request.pronunciation_issues,
+        )
         
         # Stage 2: Parallel specialized analyses
         tasks = [
@@ -433,9 +495,12 @@ Answer with JSON:
             self._analyze_pronunciation(
                 request.text,
                 request.user_native_language or "Unknown",
-                request.context
+                request.context,
+                captured_issues=captured_for_pron,
             ),
         ]
+
+        captured_pron_normalized: List[Dict[str, Any]] = []
         
         try:
             grammar_data, vocab_data, fluency_data, pronunciation_data = await asyncio.gather(
@@ -459,7 +524,15 @@ Answer with JSON:
             if isinstance(pronunciation_data, Exception):
                 logger.error(f"Pronunciation analysis failed: {pronunciation_data}")
                 pronunciation_data = {"pronunciation_score": 50, "confidence": 0.3}
-        
+
+            if isinstance(pronunciation_data, dict):
+                captured_pron_normalized = (
+                    pronunciation_data.pop(
+                        "_captured_pronunciation_issues_normalized", None
+                    )
+                    or []
+                )
+
         except Exception as e:
             logger.error(f"Parallel analysis failed: {e}", exc_info=True)
             # Return basic fallback
@@ -522,6 +595,17 @@ Answer with JSON:
         cefr_assessment.strengths = strengths
         cefr_assessment.weaknesses = weaknesses
         
+        pron_api = (
+            _pronunciation_issues_api_shape(captured_pron_normalized)
+            if captured_pron_normalized
+            else []
+        )
+        pj = (
+            str(pronunciation_data.get("justification", ""))
+            if isinstance(pronunciation_data, dict)
+            else ""
+        )
+
         return AnalysisResponse(
             cefr_assessment=cefr_assessment,
             errors=[self._convert_to_error_detail(e) for e in verified_errors],
@@ -530,8 +614,15 @@ Answer with JSON:
             strengths=strengths,
             improvement_areas=weaknesses,
             recommended_tasks=self._generate_tasks(verified_errors, weaknesses),
-            accent_notes=pronunciation_data.get("l1_influence"),
-            processing_time=time.time() - start_time
+            accent_notes=(
+                pronunciation_data.get("l1_influence")
+                if isinstance(pronunciation_data, dict)
+                else None
+            ),
+            processing_time=time.time() - start_time,
+            scores={"pronunciation": int(round(metrics.pronunciation_score))},
+            pronunciation_issues=pron_api,
+            ai_feedback={"pronunciation": {"justification": pj}},
         )
     
     # ─────────────────────────────────────────────────────────────
@@ -562,7 +653,44 @@ Answer with JSON:
         )
         return robust_json_parser(response.text)
     
-    async def _analyze_pronunciation(self, text: str, native_lang: str, azure_data: Optional[str]) -> Dict:
+    async def _analyze_pronunciation(
+        self,
+        text: str,
+        native_lang: str,
+        azure_data: Optional[str],
+        captured_issues: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict:
+        raw = [x for x in (captured_issues or []) if x]
+        if raw:
+            deduped = merge_issue_batches(raw)
+            penalty = _pronunciation_penalty_from_severities(deduped)
+            score = float(max(0, 100 - penalty))
+            justification = _justification_from_captured_pron(deduped)
+            return {
+                "pronunciation_score": score,
+                "confidence": min(0.95, 0.82 + 0.01 * min(len(deduped), 8)),
+                "problematic_words": [
+                    {
+                        "word": i.get("word"),
+                        "issue": i.get("heard", ""),
+                        "ipa_target": "",
+                    }
+                    for i in deduped[:30]
+                ],
+                "l1_influence": (
+                    f"Pronunciation items captured during the live session "
+                    f"(native language context: {native_lang})."
+                ),
+                "accent_vs_error": (
+                    "Flagged items come from tutor inline corrections and/or "
+                    "phoneme approximation map hits."
+                ),
+                "justification": justification,
+                "accuracy_score": score,
+                "processing_time": 0,
+                "_captured_pronunciation_issues_normalized": deduped,
+            }
+
         prompt = self._create_pronunciation_prompt(text, native_lang, azure_data)
         response = await asyncio.wait_for(
             self.fast_model.generate_content_async(prompt),
@@ -687,7 +815,14 @@ Answer with JSON:
             strengths=[],
             improvement_areas=[],
             recommended_tasks=[],
-            processing_time=0.1
+            processing_time=0.1,
+            scores={"pronunciation": 50},
+            pronunciation_issues=[],
+            ai_feedback={
+                "pronunciation": {
+                    "justification": "Analysis temporarily unavailable.",
+                }
+            },
         )
 
     # ─────────────────────────────────────────────────────────────

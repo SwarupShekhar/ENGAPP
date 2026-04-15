@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Pressable,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -116,22 +117,53 @@ const PulseDot = ({ color = tokensV2.colors.accentMint, size = 10 }: { color?: s
   );
 };
 
-const SkillBar = ({ label, score }: { label: string; score: number }) => (
-  <View style={styles.skillBarRow}>
-    <View style={styles.skillBarInfo}>
-      <Text style={styles.skillBarLabel}>{label}</Text>
-      <Text style={styles.skillBarPercent}>{score}%</Text>
-    </View>
-    <View style={styles.skillBarBg}>
-      <LinearGradient
-        colors={[tokensV2.colors.primaryViolet, tokensV2.colors.accentAmber] as any}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.skillBarFill, { width: `${score}%` }]}
-      />
-    </View>
-  </View>
-);
+type SkillDetailKey = 'grammar' | 'pronunciation' | 'fluency' | 'vocabulary';
+
+const SkillBar = ({
+  label,
+  score,
+  onPress,
+}: {
+  label: string;
+  score: number;
+  onPress?: () => void;
+}) => {
+  const Row = onPress ? Pressable : View;
+  const rowProps = onPress
+    ? {
+        onPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          onPress();
+        },
+        style: ({ pressed }: { pressed: boolean }) => [
+          styles.skillBarRow,
+          pressed && { opacity: 0.85 },
+        ],
+      }
+    : { style: styles.skillBarRow };
+
+  return (
+    <Row {...(rowProps as any)}>
+      <View style={styles.skillBarInfo}>
+        <Text style={styles.skillBarLabel}>{label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={styles.skillBarPercent}>{score}%</Text>
+          {onPress ? (
+            <Ionicons name="information-circle-outline" size={10} color="rgba(255,255,255,0.45)" />
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.skillBarBg}>
+        <LinearGradient
+          colors={[tokensV2.colors.primaryViolet, tokensV2.colors.accentAmber] as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.skillBarFill, { width: `${Math.min(100, Math.max(0, score))}%` }]}
+        />
+      </View>
+    </Row>
+  );
+};
 
 const MicroStatChip = ({ label, value, icon }: { label: string; value: string; icon: string }) => (
   <BlurView intensity={40} tint="dark" style={styles.statChip}>
@@ -451,6 +483,117 @@ const QuickActionButton = ({
   );
 };
 
+type SkillSheetState =
+  | null
+  | { type: 'overall' }
+  | { type: 'skill'; label: string; detailKey: SkillDetailKey };
+
+function SkillScoreModal({
+  visible,
+  onClose,
+  sheet,
+  skills,
+  headerScore,
+  goalLabel,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  sheet: SkillSheetState;
+  skills: HomeData['skills'] | undefined;
+  headerScore: number;
+  goalLabel: string;
+}) {
+  if (!sheet || !skills) return null;
+
+  const deltas = skills.deltas || {};
+  const details = skills.details || {};
+  const scores = skills.scores || {};
+  const mastery = skills.masteryFlags;
+
+  const formatDelta = (k: string) => {
+    const d = deltas[k];
+    if (d == null || d === 0) return null;
+    const sign = d > 0 ? '+' : '';
+    return `${sign}${d}`;
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.skillModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.skillModalCard} onPress={(e) => e.stopPropagation()}>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {sheet.type === 'overall' ? (
+              <>
+                <Text style={styles.skillModalTitle}>Overall score</Text>
+                <Text style={styles.skillModalBody}>
+                  This ring is your EngR progress (0–1000) toward your next milestone. It reflects your
+                  combined skill picture from your latest analyzed session — not a single test.
+                </Text>
+                <Text style={styles.skillModalMeta}>
+                  Current: {headerScore <= 0 ? '—' : Math.round(headerScore)} · Goal: {goalLabel || 'next level'}
+                </Text>
+                {skills.deltaLabel ? (
+                  <Text style={styles.skillModalHint}>
+                    Trend: {skills.deltaLabel}
+                    {skills.avgDelta !== 0 ? ` · avg ${skills.avgDelta > 0 ? '+' : ''}${skills.avgDelta} pts` : ''}
+                  </Text>
+                ) : null}
+                <Text style={styles.skillModalSection}>Skill snapshot (0–100)</Text>
+                {(['grammar', 'pronunciation', 'fluency', 'vocabulary'] as const).map((k) => (
+                  <View key={k} style={styles.skillModalRow}>
+                    <Text style={styles.skillModalRowLabel}>{k.charAt(0).toUpperCase() + k.slice(1)}</Text>
+                    <Text style={styles.skillModalRowVal}>
+                      {scores[k] ?? '—'}%{formatDelta(k) ? ` (${formatDelta(k)})` : ''}
+                    </Text>
+                  </View>
+                ))}
+                <Text style={styles.skillModalFoot}>
+                  Tap any skill bar below for mistakes, wins, and what the number means.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.skillModalTitle}>{sheet.label}</Text>
+                <Text style={styles.skillModalScoreLine}>
+                  Score: {scores[sheet.detailKey] ?? '—'}%
+                  {formatDelta(sheet.detailKey) ? (
+                    <Text style={styles.skillModalDelta}> ({formatDelta(sheet.detailKey)} vs baseline)</Text>
+                  ) : null}
+                </Text>
+                {(sheet.label === 'Speaking' || sheet.label === 'Listening') && (
+                  <Text style={styles.skillModalHint}>
+                    {sheet.label === 'Speaking'
+                      ? 'Speaking uses your fluency and flow analysis from your last session.'
+                      : 'Listening is shown with the same fluency signal until we add a separate listening score.'}
+                  </Text>
+                )}
+                <Text style={styles.skillModalSub}>{details[sheet.detailKey]?.subtext ?? ''}</Text>
+                {(details[sheet.detailKey]?.items || []).map((line, i) => (
+                  <View key={i} style={styles.skillModalBulletRow}>
+                    <Text style={styles.skillModalBullet}>•</Text>
+                    <Text style={styles.skillModalBulletText}>{line}</Text>
+                  </View>
+                ))}
+                {mastery && mastery[sheet.detailKey] ? (
+                  <View style={styles.skillModalBadge}>
+                    <Text style={styles.skillModalBadgeText}>Achievement: mastery-level in this area (85+)</Text>
+                  </View>
+                ) : null}
+                {skills.hottestSkill === sheet.detailKey ? (
+                  <Text style={styles.skillModalFoot}>This is your strongest recent gain.</Text>
+                ) : null}
+              </>
+            )}
+          </ScrollView>
+          <TouchableOpacity style={styles.skillModalDone} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.skillModalDoneText}>Got it</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 // --- Main Component ---
 
 export default function HomeScreenV2() {
@@ -460,6 +603,7 @@ export default function HomeScreenV2() {
   const [homeData, setHomeData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [skillSheet, setSkillSheet] = useState<SkillSheetState>(null);
   const socketService = useRef(SocketService.getInstance()).current;
 
   const header = homeData?.header;
@@ -613,17 +757,31 @@ export default function HomeScreenV2() {
         </GlassCard>
 
         {/* SCORE RING */}
-        <ScoreRing
-          score={score}
-          level={level}
-          nextLevelLabel={nextLevelLabel}
-          progressToNext={progressToNext}
-        />
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            setSkillSheet({ type: 'overall' });
+          }}
+          style={({ pressed }) => [{ alignSelf: 'center', opacity: pressed ? 0.92 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Overall score details"
+        >
+          <ScoreRing
+            score={score}
+            level={level}
+            nextLevelLabel={nextLevelLabel}
+            progressToNext={progressToNext}
+          />
+        </Pressable>
 
         {/* MICRO-STAT ROW */}
         <View style={styles.microStatRow}>
            <MicroStatChip icon="⚡️" label="Sessions" value="24" />
-           <MicroStatChip icon="🎯" label="Avg Score" value="782" />
+           <MicroStatChip
+             icon="🎯"
+             label="Avg Skill"
+             value={skills?.avgScore != null ? String(skills.avgScore) : '—'}
+           />
            <MicroStatChip icon="⏱️" label="Minutes" value="120" />
         </View>
 
@@ -689,12 +847,48 @@ export default function HomeScreenV2() {
                 />
               </View>
               <View style={styles.skillBarsList}>
-                 <SkillBar label="Speaking" score={skills?.scores.speaking ?? 30} />
-                 <SkillBar label="Listening" score={skills?.scores.listening ?? 30} />
-                 <SkillBar label="Grammar" score={skills?.scores.grammar ?? 30} />
-                 <SkillBar label="Vocabulary" score={skills?.scores.vocabulary ?? 30} />
-                 <SkillBar label="Fluency" score={skills?.scores.fluency ?? 30} />
-                 <SkillBar label="Pronunciation" score={skills?.scores.pronunciation ?? 30} />
+                 <SkillBar
+                   label="Speaking"
+                   score={skills?.scores.speaking ?? skills?.scores.fluency ?? 30}
+                   onPress={() =>
+                     setSkillSheet({ type: 'skill', label: 'Speaking', detailKey: 'fluency' })
+                   }
+                 />
+                 <SkillBar
+                   label="Listening"
+                   score={skills?.scores.listening ?? skills?.scores.fluency ?? 30}
+                   onPress={() =>
+                     setSkillSheet({ type: 'skill', label: 'Listening', detailKey: 'fluency' })
+                   }
+                 />
+                 <SkillBar
+                   label="Grammar"
+                   score={skills?.scores.grammar ?? 30}
+                   onPress={() =>
+                     setSkillSheet({ type: 'skill', label: 'Grammar', detailKey: 'grammar' })
+                   }
+                 />
+                 <SkillBar
+                   label="Vocabulary"
+                   score={skills?.scores.vocabulary ?? 30}
+                   onPress={() =>
+                     setSkillSheet({ type: 'skill', label: 'Vocabulary', detailKey: 'vocabulary' })
+                   }
+                 />
+                 <SkillBar
+                   label="Fluency"
+                   score={skills?.scores.fluency ?? 30}
+                   onPress={() =>
+                     setSkillSheet({ type: 'skill', label: 'Fluency', detailKey: 'fluency' })
+                   }
+                 />
+                 <SkillBar
+                   label="Pronunciation"
+                   score={skills?.scores.pronunciation ?? 30}
+                   onPress={() =>
+                     setSkillSheet({ type: 'skill', label: 'Pronunciation', detailKey: 'pronunciation' })
+                   }
+                 />
               </View>
             </GlassCard>
           </Animated.View>
@@ -859,6 +1053,15 @@ export default function HomeScreenV2() {
         
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      <SkillScoreModal
+        visible={skillSheet !== null}
+        onClose={() => setSkillSheet(null)}
+        sheet={skillSheet}
+        skills={skills}
+        headerScore={score}
+        goalLabel={nextLevelLabel}
+      />
     </View>
   );
 }
@@ -1460,5 +1663,129 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 10,
     marginTop: 4,
+  },
+  skillModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  skillModalCard: {
+    backgroundColor: '#1E1128',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 28,
+    maxHeight: '78%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  skillModalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  skillModalBody: {
+    color: tokensV2.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 12,
+  },
+  skillModalMeta: {
+    color: tokensV2.colors.textMuted,
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  skillModalHint: {
+    color: 'rgba(197,232,77,0.85)',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  skillModalSection: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  skillModalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  skillModalRowLabel: {
+    color: tokensV2.colors.textSecondary,
+    fontSize: 14,
+  },
+  skillModalRowVal: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  skillModalFoot: {
+    color: tokensV2.colors.textMuted,
+    fontSize: 12,
+    marginTop: 14,
+    lineHeight: 17,
+  },
+  skillModalScoreLine: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  skillModalDelta: {
+    color: tokensV2.colors.accentMint,
+    fontWeight: '600',
+  },
+  skillModalSub: {
+    color: tokensV2.colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  skillModalBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  skillModalBullet: {
+    color: tokensV2.colors.primaryViolet,
+    fontSize: 15,
+    marginTop: 1,
+  },
+  skillModalBulletText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  skillModalBadge: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(197,232,77,0.12)',
+  },
+  skillModalBadgeText: {
+    color: 'rgba(197,232,77,0.95)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  skillModalDone: {
+    marginTop: 16,
+    backgroundColor: tokensV2.colors.primaryViolet,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  skillModalDoneText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

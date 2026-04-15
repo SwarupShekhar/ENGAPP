@@ -17,6 +17,7 @@ class PQSResponse(BaseModel):
     pqs: float
     mean_accuracy: float
     mean_fluency: float
+    mean_prosody: float
     mispronunciation_rate: float
     word_count: int
 
@@ -60,8 +61,9 @@ async def compute_cqs(
         body.call_duration_seconds, 
         body.user_spoke_seconds
     )
-    
-    cqs = call_quality_service.compute_call_quality_score(pqs, ds, cs, es)
+
+    pqs_value = float(pqs["pqs"]) if isinstance(pqs, dict) else float(pqs)
+    cqs = call_quality_service.compute_call_quality_score(pqs_value, ds, cs, es)
 
     return CQSResponse(
         cqs=cqs,

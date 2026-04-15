@@ -16,8 +16,10 @@ from app.phoneme_loader import get_phoneme_map, get_reel_map
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ACCURACY_THRESHOLD = 45  # Aggressive: catches borderline mispronunciations Azure PA is lenient on
-FUNCTION_WORD_THRESHOLD = 60     # Higher bar for function words (the/this/that) — common th_to_d errors
+DEFAULT_ACCURACY_THRESHOLD = 70  # Raised: Azure is lenient with Indian accents, need higher bar to catch real errors
+FUNCTION_WORD_THRESHOLD = 75     # Higher bar for function words (the/this/that) — common th_to_d errors
+PHONEME_BAD_THRESHOLD = 65       # Flag if any Indian English error phoneme scores below this
+FALSE_POSITIVE_SUPPRESSION = 80  # Only suppress if word accuracy >= this AND not in our phoneme map
 
 # These phonemes are the ONLY ones that indicate Indian English pattern errors.
 INDIAN_ENGLISH_ERROR_PHONEMES = {
@@ -38,7 +40,7 @@ FUNCTION_WORDS_TH = {"the", "this", "that", "them", "they", "there", "then", "th
 # When ASR writes word A but the user likely said word B (common Indian English swaps).
 # Format: transcribed_word → (intended_word, rule_category)
 STT_CONFUSION_PAIRS: dict[str, tuple[str, str]] = {
-    # v/w swaps (Indian English most common)
+    # ── v/w swaps (Indian English most common) ──────────────────────────
     "berry": ("very", "v_to_w_reversal"),
     "wary": ("very", "w_to_v"),
     "vest": ("west", "v_to_w_reversal"),
@@ -50,8 +52,24 @@ STT_CONFUSION_PAIRS: dict[str, tuple[str, str]] = {
     "vet": ("wet", "v_to_w_reversal"),
     "vow": ("wow", "v_to_w_reversal"),
     "wane": ("vain", "w_to_v"),
-    "wary": ("vary", "w_to_v"),
-    # th/d swaps
+    "weil": ("veil", "w_to_v"),
+    "wast": ("vast", "w_to_v"),
+    "wery": ("very", "w_to_v"),
+    "wideo": ("video", "w_to_v"),
+    "wellcome": ("welcome", "w_to_v"),  # hypercorrection
+    "woice": ("voice", "w_to_v"),
+    "wiolent": ("violent", "w_to_v"),
+    "wery": ("very", "w_to_v"),
+    "walue": ("value", "w_to_v"),
+    "wehicle": ("vehicle", "w_to_v"),
+    "wersion": ("version", "w_to_v"),
+    "wision": ("vision", "w_to_v"),
+    "wictory": ("victory", "w_to_v"),
+    "willage": ("village", "w_to_v"),
+    "wait": ("bait", "v_to_w_reversal"),
+    "wane": ("vane", "w_to_v"),
+    "vowel": ("bowel", "v_to_w_reversal"),
+    # ── th/d swaps ──────────────────────────────────────────────────────
     "den": ("then", "th_to_d"),
     "dare": ("there", "th_to_d"),
     "day": ("they", "th_to_d"),
@@ -64,7 +82,20 @@ STT_CONFUSION_PAIRS: dict[str, tuple[str, str]] = {
     "fadder": ("father", "th_to_d"),
     "broder": ("brother", "th_to_d"),
     "wid": ("with", "th_to_d"),
-    # th/t swaps
+    "dere": ("there", "th_to_d"),
+    "dem": ("them", "th_to_d"),
+    "dat": ("that", "th_to_d"),
+    "der": ("their", "th_to_d"),
+    "dey": ("they", "th_to_d"),
+    "dese": ("these", "th_to_d"),
+    "dose": ("those", "th_to_d"),
+    "den": ("then", "th_to_d"),
+    "dis": ("this", "th_to_d"),
+    "anoder": ("another", "th_to_d"),
+    "toder": ("together", "th_to_d"),
+    "widout": ("without", "th_to_d"),
+    "altough": ("although", "th_to_d"),
+    # ── th/t swaps ──────────────────────────────────────────────────────
     "tick": ("thick", "th_to_t"),
     "tin": ("thin", "th_to_t"),
     "tree": ("three", "th_to_t"),
@@ -79,7 +110,19 @@ STT_CONFUSION_PAIRS: dict[str, tuple[str, str]] = {
     "wit": ("with", "th_to_t"),
     "boat": ("both", "th_to_t"),
     "moat": ("moth", "th_to_t"),
-    # Short/long vowel pairs
+    "tink": ("think", "th_to_t"),
+    "tought": ("thought", "th_to_t"),
+    "tings": ("things", "th_to_t"),
+    "ting": ("thing", "th_to_t"),
+    "tird": ("third", "th_to_t"),
+    "tirty": ("thirty", "th_to_t"),
+    "tousand": ("thousand", "th_to_t"),
+    "trough": ("through", "th_to_t"),
+    "trilling": ("thrilling", "th_to_t"),
+    "treaten": ("threaten", "th_to_t"),
+    "teme": ("theme", "th_to_t"),
+    "teory": ("theory", "th_to_t"),
+    # ── Short/long vowel pairs (i → ee) ─────────────────────────────────
     "ship": ("sheep", "i_to_ee"),
     "bit": ("beat", "i_to_ee"),
     "sit": ("seat", "i_to_ee"),
@@ -90,16 +133,69 @@ STT_CONFUSION_PAIRS: dict[str, tuple[str, str]] = {
     "slip": ("sleep", "i_to_ee"),
     "rich": ("reach", "i_to_ee"),
     "dip": ("deep", "i_to_ee"),
+    "chip": ("cheap", "i_to_ee"),
+    "his": ("he's", "i_to_ee"),
+    "bitch": ("beach", "i_to_ee"),
+    "pitch": ("peach", "i_to_ee"),
+    "mitt": ("meat", "i_to_ee"),
+    "fit": ("feet", "i_to_ee"),
+    "lid": ("lead", "i_to_ee"),
+    "tin": ("teen", "i_to_ee"),
+    "bin": ("been", "i_to_ee"),
+    "grin": ("green", "i_to_ee"),
+    "grit": ("greet", "i_to_ee"),
+    "wick": ("week", "i_to_ee"),
+    # ── oo/u vowel pairs ─────────────────────────────────────────────────
     "pull": ("pool", "o_to_aa"),
     "full": ("fool", "o_to_aa"),
     "look": ("Luke", "o_to_aa"),
-    # ae/e vowel confusion
+    "wood": ("would", "o_to_aa"),
+    "bull": ("bool", "o_to_aa"),
+    "cook": ("kook", "o_to_aa"),
+    # ── ae/e vowel confusion ─────────────────────────────────────────────
     "bed": ("bad", "ae_to_e"),
     "set": ("sat", "ae_to_e"),
     "men": ("man", "ae_to_e"),
     "pet": ("pat", "ae_to_e"),
-    "den": ("dan", "ae_to_e"),
     "pen": ("pan", "ae_to_e"),
+    "met": ("mat", "ae_to_e"),
+    "ten": ("tan", "ae_to_e"),
+    "bend": ("band", "ae_to_e"),
+    "send": ("sand", "ae_to_e"),
+    "lend": ("land", "ae_to_e"),
+    "hem": ("ham", "ae_to_e"),
+    "peck": ("pack", "ae_to_e"),
+    "neck": ("knack", "ae_to_e"),
+    "deck": ("dack", "ae_to_e"),
+    # ── h-dropping ───────────────────────────────────────────────────────
+    "ello": ("hello", "h_dropping"),
+    "im": ("him", "h_dropping"),
+    "er": ("her", "h_dropping"),
+    "is": ("his", "h_dropping"),
+    "ope": ("hope", "h_dropping"),
+    "old": ("hold", "h_dropping"),
+    "ear": ("hear", "h_dropping"),
+    "eavy": ("heavy", "h_dropping"),
+    # ── zh/j sound ───────────────────────────────────────────────────────
+    "jision": ("vision", "zh_to_j"),
+    "jision": ("vision", "zh_to_j"),
+    "jezure": ("measure", "zh_to_j"),
+    "plejure": ("pleasure", "zh_to_j"),
+    "trejure": ("treasure", "zh_to_j"),
+    "divijion": ("division", "zh_to_j"),
+    "conclusjon": ("conclusion", "zh_to_j"),
+    # ── r-rolling ────────────────────────────────────────────────────────
+    "wery": ("very", "r_rolling"),
+    "woad": ("road", "r_rolling"),
+    "wun": ("run", "r_rolling"),
+    "wight": ("right", "r_rolling"),
+    # ── Schwa/vowel reduction patterns ───────────────────────────────────
+    "abbout": ("about", "schwa_prothesis"),
+    "abuot": ("about", "schwa_prothesis"),
+    "eenglish": ("English", "schwa_prothesis"),
+    "ispecially": ("especially", "schwa_prothesis"),
+    "istart": ("start", "schwa_prothesis"),
+    "eschool": ("school", "schwa_prothesis"),
     "bet": ("bat", "ae_to_e"),
     # h-dropping
     "art": ("heart", "h_dropping"),
@@ -402,20 +498,61 @@ def detect_from_azure_result(
         elif accuracy < effective_threshold:
             # Word-level score below threshold
             is_bad = True
-        elif min_phoneme_score < 50 and worst_phoneme_name in INDIAN_ENGLISH_ERROR_PHONEMES:
-            # A specific Indian English phoneme scored very low (lowered from 60 to 50)
+        elif min_phoneme_score < PHONEME_BAD_THRESHOLD and worst_phoneme_name in INDIAN_ENGLISH_ERROR_PHONEMES:
+            # A specific Indian English error phoneme scored below our threshold
             is_bad = True
-            logger.info(f"Low phoneme score: {min_phoneme_score} for phoneme '{worst_phoneme_name}' in word '{word_lower}'")
+            logger.info(f"Low phoneme score: {min_phoneme_score:.1f} for phoneme '{worst_phoneme_name}' in word '{word_lower}'")
+        elif accuracy < 85 and phonemes:
+            # Layer 5: Even if word accuracy looks OK (70-84), check if multiple phonemes
+            # are weak — this catches Indian accent softening that Azure doesn't hard-flag
+            weak_phoneme_count = sum(
+                1 for p in phonemes
+                if (p.get("PronunciationAssessment", {}).get("AccuracyScore") or p.get("AccuracyScore") or 100) < 70
+                and _normalize(p.get("Phoneme") or p.get("phoneme") or "") in INDIAN_ENGLISH_ERROR_PHONEMES
+            )
+            if weak_phoneme_count >= 2:
+                is_bad = True
+                logger.info(f"Layer 5 multi-phoneme weak: {weak_phoneme_count} weak phonemes in '{word_lower}' (word accuracy={accuracy:.1f})")
 
         if not is_bad:
             continue
+
+        # ----------------------------------------------------------------
+        # STEP 2b: Phoneme distance fallback — no phoneme data from Azure.
+        # In free-speech mode Azure sometimes omits Phonemes for low-scoring
+        # words. Run phoneme edit distance against STT_CONFUSION_PAIRS keys to
+        # identify the likely intended word before we hit the suppression step.
+        # ----------------------------------------------------------------
+        if not phonemes and _ensure_pronouncing():
+            best_cf_match: tuple[str, str, str] | None = None
+            best_cf_dist = 999
+            for cf_key, (cf_intended, cf_cat) in STT_CONFUSION_PAIRS.items():
+                d = _phoneme_edit_distance(word_lower, cf_key)
+                if d is not None and d <= 1 and d < best_cf_dist:
+                    best_cf_dist = d
+                    best_cf_match = (cf_key, cf_intended, cf_cat)
+            if best_cf_match:
+                _, cf_intended, cf_cat = best_cf_match
+                if cf_intended.lower() != word_lower:
+                    reel_id = reel_map.get(cf_cat)
+                    flagged.append({
+                        "spoken": word_lower,
+                        "correct": cf_intended,
+                        "rule_category": cf_cat,
+                        "reel_id": reel_id,
+                        "confidence": accuracy,
+                    })
+                    logger.info(
+                        f"  Step2b phoneme-dist fallback (no phonemes): '{word_lower}' → '{cf_intended}' ({cf_cat}, dist={best_cf_dist})"
+                    )
+                    continue
 
         # ----------------------------------------------------------------
         # STEP 3: Suppress high-confidence false positives.
         # If accuracy is high AND no ErrorType AND the word is not in our
         # by_correct map at all — it's likely noise (consonant cluster, etc.)
         # ----------------------------------------------------------------
-        if accuracy >= 85 and (error_type in ("None", "", "none") or not error_type):
+        if accuracy >= FALSE_POSITIVE_SUPPRESSION and (error_type in ("None", "", "none") or not error_type):
             if word_lower not in by_correct:
                 # Not a word we track and high confidence — suppress
                 continue
