@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import * as Speech from "expo-speech";
 import { useAppTheme } from "../theme/useAppTheme";
 
 export interface PhonemeDetail {
@@ -59,6 +60,17 @@ const WordBreakdown = ({ wordData }: { wordData: WordDetail }) => {
     null,
   );
 
+  const speakPhonemeTip = useCallback(
+    (word: string, p: PhonemeDetail) => {
+      Speech.stop();
+      const wrong = getDescription(p.actually_said ?? "?");
+      const right = getDescription(p.phoneme);
+      const line = `In "${word}", it sounded like ${wrong}. Try ${right} instead.`;
+      Speech.speak(line, { language: "en-US", rate: 0.92 });
+    },
+    [],
+  );
+
   const hasErrors = wordData.phonemes?.some((p) => !p.is_correct);
   const coral = theme.tokens.skill.pronunciation;
   const coralTint = theme.tokens.skill.pronunciationTint;
@@ -103,7 +115,17 @@ const WordBreakdown = ({ wordData }: { wordData: WordDetail }) => {
       {/* Tooltip — shows when a wrong phoneme is tapped */}
       {selectedPhoneme && !selectedPhoneme.is_correct && (
         <View style={styles.tooltip}>
-          <Text style={styles.tooltipTitle}>Sound mismatch</Text>
+          <View style={styles.tooltipHeader}>
+            <Text style={styles.tooltipTitle}>Sound mismatch</Text>
+            <TouchableOpacity
+              onPress={() => speakPhonemeTip(wordData.word, selectedPhoneme)}
+              style={styles.listenBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Listen to this tip"
+            >
+              <Text style={styles.listenBtnText}>Listen</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.tooltipLine}>
             ✗ You said:{" "}
             <Text style={styles.tooltipWrong}>
@@ -225,11 +247,27 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: "#facc15",
   },
+  tooltipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
   tooltipTitle: {
     color: "#facc15",
     fontSize: 12,
     fontWeight: "600",
-    marginBottom: 6,
+  },
+  listenBtn: {
+    backgroundColor: "rgba(250, 204, 21, 0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  listenBtnText: {
+    color: "#facc15",
+    fontSize: 12,
+    fontWeight: "600",
   },
   tooltipLine: {
     color: "#ccc",
