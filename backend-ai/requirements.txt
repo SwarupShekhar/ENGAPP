@@ -23,6 +23,10 @@ nltk>=3.8.1
 lexical-diversity>=0.1.1
 pronouncing>=0.2.0
 editdistance>=0.8.1
+# Phoneme fallback for non-dictionary words (Layer 2). Requires espeak-ng at OS level:
+#   macOS: brew install espeak-ng
+#   Debian/Ubuntu: apt install espeak-ng
+phonemizer>=3.2.1
 
 # Database
 asyncpg>=0.29.0

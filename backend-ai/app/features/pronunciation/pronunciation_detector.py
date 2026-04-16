@@ -20,6 +20,8 @@ DEFAULT_ACCURACY_THRESHOLD = 70  # Raised: Azure is lenient with Indian accents,
 FUNCTION_WORD_THRESHOLD = 75     # Higher bar for function words (the/this/that) — common th_to_d errors
 PHONEME_BAD_THRESHOLD = 65       # Flag if any Indian English error phoneme scores below this
 FALSE_POSITIVE_SUPPRESSION = 80  # Only suppress if word accuracy >= this AND not in our phoneme map
+# Layer 2: max phoneme edit distance (CMU or aligned IPA) to call it a substitution
+PHONEME_SUBSTITUTION_MAX_DISTANCE = 3
 
 # These phonemes are the ONLY ones that indicate Indian English pattern errors.
 INDIAN_ENGLISH_ERROR_PHONEMES = {
@@ -225,6 +227,8 @@ for _asr, (_intended, _cat) in STT_CONFUSION_PAIRS.items():
 # ── Layer 2: Phoneme Edit Distance ───────────────────────────────────
 _pronouncing_loaded = False
 _pronouncing_available = False
+_phonemizer_loaded = False
+_phonemizer_available = False
 
 
 def _ensure_pronouncing():
@@ -243,22 +247,76 @@ def _ensure_pronouncing():
     return _pronouncing_available
 
 
+def _ensure_phonemizer():
+    """Lazy-load phonemizer (espeak backend) for CMU gaps."""
+    global _phonemizer_loaded, _phonemizer_available
+    if _phonemizer_loaded:
+        return _phonemizer_available
+    _phonemizer_loaded = True
+    try:
+        import phonemizer  # noqa: F401
+        _phonemizer_available = True
+    except ImportError:
+        logger.warning("phonemizer/espeak not installed — phonemizer fallback disabled")
+        _phonemizer_available = False
+    return _phonemizer_available
+
+
+def _phonemizer_fallback(word: str) -> list[str]:
+    """IPA phone sequence via espeak; uses | between phones for stable tokenization."""
+    if not _ensure_phonemizer():
+        return []
+    try:
+        from phonemizer import phonemize
+        from phonemizer.separator import Separator
+
+        sep = Separator(phone="|", word=" ")
+        raw = phonemize(
+            word.strip(),
+            language="en-us",
+            backend="espeak",
+            strip=True,
+            separator=sep,
+        )
+        if not raw or not str(raw).strip():
+            return []
+        tokens: list[str] = []
+        for part in str(raw).strip().split("|"):
+            tok = part.strip()
+            tok = tok.lstrip("ˈˌ")
+            tok = tok.rstrip("012")
+            if tok:
+                tokens.append(tok)
+        return tokens
+    except Exception:
+        return []
+
+
 def _phoneme_edit_distance(word_a: str, word_b: str) -> int | None:
     """
     Compute phoneme-level edit distance between two English words using CMU dict.
-    Returns None if either word is not in CMU dict.
+    If either word is missing from CMU, uses phonemizer (IPA) for *both* words so
+    sequences are comparable (mixed CMU+IPA inflated distances).
+    Returns None if either word has no phoneme sequence from either source.
     """
     import pronouncing
     import editdistance as ed
 
     phones_a = pronouncing.phones_for_word(word_a.lower())
     phones_b = pronouncing.phones_for_word(word_b.lower())
-    if not phones_a or not phones_b:
+
+    if phones_a and phones_b:
+        a_seq = [p.rstrip("012") for p in phones_a[0].split()]
+        b_seq = [p.rstrip("012") for p in phones_b[0].split()]
+        return ed.eval(a_seq, b_seq)
+
+    if not _ensure_phonemizer():
         return None
-    # Use first pronunciation variant, strip stress markers
-    a_seq = [p.rstrip("012") for p in phones_a[0].split()]
-    b_seq = [p.rstrip("012") for p in phones_b[0].split()]
-    return ed.eval(a_seq, b_seq)
+    seq_a = _phonemizer_fallback(word_a)
+    seq_b = _phonemizer_fallback(word_b)
+    if not seq_a or not seq_b:
+        return None
+    return ed.eval(seq_a, seq_b)
 
 
 def _run_phoneme_distance_pass(
@@ -299,10 +357,10 @@ def _run_phoneme_distance_pass(
             if ref_w == wl:
                 continue
             dist = _phoneme_edit_distance(wl, ref_w)
-            if dist is not None and dist <= 2 and dist < best_dist:
+            if dist is not None and dist <= PHONEME_SUBSTITUTION_MAX_DISTANCE and dist < best_dist:
                 best_dist = dist
                 best_ref = ref_w
-        if best_ref and best_dist <= 2:
+        if best_ref and best_dist <= PHONEME_SUBSTITUTION_MAX_DISTANCE:
             extra_flags.append({
                 "spoken": wl,
                 "correct": best_ref,
@@ -650,3 +708,12 @@ def detect_from_words(
 ) -> list[dict[str, Any]]:
     """Same as detect_from_azure_result but accepts a flat list of word dicts."""
     return detect_from_azure_result({"Words": words}, accuracy_threshold=accuracy_threshold)
+
+
+if __name__ == "__main__":
+    d1 = _phoneme_edit_distance("pepul", "people")
+    d2 = _phoneme_edit_distance("peeple", "people")
+    d3 = _phoneme_edit_distance("verry", "very")
+    print("_phoneme_edit_distance('pepul', 'people') =", d1)
+    print("_phoneme_edit_distance('peeple', 'people') =", d2)
+    print("_phoneme_edit_distance('verry', 'very') =", d3)

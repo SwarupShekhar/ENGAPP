@@ -1,36 +1,32 @@
-import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 
-def test_pronunciation_structure():
-    """Test the API response structure for pronunciation."""
+
+def test_pronunciation_assess_json_azure_result_path():
+    """POST /api/pronunciation/assess with JSON azure_result avoids Azure audio calls."""
     payload = {
-        "audio_url": "https://example.com/audio.wav",
-        "reference_text": "Hello world",
-        "user_id": "user_123"
-    }
-    
-    with patch("app.api.routes.pronunciation.pronunciation_service.assess") as mock_assess:
-        mock_assess.return_value = {
-            "accuracy_score": 85,
-            "fluency_score": 80,
-            "completeness_score": 100,
-            "pronunciation_score": 83,
-            "words": [],
-            "common_issues": [],
-            "improvement_tips": [],
-            "processing_time": 0.5,
-            "prosody_score": 75,
-            "speech_rate_wpm": 120,
-            "pitch_variance": 30
+        "azure_result": {
+            "NBest": [{"Words": [{"AccuracyScore": 90, "Word": "hello"}]}],
         }
-        
-        response = client.post("/api/pronunciation", json=payload)
-        
+    }
+    with (
+        patch(
+            "app.features.pronunciation.routes.detect_from_azure_result",
+            return_value=[],
+        ) as mock_detect,
+        patch(
+            "app.features.pronunciation.routes.calculate_pronunciation_score",
+            return_value={"overall": 83.0},
+        ) as mock_score,
+    ):
+        response = client.post("/api/pronunciation/assess", json=payload)
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert data["data"]["accuracy_score"] == 85
+        assert "flagged_errors" in data
+        assert "pronunciation_score" in data
+        assert data["pronunciation_score"] == {"overall": 83.0}
+        mock_detect.assert_called_once()
+        mock_score.assert_called_once()

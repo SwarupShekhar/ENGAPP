@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
+from app.features.assessment.service import analysis_service
 
 client = TestClient(app)
 
@@ -13,7 +13,7 @@ def test_analyze_structure():
         "session_id": "session_456"
     }
     
-    with patch("app.api.routes.analyze.analysis_service.analyze") as mock_analyze:
+    with patch.object(analysis_service, "analyze", new_callable=AsyncMock) as mock_analyze:
         mock_analyze.return_value = {
             "cefr_assessment": {"level": "A1", "score": 20, "confidence": 0.9, "strengths": [], "weaknesses": [], "next_level_requirements": []},
             "errors": [],
