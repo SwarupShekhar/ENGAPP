@@ -1,0 +1,54 @@
+name: Backend AI CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend-ai/**"
+      - ".github/workflows/backend-ai-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend-ai/**"
+
+jobs:
+  test:
+    name: Test (Python + espeak-ng)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-ai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install espeak-ng
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+
+      - name: Set PHONEMIZER_ESPEAK_LIBRARY
+        run: |
+          LIB=$(find /usr/lib -name 'libespeak-ng.so*' ! -name '*.a' 2>/dev/null | head -1)
+          if [ -z "$LIB" ] || [ ! -e "$LIB" ]; then
+            echo "Could not find libespeak-ng"
+            dpkg -L espeak-ng libespeak-ng1 2>/dev/null || true
+            exit 1
+          fi
+          echo "PHONEMIZER_ESPEAK_LIBRARY=$LIB" >> "$GITHUB_ENV"
+          echo "Using $LIB"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend-ai/requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          # Disk-only cache avoids Redis requirement in CI
+          CACHE_MODE: disk_only
+        run: pytest -q

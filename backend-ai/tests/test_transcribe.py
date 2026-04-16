@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
+from app.features.transcription.service import transcription_service
 
 client = TestClient(app)
 
@@ -14,8 +14,7 @@ def test_transcribe_structure():
     }
     
     # Mock the service to avoid actual Azure calls
-    with patch("app.api.routes.transcribe.transcription_service.transcribe") as mock_transcribe:
-        mock_transcribe.return_value = AsyncMock()
+    with patch.object(transcription_service, "transcribe", new_callable=AsyncMock) as mock_transcribe:
         mock_transcribe.return_value = {
             "text": "Hello world",
             "confidence": 0.95,

@@ -1,0 +1,12 @@
+# iOS build artifacts and Pods (17k+ files, not source)
+mobile/ios/
+mobile/android/
+
+# Archived code
+archive/
+
+# Generated Prisma client (auto-generated, not source)
+generated/
+
+# CMS config boilerplate
+ebites-cms/config/
