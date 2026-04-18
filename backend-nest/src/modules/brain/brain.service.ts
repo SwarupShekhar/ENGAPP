@@ -38,17 +38,23 @@ export class BrainService implements OnModuleInit {
   }
 
   /**
-   * Ping the AI engine's health or root endpoint
+   * Ping the AI engine's health or root endpoint.
+   * Render free tier cold starts often need 15–60s; default 5s caused false "unreachable".
    */
   async checkAiEngineHealth(): Promise<boolean> {
+    const timeoutMs = Math.max(
+      5000,
+      Number(this.configService.get<string>('AI_ENGINE_HEALTH_TIMEOUT_MS')) ||
+        25000,
+    );
     try {
       const response = await lastValueFrom(
-        this.httpService.get(`${this.aiEngineUrl}/`, {
-          timeout: 5000, // 5 second timeout
+        this.httpService.get(`${this.aiEngineUrl.replace(/\/$/, '')}/`, {
+          timeout: timeoutMs,
         }),
       );
 
-      if (response.status === 200) {
+      if (response.status >= 200 && response.status < 300) {
         if (!this.aiEngineHealthy) {
           this.logger.log(
             `✅ AI Engine is ONLINE at ${this.aiEngineUrl} (was previously offline)`,
@@ -59,17 +65,22 @@ export class BrainService implements OnModuleInit {
         this.lastHealthCheck = new Date();
         return true;
       }
-    } catch (error) {
+    } catch (error: any) {
       this.consecutiveFailures++;
       this.aiEngineHealthy = false;
       this.lastHealthCheck = new Date();
 
-      const msg = `🔴 AI ENGINE UNREACHABLE at ${this.aiEngineUrl} (failure #${this.consecutiveFailures})`;
+      const detail =
+        error?.code ||
+        error?.message ||
+        error?.response?.status ||
+        String(error);
+      const msg = `🔴 AI ENGINE UNREACHABLE at ${this.aiEngineUrl} (failure #${this.consecutiveFailures}) — ${detail}`;
 
       if (this.consecutiveFailures <= 1) {
         this.logger.error(msg);
         this.logger.error(
-          `⚠️  POST-CALL ANALYSIS WILL FAIL! Start the AI engine: cd backend-ai && uvicorn app.main:app --port 8001`,
+          `⚠️  If URLs are correct, this is often Render cold start or the AI service sleeping. Open ${this.aiEngineUrl}/ in a browser to wake it, or raise AI_ENGINE_HEALTH_TIMEOUT_MS. Local dev: cd backend-ai && uvicorn app.main:app --port 8001`,
         );
       } else if (this.consecutiveFailures % 6 === 0) {
         // Re-warn every 30 minutes (6 × 5min intervals)

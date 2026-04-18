@@ -64,7 +64,16 @@ class AppErrorBoundary extends Component<
   }
 }
 
-const CLERK_PUBLISHABLE_KEY = "pk_test_cmlnaHQtYmFzaWxpc2stOTEuY2xlcmsuYWNjb3VudHMuZGV2JA";
+/** Same fallback as app.config.js — EAS may expose extra on manifest or expoConfig. */
+const CLERK_PUBLISHABLE_KEY_FALLBACK =
+  "pk_test_cmlnaHQtYmFzaWxpc2stOTEuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
+const CLERK_PUBLISHABLE_KEY =
+  (Constants.expoConfig as { extra?: { clerkPublishableKey?: string } })?.extra
+    ?.clerkPublishableKey ||
+  (Constants.manifest as { extra?: { clerkPublishableKey?: string } })?.extra
+    ?.clerkPublishableKey ||
+  CLERK_PUBLISHABLE_KEY_FALLBACK;
 
 if (__DEV__) {
   console.log(

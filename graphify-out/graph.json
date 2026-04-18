@@ -6434,12 +6434,21 @@
       "norm_label": "question.ts"
     },
     {
+      "label": "app.config.js",
+      "file_type": "code",
+      "source_file": "mobile/app.config.js",
+      "source_location": "L1",
+      "id": "mobile_app_config_js",
+      "community": 314,
+      "norm_label": "app.config.js"
+    },
+    {
       "label": "babel.config.js",
       "file_type": "code",
       "source_file": "mobile/babel.config.js",
       "source_location": "L1",
       "id": "mobile_babel_config_js",
-      "community": 314,
+      "community": 315,
       "norm_label": "babel.config.js"
     },
     {
@@ -6448,7 +6457,7 @@
       "source_file": "mobile/index.ts",
       "source_location": "L1",
       "id": "mobile_index_ts",
-      "community": 315,
+      "community": 316,
       "norm_label": "index.ts"
     },
     {
@@ -6509,7 +6518,7 @@
       "label": "AppSocketHandler()",
       "file_type": "code",
       "source_file": "mobile/src/App.tsx",
-      "source_location": "L88",
+      "source_location": "L97",
       "id": "app_appsockethandler",
       "community": 42,
       "norm_label": "appsockethandler()"
@@ -6518,7 +6527,7 @@
       "label": "OnboardingGate()",
       "file_type": "code",
       "source_file": "mobile/src/App.tsx",
-      "source_location": "L201",
+      "source_location": "L210",
       "id": "app_onboardinggate",
       "community": 42,
       "norm_label": "onboardinggate()"
@@ -6529,7 +6538,7 @@
       "source_file": "mobile/src/types/aiTutor.ts",
       "source_location": "L1",
       "id": "mobile_src_types_aitutor_ts",
-      "community": 316,
+      "community": 317,
       "norm_label": "aitutor.ts"
     },
     {
@@ -6538,7 +6547,7 @@
       "source_file": "mobile/src/types/session.ts",
       "source_location": "L1",
       "id": "mobile_src_types_session_ts",
-      "community": 317,
+      "community": 318,
       "norm_label": "session.ts"
     },
     {
@@ -6547,7 +6556,7 @@
       "source_file": "mobile/src/types/user.ts",
       "source_location": "L1",
       "id": "mobile_src_types_user_ts",
-      "community": 318,
+      "community": 319,
       "norm_label": "user.ts"
     },
     {
@@ -6556,7 +6565,7 @@
       "source_file": "mobile/src/types/assessment.ts",
       "source_location": "L1",
       "id": "mobile_src_types_assessment_ts",
-      "community": 319,
+      "community": 320,
       "norm_label": "assessment.ts"
     },
     {
@@ -6808,7 +6817,7 @@
       "source_file": "mobile/src/features/englivo/constants.ts",
       "source_location": "L1",
       "id": "mobile_src_features_englivo_constants_ts",
-      "community": 320,
+      "community": 321,
       "norm_label": "constants.ts"
     },
     {
@@ -6887,7 +6896,7 @@
       "source_file": "mobile/src/features/englivo/screens/EnglivoBookingScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_englivo_screens_englivobookingscreen_tsx",
-      "community": 321,
+      "community": 322,
       "norm_label": "englivobookingscreen.tsx"
     },
     {
@@ -6923,7 +6932,7 @@
       "source_file": "mobile/src/features/englivo/screens/EnglivoActiveCallScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_englivo_screens_englivoactivecallscreen_tsx",
-      "community": 322,
+      "community": 323,
       "norm_label": "englivoactivecallscreen.tsx"
     },
     {
@@ -6932,7 +6941,7 @@
       "source_file": "mobile/src/features/englivo/screens/EnglivoProgressScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_englivo_screens_englivoprogressscreen_tsx",
-      "community": 323,
+      "community": 324,
       "norm_label": "englivoprogressscreen.tsx"
     },
     {
@@ -7075,7 +7084,7 @@
       "source_file": "mobile/src/features/englivo/screens/EnglivoAiConversationScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_englivo_screens_englivoaiconversationscreen_tsx",
-      "community": 324,
+      "community": 325,
       "norm_label": "englivoaiconversationscreen.tsx"
     },
     {
@@ -7084,7 +7093,7 @@
       "source_file": "mobile/src/features/englivo/screens/EnglivoProfileScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_englivo_screens_englivoprofilescreen_tsx",
-      "community": 325,
+      "community": 326,
       "norm_label": "englivoprofilescreen.tsx"
     },
     {
@@ -7367,7 +7376,7 @@
       "source_file": "mobile/src/features/progress/services/progressApi.ts",
       "source_location": "L1",
       "id": "mobile_src_features_progress_services_progressapi_ts",
-      "community": 326,
+      "community": 327,
       "norm_label": "progressapi.ts"
     },
     {
@@ -7826,7 +7835,7 @@
       "source_file": "mobile/src/features/assessment/components/RecurringErrorsCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_assessment_components_recurringerrorscard_tsx",
-      "community": 327,
+      "community": 328,
       "norm_label": "recurringerrorscard.tsx"
     },
     {
@@ -7835,7 +7844,7 @@
       "source_file": "mobile/src/features/assessment/components/BenchmarkCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_assessment_components_benchmarkcard_tsx",
-      "community": 328,
+      "community": 329,
       "norm_label": "benchmarkcard.tsx"
     },
     {
@@ -7844,7 +7853,7 @@
       "source_file": "mobile/src/features/assessment/services/assessment.ts",
       "source_location": "L1",
       "id": "mobile_src_features_assessment_services_assessment_ts",
-      "community": 329,
+      "community": 330,
       "norm_label": "assessment.ts"
     },
     {
@@ -7880,7 +7889,7 @@
       "source_file": "mobile/src/features/reels/services/reelsApi.ts",
       "source_location": "L1",
       "id": "mobile_src_features_reels_services_reelsapi_ts",
-      "community": 330,
+      "community": 331,
       "norm_label": "reelsapi.ts"
     },
     {
@@ -8267,7 +8276,7 @@
       "source_file": "mobile/src/features/call/components/PracticeTips.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_call_components_practicetips_tsx",
-      "community": 331,
+      "community": 332,
       "norm_label": "practicetips.tsx"
     },
     {
@@ -8276,7 +8285,7 @@
       "source_file": "mobile/src/features/call/components/GrammarVocabBreakdown.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_call_components_grammarvocabbreakdown_tsx",
-      "community": 332,
+      "community": 333,
       "norm_label": "grammarvocabbreakdown.tsx"
     },
     {
@@ -8339,7 +8348,7 @@
       "source_file": "mobile/src/features/call/components/CallQualityScoreCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_call_components_callqualityscorecard_tsx",
-      "community": 333,
+      "community": 334,
       "norm_label": "callqualityscorecard.tsx"
     },
     {
@@ -8348,7 +8357,7 @@
       "source_file": "mobile/src/features/call/components/WordLevelBreakdown.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_call_components_wordlevelbreakdown_tsx",
-      "community": 334,
+      "community": 335,
       "norm_label": "wordlevelbreakdown.tsx"
     },
     {
@@ -8924,7 +8933,7 @@
       "source_file": "mobile/src/features/tutor/services/tutorApi.ts",
       "source_location": "L1",
       "id": "mobile_src_features_tutor_services_tutorapi_ts",
-      "community": 335,
+      "community": 336,
       "norm_label": "tutorapi.ts"
     },
     {
@@ -8987,7 +8996,7 @@
       "source_file": "mobile/src/features/session/screens/DashboardScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_session_screens_dashboardscreen_tsx",
-      "community": 336,
+      "community": 337,
       "norm_label": "dashboardscreen.tsx"
     },
     {
@@ -8996,7 +9005,7 @@
       "source_file": "mobile/src/features/session/screens/PracticeScreen.tsx",
       "source_location": "L1",
       "id": "mobile_src_features_session_screens_practicescreen_tsx",
-      "community": 337,
+      "community": 338,
       "norm_label": "practicescreen.tsx"
     },
     {
@@ -9023,7 +9032,7 @@
       "source_file": "mobile/src/navigation/EngrTabs.tsx",
       "source_location": "L1",
       "id": "mobile_src_navigation_engrtabs_tsx",
-      "community": 338,
+      "community": 339,
       "norm_label": "engrtabs.tsx"
     },
     {
@@ -9032,7 +9041,7 @@
       "source_file": "mobile/src/navigation/EnglivoTabs.tsx",
       "source_location": "L1",
       "id": "mobile_src_navigation_englivotabs_tsx",
-      "community": 339,
+      "community": 340,
       "norm_label": "englivotabs.tsx"
     },
     {
@@ -9054,7 +9063,7 @@
       "source_file": "mobile/src/navigation/AuthNavigator.tsx",
       "source_location": "L1",
       "id": "mobile_src_navigation_authnavigator_tsx",
-      "community": 340,
+      "community": 341,
       "norm_label": "authnavigator.tsx"
     },
     {
@@ -9189,7 +9198,7 @@
       "source_file": "mobile/src/components/SplashAnimation.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_splashanimation_tsx",
-      "community": 341,
+      "community": 342,
       "norm_label": "splashanimation.tsx"
     },
     {
@@ -9306,7 +9315,7 @@
       "source_file": "mobile/src/components/home/WeeklySummaryCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_weeklysummarycard_tsx",
-      "community": 342,
+      "community": 343,
       "norm_label": "weeklysummarycard.tsx"
     },
     {
@@ -9315,7 +9324,7 @@
       "source_file": "mobile/src/components/home/CallOptionCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_calloptioncard_tsx",
-      "community": 343,
+      "community": 344,
       "norm_label": "calloptioncard.tsx"
     },
     {
@@ -9378,7 +9387,7 @@
       "source_file": "mobile/src/components/home/C2MasteryGateCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_c2masterygatecard_tsx",
-      "community": 344,
+      "community": 345,
       "norm_label": "c2masterygatecard.tsx"
     },
     {
@@ -9414,7 +9423,7 @@
       "source_file": "mobile/src/components/home/WeeklyActivityBar.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_weeklyactivitybar_tsx",
-      "community": 345,
+      "community": 346,
       "norm_label": "weeklyactivitybar.tsx"
     },
     {
@@ -9504,7 +9513,7 @@
       "source_file": "mobile/src/components/home/StickyPrompt.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_stickyprompt_tsx",
-      "community": 346,
+      "community": 347,
       "norm_label": "stickyprompt.tsx"
     },
     {
@@ -9648,7 +9657,7 @@
       "source_file": "mobile/src/components/home/ContextualCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_contextualcard_tsx",
-      "community": 347,
+      "community": 348,
       "norm_label": "contextualcard.tsx"
     },
     {
@@ -9657,7 +9666,7 @@
       "source_file": "mobile/src/components/home/SkillRingsRow.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_home_skillringsrow_tsx",
-      "community": 348,
+      "community": 349,
       "norm_label": "skillringsrow.tsx"
     },
     {
@@ -9666,7 +9675,7 @@
       "source_file": "mobile/src/components/progress/MiniChart.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_minichart_tsx",
-      "community": 349,
+      "community": 350,
       "norm_label": "minichart.tsx"
     },
     {
@@ -9675,7 +9684,7 @@
       "source_file": "mobile/src/components/progress/SkillRadarChart.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_skillradarchart_tsx",
-      "community": 350,
+      "community": 351,
       "norm_label": "skillradarchart.tsx"
     },
     {
@@ -9684,7 +9693,7 @@
       "source_file": "mobile/src/components/progress/PerformanceTrendChart.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_performancetrendchart_tsx",
-      "community": 351,
+      "community": 352,
       "norm_label": "performancetrendchart.tsx"
     },
     {
@@ -9711,7 +9720,7 @@
       "source_file": "mobile/src/components/progress/TrendIndicator.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_trendindicator_tsx",
-      "community": 352,
+      "community": 353,
       "norm_label": "trendindicator.tsx"
     },
     {
@@ -9720,7 +9729,7 @@
       "source_file": "mobile/src/components/progress/JourneyTimeline.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_journeytimeline_tsx",
-      "community": 353,
+      "community": 354,
       "norm_label": "journeytimeline.tsx"
     },
     {
@@ -9729,7 +9738,7 @@
       "source_file": "mobile/src/components/progress/MetricCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_metriccard_tsx",
-      "community": 354,
+      "community": 355,
       "norm_label": "metriccard.tsx"
     },
     {
@@ -9756,7 +9765,7 @@
       "source_file": "mobile/src/components/progress/LevelProgressCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_levelprogresscard_tsx",
-      "community": 355,
+      "community": 356,
       "norm_label": "levelprogresscard.tsx"
     },
     {
@@ -9765,7 +9774,7 @@
       "source_file": "mobile/src/components/progress/WeeklyActivityChart.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_weeklyactivitychart_tsx",
-      "community": 356,
+      "community": 357,
       "norm_label": "weeklyactivitychart.tsx"
     },
     {
@@ -9774,7 +9783,7 @@
       "source_file": "mobile/src/components/progress/StreaksAndGoals.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_progress_streaksandgoals_tsx",
-      "community": 357,
+      "community": 358,
       "norm_label": "streaksandgoals.tsx"
     },
     {
@@ -9783,7 +9792,7 @@
       "source_file": "mobile/src/components/gamification/PointsBanner.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_gamification_pointsbanner_tsx",
-      "community": 358,
+      "community": 359,
       "norm_label": "pointsbanner.tsx"
     },
     {
@@ -9846,7 +9855,7 @@
       "source_file": "mobile/src/components/growth/WeakAreaCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_growth_weakareacard_tsx",
-      "community": 359,
+      "community": 360,
       "norm_label": "weakareacard.tsx"
     },
     {
@@ -9891,7 +9900,7 @@
       "source_file": "mobile/src/components/growth/SkillSummary.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_growth_skillsummary_tsx",
-      "community": 360,
+      "community": 361,
       "norm_label": "skillsummary.tsx"
     },
     {
@@ -9900,7 +9909,7 @@
       "source_file": "mobile/src/components/common/SkillBadge.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_common_skillbadge_tsx",
-      "community": 361,
+      "community": 362,
       "norm_label": "skillbadge.tsx"
     },
     {
@@ -9927,7 +9936,7 @@
       "source_file": "mobile/src/components/common/SemanticProgressBar.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_common_semanticprogressbar_tsx",
-      "community": 362,
+      "community": 363,
       "norm_label": "semanticprogressbar.tsx"
     },
     {
@@ -9936,7 +9945,7 @@
       "source_file": "mobile/src/components/common/SemanticLevelBadge.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_common_semanticlevelbadge_tsx",
-      "community": 363,
+      "community": 364,
       "norm_label": "semanticlevelbadge.tsx"
     },
     {
@@ -10035,7 +10044,7 @@
       "source_file": "mobile/src/components/redesigned/PremiumHeader.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_redesigned_premiumheader_tsx",
-      "community": 364,
+      "community": 365,
       "norm_label": "premiumheader.tsx"
     },
     {
@@ -10044,7 +10053,7 @@
       "source_file": "mobile/src/components/redesigned/PremiumCTACard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_redesigned_premiumctacard_tsx",
-      "community": 365,
+      "community": 366,
       "norm_label": "premiumctacard.tsx"
     },
     {
@@ -10053,7 +10062,7 @@
       "source_file": "mobile/src/components/redesigned/PremiumSkillsCard.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_redesigned_premiumskillscard_tsx",
-      "community": 366,
+      "community": 367,
       "norm_label": "premiumskillscard.tsx"
     },
     {
@@ -10062,7 +10071,7 @@
       "source_file": "mobile/src/components/redesigned/ContextualCardList.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_redesigned_contextualcardlist_tsx",
-      "community": 367,
+      "community": 368,
       "norm_label": "contextualcardlist.tsx"
     },
     {
@@ -10071,7 +10080,7 @@
       "source_file": "mobile/src/components/redesigned/PremiumScoreRing.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_redesigned_premiumscorering_tsx",
-      "community": 368,
+      "community": 369,
       "norm_label": "premiumscorering.tsx"
     },
     {
@@ -10080,7 +10089,7 @@
       "source_file": "mobile/src/components/redesigned/NextGoalIndicator.tsx",
       "source_location": "L1",
       "id": "mobile_src_components_redesigned_nextgoalindicator_tsx",
-      "community": 369,
+      "community": 370,
       "norm_label": "nextgoalindicator.tsx"
     },
     {
@@ -10089,7 +10098,7 @@
       "source_file": "mobile/src/theme/base.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_base_ts",
-      "community": 370,
+      "community": 371,
       "norm_label": "base.ts"
     },
     {
@@ -10098,7 +10107,7 @@
       "source_file": "mobile/src/theme/types.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_types_ts",
-      "community": 371,
+      "community": 372,
       "norm_label": "types.ts"
     },
     {
@@ -10251,7 +10260,7 @@
       "source_file": "mobile/src/theme/index.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_index_ts",
-      "community": 372,
+      "community": 373,
       "norm_label": "index.ts"
     },
     {
@@ -10260,7 +10269,7 @@
       "source_file": "mobile/src/theme/theme.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_theme_ts",
-      "community": 373,
+      "community": 374,
       "norm_label": "theme.ts"
     },
     {
@@ -10287,7 +10296,7 @@
       "source_file": "mobile/src/theme/families/blueSky.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_bluesky_ts",
-      "community": 374,
+      "community": 375,
       "norm_label": "bluesky.ts"
     },
     {
@@ -10296,7 +10305,7 @@
       "source_file": "mobile/src/theme/families/atlatitude.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_atlatitude_ts",
-      "community": 375,
+      "community": 376,
       "norm_label": "atlatitude.ts"
     },
     {
@@ -10305,7 +10314,7 @@
       "source_file": "mobile/src/theme/families/oceanDepth.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_oceandepth_ts",
-      "community": 376,
+      "community": 377,
       "norm_label": "oceandepth.ts"
     },
     {
@@ -10314,7 +10323,7 @@
       "source_file": "mobile/src/theme/families/englivo.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_englivo_ts",
-      "community": 377,
+      "community": 378,
       "norm_label": "englivo.ts"
     },
     {
@@ -10323,7 +10332,7 @@
       "source_file": "mobile/src/theme/families/purpleDream.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_purpledream_ts",
-      "community": 378,
+      "community": 379,
       "norm_label": "purpledream.ts"
     },
     {
@@ -10332,7 +10341,7 @@
       "source_file": "mobile/src/theme/families/sunsetEnergy.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_sunsetenergy_ts",
-      "community": 379,
+      "community": 380,
       "norm_label": "sunsetenergy.ts"
     },
     {
@@ -10341,7 +10350,7 @@
       "source_file": "mobile/src/theme/families/engr.ts",
       "source_location": "L1",
       "id": "mobile_src_theme_families_engr_ts",
-      "community": 380,
+      "community": 381,
       "norm_label": "engr.ts"
     },
     {
@@ -10350,7 +10359,7 @@
       "source_file": "mobile/src/api/bridgeApi.ts",
       "source_location": "L1",
       "id": "mobile_src_api_bridgeapi_ts",
-      "community": 381,
+      "community": 382,
       "norm_label": "bridgeapi.ts"
     },
     {
@@ -10359,7 +10368,7 @@
       "source_file": "mobile/src/api/tutor.ts",
       "source_location": "L1",
       "id": "mobile_src_api_tutor_ts",
-      "community": 382,
+      "community": 383,
       "norm_label": "tutor.ts"
     },
     {
@@ -10375,7 +10384,7 @@
       "label": "setEnglivoAuthToken()",
       "file_type": "code",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L49",
+      "source_location": "L48",
       "id": "englivoclient_setenglivoauthtoken",
       "community": 115,
       "norm_label": "setenglivoauthtoken()"
@@ -10384,7 +10393,7 @@
       "label": "setAuthTokenFetcher()",
       "file_type": "code",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L57",
+      "source_location": "L56",
       "id": "englivoclient_setauthtokenfetcher",
       "community": 115,
       "norm_label": "setauthtokenfetcher()"
@@ -10393,7 +10402,7 @@
       "label": "getSessionsCount()",
       "file_type": "code",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L91",
+      "source_location": "L90",
       "id": "englivoclient_getsessionscount",
       "community": 115,
       "norm_label": "getsessionscount()"
@@ -10402,7 +10411,7 @@
       "label": "getUpcomingSession()",
       "file_type": "code",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L97",
+      "source_location": "L96",
       "id": "englivoclient_getupcomingsession",
       "community": 115,
       "norm_label": "getupcomingsession()"
@@ -10413,7 +10422,7 @@
       "source_file": "mobile/src/api/livekit.ts",
       "source_location": "L1",
       "id": "mobile_src_api_livekit_ts",
-      "community": 383,
+      "community": 384,
       "norm_label": "livekit.ts"
     },
     {
@@ -10422,7 +10431,7 @@
       "source_file": "mobile/src/api/progress.ts",
       "source_location": "L1",
       "id": "mobile_src_api_progress_ts",
-      "community": 384,
+      "community": 385,
       "norm_label": "progress.ts"
     },
     {
@@ -10530,7 +10539,7 @@
       "source_file": "mobile/src/api/reels.ts",
       "source_location": "L1",
       "id": "mobile_src_api_reels_ts",
-      "community": 385,
+      "community": 386,
       "norm_label": "reels.ts"
     },
     {
@@ -10647,7 +10656,7 @@
       "source_file": "mobile/src/api/connections.ts",
       "source_location": "L1",
       "id": "mobile_src_api_connections_ts",
-      "community": 386,
+      "community": 387,
       "norm_label": "connections.ts"
     },
     {
@@ -10701,7 +10710,7 @@
       "source_file": "mobile/src/api/englivoAiTutor.ts",
       "source_location": "L1",
       "id": "mobile_src_api_englivoaitutor_ts",
-      "community": 387,
+      "community": 388,
       "norm_label": "englivoaitutor.ts"
     },
     {
@@ -10710,7 +10719,7 @@
       "source_file": "mobile/src/api/reliability.ts",
       "source_location": "L1",
       "id": "mobile_src_api_reliability_ts",
-      "community": 388,
+      "community": 389,
       "norm_label": "reliability.ts"
     },
     {
@@ -10737,7 +10746,7 @@
       "source_file": "mobile/src/api/matchmaking.ts",
       "source_location": "L1",
       "id": "mobile_src_api_matchmaking_ts",
-      "community": 389,
+      "community": 390,
       "norm_label": "matchmaking.ts"
     },
     {
@@ -10746,7 +10755,7 @@
       "source_file": "mobile/src/api/tasks.ts",
       "source_location": "L1",
       "id": "mobile_src_api_tasks_ts",
-      "community": 390,
+      "community": 391,
       "norm_label": "tasks.ts"
     },
     {
@@ -10755,7 +10764,7 @@
       "source_file": "mobile/src/api/user.ts",
       "source_location": "L1",
       "id": "mobile_src_api_user_ts",
-      "community": 391,
+      "community": 392,
       "norm_label": "user.ts"
     },
     {
@@ -10995,7 +11004,7 @@
       "author": null,
       "contributor": null,
       "id": "quota_api_LiveKitTokenResponse",
-      "community": 392,
+      "community": 393,
       "norm_label": "livekittokenresponse interface"
     },
     {
@@ -11193,7 +11202,7 @@
       "source_file": "scripts/test_local_transcribe.py",
       "source_location": "L1",
       "id": "scripts_test_local_transcribe_py",
-      "community": 393,
+      "community": 394,
       "norm_label": "test_local_transcribe.py"
     },
     {
@@ -11301,7 +11310,7 @@
       "source_file": "backend-ai/run_all_tests.py",
       "source_location": "L1",
       "id": "backend_ai_run_all_tests_py",
-      "community": 394,
+      "community": 395,
       "norm_label": "run_all_tests.py"
     },
     {
@@ -11310,7 +11319,7 @@
       "source_file": "backend-ai/app/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_init_py",
-      "community": 395,
+      "community": 396,
       "norm_label": "__init__.py"
     },
     {
@@ -11544,7 +11553,7 @@
       "source_file": "backend-ai/app/middleware/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_middleware_init_py",
-      "community": 396,
+      "community": 397,
       "norm_label": "__init__.py"
     },
     {
@@ -11615,7 +11624,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/core/config.py",
       "source_location": "L119",
-      "community": 397,
+      "community": 398,
       "norm_label": "parse cors origins from comma-separated string.",
       "id": "config_rationale_119"
     },
@@ -11624,7 +11633,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/core/config.py",
       "source_location": "L127",
-      "community": 398,
+      "community": 399,
       "norm_label": "parse supported audio formats from comma-separated string.",
       "id": "config_rationale_127"
     },
@@ -11634,7 +11643,7 @@
       "source_file": "backend-ai/app/core/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_core_init_py",
-      "community": 399,
+      "community": 400,
       "norm_label": "__init__.py"
     },
     {
@@ -11697,7 +11706,7 @@
       "source_file": "backend-ai/app/cache/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_cache_init_py",
-      "community": 400,
+      "community": 401,
       "norm_label": "__init__.py"
     },
     {
@@ -11922,7 +11931,7 @@
       "source_file": "backend-ai/app/features/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_init_py",
-      "community": 401,
+      "community": 402,
       "norm_label": "__init__.py"
     },
     {
@@ -12362,7 +12371,7 @@
       "source_file": "backend-ai/app/features/transcription/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_transcription_init_py",
-      "community": 402,
+      "community": 403,
       "norm_label": "__init__.py"
     },
     {
@@ -12478,7 +12487,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/transcription/async_azure_speech.py",
       "source_location": "L60",
-      "community": 403,
+      "community": 404,
       "norm_label": "transcribe audio from bytes asynchronously.",
       "id": "async_azure_speech_rationale_60"
     },
@@ -12505,7 +12514,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/transcription/async_azure_speech.py",
       "source_location": "L182",
-      "community": 404,
+      "community": 405,
       "norm_label": "assess pronunciation asynchronously.",
       "id": "async_azure_speech_rationale_182"
     },
@@ -12668,7 +12677,7 @@
       "source_file": "backend-ai/app/features/health/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_health_init_py",
-      "community": 405,
+      "community": 406,
       "norm_label": "__init__.py"
     },
     {
@@ -12695,7 +12704,7 @@
       "source_file": "backend-ai/app/features/admin/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_admin_init_py",
-      "community": 406,
+      "community": 407,
       "norm_label": "__init__.py"
     },
     {
@@ -13217,7 +13226,7 @@
       "source_file": "backend-ai/app/features/assessment/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_assessment_init_py",
-      "community": 407,
+      "community": 408,
       "norm_label": "__init__.py"
     },
     {
@@ -13532,7 +13541,7 @@
       "source_file": "backend-ai/app/features/pronunciation/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_pronunciation_init_py",
-      "community": 408,
+      "community": 409,
       "norm_label": "__init__.py"
     },
     {
@@ -14053,7 +14062,7 @@
       "source_file": "backend-ai/app/features/tutor/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_tutor_init_py",
-      "community": 409,
+      "community": 410,
       "norm_label": "__init__.py"
     },
     {
@@ -14143,7 +14152,7 @@
       "source_file": "backend-ai/app/features/tts/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_features_tts_init_py",
-      "community": 410,
+      "community": 411,
       "norm_label": "__init__.py"
     },
     {
@@ -14566,7 +14575,7 @@
       "source_file": "backend-ai/app/utils/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_utils_init_py",
-      "community": 411,
+      "community": 412,
       "norm_label": "__init__.py"
     },
     {
@@ -14664,7 +14673,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/utils/robust_json_parser.py",
       "source_location": "L18",
-      "community": 412,
+      "community": 413,
       "norm_label": "extract json from various text formats.",
       "id": "robust_json_parser_rationale_18"
     },
@@ -14673,7 +14682,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/utils/robust_json_parser.py",
       "source_location": "L78",
-      "community": 413,
+      "community": 414,
       "norm_label": "clean common json formatting issues.",
       "id": "robust_json_parser_rationale_78"
     },
@@ -14682,7 +14691,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/utils/robust_json_parser.py",
       "source_location": "L91",
-      "community": 414,
+      "community": 415,
       "norm_label": "parse json with multiple recovery strategies.",
       "id": "robust_json_parser_rationale_91"
     },
@@ -14773,7 +14782,7 @@
       "source_file": "backend-ai/app/models/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_models_init_py",
-      "community": 415,
+      "community": 416,
       "norm_label": "__init__.py"
     },
     {
@@ -15097,7 +15106,7 @@
       "source_file": "backend-ai/app/assessment/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_assessment_init_py",
-      "community": 416,
+      "community": 417,
       "norm_label": "__init__.py"
     },
     {
@@ -15331,7 +15340,7 @@
       "source_file": "backend-ai/app/assessment/scoring/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_assessment_scoring_init_py",
-      "community": 417,
+      "community": 418,
       "norm_label": "__init__.py"
     },
     {
@@ -15781,7 +15790,7 @@
       "source_file": "backend-ai/app/api/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_api_init_py",
-      "community": 418,
+      "community": 419,
       "norm_label": "__init__.py"
     },
     {
@@ -15880,7 +15889,7 @@
       "source_file": "backend-ai/app/services/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_app_services_init_py",
-      "community": 419,
+      "community": 420,
       "norm_label": "__init__.py"
     },
     {
@@ -15970,7 +15979,7 @@
       "source_file": "backend-ai/tests/__init__.py",
       "source_location": "L1",
       "id": "backend_ai_tests_init_py",
-      "community": 420,
+      "community": 421,
       "norm_label": "__init__.py"
     },
     {
@@ -16208,7 +16217,7 @@
       "source_file": "super-app/apps/babel.config.js",
       "source_location": "L1",
       "id": "super_app_apps_babel_config_js",
-      "community": 421,
+      "community": 422,
       "norm_label": "babel.config.js"
     },
     {
@@ -16235,7 +16244,7 @@
       "source_file": "super-app/apps/englivo/metro.config.js",
       "source_location": "L1",
       "id": "super_app_apps_englivo_metro_config_js",
-      "community": 422,
+      "community": 423,
       "norm_label": "metro.config.js"
     },
     {
@@ -16244,7 +16253,7 @@
       "source_file": "super-app/apps/englivo/babel.config.js",
       "source_location": "L1",
       "id": "super_app_apps_englivo_babel_config_js",
-      "community": 423,
+      "community": 424,
       "norm_label": "babel.config.js"
     },
     {
@@ -16253,7 +16262,7 @@
       "source_file": "super-app/apps/englivo/index.ts",
       "source_location": "L1",
       "id": "super_app_apps_englivo_index_ts",
-      "community": 424,
+      "community": 425,
       "norm_label": "index.ts"
     },
     {
@@ -16262,7 +16271,7 @@
       "source_file": "super-app/apps/englivo/src/types/aiTutor.ts",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_types_aitutor_ts",
-      "community": 425,
+      "community": 426,
       "norm_label": "aitutor.ts"
     },
     {
@@ -16271,7 +16280,7 @@
       "source_file": "super-app/apps/englivo/src/types/session.ts",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_types_session_ts",
-      "community": 426,
+      "community": 427,
       "norm_label": "session.ts"
     },
     {
@@ -16280,7 +16289,7 @@
       "source_file": "super-app/apps/englivo/src/types/user.ts",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_types_user_ts",
-      "community": 427,
+      "community": 428,
       "norm_label": "user.ts"
     },
     {
@@ -16388,7 +16397,7 @@
       "source_file": "super-app/apps/englivo/src/features/sessions/screens/SessionModeScreen.tsx",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_features_sessions_screens_sessionmodescreen_tsx",
-      "community": 428,
+      "community": 429,
       "norm_label": "sessionmodescreen.tsx"
     },
     {
@@ -16496,7 +16505,7 @@
       "source_file": "super-app/apps/englivo/src/navigation/RootNavigator.tsx",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_navigation_rootnavigator_tsx",
-      "community": 429,
+      "community": 430,
       "norm_label": "rootnavigator.tsx"
     },
     {
@@ -16523,7 +16532,7 @@
       "source_file": "super-app/apps/englivo/src/theme/types.ts",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_theme_types_ts",
-      "community": 430,
+      "community": 431,
       "norm_label": "types.ts"
     },
     {
@@ -16532,7 +16541,7 @@
       "source_file": "super-app/apps/englivo/src/theme/englivo.ts",
       "source_location": "L1",
       "id": "super_app_apps_englivo_src_theme_englivo_ts",
-      "community": 431,
+      "community": 432,
       "norm_label": "englivo.ts"
     },
     {
@@ -16639,7 +16648,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L233",
-      "community": 432,
+      "community": 433,
       "norm_label": "lazy-load the pronouncing package (cmu dict).",
       "id": "pronunciation_detector_rationale_233"
     },
@@ -16648,7 +16657,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L249",
-      "community": 433,
+      "community": 434,
       "norm_label": "lazy-load phonemizer (espeak backend) for cmu gaps.",
       "id": "pronunciation_detector_rationale_249"
     },
@@ -16657,7 +16666,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L292",
-      "community": 434,
+      "community": 435,
       "norm_label": "compute phoneme-level edit distance between two english words using cmu dict.",
       "id": "pronunciation_detector_rationale_292"
     },
@@ -16666,7 +16675,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L318",
-      "community": 435,
+      "community": 436,
       "norm_label": "layer 2: for each recognized word, check if a phonetically similar but different",
       "id": "pronunciation_detector_rationale_318"
     },
@@ -16675,7 +16684,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L369",
-      "community": 436,
+      "community": 437,
       "norm_label": "layer 4 standalone: flag any recognized word that appears in the stt confusion t",
       "id": "pronunciation_detector_rationale_369"
     },
@@ -16684,7 +16693,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L402",
-      "community": 437,
+      "community": 438,
       "norm_label": "consumes azure pronunciation assessment result and returns flagged indian englis",
       "id": "pronunciation_detector_rationale_402"
     },
@@ -16693,7 +16702,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L701",
-      "community": 438,
+      "community": 439,
       "norm_label": "same as detect_from_azure_result but accepts a flat list of word dicts.",
       "id": "pronunciation_detector_rationale_701"
     },
@@ -16810,7 +16819,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L231",
-      "community": 439,
+      "community": 440,
       "norm_label": "lazy-load the pronouncing package (cmu dict).",
       "id": "pronunciation_detector_rationale_231"
     },
@@ -16819,7 +16828,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L247",
-      "community": 440,
+      "community": 441,
       "norm_label": "compute phoneme-level edit distance between two english words using cmu dict.",
       "id": "pronunciation_detector_rationale_247"
     },
@@ -16828,7 +16837,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L268",
-      "community": 441,
+      "community": 442,
       "norm_label": "layer 2: for each recognized word, check if a phonetically similar but different",
       "id": "pronunciation_detector_rationale_268"
     },
@@ -16837,7 +16846,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L319",
-      "community": 442,
+      "community": 443,
       "norm_label": "layer 4 standalone: flag any recognized word that appears in the stt confusion t",
       "id": "pronunciation_detector_rationale_319"
     },
@@ -16846,7 +16855,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L352",
-      "community": 443,
+      "community": 444,
       "norm_label": "consumes azure pronunciation assessment result and returns flagged indian englis",
       "id": "pronunciation_detector_rationale_352"
     },
@@ -16855,7 +16864,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/pronunciation_detector.py",
       "source_location": "L651",
-      "community": 444,
+      "community": 445,
       "norm_label": "same as detect_from_azure_result but accepts a flat list of word dicts.",
       "id": "pronunciation_detector_rationale_651"
     },
@@ -16864,7 +16873,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/routes.py",
       "source_location": "L1",
-      "community": 445,
+      "community": 446,
       "norm_label": "pronunciation assessment api. - post /pronunciation/assess \u2014 run azure pronuncia",
       "id": "routes_rationale_1"
     },
@@ -16873,7 +16882,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/routes.py",
       "source_location": "L23",
-      "community": 446,
+      "community": 447,
       "norm_label": "average of all word-level accuracyscore values from the azure pa result. default",
       "id": "routes_rationale_23"
     },
@@ -16882,7 +16891,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/routes.py",
       "source_location": "L46",
-      "community": 447,
+      "community": 448,
       "norm_label": "removes speaker labels (e.g. 'user a:', 'partner:') and empty lines.",
       "id": "routes_rationale_46"
     },
@@ -16891,7 +16900,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/routes.py",
       "source_location": "L68",
-      "community": 448,
+      "community": 449,
       "norm_label": "run azure pa with continuous recognition so the entire audio file is assessed,",
       "id": "routes_rationale_68"
     },
@@ -16900,7 +16909,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/routes.py",
       "source_location": "L175",
-      "community": 449,
+      "community": 450,
       "norm_label": "run azure pronunciation assessment against the full audio file.      strategy:",
       "id": "routes_rationale_175"
     },
@@ -16909,7 +16918,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/pronunciation/routes.py",
       "source_location": "L232",
-      "community": 450,
+      "community": 451,
       "norm_label": "post /pronunciation/assess     accepts either:     1. multipart form data: `audi",
       "id": "routes_rationale_232"
     },
@@ -16918,7 +16927,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L1",
-      "community": 451,
+      "community": 452,
       "norm_label": "accumulate pronunciation issues during live tutor websocket sessions. post-call",
       "id": "pronunciation_capture_rationale_1"
     },
@@ -16927,7 +16936,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L41",
-      "community": 452,
+      "community": 453,
       "norm_label": "merge optional request body issues with websocket-accumulated issues (store is p",
       "id": "pronunciation_capture_rationale_41"
     },
@@ -16936,7 +16945,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L70",
-      "community": 453,
+      "community": 454,
       "norm_label": "remove complete pron tags and any incomplete `[pron:` suffix (streaming-safe).",
       "id": "pronunciation_capture_rationale_70"
     },
@@ -16945,7 +16954,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L81",
-      "community": 454,
+      "community": 455,
       "norm_label": "parse [pron: heard=\"...\" correct=\"...\" rule=\"...\"] from the full model output.",
       "id": "pronunciation_capture_rationale_81"
     },
@@ -16954,7 +16963,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L120",
-      "community": 455,
+      "community": 456,
       "norm_label": "unwrap optional { phonetic_insights: {...}, reference_text, ... } from client.",
       "id": "pronunciation_capture_rationale_120"
     },
@@ -16963,7 +16972,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L134",
-      "community": 456,
+      "community": 457,
       "norm_label": "layer a: azure dual-pass / merged insights.     critical_errors / minor_errors u",
       "id": "pronunciation_capture_rationale_134"
     },
@@ -16972,7 +16981,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L284",
-      "community": 457,
+      "community": 458,
       "norm_label": "heuristic extraction of explicit pronunciation corrections from tutor text.",
       "id": "pronunciation_capture_rationale_284"
     },
@@ -16981,7 +16990,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L362",
-      "community": 458,
+      "community": 459,
       "norm_label": "cross-reference stt words with phoneme map by_approximation (silent misses).",
       "id": "pronunciation_capture_rationale_362"
     },
@@ -16990,7 +16999,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L398",
-      "community": 459,
+      "community": 460,
       "norm_label": "deduplicate by target word (case-insensitive); keep highest severity; enrich hea",
       "id": "pronunciation_capture_rationale_398"
     },
@@ -16999,7 +17008,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/app/features/tutor/pronunciation_capture.py",
       "source_location": "L435",
-      "community": 460,
+      "community": 461,
       "norm_label": "one websocket turn: azure insights \u2192 gemini pron tags \u2192 phrase regexes \u2192 stt tok",
       "id": "pronunciation_capture_rationale_435"
     },
@@ -17008,7 +17017,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/scripts/test_pronunciation.py",
       "source_location": "L1",
-      "community": 461,
+      "community": 462,
       "norm_label": "pronunciation pipeline validation script.  usage:     pron_debug=1 python script",
       "id": "test_pronunciation_rationale_1"
     },
@@ -17017,7 +17026,7 @@
       "file_type": "rationale",
       "source_file": "backend-ai/scripts/test_pronunciation.py",
       "source_location": "L36",
-      "community": 462,
+      "community": 463,
       "norm_label": "generate a minimal silent wav (16-bit, 16 khz, mono).",
       "id": "test_pronunciation_rationale_36"
     },
@@ -17030,7 +17039,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 463,
+      "community": 464,
       "norm_label": "call feedback mechanism doc",
       "id": "call_feedback_doc"
     },
@@ -17056,7 +17065,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 464,
+      "community": 465,
       "norm_label": "system architecture doc",
       "id": "system_architecture_doc"
     },
@@ -17069,7 +17078,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 465,
+      "community": 466,
       "norm_label": "scoring logic report",
       "id": "scoring_logic_doc"
     },
@@ -17147,7 +17156,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 466,
+      "community": 467,
       "norm_label": "3-tier microservices architecture",
       "id": "system_arch_concept_3tier"
     },
@@ -17160,7 +17169,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 467,
+      "community": 468,
       "norm_label": "hinglish ai tutor (priya/maya)",
       "id": "system_arch_concept_hinglish_tutor"
     },
@@ -17199,7 +17208,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 468,
+      "community": 469,
       "norm_label": "rationale: multi-layer detection (azure pa + phoneme dist + stt confusion)",
       "id": "pron_detector_rationale_layers"
     },
@@ -17641,7 +17650,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 469,
+      "community": 470,
       "norm_label": "startstream event (audio)",
       "id": "realtime_StartStream"
     },
@@ -17706,7 +17715,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 470,
+      "community": 471,
       "norm_label": "chat rest api",
       "id": "apicontracts_ChatRestAPI"
     },
@@ -17732,7 +17741,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 471,
+      "community": 472,
       "norm_label": "assessment rest api",
       "id": "apicontracts_AssessmentAPI"
     },
@@ -17875,7 +17884,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 472,
+      "community": 473,
       "norm_label": "nestjs runtime port config",
       "id": "deploy_NestPort"
     },
@@ -17927,7 +17936,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 473,
+      "community": 474,
       "norm_label": "observability (swagger + prometheus)",
       "id": "deploy_Observability"
     },
@@ -18018,7 +18027,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 474,
+      "community": 475,
       "norm_label": "userpoints gamification entity",
       "id": "schema_UserPoints"
     },
@@ -18538,7 +18547,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 475,
+      "community": 476,
       "norm_label": "clerk next.js auth service",
       "id": "clerknextjs_AuthService"
     },
@@ -18837,7 +18846,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 476,
+      "community": 477,
       "norm_label": "backend-ai requirements.txt (python dependencies)",
       "id": "requirements_txt"
     },
@@ -18850,7 +18859,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 477,
+      "community": 478,
       "norm_label": "pronunciation detector fixes verification",
       "id": "pronunciation_fixes_doc"
     },
@@ -18863,7 +18872,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 478,
+      "community": 479,
       "norm_label": "fix 1: duplicate suppression (keep lower confidence)",
       "id": "pronunciation_fix1_dedupe"
     },
@@ -18876,7 +18885,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 479,
+      "community": 480,
       "norm_label": "fix 2: high-confidence false positive suppression (confidence >= 85)",
       "id": "pronunciation_fix2_high_confidence_fp"
     },
@@ -18889,7 +18898,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 480,
+      "community": 481,
       "norm_label": "fix 3: unknown_substitution category + null reel_id",
       "id": "pronunciation_fix3_unknown_substitution"
     },
@@ -18902,7 +18911,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 481,
+      "community": 482,
       "norm_label": "fix 4: test_02 reference text pairing in run_all_tests.py",
       "id": "pronunciation_fix4_reference_text"
     },
@@ -19019,7 +19028,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 482,
+      "community": 483,
       "norm_label": "ebites cms favicon (strapi branding)",
       "id": "ebites_cms_favicon_png"
     },
@@ -19032,7 +19041,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 483,
+      "community": 484,
       "norm_label": "file svg icon (next.js public asset)",
       "id": "clerk_nextjs_file_svg"
     },
@@ -19045,7 +19054,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 484,
+      "community": 485,
       "norm_label": "vercel logo svg (deployment platform branding)",
       "id": "clerk_nextjs_vercel_svg"
     },
@@ -19058,7 +19067,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 485,
+      "community": 486,
       "norm_label": "next.js logo svg",
       "id": "clerk_nextjs_next_svg"
     },
@@ -19071,7 +19080,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 486,
+      "community": 487,
       "norm_label": "globe svg icon (next.js public asset)",
       "id": "clerk_nextjs_globe_svg"
     },
@@ -19084,7 +19093,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 487,
+      "community": 488,
       "norm_label": "window svg icon (next.js public asset)",
       "id": "clerk_nextjs_window_svg"
     }
@@ -26978,7 +26987,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/App.tsx",
-      "source_location": "L76",
+      "source_location": "L85",
       "weight": 1.0,
       "_src": "mobile_src_app_tsx",
       "_tgt": "app_authtokeninjector",
@@ -26990,7 +26999,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/App.tsx",
-      "source_location": "L88",
+      "source_location": "L97",
       "weight": 1.0,
       "_src": "mobile_src_app_tsx",
       "_tgt": "app_appsockethandler",
@@ -27002,7 +27011,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/App.tsx",
-      "source_location": "L201",
+      "source_location": "L210",
       "weight": 1.0,
       "_src": "mobile_src_app_tsx",
       "_tgt": "app_onboardinggate",
@@ -31646,7 +31655,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L49",
+      "source_location": "L48",
       "weight": 1.0,
       "_src": "mobile_src_api_englivoclient_ts",
       "_tgt": "englivoclient_setenglivoauthtoken",
@@ -31658,7 +31667,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L57",
+      "source_location": "L56",
       "weight": 1.0,
       "_src": "mobile_src_api_englivoclient_ts",
       "_tgt": "englivoclient_setauthtokenfetcher",
@@ -31670,7 +31679,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L91",
+      "source_location": "L90",
       "weight": 1.0,
       "_src": "mobile_src_api_englivoclient_ts",
       "_tgt": "englivoclient_getsessionscount",
@@ -31682,7 +31691,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/api/englivoClient.ts",
-      "source_location": "L97",
+      "source_location": "L96",
       "weight": 1.0,
       "_src": "mobile_src_api_englivoclient_ts",
       "_tgt": "englivoclient_getupcomingsession",
@@ -31934,7 +31943,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "mobile/src/api/client.ts",
-      "source_location": "L54",
+      "source_location": "L58",
       "weight": 1.0,
       "_src": "mobile_src_api_client_ts",
       "_tgt": "client_setauthtokenfetcher",

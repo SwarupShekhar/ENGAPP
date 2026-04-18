@@ -25,7 +25,7 @@ class StreamingTutorService {
     let wsUrl: string;
 
     if (IS_PROD) {
-      wsUrl = "wss://engapp-2ai.onrender.com";
+      wsUrl = "wss://englivo-ai.onrender.com";
     } else {
       wsUrl = API_URL.replace("http", "ws");
       if (wsUrl.includes(":3000")) {

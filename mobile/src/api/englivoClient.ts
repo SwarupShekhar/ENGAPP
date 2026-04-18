@@ -2,6 +2,7 @@ import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { client as nestClient } from "./client";
+import { coerceReleaseApiOverride } from "./releaseUrlOverride";
 
 const IS_PROD = !__DEV__;
 const FORCE_LOCAL = false;
@@ -10,19 +11,19 @@ const LOCAL_IP = "192.168.1.34";
 const LOCAL_PORT = "3000";
 const isDevice = Constants.isDevice;
 
-const EXTRA_API_URL_OVERRIDE =
+const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
   (Constants.expoConfig as any)?.extra?.englivoApiUrlOverride ||
-  (Constants.manifest as any)?.extra?.englivoApiUrlOverride ||
-  null;
+    (Constants.manifest as any)?.extra?.englivoApiUrlOverride,
+  "Englivo API",
+);
 
-// Production: https://englivo.com — paths use /api/... prefix (Next.js BFF for profile, tutor, etc.)
-// Core session stats (count / upcoming) are served by Nest — see getSessionsCount / getUpcomingSession.
+// Production: Englivo AI (FastAPI on Render). Nest still serves core session APIs — see client.ts.
 export const API_URL =
   (typeof EXTRA_API_URL_OVERRIDE === "string" && EXTRA_API_URL_OVERRIDE.trim()
     ? EXTRA_API_URL_OVERRIDE.trim()
     : null) ||
   (IS_PROD
-    ? "https://englivo.com"
+    ? "https://englivo-ai.onrender.com"
     : FORCE_LOCAL
       ? `http://${LOCAL_IP}:${LOCAL_PORT}`
       : (() => {

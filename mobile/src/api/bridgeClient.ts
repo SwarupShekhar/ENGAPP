@@ -1,20 +1,23 @@
 import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import { coerceReleaseApiOverride } from "./releaseUrlOverride";
 
 const IS_PROD = !__DEV__;
 const LOCAL_IP = "192.168.1.34";
 const BRIDGE_PORT = "3012";
 const isDevice = Constants.isDevice;
 
-const EXTRA_BRIDGE_URL_OVERRIDE =
+const EXTRA_BRIDGE_URL_OVERRIDE = coerceReleaseApiOverride(
   (Constants.expoConfig as any)?.extra?.bridgeApiUrl ||
-  (Constants.manifest as any)?.extra?.bridgeApiUrl ||
-  null;
-const EXTRA_API_URL_OVERRIDE =
+    (Constants.manifest as any)?.extra?.bridgeApiUrl,
+  "Bridge API",
+);
+const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
   (Constants.expoConfig as any)?.extra?.apiUrlOverride ||
-  (Constants.manifest as any)?.extra?.apiUrlOverride ||
-  null;
+    (Constants.manifest as any)?.extra?.apiUrlOverride,
+  "Bridge API (from Nest override)",
+);
 
 const toBridgeUrlFromApi = (apiUrl: string): string => {
   const trimmed = apiUrl.replace(/\/$/, "");
@@ -31,7 +34,7 @@ const BRIDGE_API_URL =
     ? toBridgeUrlFromApi(EXTRA_API_URL_OVERRIDE.trim())
     : null) ||
   (IS_PROD
-    ? "https://bridge.engr.app"
+    ? "https://bridge-api-3m4n.onrender.com"
     : (() => {
         // iOS simulator can use localhost, but physical iOS devices cannot.
         if (Platform.OS === "ios" && isDevice === false) {
