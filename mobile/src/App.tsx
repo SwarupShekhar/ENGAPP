@@ -22,6 +22,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import Constants from "expo-constants";
+import * as Updates from "expo-updates";
 import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -276,11 +277,51 @@ function OnboardingGate() {
  * Renders content only after auth is loaded. When Clerk is still loading,
  * SignedIn/SignedOut both render nothing → blank screen. So we show a loading
  * screen until isLoaded, then render the correct branch.
+ *
+ * If `isLoaded` never flips true (bad publishable key, offline, Clerk blocked),
+ * we surface a timeout instead of spinning forever.
  */
 function AuthGate() {
   const { isLoaded, isSignedIn } = useAuth();
+  const [authStuck, setAuthStuck] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded) {
+      setAuthStuck(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      console.warn(
+        "[AuthGate] Clerk still not loaded after 20s — check EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in EAS and device network.",
+      );
+      setAuthStuck(true);
+    }, 20000);
+    return () => clearTimeout(t);
+  }, [isLoaded]);
 
   if (!isLoaded) {
+    if (authStuck) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#FF6B6B" />
+          <Text style={styles.errorText}>
+            Sign-in service is not responding. Check your internet connection.
+            {"\n\n"}
+            If you just installed this build, confirm the Clerk publishable key
+            is set in Expo (EAS) for this profile.
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => {
+              setAuthStuck(false);
+              void Updates.reloadAsync();
+            }}
+          >
+            <Text style={styles.retryText}>Reload app</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6C5CE7" />
