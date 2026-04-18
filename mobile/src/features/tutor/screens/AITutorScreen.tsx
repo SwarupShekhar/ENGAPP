@@ -676,6 +676,13 @@ export default function AITutorScreen({ navigation }: any) {
               const response = await tutorApi.streamSpeech(formData, {
                 Authorization: `Bearer ${token}`,
               });
+              if (!response.ok) {
+                const errText = await response.text().catch(() => "");
+                console.warn(
+                  `[Tutor SSE] ${response.status} ${response.statusText}`,
+                  errText.slice(0, 500),
+                );
+              }
               if (response.ok && response.body) {
                 usedSSE = true;
                 let userTranscript = "";

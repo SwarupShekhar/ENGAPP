@@ -1,7 +1,7 @@
 import axios from "axios";
-import { useAuth } from "@clerk/clerk-expo";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import { coerceReleaseApiOverride } from "./releaseUrlOverride";
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
@@ -14,12 +14,13 @@ const FORCE_LOCAL = false;
 const LOCAL_IP = "192.168.1.34";
 
 // Optional override for internal builds / device testing.
-// Configure via app.json -> expo.extra.apiUrlOverride (or EAS env that populates extra).
+// Optional override: app.config.js `extra.apiUrlOverride` via APP_API_URL_OVERRIDE (.env / EAS).
 // Example: "http://192.168.1.34:3000"
-const EXTRA_API_URL_OVERRIDE =
+const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
   (Constants.expoConfig as any)?.extra?.apiUrlOverride ||
-  (Constants.manifest as any)?.extra?.apiUrlOverride ||
-  null;
+    (Constants.manifest as any)?.extra?.apiUrlOverride,
+  "Nest API",
+);
 
 // Determine the API URL based on environment.
 // Production builds (IS_PROD=true) will ALWAYS use the production URL.
@@ -39,7 +40,12 @@ export const API_URL =
           default: `http://${LOCAL_IP}:3000`,
         }));
 
-if (__DEV__) console.log(`[API] Initializing client with URL: ${API_URL}`);
+if (__DEV__) {
+  console.log(`[API] Initializing client with URL: ${API_URL}`);
+} else {
+  // Release builds: visible in Xcode / `adb logcat` when debugging connectivity
+  console.warn(`[EngR] Nest API base URL: ${API_URL}`);
+}
 
 export const client = axios.create({
   baseURL: API_URL,
@@ -84,15 +90,24 @@ client.interceptors.request.use(
   },
 );
 
-if (__DEV__) {
-  client.interceptors.response.use(
-    (response) => {
-      console.log(`[NestJS API] ${response.config.method?.toUpperCase()} ${response.config.url} -> ${response.status}`);
-      return response;
-    },
-    (error) => {
-      console.error(`[NestJS API] Error ${error.response?.status} on ${error.config?.url}:`, error.response?.data);
-      return Promise.reject(error);
-    },
-  );
-}
+client.interceptors.response.use(
+  (response) => {
+    if (__DEV__) {
+      console.log(
+        `[NestJS API] ${response.config.method?.toUpperCase()} ${response.config.url} -> ${response.status}`,
+      );
+    }
+    return response;
+  },
+  (error) => {
+    const status = error.response?.status;
+    const path = error.config?.url ?? "";
+    const base = error.config?.baseURL ?? "";
+    const data = error.response?.data;
+    console.warn(
+      `[EngR API] ${status ?? "network"} ${base}${path}`,
+      typeof data === "object" ? JSON.stringify(data) : data ?? error.message,
+    );
+    return Promise.reject(error);
+  },
+);
