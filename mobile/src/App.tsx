@@ -9,6 +9,7 @@ import { tokenCache } from "./utils/tokenCache";
 import { setAuthTokenFetcher as setEngrTokenFetcher } from "./api/client";
 import { setAuthTokenFetcher as setEnglivoTokenFetcher } from "./api/englivoClient";
 import { setAuthTokenFetcher as setBridgeTokenFetcher } from "./api/bridgeClient";
+import { API_URL } from "./api/client";
 import { UIVariantProvider } from "./context/UIVariantContext";
 import {
   View,
@@ -76,11 +77,41 @@ const CLERK_PUBLISHABLE_KEY =
     ?.clerkPublishableKey ||
   CLERK_PUBLISHABLE_KEY_FALLBACK;
 
-if (__DEV__) {
-  console.log(
-    "[Clerk] publishable key prefix:",
-    CLERK_PUBLISHABLE_KEY?.slice(0, 14),
-  );
+/** Logcat / Xcode: Clerk does not call Render; this confirms pk baked into the build. */
+console.warn(
+  "[EngR] Clerk publishable key prefix:",
+  CLERK_PUBLISHABLE_KEY?.slice(0, 18) ?? "(missing)",
+);
+
+/**
+ * Fire-and-forget GET /health so Render logs show traffic even while Clerk is still loading.
+ */
+function StartupReachabilityProbe() {
+  useEffect(() => {
+    const base = API_URL.replace(/\/$/, "");
+    const ac = new AbortController();
+    const tid = setTimeout(() => {
+      fetch(`${base}/health`, { signal: ac.signal })
+        .then(async (r) => {
+          const text = await r.text();
+          console.warn(
+            `[EngR] Nest /health -> HTTP ${r.status} (${base})`,
+            text.slice(0, 200),
+          );
+        })
+        .catch((e: unknown) => {
+          console.warn(
+            `[EngR] Nest /health FAILED (${base}):`,
+            e instanceof Error ? e.message : e,
+          );
+        });
+    }, 2000);
+    return () => {
+      clearTimeout(tid);
+      ac.abort();
+    };
+  }, []);
+  return null;
 }
 
 function AuthTokenInjector({ children }: { children: React.ReactNode }) {
@@ -314,7 +345,9 @@ function AuthGate() {
             style={styles.retryButton}
             onPress={() => {
               setAuthStuck(false);
-              void Updates.reloadAsync();
+              void Updates.reloadAsync().catch((e) =>
+                console.warn("[EngR] reloadAsync failed:", e),
+              );
             }}
           >
             <Text style={styles.retryText}>Reload app</Text>
@@ -345,6 +378,7 @@ export default function App() {
       publishableKey={CLERK_PUBLISHABLE_KEY}
       tokenCache={tokenCache}
     >
+      <StartupReachabilityProbe />
       <AuthTokenInjector>
         <AppSocketHandler>
           <SafeAreaProvider>
