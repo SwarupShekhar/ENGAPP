@@ -40,3 +40,92 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+
+.claude/
+.cursor/
+.docs/
+.graphify/
+.omc/
+.scratch/
+.scratchpad/
+.mcp.json
+.mcp/
+.mcp-store/
+.mcp-store/
+# Vector databases & local ML storage
+ruvector.db
+*.db
+*.sqlite
+*.sqlite3
+.claude/memory.db
+.swarm/memory.db
+.code-review-graph/graph.db
+
+# --- LOGS (all environments) ---
+*.log
+*.logs
+debug*.log
+nestjs.log
+uvicorn.log
+ai.log
+nest.log
+debug.log
+error.log
+session.log
+payload.log
+*.debug.*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# --- CACHES & TEMP FILES ---
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.ruff_cache/
+.venv/
+venv/
+env/
+.venv_broken/
+.venv_new/
+
+# Node.js additional
+.npm
+.eslintcache
+.turbo
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Cursor/Claude specific
+.claude/
+.claude-flow/
+.cursor/
+.omc/
+.swarm/
+.agents/
+.graphifyignore
+.graphify-out/
+
+# Planning & generated
+.planning/
+generated/
+archive/
+# Repo-level internal Markdown lives under /docs (see root .gitignore)
+
+# iOS / EAS
+Pods/
+.eas-logs/

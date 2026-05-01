@@ -1,6 +1,19 @@
-node_modules
+node_modules/
 dist/
-# Keep environment variables out of version control
+
+# Environment
 .env
 
+# Logs & debug dumps
+*.log
+debug*.log
+debug*.txt
+db-output.txt
+
+# Prisma
 /generated/prisma
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
