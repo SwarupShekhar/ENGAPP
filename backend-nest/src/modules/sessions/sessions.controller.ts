@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Put, Param, Get, Query, UseGuards, Request } from '@nestjs/common';
+import axios from 'axios';
 import { SessionsService } from './sessions.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { TasksService } from '../tasks/tasks.service';
@@ -37,6 +38,37 @@ export class SessionsController {
     @UseGuards(ClerkGuard)
     async getUpcoming(@Request() req) {
         return this.sessionsService.getUserUpcomingSession(req.user.id);
+    }
+
+    @Post('bridge/streak')
+    @UseGuards(ClerkGuard)
+    async incrementBridgeStreak(@Request() req: { user: { clerkId: string } }) {
+        const bridgeApiUrl = process.env.BRIDGE_API_URL;
+        const internalSecret = process.env.INTERNAL_SECRET;
+        if (!bridgeApiUrl || !internalSecret) return { ok: false, reason: 'bridge not configured' };
+        await axios.patch(
+            `${bridgeApiUrl}/user/${req.user.clerkId}/streak`,
+            {},
+            { headers: { 'x-internal-secret': internalSecret } },
+        );
+        return { ok: true };
+    }
+
+    @Post('bridge/minutes')
+    @UseGuards(ClerkGuard)
+    async addBridgeMinutes(
+        @Request() req: { user: { clerkId: string } },
+        @Body() body: { minutes: number },
+    ) {
+        const bridgeApiUrl = process.env.BRIDGE_API_URL;
+        const internalSecret = process.env.INTERNAL_SECRET;
+        if (!bridgeApiUrl || !internalSecret) return { ok: false, reason: 'bridge not configured' };
+        await axios.patch(
+            `${bridgeApiUrl}/user/${req.user.clerkId}/minutes`,
+            { minutes: body.minutes },
+            { headers: { 'x-internal-secret': internalSecret } },
+        );
+        return { ok: true };
     }
 
     @Get(':id/analysis')
