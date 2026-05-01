@@ -1,67 +1,143 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import React, { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  withSpring,
+  Easing,
+} from "react-native-reanimated";
+
+const QUINT   = Easing.bezier(0.22, 1, 0.36, 1);
+const q       = (d: number) => ({ duration: d, easing: QUINT });
+const GRAVITY = { damping: 10, stiffness: 130, mass: 0.7 }; // ζ≈0.52 — underdamped, settle bounce
+const SPRING  = { damping: 16, stiffness: 120, mass: 0.8 }; // pills — more controlled
 
 interface Props {
   onFinish: () => void;
 }
 
+const CHARS = ['E', 'N', 'G', 'L', 'I', 'V', 'O'] as const;
+
 /**
  * Full-screen cold-start splash.
- * Sequence: wordmark slides up → divider expands → pills fade in → hold → screen fades out
- * Total: ~1.4s
+ * Entrance: each letter of ENGLIVO falls from above with a gravity spring (22ms stagger).
+ * Divider expands, pills slide in from sides.
+ * Exit: "dive" — screen scales up + fades.
+ * Total: ~1520ms
  */
 export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
-  const logoY        = useRef(new Animated.Value(12)).current;
-  const logoOpacity  = useRef(new Animated.Value(0)).current;
-  const lineWidth    = useRef(new Animated.Value(0)).current;
-  const pillsOpacity = useRef(new Animated.Value(0)).current;
-  const screenOpacity = useRef(new Animated.Value(1)).current;
+  // Per-character shared values — hooks cannot be called in loops, declared individually
+  const y0 = useSharedValue(-50); const o0 = useSharedValue(0);
+  const y1 = useSharedValue(-50); const o1 = useSharedValue(0);
+  const y2 = useSharedValue(-50); const o2 = useSharedValue(0);
+  const y3 = useSharedValue(-50); const o3 = useSharedValue(0);
+  const y4 = useSharedValue(-50); const o4 = useSharedValue(0);
+  const y5 = useSharedValue(-50); const o5 = useSharedValue(0);
+  const y6 = useSharedValue(-50); const o6 = useSharedValue(0);
+
+  const dividerOpacity = useSharedValue(0);
+  const dividerScale   = useSharedValue(0);
+  const pulseX         = useSharedValue(-25);
+  const pulseOpacity   = useSharedValue(0);
+  const coreX          = useSharedValue(25);
+  const coreOpacity    = useSharedValue(0);
+  const screenOpacity  = useSharedValue(1);
+  const screenScale    = useSharedValue(1);
 
   useEffect(() => {
-    Animated.sequence([
-      // 1. Wordmark slides up + fades in (600ms)
-      Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(logoY,       { toValue: 0, duration: 600, useNativeDriver: true }),
-      ]),
-      // 2. Divider expands (400ms) — useNativeDriver:false required for width
-      Animated.timing(lineWidth, { toValue: 140, duration: 400, useNativeDriver: false }),
-      // 3. Pills fade in (350ms)
-      Animated.timing(pillsOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-      // 4. Hold (350ms)
-      Animated.delay(350),
-      // 5. Screen fades out (300ms)
-      Animated.timing(screenOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-    ]).start(() => onFinish());
+    const charY = [y0, y1, y2, y3, y4, y5, y6];
+    const charO = [o0, o1, o2, o3, o4, o5, o6];
+
+    // Phase 1: each character falls from y=-50 with gravity spring, 22ms stagger
+    // Fast opacity (80ms) so the fall arc is visible, not just the landing
+    charY.forEach((sv, i) => { sv.value = withDelay(i * 22, withSpring(0, GRAVITY)); });
+    charO.forEach((sv, i) => { sv.value = withDelay(i * 22, withTiming(1, q(80))); });
+
+    // Phase 2: divider expands (t=420, overlaps tail of character falls)
+    dividerOpacity.value = withDelay(420, withTiming(1, q(320)));
+    dividerScale.value   = withDelay(420, withTiming(1, q(360)));
+
+    // Phase 3: PULSE from left, CORE from right, 70ms stagger (t=570 / t=640)
+    pulseOpacity.value = withDelay(570, withTiming(1, q(340)));
+    pulseX.value       = withDelay(570, withSpring(0, SPRING));
+    coreOpacity.value  = withDelay(640, withTiming(1, q(340)));
+    coreX.value        = withDelay(640, withSpring(0, SPRING));
+
+    // Phase 4: dive exit at t=1100
+    const exitTimer = setTimeout(() => {
+      screenScale.value    = withTiming(1.05, q(380));
+      screenOpacity.value  = withDelay(100, withTiming(0, q(280)));
+      charO.forEach(sv => { sv.value = withTiming(0, q(200)); });
+      dividerOpacity.value = withTiming(0, q(180));
+      pulseOpacity.value   = withTiming(0, q(180));
+      coreOpacity.value    = withTiming(0, q(180));
+    }, 1100);
+
+    const doneTimer = setTimeout(() => onFinish(), 1520);
+
+    return () => {
+      clearTimeout(exitTimer);
+      clearTimeout(doneTimer);
+    };
   }, []);
 
+  // Animated style per character
+  const cs0 = useAnimatedStyle(() => ({ opacity: o0.value, transform: [{ translateY: y0.value }] }));
+  const cs1 = useAnimatedStyle(() => ({ opacity: o1.value, transform: [{ translateY: y1.value }] }));
+  const cs2 = useAnimatedStyle(() => ({ opacity: o2.value, transform: [{ translateY: y2.value }] }));
+  const cs3 = useAnimatedStyle(() => ({ opacity: o3.value, transform: [{ translateY: y3.value }] }));
+  const cs4 = useAnimatedStyle(() => ({ opacity: o4.value, transform: [{ translateY: y4.value }] }));
+  const cs5 = useAnimatedStyle(() => ({ opacity: o5.value, transform: [{ translateY: y5.value }] }));
+  const cs6 = useAnimatedStyle(() => ({ opacity: o6.value, transform: [{ translateY: y6.value }] }));
+  const charStyles = [cs0, cs1, cs2, cs3, cs4, cs5, cs6];
+
+  const dividerStyle = useAnimatedStyle(() => ({
+    opacity: dividerOpacity.value,
+    transform: [{ scaleX: dividerScale.value }],
+  }));
+  const pulseStyle   = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+    transform: [{ translateX: pulseX.value }],
+  }));
+  const coreStyle    = useAnimatedStyle(() => ({
+    opacity: coreOpacity.value,
+    transform: [{ translateX: coreX.value }],
+  }));
+  const dotStyle     = useAnimatedStyle(() => ({ opacity: dividerOpacity.value }));
+  const screenStyle  = useAnimatedStyle(() => ({
+    opacity: screenOpacity.value,
+    transform: [{ scale: screenScale.value }],
+  }));
+
   return (
-    <Animated.View style={[s.screen, { opacity: screenOpacity }]}>
-      {/* Wordmark */}
-      <Animated.View
-        style={[
-          s.wordmarkRow,
-          { opacity: logoOpacity, transform: [{ translateY: logoY }] },
-        ]}
-      >
-        <Text style={s.wordmarkWhite}>ENGLI</Text>
-        <Text style={s.wordmarkViolet}>VO</Text>
-      </Animated.View>
+    <Reanimated.View style={[s.screen, screenStyle]}>
+      {/* Wordmark — each character falls independently */}
+      <View style={s.wordmarkRow}>
+        {CHARS.map((char, i) => (
+          <Reanimated.View key={i} style={charStyles[i]}>
+            <Text style={i < 5 ? s.charWhite : s.charViolet}>{char}</Text>
+          </Reanimated.View>
+        ))}
+      </View>
 
       {/* Divider */}
-      <Animated.View style={[s.divider, { width: lineWidth }]} />
+      <Reanimated.View style={[s.divider, dividerStyle]} />
 
-      {/* Pills row */}
-      <Animated.View style={[s.pillsRow, { opacity: pillsOpacity }]}>
-        <View style={s.pillPulse}>
+      {/* Mode pills */}
+      <View style={s.pillsRow}>
+        <Reanimated.View style={[s.pillPulse, pulseStyle]}>
           <Text style={[s.pillText, { color: "#9D93D8" }]}>PULSE</Text>
-        </View>
-        <View style={s.dot} />
-        <View style={s.pillCore}>
-          <Text style={[s.pillText, { color: "#D29E3C" }]}>CORE</Text>
-        </View>
-      </Animated.View>
-    </Animated.View>
+        </Reanimated.View>
+        <Reanimated.View style={dotStyle}>
+          <View style={s.dot} />
+        </Reanimated.View>
+        <Reanimated.View style={[s.pillCore, coreStyle]}>
+          <Text style={[s.pillText, { color: "#C9923A" }]}>CORE</Text>
+        </Reanimated.View>
+      </View>
+    </Reanimated.View>
   );
 };
 
@@ -75,24 +151,25 @@ const s = StyleSheet.create({
   },
   wordmarkRow: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     marginBottom: 14,
   },
-  wordmarkWhite: {
+  charWhite: {
     fontSize: 48,
     fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: 8,
   },
-  wordmarkViolet: {
+  charViolet: {
     fontSize: 48,
     fontWeight: "700",
-    color: "#7B6FCC",
+    color: "#818CF8",
     letterSpacing: 8,
   },
   divider: {
+    width: 140,
     height: 1.5,
-    backgroundColor: "#7B6FCC",
+    backgroundColor: "rgba(129,140,248,0.45)",
     marginBottom: 18,
   },
   pillsRow: {
@@ -102,14 +179,14 @@ const s = StyleSheet.create({
   },
   pillPulse: {
     borderWidth: 1,
-    borderColor: "rgba(123,111,204,0.6)",
+    borderColor: "rgba(129,140,248,0.5)",
     borderRadius: 99,
     paddingHorizontal: 14,
     paddingVertical: 5,
   },
   pillCore: {
     borderWidth: 1,
-    borderColor: "rgba(210,158,60,0.5)",
+    borderColor: "rgba(201,146,58,0.45)",
     borderRadius: 99,
     paddingHorizontal: 14,
     paddingVertical: 5,
@@ -123,6 +200,6 @@ const s = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
 });

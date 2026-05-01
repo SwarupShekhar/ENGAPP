@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import { BrainService } from '../brain/brain.service';
 import { WeaknessService } from '../reels/weakness.service';
 
@@ -6,9 +7,41 @@ export type FlaggedPronunciationError = {
   spoken: string;
   correct: string;
   rule_category: string;
-  reel_id: string;
+  reel_id?: string | null;
   confidence: number;
 };
+
+/** Human-readable tip for pronunciation issues (rule_category from detector). */
+function formatPronunciationSuggestion(
+  ruleCategory: string,
+  correctWord?: string,
+): string {
+  const tips: Record<string, string> = {
+    w_to_v: 'Practice "w" vs "v" (e.g. "wine" vs "vine")',
+    v_to_w_reversal: 'Practice "v" vs "w" (e.g. "very" vs "wery")',
+    th_to_t: 'Practice "th" /θ/ vs "t" (e.g. "think" vs "tink")',
+    th_to_d: 'Practice "th" /ð/ vs "d" (e.g. "the" vs "de")',
+    zh_to_j: 'Practice "s" in "vision" vs "j" sound',
+    z_to_j: 'Practice "z" vs "j" in words like "measure"',
+    h_dropping: 'Pronounce the "h" at the start of words',
+    r_rolling: 'Soften "r" — avoid rolling or heavy "r"',
+    ae_to_e: 'Practice /æ/ vs /e/ (e.g. "cat" vs "ket")',
+    i_to_ee: 'Practice short "i" vs long "ee"',
+    o_to_aa: 'Practice vowel in "go" vs "got"',
+    general_mispronunciation: `Practice pronouncing "${correctWord}" more clearly`,
+  };
+  return (
+    tips[ruleCategory] ||
+    `Practice "${correctWord || ruleCategory.replace(/_/g, ' ')}"`
+  );
+}
+
+function severityForConfidence(confidence?: number): 'high' | 'medium' | 'low' {
+  if (confidence == null) return 'medium';
+  if (confidence < 40) return 'high';
+  if (confidence < 65) return 'medium';
+  return 'low';
+}
 
 /**
  * Bridge: backend-ai pronunciation assess → WeaknessService (same pipeline as grammar).
@@ -21,6 +54,7 @@ export class PronunciationService {
   constructor(
     private readonly brain: BrainService,
     private readonly weakness: WeaknessService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -51,6 +85,40 @@ export class PronunciationService {
       `processFlaggedErrors userId=${userId} count=${flaggedErrors.length}`,
     );
     return flaggedErrors;
+  }
+
+  async savePronunciationIssues(
+    analysisId: string,
+    flaggedErrors: FlaggedPronunciationError[],
+  ): Promise<number> {
+    await this.prisma.pronunciationIssue.deleteMany({
+      where: { analysisId },
+    });
+
+    const data = (flaggedErrors || [])
+      .filter((err) => err?.spoken && err?.correct)
+      .map((err) => ({
+        analysisId,
+        word: err.spoken,
+        spoken: err.spoken,
+        correct: err.correct,
+        ruleCategory: err.rule_category,
+        reelId: err.reel_id || null,
+        issueType: err.rule_category,
+        severity: severityForConfidence(err.confidence),
+        confidence: err.confidence,
+        suggestion: formatPronunciationSuggestion(
+          err.rule_category,
+          err.correct,
+        ),
+      }));
+
+    if (data.length === 0) {
+      return 0;
+    }
+
+    const result = await this.prisma.pronunciationIssue.createMany({ data });
+    return result.count;
   }
 
   /**

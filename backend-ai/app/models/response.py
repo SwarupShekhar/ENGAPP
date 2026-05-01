@@ -29,6 +29,11 @@ class TranscriptionResponse(BaseModel):
     words: List[Word]
     duration: float
     processing_time: float
+    # Optional conversational transcript from a secondary provider (e.g. Deepgram).
+    # `text` remains the Azure transcript used for pronunciation-aligned flows.
+    secondary_text: Optional[str] = None
+    secondary_provider: Optional[str] = None
+    secondary_confidence: Optional[float] = None
 
     def to_dict(self):
         return self.model_dump()
@@ -189,3 +194,7 @@ class HinglishSTTWithIntentResponse(BaseModel):
     is_command: bool = False
     matched_keyword: Optional[str] = None
     phonetic_insights: Optional[Dict[str, Any]] = None
+    # Optional secondary transcript (e.g. Deepgram) for UI; `text` stays Azure for PA.
+    display_text: Optional[str] = None
+    display_provider: Optional[str] = None
+    display_confidence: Optional[float] = None

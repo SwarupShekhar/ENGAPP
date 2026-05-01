@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { API_URL } from "../../../api/client";
 
 export interface StreamChunk {
@@ -19,17 +20,25 @@ class StreamingTutorService {
     if (this.ws) {
       this.ws.close();
     }
-    // In production, connect to the deployed AI backend directly
-    // In dev, swap port 3000 → 8001 on the local URL
     const IS_PROD = !__DEV__;
     let wsUrl: string;
 
-    if (IS_PROD) {
+    // Explicit override wins (set via ENGLIVO_WS_URL_OVERRIDE in .env.local for internal builds)
+    const wsOverride = ((Constants.expoConfig as any)?.extra?.englivoWsUrlOverride as string | undefined)?.trim();
+    if (wsOverride) {
+      wsUrl = wsOverride;
+    } else if (IS_PROD) {
       wsUrl = "wss://englivo-ai.onrender.com";
     } else {
-      wsUrl = API_URL.replace("http", "ws");
-      if (wsUrl.includes(":3000")) {
-        wsUrl = wsUrl.replace(":3000", ":8001");
+      // Dev: derive from API_URL host, backend-ai on 8001
+      try {
+        const base = API_URL.replace(/\/$/, "");
+        const u = new URL(base.startsWith("http") ? base : `http://${base}`);
+        const host = u.hostname;
+        const wsScheme = u.protocol === "https:" ? "wss" : "ws";
+        wsUrl = `${wsScheme}://${host}:8001`;
+      } catch {
+        wsUrl = API_URL.replace("http", "ws").replace(":3000", ":8001");
       }
     }
 

@@ -19,8 +19,33 @@ from app.features.pronunciation.pronunciation_scorer import calculate_pronunciat
 logger = logging.getLogger(__name__)
 
 
+def _extract_words(azure_result: dict[str, Any]) -> list[dict]:
+    """Extract the flattened word list from the various Azure/NBest shapes."""
+    words: list[dict] = []
+    nbests = azure_result.get("NBest") or azure_result.get("Nbests") or azure_result.get("nbest")
+    if nbests and isinstance(nbests, list) and len(nbests) > 0:
+        first = nbests[0]
+        words = first.get("Words") or first.get("words") or []
+    elif "Words" in azure_result:
+        words = azure_result["Words"]
+    elif "words" in azure_result:
+        words = azure_result["words"]
+    return words or []
+
+
 def _compute_word_accuracy_average(azure_result: dict[str, Any]) -> float:
-    """Average of all word-level AccuracyScore values from the Azure PA result. Default 100 if none."""
+    """Average of all word-level AccuracyScore values from the Azure PA result. Returns 0 if none."""
+    words = _extract_words(azure_result)
+    if not words:
+        return 0.0
+    total = 0.0
+    count = 0
+    for w in words:
+        acc = w.get("AccuracyScore") or (w.get("PronunciationAssessment") or {}).get("AccuracyScore")
+        if acc is not None:
+            total += float(acc)
+            count += 1
+    return total / count if count else 0.0
     words: list[dict] = []
     nbests = azure_result.get("NBest") or azure_result.get("Nbests") or azure_result.get("nbest")
     if nbests and isinstance(nbests, list) and len(nbests) > 0:
@@ -75,7 +100,7 @@ def _run_continuous_pa_sync(
     import threading
 
     speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
-    speech_config.speech_recognition_language = "en-US"
+    speech_config.speech_recognition_language = "en-IN"
 
     audio_config = speechsdk.audio.AudioConfig(filename=audio_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
@@ -263,6 +288,9 @@ async def assess_pronunciation(
         except Exception as e:
             raise HTTPException(400, f"Invalid azure_result JSON: {e}")
         raw = data.get("azure_result") or data
+        # Reject if no words recognized to avoid inflated scores on silence
+        if len(_extract_words(raw)) == 0:
+            raise HTTPException(400, "No speech detected in azure_result; please retry with mic unmuted.")
         errors = detect_from_azure_result(raw)
         azure_avg = _compute_word_accuracy_average(raw)
         fluency = raw.get("fluency_score")
@@ -375,6 +403,10 @@ async def assess_pronunciation(
             azure_avg = _compute_word_accuracy_average(pass_2_result)
             fluency = pass_2_result.get("fluency_score")
             prosody = pass_2_result.get("prosody_score")
+            word_count = len(_extract_words(pass_2_result))
+            if word_count == 0:
+                logger.error("Azure PA returned 0 words (silence) — rejecting request")
+                raise HTTPException(400, "No speech detected; please retry with mic unmuted.")
             score_result = calculate_pronunciation_score(
                 errors,
                 azure_avg,

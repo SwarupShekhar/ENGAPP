@@ -51,6 +51,7 @@ import { getSessionsCount, getUpcomingSession } from "../../../api/englivoClient
 import { joinSession, getInstantTutorToken } from "../../../api/englivoApi";
 import { ModeSwitcher } from "../../../components/navigation/ModeSwitcher";
 import { ENGLIVO_AI_TUTOR_TITLE } from "../constants";
+import { useClerk } from "@clerk/clerk-expo";
 
 const { width } = Dimensions.get("window");
 
@@ -297,6 +298,7 @@ function SectionHead({ title, action, onAction }: { title: string; action?: stri
 export default function EnglivoHomeScreenV2() {
   const navigation = useNavigation<any>();
   const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
   const theme = useAppTheme();
 
   const [loading, setLoading] = useState(true);
@@ -312,9 +314,11 @@ export default function EnglivoHomeScreenV2() {
   const [credits, setCredits] = useState<number | null>(null);
   const [sessionsCount, setSessionsCount] = useState(0);
   const [upcomingSession, setUpcomingSession] = useState<any | null>(null);
+  const [authError, setAuthError] = useState(false);
 
   const load = async () => {
     try {
+      setAuthError(false);
       const [me] = await Promise.all([getMe()]);
       setFirstName(me?.firstName ?? clerkUser?.firstName ?? "");
       if (me?.totalMinutes) setTotalMinutes(me.totalMinutes);
@@ -332,6 +336,10 @@ export default function EnglivoHomeScreenV2() {
 
       try { setSessionsCount(await getSessionsCount()); } catch { /* silent */ }
       try { setUpcomingSession(await getUpcomingSession()); } catch { /* silent */ }
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        setAuthError(true);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -382,6 +390,25 @@ export default function EnglivoHomeScreenV2() {
       setCallingNow(false);
     }
   };
+
+  if (authError) {
+    return (
+      <SafeAreaView style={[s.root, { justifyContent: "center", alignItems: "center", padding: 32 }]}>
+        <Text style={{ color: C.goldMid, fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 12 }}>
+          Session Expired
+        </Text>
+        <Text style={{ color: C.ash, fontSize: 14, textAlign: "center", marginBottom: 32, lineHeight: 22 }}>
+          Your Englivo session could not be verified. This usually means your sign-in token is from a different account.{"\n\n"}Sign out and sign back in with your Englivo account.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: C.goldMid, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 10 }}
+          onPress={() => signOut()}
+        >
+          <Text style={{ color: C.void, fontWeight: "800", fontSize: 15 }}>Sign Out & Re-authenticate</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.root}>

@@ -5,10 +5,12 @@ import { client as nestClient } from "./client";
 import { coerceReleaseApiOverride } from "./releaseUrlOverride";
 
 const IS_PROD = !__DEV__;
+// Set to true only when you intentionally run backend-ai locally with matching routes.
 const FORCE_LOCAL = false;
 
 const LOCAL_IP = "192.168.1.34";
-const LOCAL_PORT = "3000";
+/** backend-ai (FastAPI) local port — not Nest (3000/3002). */
+const LOCAL_PORT = "8001";
 const isDevice = Constants.isDevice;
 
 const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
@@ -18,19 +20,22 @@ const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
 );
 
 // Production: Englivo AI (FastAPI on Render). Nest still serves core session APIs — see client.ts.
+// Default in dev now points to production to avoid missing local routes.
 export const API_URL =
   (typeof EXTRA_API_URL_OVERRIDE === "string" && EXTRA_API_URL_OVERRIDE.trim()
     ? EXTRA_API_URL_OVERRIDE.trim()
     : null) ||
-  (IS_PROD
-    ? "https://englivo-ai.onrender.com"
-    : FORCE_LOCAL
-      ? `http://${LOCAL_IP}:${LOCAL_PORT}`
-      : (() => {
-          if (Platform.OS === "ios") return "http://localhost:3000";
-          if (isDevice === false) return "http://10.0.2.2:3000";
-          return `http://${LOCAL_IP}:${LOCAL_PORT}`;
-        })());
+  (IS_PROD || !FORCE_LOCAL
+    ? "https://englivo.com"
+    : (() => {
+        if (Platform.OS === "ios") {
+          return isDevice === false
+            ? `http://localhost:${LOCAL_PORT}`
+            : `http://${LOCAL_IP}:${LOCAL_PORT}`;
+        }
+        if (isDevice === false) return `http://10.0.2.2:${LOCAL_PORT}`;
+        return `http://${LOCAL_IP}:${LOCAL_PORT}`;
+      })());
 
 if (__DEV__) console.log("[Englivo API] Resolved URL:", API_URL);
 
@@ -54,10 +59,23 @@ export const setEnglivoAuthToken = (token: string | null) => {
 // ── Auth pattern 2: async fetcher (preferred — always gets a fresh token) ──────
 // App.tsx wires this via AuthTokenInjector on startup.
 let getToken: (() => Promise<string | null>) | null = null;
+let _loggedJwtIss = false;
 
 export const setAuthTokenFetcher = (fetcher: () => Promise<string | null>) => {
   getToken = fetcher;
 };
+
+// Decode JWT payload without verification — used only for diagnostic logging.
+function _jwtIss(token: string): string | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return decoded.iss ?? null;
+  } catch {
+    return null;
+  }
+}
 
 client.interceptors.request.use(
   async (config) => {
@@ -66,9 +84,21 @@ client.interceptors.request.use(
         const token = await getToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          // One-time diagnostic: log which Clerk instance issued this token
+          if (!_loggedJwtIss) {
+            _loggedJwtIss = true;
+            const iss = _jwtIss(token);
+            console.log(`[Englivo API] JWT issuer (iss): ${iss ?? '(unknown)'}`);
+            if (iss && !iss.includes('englivo')) {
+              console.warn(
+                `[Englivo API] ⚠️ Token is from "${iss}" — NOT the englivo.com Clerk instance. ` +
+                'Sign out and sign in again to get a fresh token from clerk.englivo.com.',
+              );
+            }
+          }
         } else {
           console.warn(
-            `[Englivo API] getToken returned null for URL: ${config.url}`,
+            `[Englivo API] getToken returned null for URL: ${config.url} — user not signed in`,
           );
         }
       } catch (e) {
@@ -78,7 +108,6 @@ client.interceptors.request.use(
         );
       }
     } else if (_authToken) {
-      // Fallback to static token if fetcher not configured yet
       config.headers.Authorization = `Bearer ${_authToken}`;
     } else {
       console.warn(`[Englivo API] No token configured yet! URL: ${config.url}`);
@@ -114,10 +143,41 @@ if (__DEV__) {
       return response;
     },
     (error) => {
-      console.error(
-        `[Englivo API] Error ${error.response?.status} on ${error.config?.url}:`,
-        error.response?.data,
-      );
+      const status = error?.response?.status;
+      const url = String(error?.config?.url ?? "");
+      const data = error?.response?.data;
+      // Local backend-ai does not currently expose some Core endpoints.
+      // Keep these as warnings so RN dev overlay does not block debugging.
+      if (status === 401) {
+        _loggedJwtIss = false; // allow re-logging on next request after auth change
+        console.error(
+          `[Englivo API] 401 on ${url} — Clerk token rejected by englivo.com.`,
+          '\n  Check: (1) JWT iss log above matches clerk.englivo.com',
+          '\n         (2) "engr:///" added to Clerk Dashboard → Native Applications',
+          '\n         (3) Sign out + sign back in to refresh the session',
+          data,
+        );
+      } else if (
+        status === 404 &&
+        (url.includes("/api/me") || url.includes("/api/livekit/token"))
+      ) {
+        console.warn(
+          `[Englivo API] 404 on ${url} (route not available on local backend-ai)`,
+          data,
+        );
+      } else if (status === 500 || status === 502 || status === 503) {
+        // Server-side errors — screens fall back to empty state, so use warn
+        // to avoid triggering the RN dev red-box overlay.
+        console.warn(
+          `[Englivo API] ${status} on ${url} (server error — screen falls back gracefully):`,
+          typeof data === 'object' ? JSON.stringify(data) : data,
+        );
+      } else {
+        console.error(
+          `[Englivo API] Error ${status} on ${url}:`,
+          data,
+        );
+      }
       return Promise.reject(error);
     },
   );

@@ -75,7 +75,7 @@ export class RealtimeAudioGateway implements OnGatewayConnection, OnGatewayDisco
         @ConnectedSocket() client: Socket,
         @MessageBody() payload: { userId: string; sessionId: string; language?: string }
     ) {
-        const { userId, sessionId, language = 'en-US' } = payload;
+        const { userId, sessionId, language = 'en-IN' } = payload;
 
         this.logger.log(`Starting audio stream for user ${userId} in session ${sessionId}`);
 

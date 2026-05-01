@@ -70,3 +70,12 @@ export async function fetchFullFeedbackNarration(
   );
   return res.data;
 }
+
+export async function fetchErrorSpeak(text: string): Promise<FeedbackNarrationResponse> {
+  const res = await client.post<FeedbackNarrationResponse>(
+    '/api/tts/speak',
+    { text },
+    { timeout: 10000 },
+  );
+  return res.data;
+}

@@ -16,10 +16,10 @@ from app.phoneme_loader import get_phoneme_map, get_reel_map
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ACCURACY_THRESHOLD = 70  # Raised: Azure is lenient with Indian accents, need higher bar to catch real errors
-FUNCTION_WORD_THRESHOLD = 75     # Higher bar for function words (the/this/that) — common th_to_d errors
-PHONEME_BAD_THRESHOLD = 65       # Flag if any Indian English error phoneme scores below this
-FALSE_POSITIVE_SUPPRESSION = 80  # Only suppress if word accuracy >= this AND not in our phoneme map
+DEFAULT_ACCURACY_THRESHOLD = 78  # Stricter default for better mispronunciation recall.
+FUNCTION_WORD_THRESHOLD = 84     # Function words (the/this/that) need tighter scoring.
+PHONEME_BAD_THRESHOLD = 72       # Catch weaker phoneme realizations earlier.
+FALSE_POSITIVE_SUPPRESSION = 95  # Suppress only when confidence is very high.
 # Layer 2: max phoneme edit distance (CMU or aligned IPA) to call it a substitution
 PHONEME_SUBSTITUTION_MAX_DISTANCE = 3
 
@@ -401,6 +401,21 @@ def _normalize(s: str) -> str:
     return (s or "").strip().lower()
 
 
+def _extract_phoneme_score(phoneme: dict[str, Any]) -> float:
+    """Extract a phoneme score while preserving zero-valued scores."""
+    p_pa = phoneme.get("PronunciationAssessment", {})
+    p_pa_score = p_pa.get("AccuracyScore")
+    if p_pa_score is not None:
+        return float(p_pa_score)
+    p_score = phoneme.get("AccuracyScore")
+    if p_score is not None:
+        return float(p_score)
+    p_score = phoneme.get("Score")
+    if p_score is not None:
+        return float(p_score)
+    return 100.0
+
+
 def detect_from_azure_result(
     azure_result: dict[str, Any],
     *,
@@ -489,21 +504,11 @@ def detect_from_azure_result(
         min_phoneme_score = 100.0
         worst_phoneme_name = ""
         for p in phonemes:
-            p_pa = p.get("PronunciationAssessment", {})
-            # Explicitly check for None to preserve 0 scores
-            p_pa_score = p_pa.get("AccuracyScore")
-            if p_pa_score is not None:
-                p_score = p_pa_score
-            else:
-                p_score = p.get("AccuracyScore")
-                if p_score is None:
-                    p_score = p.get("Score")
+            p_score = _extract_phoneme_score(p)
             p_name = _normalize(p.get("Phoneme") or p.get("phoneme") or "")
-            if p_score is not None:
-                score_f = float(p_score)
-                if score_f < min_phoneme_score:
-                    min_phoneme_score = score_f
-                    worst_phoneme_name = p_name
+            if p_score < min_phoneme_score:
+                min_phoneme_score = p_score
+                worst_phoneme_name = p_name
 
         # ----------------------------------------------------------------
         # STEP 1: Check if Azure returned the spoken approximation directly
@@ -515,7 +520,13 @@ def detect_from_azure_result(
             # Case 1: Word is in reference text — person likely said it correctly
             # Only skip if high confidence AND high phoneme scores
             if reference_words and word_lower in reference_words:
-                if accuracy >= 80 and min_phoneme_score >= 65:
+                if accuracy >= 90 and min_phoneme_score >= 75:
+                    logger.info(
+                        "Suppressed approx-word flag for '%s' (reference hit, accuracy=%.1f, min_phoneme=%.1f)",
+                        word_lower,
+                        accuracy,
+                        min_phoneme_score,
+                    )
                     continue  # Said correctly, skip
             # Case 2: Word is NOT in reference text — Azure returned the approximation form
             # This is a genuine mispronunciation (e.g. "bijan" when "vision" was expected)
@@ -560,17 +571,22 @@ def detect_from_azure_result(
             # A specific Indian English error phoneme scored below our threshold
             is_bad = True
             logger.info(f"Low phoneme score: {min_phoneme_score:.1f} for phoneme '{worst_phoneme_name}' in word '{word_lower}'")
-        elif accuracy < 85 and phonemes:
-            # Layer 5: Even if word accuracy looks OK (70-84), check if multiple phonemes
-            # are weak — this catches Indian accent softening that Azure doesn't hard-flag
+        elif accuracy < 90 and phonemes:
+            # Layer 5: Even if word accuracy looks "acceptable", still catch weak
+            # Indian-English-sensitive phonemes that Azure may not hard-flag.
             weak_phoneme_count = sum(
                 1 for p in phonemes
-                if (p.get("PronunciationAssessment", {}).get("AccuracyScore") or p.get("AccuracyScore") or 100) < 70
+                if _extract_phoneme_score(p) < 75
                 and _normalize(p.get("Phoneme") or p.get("phoneme") or "") in INDIAN_ENGLISH_ERROR_PHONEMES
             )
-            if weak_phoneme_count >= 2:
+            if weak_phoneme_count >= 1:
                 is_bad = True
-                logger.info(f"Layer 5 multi-phoneme weak: {weak_phoneme_count} weak phonemes in '{word_lower}' (word accuracy={accuracy:.1f})")
+                logger.info(
+                    "Layer 5 weak phoneme trigger: %d weak phoneme(s) in '%s' (word accuracy=%.1f)",
+                    weak_phoneme_count,
+                    word_lower,
+                    accuracy,
+                )
 
         if not is_bad:
             continue
@@ -610,9 +626,20 @@ def detect_from_azure_result(
         # If accuracy is high AND no ErrorType AND the word is not in our
         # by_correct map at all — it's likely noise (consonant cluster, etc.)
         # ----------------------------------------------------------------
-        if accuracy >= FALSE_POSITIVE_SUPPRESSION and (error_type in ("None", "", "none") or not error_type):
+        if (
+            accuracy >= FALSE_POSITIVE_SUPPRESSION
+            and min_phoneme_score >= 85
+            and (error_type in ("None", "", "none") or not error_type)
+        ):
             if word_lower not in by_correct:
                 # Not a word we track and high confidence — suppress
+                logger.info(
+                    "Suppressed potential false positive for '%s' (accuracy=%.1f, min_phoneme=%.1f, errorType=%s)",
+                    word_lower,
+                    accuracy,
+                    min_phoneme_score,
+                    error_type or "None",
+                )
                 continue
 
         # ----------------------------------------------------------------

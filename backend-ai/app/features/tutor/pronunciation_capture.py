@@ -12,6 +12,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from app.phoneme_loader import get_phoneme_map
+from app.features.pronunciation.pronunciation_detector import PHONEME_BAD_THRESHOLD
 
 _PRON_TAG = re.compile(
     r'\[PRON:\s*heard="([^"]+)"\s+correct="([^"]+)"\s+rule="([^"]*)"\s*\]',
@@ -24,6 +25,7 @@ _LOCK = Lock()
 _SESSION_PRONUNCIATION_ISSUES: dict[str, list[dict[str, Any]]] = {}
 
 _SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
+_EXPLICIT_FEEDBACK_CONFIDENCE = 0.75
 
 
 def append_pronunciation_issues(session_id: str, items: list[dict[str, Any]]) -> None:
@@ -63,7 +65,34 @@ def _severity_from_confidence(conf: float) -> str:
 
 def _default_suggestion(rule_category: str, correct: str, heard: str) -> str:
     rc = (rule_category or "general").replace("_", " ")
+    if not heard or heard.lower() == correct.lower():
+        return f"Practice '{correct}' — focus on clear pronunciation ({rc})."
     return f"Practice '{correct}' (heard as '{heard}') — pattern: {rc}."
+
+
+def _compose_feedback_suggestion(
+    *,
+    correct: str,
+    heard: str,
+    rule_category: str,
+    confidence: float,
+    base_tip: str = "",
+) -> str:
+    """
+    Build a TTS-friendly correction line.
+
+    For high-confidence substitutions, prefer explicit phrasing:
+    "You said 'pepul' instead of 'people'."
+    """
+    c = (correct or "").strip()
+    h = (heard or "").strip()
+    tip = (base_tip or "").strip()
+    if h and c and h.lower() != c.lower() and confidence >= _EXPLICIT_FEEDBACK_CONFIDENCE:
+        prefix = f"You said '{h}' instead of '{c}'."
+        return f"{prefix} {tip}".strip() if tip else prefix
+    if tip:
+        return tip
+    return _default_suggestion(rule_category, c or h or "word", h or c or "word")
 
 
 def strip_pron_tags_for_mobile(text: str) -> str:
@@ -99,16 +128,22 @@ def extract_structured_tags(gemini_response: str) -> tuple[list[dict[str, Any]],
             continue
         entry = by_app.get(heard) if isinstance(by_app.get(heard), dict) else {}
         tip = entry.get("tip") if isinstance(entry, dict) else None
-        if not tip:
-            tip = f"Practice '{correct}' — avoid saying '{heard}'."
+        conf = 0.92
+        suggestion = _compose_feedback_suggestion(
+            correct=correct,
+            heard=heard,
+            rule_category=rule,
+            confidence=conf,
+            base_tip=str(tip or ""),
+        )
         out.append(
             {
                 "word": correct,
                 "heard": heard,
                 "issueType": "mispronunciation",
                 "severity": "medium",
-                "suggestion": str(tip),
-                "confidence": 0.92,
+                "suggestion": suggestion,
+                "confidence": conf,
                 "rule_category": rule,
             }
         )
@@ -138,8 +173,9 @@ def issues_from_phonetic_context(
     indian_english_patterns may supply ``detected_as`` as the mispronounced form.
 
     Also handles the free-speech phonetic_context shape: a ``words`` list of raw Azure
-    word entries with AccuracyScore / ErrorType / Phonemes. Any word with AccuracyScore < 70
-    or an explicit Mispronunciation/Insertion/Omission ErrorType is flagged, and the phoneme
+    word entries with AccuracyScore / ErrorType / Phonemes. Any word with AccuracyScore below
+    ``PHONEME_BAD_THRESHOLD`` (Azure PA phoneme layer) or an explicit
+    Mispronunciation/Insertion/Omission ErrorType is flagged, and the phoneme
     breakdown is included so the feedback UI can show which phoneme was wrong.
     """
     if not phonetic_context:
@@ -168,27 +204,31 @@ def issues_from_phonetic_context(
         heard_l = str(approx).lower().strip() if approx else ""
         heard = heard_l or correct
         rule = str(entry.get("rule_category") or "phoneme_score")
-        tip = str(
-            entry.get("tip")
-            or _default_suggestion(rule, correct, heard)
-        )
         conf = max(0.0, min(1.0, 1.0 - (float(score) / 100.0)))
+        tip = str(entry.get("tip") or "")
+        suggestion = _compose_feedback_suggestion(
+            correct=correct,
+            heard=heard,
+            rule_category=rule,
+            confidence=conf,
+            base_tip=tip,
+        )
         out.append(
             {
                 "word": correct,
                 "heard": heard,
                 "issueType": "mispronunciation",
                 "severity": severity,
-                "suggestion": tip,
+                "suggestion": suggestion,
                 "confidence": round(conf, 2),
                 "rule_category": rule,
             }
         )
 
-    # --- Raw words from free-speech Azure PA (AccuracyScore < 70 check) ---
+    # --- Raw words from free-speech Azure PA (accuracy threshold check) ---
     # In free-speech mode Azure sets genuine AccuracyScores instead of inflated
     # self-reference scores. Flag any word below threshold regardless of ErrorType.
-    _ACCURACY_THRESHOLD = 70
+    _ACCURACY_THRESHOLD = PHONEME_BAD_THRESHOLD
     for rw in raw_words:
         rw_word = (rw.get("Word") or "").strip().lower()
         if not rw_word:
@@ -203,8 +243,15 @@ def issues_from_phonetic_context(
         approx = entry.get("indian_spelling_approximation") or entry.get("approximation")
         heard_l = str(approx).lower().strip() if approx else rw_word
         rule = str(entry.get("rule_category") or "phoneme_score")
-        tip = str(entry.get("tip") or _default_suggestion(rule, rw_word, heard_l))
         conf = max(0.0, min(1.0, 1.0 - (rw_acc / 100.0)))
+        tip = str(entry.get("tip") or "")
+        suggestion = _compose_feedback_suggestion(
+            correct=rw_word,
+            heard=heard_l,
+            rule_category=rule,
+            confidence=conf,
+            base_tip=tip,
+        )
         severity = "high" if rw_acc < 50 else "medium"
         # Include worst phoneme info so feedback UI can show which phoneme failed
         phonemes = rw.get("Phonemes") or []
@@ -223,7 +270,7 @@ def issues_from_phonetic_context(
             "heard": heard_l,
             "issueType": "mispronunciation",
             "severity": severity,
-            "suggestion": tip,
+            "suggestion": suggestion,
             "confidence": round(conf, 2),
             "rule_category": rule,
         }
@@ -265,14 +312,22 @@ def issues_from_phonetic_context(
         heard = (p.get("detected_as") or correct).lower().strip()
         rule = str(p.get("pattern_name") or "indian_english")
         hint = str(p.get("hint") or f"Practice '{correct}'")
+        conf = 0.85
+        suggestion = _compose_feedback_suggestion(
+            correct=correct,
+            heard=heard,
+            rule_category=rule,
+            confidence=conf,
+            base_tip=hint,
+        )
         out.append(
             {
                 "word": correct,
                 "heard": heard,
                 "issueType": "mispronunciation",
                 "severity": "medium",
-                "suggestion": hint,
-                "confidence": 0.85,
+                "suggestion": suggestion,
+                "confidence": conf,
                 "rule_category": rule,
             }
         )
@@ -343,13 +398,20 @@ def extract_pronunciation_corrections(gemini_response_text: str) -> list[dict[st
                 continue
             conf = 0.88 if "pronounced" in lower or "correct pronunciation" in lower else 0.80
             sev = _severity_from_confidence(conf)
+            suggestion = _compose_feedback_suggestion(
+                correct=correct,
+                heard=heard or correct,
+                rule_category="tutor_correction",
+                confidence=conf,
+                base_tip="",
+            )
             found.append(
                 {
                     "word": correct,
                     "heard": heard or correct,
                     "issueType": "substitution",
                     "severity": sev,
-                    "suggestion": _default_suggestion("tutor_correction", correct, heard or "?"),
+                    "suggestion": suggestion,
                     "confidence": conf,
                     "rule_category": "tutor_inline_correction",
                 }
@@ -380,13 +442,20 @@ def issues_from_transcript_approximation(transcript: str) -> list[dict[str, Any]
         rule = str(entry.get("rule_category") or "approximation")
         conf = 0.72
         sev = _severity_from_confidence(conf)
+        suggestion = _compose_feedback_suggestion(
+            correct=correct,
+            heard=w,
+            rule_category=rule,
+            confidence=conf,
+            base_tip="",
+        )
         out.append(
             {
                 "word": correct,
                 "heard": w,
                 "issueType": "substitution",
                 "severity": sev,
-                "suggestion": _default_suggestion(rule, correct, w),
+                "suggestion": suggestion,
                 "confidence": conf,
                 "rule_category": rule,
             }
@@ -415,9 +484,23 @@ def merge_issue_batches(issues: list[dict[str, Any]]) -> list[dict[str, Any]]:
             by_word[w] = {**it, "word": it.get("word") or w, "severity": sev}
         elif _SEVERITY_RANK[sev] == _SEVERITY_RANK[cur_sev]:
             merged = {**cur}
+            cur_conf = float(cur.get("confidence") or 0.0)
+            new_conf = float(it.get("confidence") or 0.0)
             if not str(cur.get("heard") or "").strip() and str(it.get("heard") or "").strip():
                 merged["heard"] = it.get("heard")
-            if len(str(it.get("suggestion") or "")) > len(str(cur.get("suggestion") or "")):
+            cur_suggestion = str(cur.get("suggestion") or "")
+            new_suggestion = str(it.get("suggestion") or "")
+            cur_explicit = "You said '" in cur_suggestion
+            new_explicit = "You said '" in new_suggestion
+            if cur_explicit and not new_explicit:
+                pass
+            elif new_explicit and not cur_explicit:
+                merged["suggestion"] = new_suggestion
+                merged["confidence"] = new_conf
+            elif new_conf > cur_conf and len(new_suggestion) >= len(cur_suggestion):
+                merged["suggestion"] = new_suggestion
+                merged["confidence"] = new_conf
+            elif len(new_suggestion) > len(cur_suggestion):
                 merged["suggestion"] = it.get("suggestion")
             rc = it.get("rule_category") or ""
             if rc and rc != "tutor_inline_correction":

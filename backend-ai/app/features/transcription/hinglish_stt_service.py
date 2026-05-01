@@ -6,6 +6,7 @@ import azure.cognitiveservices.speech as speechsdk
 from pydub import AudioSegment
 from app.core.config import settings
 from app.core.logger import logger
+from app.features.transcription.deepgram_service import deepgram_transcription_service
 from app.models.response import (
     TutorPronunciationAssessmentResult,
     WordDetail,
@@ -50,16 +51,55 @@ class HinglishSTTService:
     # ─── Core Transcription ───────────────────────────────────
 
     def transcribe_hinglish(self, audio_data: bytes) -> dict:
-        if not self.speech_config:
-            raise RuntimeError("Hinglish STT service is not configured.")
-
         try:
             wav_bytes = self._convert_to_wav(audio_data)
         except Exception as e:
             logger.error(f"Audio conversion failed: {e}")
             return {"text": "", "language": None, "error": "Invalid audio format"}
 
-        return self._transcribe_push_stream(wav_bytes)
+        if not self.speech_config:
+            if settings.deepgram_secondary_transcript and deepgram_transcription_service.configured:
+                try:
+                    dg = deepgram_transcription_service.transcribe_bytes_sync(
+                        wav_bytes,
+                        language=settings.deepgram_language,
+                        mime_type="audio/wav",
+                    )
+                    return {
+                        "text": dg.text,
+                        "language": settings.deepgram_language,
+                        "success": True,
+                        "confidence": dg.confidence,
+                        "provider": "deepgram",
+                        "model": settings.deepgram_model,
+                    }
+                except Exception as e:
+                    logger.error("Deepgram Hinglish STT failed (Azure unavailable): %s", e, exc_info=True)
+
+            raise RuntimeError("Hinglish STT service is not configured.")
+
+        azure_result = self._transcribe_push_stream(wav_bytes)
+
+        if (
+            settings.deepgram_secondary_transcript
+            and deepgram_transcription_service.configured
+        ):
+            try:
+                dg = deepgram_transcription_service.transcribe_bytes_sync(
+                    wav_bytes,
+                    language=settings.deepgram_language,
+                    mime_type="audio/wav",
+                )
+                display = (dg.text or "").strip()
+                if display and display != (azure_result.get("text") or "").strip():
+                    azure_result["display_text"] = display
+                    azure_result["display_provider"] = "deepgram"
+                    azure_result["display_confidence"] = dg.confidence
+            except Exception as e:
+                logger.warning("Deepgram display transcript failed (non-fatal): %s", e, exc_info=True)
+
+        azure_result.setdefault("provider", "azure")
+        return azure_result
 
     def _transcribe_push_stream(self, wav_bytes: bytes) -> dict:
         if not self.speech_config:
@@ -995,6 +1035,7 @@ class HinglishSTTService:
         intent_result = self.detect_intent_from_text(text)
 
         return {
+            **transcription_result,
             "text": text,
             "language": transcription_result.get("language"),
             "success": True,

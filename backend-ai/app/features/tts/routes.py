@@ -112,3 +112,13 @@ async def full_feedback_narration(request: Request, body: FullFeedbackNarrationR
     log.info(f"full_feedback_narration_completed ms={ms} audio_bytes={len(audio_bytes)}")
 
     return FeedbackNarrationResponse(audio_base64=audio_base64, text=script)
+
+
+class SpeakRequest(BaseModel):
+    text: str
+
+@router.post("/speak", response_model=FeedbackNarrationResponse)
+async def speak(request: Request, body: SpeakRequest):
+    audio_bytes = await inworld_tts_service.synthesize_async(body.text)
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    return FeedbackNarrationResponse(audio_base64=audio_b64, text=body.text)

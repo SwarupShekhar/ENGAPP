@@ -7,6 +7,8 @@
  * for preview/production — release builds will then call your laptop instead of Render.
  */
 try {
+  // .env.local takes precedence (written by scripts/set-local-ip.sh for local device builds)
+  require("dotenv").config({ path: require("path").resolve(__dirname, ".env.local"), override: true });
   require("dotenv").config();
 } catch {
   // dotenv optional; EAS provides env without it
@@ -34,6 +36,12 @@ if (process.env.APP_BRIDGE_API_URL?.trim()) {
 }
 if (process.env.APP_ENGLIVO_API_URL?.trim()) {
   extra.englivoApiUrlOverride = process.env.APP_ENGLIVO_API_URL.trim();
+}
+if (process.env.ENGLIVO_API_URL_OVERRIDE?.trim()) {
+  extra.englivoApiUrlOverride = process.env.ENGLIVO_API_URL_OVERRIDE.trim();
+}
+if (process.env.ENGLIVO_WS_URL_OVERRIDE?.trim()) {
+  extra.englivoWsUrlOverride = process.env.ENGLIVO_WS_URL_OVERRIDE.trim();
 }
 
 module.exports = {
