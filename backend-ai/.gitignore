@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
 venv/
 .venv/
 .pytest_cache/
@@ -13,3 +17,11 @@ htmlcov/
 
 # Logs
 *.log
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Tooling caches
+.ruff_cache/

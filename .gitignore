@@ -5,20 +5,24 @@ venv/
 __pycache__/
 *.pyc
 
-# Distribution / Build
+# Distribution / build outputs
 dist/
 build/
 out/
 *.tsbuildinfo
+android/build/
+ios/build/
+Pods/
+.expo/
 
 # IDEs
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
-*.md
 
-# Environment Variables
+# Environment
 .env
 .env.local
 .env.development.local
@@ -27,13 +31,49 @@ out/
 
 # Logs
 *.log
+*.logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+debug*.log
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Project Specific
+# Local DBs & vector stores
+ruvector.db
+*.db
+*.sqlite
+*.sqlite3
+.claude/memory.db
+.swarm/memory.db
+.code-review-graph/graph.db
+
+# MCP / agent / graph tooling (local only)
+.omc/
+.agents/
+.swarm/
+.claude-flow/
+.planning/
+.graphifyignore
+graphify-out/
+
+# CI / EAS
+.eas-logs/
+
+# Strapi-style temp & uploads (root-level copies)
+.tmp/
+.strapi/
+/uploads/
+public/uploads/
+
+# Internal drafts & generated trees (not blanket *.md)
+archive/
+generated/
+/*.md
+docs/*.md
+docs/superpowers/
+
+# Project-specific
 /generated/prisma
