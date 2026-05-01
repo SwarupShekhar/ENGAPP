@@ -32,7 +32,13 @@ export class ClerkGuard implements CanActivate {
       throw new UnauthorizedException('Bearer token is missing');
     }
 
-    const session = await this.clerkService.verifyToken(token);
+    let session: any = null;
+    try {
+      session = await this.clerkService.verifyToken(token);
+    } catch (err: any) {
+      const reason = err?.clerkReason ?? 'unknown';
+      throw new UnauthorizedException(`Invalid or expired token [${reason}]`);
+    }
 
     if (!session) {
       throw new UnauthorizedException('Invalid or expired token');

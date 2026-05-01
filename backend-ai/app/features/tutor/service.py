@@ -94,8 +94,7 @@ class StreamingTutorService:
 
     async def recognize_audio_bytes(self, audio_bytes: bytes) -> str:
         """
-        Run STT in-process via Azure push stream. Saves a full HTTP round-trip vs calling /stt.
-        Returns recognized text or empty string on failure.
+        Run STT in-process using Azure Speech (same locale as pronunciation assessment).
         """
         if not getattr(self, "speech_config", None):
             logger.warning("Azure Speech not configured, cannot recognize audio")

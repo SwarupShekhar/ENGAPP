@@ -6,6 +6,7 @@ import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { useSignIn, useSignUp, useOAuth } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 
 // Required for OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -96,7 +97,8 @@ const [email, setEmail] = useState('');
     const handleGoogleAuth = async () => {
         try {
             setLoading(true);
-            const { createdSessionId, setActive } = await startGoogleOAuth();
+            const redirectUrl = Linking.createURL('/');
+            const { createdSessionId, setActive } = await startGoogleOAuth({ redirectUrl });
 
             if (createdSessionId && setActive) {
                 await setActive({ session: createdSessionId });

@@ -55,7 +55,7 @@ class AsyncAzureSpeech:
     async def transcribe_from_bytes(
         self,
         audio_bytes: bytes,
-        language: str = "en-US"
+        language: str = "en-IN"
     ) -> dict:
         """
         Transcribe audio from bytes asynchronously.
@@ -177,7 +177,7 @@ class AsyncAzureSpeech:
         self,
         audio_bytes: bytes,
         reference_text: str,
-        language: str = "en-US"
+        language: str = "en-IN"
     ) -> dict:
         """
         Assess pronunciation asynchronously.

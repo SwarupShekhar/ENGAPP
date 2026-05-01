@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "run_id": "20260430T101424Z__strict-v1",
+    "generated_at_utc": "2026-04-30T10:14:24.591804+00:00",
+    "script": "backend-ai/scripts/ab_pronunciation_detector.py",
+    "tag": "strict-v1"
+  },
+  "config": {
+    "old": {
+      "default_accuracy_threshold": 70,
+      "function_word_threshold": 75,
+      "phoneme_bad_threshold": 65,
+      "false_positive_suppression": 80
+    },
+    "new": {
+      "default_accuracy_threshold": 78,
+      "function_word_threshold": 84,
+      "phoneme_bad_threshold": 72,
+      "false_positive_suppression": 95
+    }
+  },
+  "aggregate": {
+    "old_total_flags": 3,
+    "new_total_flags": 4,
+    "net_change": 1,
+    "added_signals": 1,
+    "removed_signals": 0
+  },
+  "cases": [
+    {
+      "name": "FunctionWord_ThToD_Borderline",
+      "reference_text": "this",
+      "old_count": 1,
+      "new_count": 1,
+      "added_in_new": [],
+      "removed_in_new": [],
+      "old_errors": [
+        {
+          "spoken": "dis",
+          "correct": "this",
+          "rule_category": "th_to_d",
+          "reel_id": "REEL_007",
+          "confidence": 80.0
+        }
+      ],
+      "new_errors": [
+        {
+          "spoken": "dis",
+          "correct": "this",
+          "rule_category": "th_to_d",
+          "reel_id": "REEL_007",
+          "confidence": 80.0
+        }
+      ]
+    },
+    {
+      "name": "GeneralWord_Borderline_Accuracy",
+      "reference_text": "water",
+      "old_count": 0,
+      "new_count": 1,
+      "added_in_new": [
+        [
+          "vater",
+          "water",
+          "w_to_v"
+        ]
+      ],
+      "removed_in_new": [],
+      "old_errors": [],
+      "new_errors": [
+        {
+          "spoken": "vater",
+          "correct": "water",
+          "rule_category": "w_to_v",
+          "reel_id": "REEL_001",
+          "confidence": 76.0
+        }
+      ]
+    },
+    {
+      "name": "SingleWeakCriticalPhoneme",
+      "reference_text": "very",
+      "old_count": 1,
+      "new_count": 1,
+      "added_in_new": [],
+      "removed_in_new": [],
+      "old_errors": [
+        {
+          "spoken": "bery",
+          "correct": "very",
+          "rule_category": "b_to_v",
+          "reel_id": null,
+          "confidence": 88.0
+        }
+      ],
+      "new_errors": [
+        {
+          "spoken": "bery",
+          "correct": "very",
+          "rule_category": "b_to_v",
+          "reel_id": null,
+          "confidence": 88.0
+        }
+      ]
+    },
+    {
+      "name": "HighConfidence_NonMapped_ShouldSuppress",
+      "reference_text": "umbrella",
+      "old_count": 0,
+      "new_count": 0,
+      "added_in_new": [],
+      "removed_in_new": [],
+      "old_errors": [],
+      "new_errors": []
+    },
+    {
+      "name": "HighConfidence_NonMapped_StillSuppressedAt95Gate",
+      "reference_text": "umbrella",
+      "old_count": 0,
+      "new_count": 0,
+      "added_in_new": [],
+      "removed_in_new": [],
+      "old_errors": [],
+      "new_errors": []
+    },
+    {
+      "name": "ExplicitAzureMispronunciation",
+      "reference_text": "water",
+      "old_count": 1,
+      "new_count": 1,
+      "added_in_new": [],
+      "removed_in_new": [],
+      "old_errors": [
+        {
+          "spoken": "vater",
+          "correct": "water",
+          "rule_category": "w_to_v",
+          "reel_id": "REEL_001",
+          "confidence": 83.0
+        }
+      ],
+      "new_errors": [
+        {
+          "spoken": "vater",
+          "correct": "water",
+          "rule_category": "w_to_v",
+          "reel_id": "REEL_001",
+          "confidence": 83.0
+        }
+      ]
+    }
+  ]
+}

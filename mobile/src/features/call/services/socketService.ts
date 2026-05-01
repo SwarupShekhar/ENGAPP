@@ -34,6 +34,16 @@ class SocketService {
    */
   connect(getToken: (() => Promise<string | null>) | string, userId?: string) {
     if (this.socket?.connected || this.isConnecting) return;
+    // Prevent parallel socket instances/reconnect loops after hot reloads or repeated connect() calls.
+    if (this.socket && !this.socket.connected) {
+      try {
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+      } catch {
+        // no-op
+      }
+      this.socket = null;
+    }
     this.isConnecting = true;
 
     if (userId) {

@@ -47,11 +47,11 @@ def _justification_from_captured_pron(deduped: List[Dict[str, Any]]) -> str:
         h = str(it.get("heard") or "").strip()
         rc = str(it.get("rule_category") or "").strip()
         if h and h.lower() != w.lower():
-            bits.append(f"'{h}' → '{w}'" + (f" ({rc})" if rc else ""))
+            bits.append(f"you said '{h}' instead of '{w}'" + (f" ({rc})" if rc else ""))
         elif w:
             bits.append(w)
     return (
-        "You had a few pronunciation substitutions to work on: "
+        "Pronunciation feedback: "
         + "; ".join(bits)
         + "."
         if bits

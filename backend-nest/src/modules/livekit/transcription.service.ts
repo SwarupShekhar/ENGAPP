@@ -34,7 +34,7 @@ export class TranscriptionService {
     }
 
     const speechConfig = sdk.SpeechConfig.fromSubscription(key, region);
-    speechConfig.speechRecognitionLanguage = 'en-US';
+    speechConfig.speechRecognitionLanguage = 'en-IN';
     speechConfig.outputFormat = sdk.OutputFormat.Detailed;
 
     const wavBuffer = fs.readFileSync(filePath);
@@ -86,7 +86,7 @@ export class TranscriptionService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audio_url: audioUrl,
-          language: opts?.language ?? 'en-US',
+          language: opts?.language ?? 'en-IN',
           user_id: opts?.userId ?? 'system',
           session_id: opts?.sessionId ?? 'system',
         }),

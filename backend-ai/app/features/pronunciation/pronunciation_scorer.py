@@ -97,6 +97,15 @@ def calculate_pronunciation_score(
 
     # Start from min(100, azure_average) — azure average acts as a ceiling
     base = min(100.0, max(0.0, float(azure_word_accuracy_average)))
+    if azure_word_accuracy_average <= 0 and not flagged_errors:
+        logger.warning("No words recognized (azure avg <= 0) and no errors; returning 0 score.")
+        return {
+            "score": 0.0,
+            "cefr_cap": None,
+            "cap_reason": "no_speech_detected",
+            "category_breakdown": {},
+            "dominant_errors": [],
+        }
     score = base
 
     # Apply per-error deductions weighted by intelligibility impact

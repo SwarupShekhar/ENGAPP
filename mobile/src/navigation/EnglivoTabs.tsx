@@ -17,7 +17,7 @@ export default function EnglivoTabs() {
         screenOptions={{ headerShown: false }}
       >
         <Tab.Screen name="Home" component={EnglivoHomeScreen} />
-        <Tab.Screen name="Sessions" component={EnglivoSessionsScreen} />
+        <Tab.Screen name="EnglivoSessions" component={EnglivoSessionsScreen} />
         <Tab.Screen name="Progress" component={EnglivoProgressScreen} />
         <Tab.Screen name="Profile" component={EnglivoProfileScreen} />
       </Tab.Navigator>

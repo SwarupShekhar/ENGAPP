@@ -27,21 +27,26 @@ export class ClerkService {
 
       // Real Token Verification
       try {
-        const decoded = await clerkClient.verifyToken(token);
+        const decoded = await clerkClient.verifyToken(token, {
+          issuer: (iss: string) => iss.startsWith('https://clerk.') || iss.includes('.clerk.accounts'),
+          clockSkewInMs: 60_000,
+          skipJwksCache: true,
+        });
 
         return {
           userId: decoded.sub,
           sessionId: decoded.sid,
-          // Note: Standard JWT doesn't check claims for email/name unless configured.
-          // We rely on getUser to fetch details when creating the user.
         };
-      } catch (e) {
-        this.logger.error(`Token verification failed: ${e.message}`);
-        this.logger.error(`Token error details:`, e);
-        return null;
+      } catch (e: any) {
+        const reason = e?.reason ?? e?.clerkError?.reason ?? 'unknown';
+        this.logger.error(`Token verification failed [${reason}]: ${e.message}`);
+        // Attach reason so ClerkGuard can surface it in dev 401 responses
+        const err = new Error(e.message) as any;
+        err.clerkReason = reason;
+        throw err;
       }
-    } catch (error) {
-      this.logger.error('Clerk token verification failed:', error);
+    } catch (error: any) {
+      this.logger.error(`Clerk token verification failed [${error?.clerkReason ?? 'unknown'}]: ${error?.message}`);
       return null;
     }
   }

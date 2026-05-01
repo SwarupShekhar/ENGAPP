@@ -69,4 +69,24 @@ export class TtsController {
       );
     }
   }
+
+  @Post('speak')
+  async speak(@Body() body: { text: string }) {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/tts/speak`,
+          body,
+          { timeout: 10000 },
+        ),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`TTS speak proxy failed: ${error?.message}`);
+      throw new HttpException(
+        { message: 'TTS service unavailable', audio_base64: '', text: '' },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
 }

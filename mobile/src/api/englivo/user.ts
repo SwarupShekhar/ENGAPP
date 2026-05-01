@@ -2,8 +2,27 @@ import { client } from "../englivoClient";
 import { SessionHistory, User } from "../../types/user";
 
 export async function getMe(): Promise<User> {
-  const r = await client.get<User>("/api/me");
-  return r.data;
+  try {
+    const r = await client.get<User>("/api/me");
+    return r.data;
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      // Local backend-ai does not expose /api/me in current setup.
+      return {
+        id: "",
+        clerkId: "",
+        firstName: "Learner",
+        email: "",
+        cefrLevel: "A1",
+        streakDays: 0,
+        totalSessions: 0,
+        totalMinutes: 0,
+        createdAt: new Date().toISOString(),
+        credits: 0,
+      };
+    }
+    throw err;
+  }
 }
 
 export async function getHistory(): Promise<SessionHistory[]> {

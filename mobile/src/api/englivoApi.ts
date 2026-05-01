@@ -30,7 +30,26 @@ export interface BookingResult {
 
 /** GET /api/me — Englivo user profile (credits, plan, CEFR, etc.) */
 export const getEnglivoMe = () =>
-  client.get("/api/me").then((r) => r.data);
+  client.get("/api/me").then((r) => r.data).catch((err) => {
+    if (err?.response?.status === 404) {
+      // Local backend-ai does not expose /api/me in current setup.
+      return {
+        clerkId: '',
+        plan: 'FREE',
+        status: 'ACTIVE',
+        quota: {
+          weeklyLimitSeconds: null,
+          usedSeconds: 0,
+          rolledOverSeconds: 0,
+          remainingSeconds: null,
+          weekStartDate: new Date().toISOString(),
+        },
+        aiCredits: { granted: 0, used: 0, remaining: 0 },
+        organization: null,
+      };
+    }
+    throw err;
+  });
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
@@ -88,3 +107,18 @@ export const saveAiSession = (payload: any) =>
 /** GET /api/ai-tutor/history — AI session history */
 export const getAiTutorHistory = () =>
   client.get("/api/ai-tutor/history").then((r) => r.data);
+
+export interface ReportPayload {
+  transcript: string;
+  duration: number;
+  words: number;
+  sessionId?: string;
+}
+
+export interface ReportResult {
+  report?: any;
+  [key: string]: any;
+}
+
+export const generateReport = (payload: ReportPayload): Promise<ReportResult> =>
+  client.post<ReportResult>('/api/ai-tutor/report', payload).then((r) => r.data);

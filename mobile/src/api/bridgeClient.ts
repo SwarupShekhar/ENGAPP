@@ -61,6 +61,15 @@ const INTERNAL_SECRET =
 
 export const hasBridgeInternalSecret = (): boolean => Boolean(INTERNAL_SECRET);
 let hasWarnedBridgeReadUnauthorized = false;
+let hasWarnedBridgeSecretMissing = false;
+
+const warnBridgeSecretMissing = () => {
+  if (hasWarnedBridgeSecretMissing) return;
+  hasWarnedBridgeSecretMissing = true;
+  console.warn(
+    "[Bridge API] Skipping protected Bridge request: BRIDGE_INTERNAL_SECRET is not configured.",
+  );
+};
 
 const bridgeClient = axios.create({
   baseURL: BRIDGE_API_URL,
@@ -129,6 +138,10 @@ if (__DEV__) {
 }
 
 export async function getBridgeUser(clerkId: string): Promise<any> {
+  if (!INTERNAL_SECRET) {
+    warnBridgeSecretMissing();
+    return null;
+  }
   try {
     const r = await bridgeClient.get(`/user/${clerkId}`);
     return r.data;
@@ -152,11 +165,19 @@ export async function updateLastActiveApp(
   clerkId: string,
   app: "PULSE" | "CORE",
 ): Promise<any> {
+  if (!INTERNAL_SECRET) {
+    warnBridgeSecretMissing();
+    return null;
+  }
   const r = await bridgeClient.patch(`/user/${clerkId}`, { last_active_app: app });
   return r.data;
 }
 
 export async function incrementBridgeStreak(clerkId: string): Promise<any> {
+  if (!INTERNAL_SECRET) {
+    warnBridgeSecretMissing();
+    return null;
+  }
   const r = await bridgeClient.patch(`/user/${clerkId}/streak`);
   return r.data;
 }
@@ -165,6 +186,10 @@ export async function addBridgePracticeMinutes(
   clerkId: string,
   minutes: number,
 ): Promise<any> {
+  if (!INTERNAL_SECRET) {
+    warnBridgeSecretMissing();
+    return null;
+  }
   const r = await bridgeClient.patch(`/user/${clerkId}/minutes`, { minutes });
   return r.data;
 }
@@ -175,6 +200,10 @@ export async function syncBridgeCefr(payload: {
   fluencyScore?: number;
   source?: string;
 }): Promise<any> {
+  if (!INTERNAL_SECRET) {
+    warnBridgeSecretMissing();
+    return null;
+  }
   const r = await bridgeClient.patch("/sync/cefr", payload);
   return r.data;
 }

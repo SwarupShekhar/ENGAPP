@@ -234,6 +234,30 @@ export class AssessmentService {
   }
 
   /**
+   * Call AI engine pronunciation analysis and map validation errors (e.g., no speech)
+   * to a 400 for the client instead of bubbling as 500.
+   */
+  private async safeAnalyzeSpeech(
+    audioUrl: string,
+    referenceText: string,
+    audioBase64?: string,
+  ) {
+    try {
+      return await this.azure.analyzeSpeech(audioUrl, referenceText, audioBase64);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const detail =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message;
+      if (status === 400) {
+        throw new BadRequestException(detail || 'Invalid audio input');
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Enhanced fluency calculation with hesitation penalties
    */
   private calculateEnhancedFluency(azureResult: any, audioData: any): number {
@@ -313,7 +337,7 @@ export class AssessmentService {
   ) {
     // Use predefined text for Phase 1 to skip transcription step
     const referenceText = 'I like to eat breakfast at home.';
-    const result = await this.azure.analyzeSpeech(
+    const result = await this.safeAnalyzeSpeech(
       audioUrl,
       referenceText,
       audioBase64,
@@ -373,7 +397,7 @@ export class AssessmentService {
       attempt === 1
         ? ELICITED_SENTENCES.B1
         : currentPhase2Data?.adaptiveSentence?.text || ELICITED_SENTENCES.B1;
-    const result = await this.azure.analyzeSpeech(
+    const result = await this.safeAnalyzeSpeech(
       audioUrl,
       referenceText,
       audioBase64,
@@ -489,7 +513,7 @@ export class AssessmentService {
     const latestSession = await this.prisma.assessmentSession.findUnique({
       where: { id: session.id },
     });
-    const azureResult = await this.azure.analyzeSpeech(
+    const azureResult = await this.safeAnalyzeSpeech(
       audioUrl,
       '',
       audioBase64,
@@ -546,7 +570,7 @@ export class AssessmentService {
     audioUrl: string,
     audioBase64: string,
   ) {
-    const result = await this.azure.analyzeSpeech(audioUrl, '', audioBase64);
+    const result = await this.safeAnalyzeSpeech(audioUrl, '', audioBase64);
 
     // Stricter comprehension scoring: word count + content quality
     let baseScore = 35; // Base score
@@ -1103,7 +1127,7 @@ export class AssessmentService {
         const url = audioUrls[participant.userId];
 
         if (url) {
-          const evidence = await this.azure.analyzeSpeech(url, '');
+          const evidence = await this.safeAnalyzeSpeech(url, '');
           participantEvidence[participant.userId] = evidence;
           segments.push({
             speaker_id: participant.userId,
@@ -1185,6 +1209,36 @@ export class AssessmentService {
         },
         include: { mistakes: true },
       });
+
+      // Persist Azure PA pronunciation issues so mobile can render post-call feedback
+      if (evidence?.pronunciationEvidence?.length > 0) {
+        const pronIssues = (evidence.pronunciationEvidence as any[]).map((e: any) => {
+          const spokenRaw = e.spoken ? String(e.spoken) : '';
+          const isKnown = !!spokenRaw && !spokenRaw.startsWith('[mispronounced:');
+          return {
+            analysisId: analysis.id,
+            word: e.correct ?? '',
+            spoken: isKnown ? spokenRaw : null,
+            correct: e.correct ?? null,
+            ruleCategory: e.rule_category ?? 'general_mispronunciation',
+            reelId: e.reel_id ?? null,
+            confidence: e.confidence != null ? Number(e.confidence) : null,
+            severity: (e.confidence ?? 100) < 50 ? 'HIGH' : 'MEDIUM',
+            suggestion: isKnown
+              ? `You said '${spokenRaw}' instead of '${e.correct}'.`
+              : `Practice saying '${e.correct ?? ''}' clearly.`,
+          };
+        });
+        if (pronIssues.length > 0) {
+          await this.prisma.pronunciationIssue.createMany({
+            data: pronIssues,
+            skipDuplicates: true,
+          });
+          this.logger.log(
+            `Stored ${pronIssues.length} pronunciation issues for participant ${participant.id} (Session: ${sessionId})`,
+          );
+        }
+      }
 
       participantsWithAnalysis.add(participant.id);
 

@@ -39,9 +39,37 @@ export interface SubscriptionResponse {
   currentPlan?: string
 }
 
+const fallbackMe = (): MeResponse => ({
+  clerkId: '',
+  plan: 'FREE',
+  status: 'ACTIVE',
+  quota: {
+    weeklyLimitSeconds: null,
+    usedSeconds: 0,
+    rolledOverSeconds: 0,
+    remainingSeconds: null,
+    weekStartDate: new Date().toISOString(),
+  },
+  aiCredits: {
+    granted: 0,
+    used: 0,
+    remaining: 0,
+  },
+  organization: null,
+})
+
 /** GET /api/me — plan + quota status */
 export const getMe = (): Promise<MeResponse> =>
-  client.get<MeResponse>('/api/me').then((r) => r.data)
+  client
+    .get<MeResponse>('/api/me')
+    .then((r) => r.data)
+    .catch((err) => {
+      if (err?.response?.status === 404) {
+        // Local backend-ai does not expose /api/me in current setup.
+        return fallbackMe()
+      }
+      throw err
+    })
 
 /** GET /api/livekit/token?category=...&mode=human */
 export const getLiveKitToken = (
@@ -54,6 +82,10 @@ export const getLiveKitToken = (
     .catch((err) => {
       if (err.response?.status === 402) {
         return { error: 'QUOTA_EXHAUSTED', remainingSeconds: 0 } as any
+      }
+      if (err.response?.status === 404) {
+        // Local backend-ai does not expose this endpoint in current setup.
+        return { error: 'SERVICE_UNAVAILABLE' } as any
       }
       throw err
     })

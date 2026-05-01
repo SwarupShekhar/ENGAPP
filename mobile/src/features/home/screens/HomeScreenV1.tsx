@@ -9,7 +9,6 @@ import {
   Dimensions,
   Image,
   Animated as RNAnimated,
-  FlatList,
   Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -305,7 +304,7 @@ function StreakRow({ streak, done, target, theme }: { streak: number; done: numb
 function AssessmentNudge({ theme, onPress }: { theme: any; onPress: () => void }) {
   const c = theme.colors;
   return (
-    <View style={[st.nudgeCard, { backgroundColor: c.surface, borderColor: `${c.primary}35`, borderRadius: theme.borderRadius.xl, overflow: 'hidden' }]}>
+    <View style={[st.nudgeCard, { backgroundColor: c.surface, borderColor: `${c.primary}35`, borderRadius: theme.borderRadius.xl }]}>
       <LinearGradient colors={[`${c.primary}25`, 'transparent']} style={st.nudgeGlow} />
       <View style={[st.nudgeIcon, { backgroundColor: `${c.primary}18`, borderColor: `${c.primary}35` }]}>
         <Ionicons name="analytics-outline" size={28} color={c.primary} />
@@ -526,7 +525,7 @@ function CallCard({ theme, onPress }: { theme: any; onPress: () => void }) {
       >
         <Animated.View style={[st.callBlob, { backgroundColor: c.accent }, glowSt]} />
         <View style={st.callBody}>
-          <Text style={st.callEye}>PRACTICE NOW</Text>
+          <Text style={st.callEye}>FIND A PARTNER</Text>
           <Text style={st.callTitle}>Find a Partner</Text>
           <Text style={st.callSub}>Start a live speaking session</Text>
         </View>
@@ -580,6 +579,13 @@ function PhraseSkeleton({ theme }: { theme: any }) {
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+function timeGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { user, isLoaded } = useUser();
@@ -591,7 +597,7 @@ export default function HomeScreen() {
   const [phrases, setPhrases]         = useState<Phrase[]>([]);
   const [loadingHome, setLoadingHome] = useState(true);
   const [loadingPhrase, setLoadingPhrase] = useState(true);
-  const [phraseIdx, setPhraseIdx]     = useState(0);
+  const [phraseIdx, setPhraseIdx]     = useState(0); // kept for type compat, unused
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
 
@@ -705,7 +711,14 @@ export default function HomeScreen() {
             ? <Avatar url={user?.imageUrl} initials={initials} primary={c.primary} />
             : <View style={[st.avatar, { borderColor: `${c.primary}28`, backgroundColor: `${c.primary}15` }]} />
           }
-          <ModeSwitcher style={st.switcher} />
+          <View style={st.switcher}>
+            {isLoaded && user?.firstName ? (
+              <Text style={{ fontSize: 11, color: c.text.light, fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
+                {timeGreeting()}, {user.firstName}
+              </Text>
+            ) : null}
+            <ModeSwitcher />
+          </View>
           <View style={st.actions}>
             <Pressable onPress={goChat} style={[st.iconBtn, { backgroundColor: `${c.primary}14`, borderColor: `${c.primary}28` }]} accessibilityLabel="Chat">
               <Ionicons name="chatbubble-outline" size={18} color={c.primary} />
@@ -767,27 +780,12 @@ export default function HomeScreen() {
             <PhraseSkeleton theme={theme} />
           ) : (
             <>
-              <FlatList
-                data={phrases}
-                horizontal
-                pagingEnabled
-                snapToInterval={SW - HPAD * 2}
-                decelerationRate="fast"
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(it, i) => it.id ?? String(i)}
-                onScroll={e => setPhraseIdx(Math.round(e.nativeEvent.contentOffset.x / (SW - HPAD * 2)))}
-                scrollEventThrottle={16}
-                renderItem={({ item }) => (
-                  <PhraseCard phrase={item} theme={theme} onPractice={() => navigation.navigate('AITutor', { phrase: item })} />
-                )}
-                style={{ overflow: 'visible' }}
-              />
-              {phrases.length > 1 && (
-                <View style={st.paginationRow}>
-                  {phrases.map((_, i) => (
-                    <View key={i} style={[st.pagDot, { backgroundColor: i === phraseIdx ? c.primary : `${c.primary}32`, width: i === phraseIdx ? 18 : 6 }]} />
-                  ))}
-                </View>
+              {phrases[0] && (
+                <PhraseCard
+                  phrase={phrases[0]}
+                  theme={theme}
+                  onPractice={() => navigation.navigate('AITutor', { phrase: phrases[0] })}
+                />
               )}
             </>
           )}

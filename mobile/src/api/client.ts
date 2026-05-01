@@ -10,8 +10,11 @@ const IS_PROD = !__DEV__;
 // Use true only for temporary local testing on a physical device.
 const FORCE_LOCAL = false;
 
-// Your Mac's local IP address on the Wi-Fi network
+// Your Mac's LAN IP for physical devices (same Wi‑Fi). Emulator ignores this for Android.
 const LOCAL_IP = "192.168.1.34";
+// Align with backend-nest .env PORT (health responds on 3004)
+const LOCAL_PORT = 3004;
+const isDevice = Constants.isDevice;
 
 // Optional override for internal builds / device testing.
 // Optional override: app.config.js `extra.apiUrlOverride` via APP_API_URL_OVERRIDE (.env / EAS).
@@ -33,11 +36,19 @@ export const API_URL =
   (IS_PROD
     ? "https://engapp-3210.onrender.com"
     : FORCE_LOCAL
-      ? `http://${LOCAL_IP}:3000`
+      ? `http://${LOCAL_IP}:${LOCAL_PORT}`
       : Platform.select({
-          ios: "http://localhost:3000",
-          android: "http://10.0.2.2:3000",
-          default: `http://${LOCAL_IP}:3000`,
+          // Simulator: localhost. Physical iPhone: host machine LAN IP.
+          ios:
+            isDevice === false
+              ? `http://localhost:${LOCAL_PORT}`
+              : `http://${LOCAL_IP}:${LOCAL_PORT}`,
+          // Emulator: 10.0.2.2 = host loopback. Physical Android: LAN IP (10.0.2.2 will always fail).
+          android:
+            isDevice === false
+              ? `http://10.0.2.2:${LOCAL_PORT}`
+              : `http://${LOCAL_IP}:${LOCAL_PORT}`,
+          default: `http://${LOCAL_IP}:${LOCAL_PORT}`,
         }));
 
 if (__DEV__) {

@@ -5,7 +5,10 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { ReliabilityService } from '../reliability/reliability.service';
 import { TranscriptionService } from '../livekit/transcription.service';
-import { PronunciationService, FlaggedPronunciationError } from '../pronunciation/pronunciation.service';
+import {
+  PronunciationService,
+  FlaggedPronunciationError,
+} from '../pronunciation/pronunciation.service';
 
 @Injectable()
 export class SessionsService {
@@ -20,7 +23,10 @@ export class SessionsService {
     private readonly pronunciationService: PronunciationService,
   ) {}
 
-  async rerunPronunciationForSession(sessionId: string, requesterUserId: string) {
+  async rerunPronunciationForSession(
+    sessionId: string,
+    requesterUserId: string,
+  ) {
     const session = await this.prisma.conversationSession.findUnique({
       where: { id: sessionId },
       include: {
@@ -31,7 +37,9 @@ export class SessionsService {
       throw new BadRequestException('Session not found');
     }
 
-    const isParticipant = session.participants.some((p) => p.userId === requesterUserId);
+    const isParticipant = session.participants.some(
+      (p) => p.userId === requesterUserId,
+    );
     if (!isParticipant) {
       throw new BadRequestException('Not a participant in this session');
     }
@@ -40,18 +48,29 @@ export class SessionsService {
     for (const p of session.participants as any[]) {
       const recordingUrl = p.participantRecordingUrl as string | null;
       if (!recordingUrl || !recordingUrl.startsWith('http')) {
-        results.push({ userId: p.userId, ok: false, reason: 'no_recording_url' });
+        results.push({
+          userId: p.userId,
+          ok: false,
+          reason: 'no_recording_url',
+        });
         continue;
       }
 
       try {
-        const transcript = await this.transcription.transcribeFromUrl(recordingUrl, {
-          userId: p.userId,
-          sessionId,
-          language: 'en-US',
-        });
+        const transcript = await this.transcription.transcribeFromUrl(
+          recordingUrl,
+          {
+            userId: p.userId,
+            sessionId,
+            language: 'en-IN',
+          },
+        );
         if (!transcript?.trim()) {
-          results.push({ userId: p.userId, ok: false, reason: 'empty_transcript' });
+          results.push({
+            userId: p.userId,
+            ok: false,
+            reason: 'empty_transcript',
+          });
           continue;
         }
 
@@ -73,35 +92,27 @@ export class SessionsService {
               sessionId,
               participantId: p.id,
               cefrLevel: 'B1',
-              scores: { overall: 0, grammar: 0, vocabulary: 0, fluency: 0, pronunciation: 0 } as any,
+              scores: {
+                overall: 0,
+                grammar: 0,
+                vocabulary: 0,
+                fluency: 0,
+                pronunciation: 0,
+              } as any,
               rawData: {} as any,
             } as any,
             select: { id: true, scores: true },
           });
         }
 
-        // Replace pronunciation issues for this analysis
-        await this.prisma.pronunciationIssue.deleteMany({ where: { analysisId: analysis.id } });
-        if (Array.isArray(flagged_errors) && flagged_errors.length > 0) {
-          await this.prisma.pronunciationIssue.createMany({
-            data: (flagged_errors as FlaggedPronunciationError[]).map((err) => ({
-              analysisId: analysis!.id,
-              word: err.spoken,
-              issueType: err.rule_category,
-              severity:
-                err.confidence < 40
-                  ? 'high'
-                  : err.confidence < 65
-                    ? 'medium'
-                    : 'low',
-              confidence: err.confidence,
-              suggestion: `Practice ${err.correct}`,
-            })),
-          });
-        }
+        await this.pronunciationService.savePronunciationIssues(
+          analysis.id,
+          flagged_errors as FlaggedPronunciationError[],
+        );
 
         if (pronunciation_score?.score != null) {
-          const existingScores = (analysis.scores as Record<string, number>) || {};
+          const existingScores =
+            (analysis.scores as Record<string, number>) || {};
           await this.prisma.analysis.update({
             where: { id: analysis.id },
             data: {
@@ -121,8 +132,14 @@ export class SessionsService {
           score: pronunciation_score?.score ?? null,
         });
       } catch (e: any) {
-        this.logger.warn(`rerunPronunciation failed userId=${p.userId}: ${e?.message ?? e}`);
-        results.push({ userId: p.userId, ok: false, reason: e?.message ?? 'error' });
+        this.logger.warn(
+          `rerunPronunciation failed userId=${p.userId}: ${e?.message ?? e}`,
+        );
+        results.push({
+          userId: p.userId,
+          ok: false,
+          reason: e?.message ?? 'error',
+        });
       }
     }
 
@@ -191,7 +208,11 @@ export class SessionsService {
       await this.sessionsQueue.add(
         'process-session',
         { sessionId, audioUrls: {}, participantIds },
-        { attempts: 3, backoff: { type: 'exponential', delay: 2000 }, jobId: `process-session-${sessionId}` },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          jobId: `process-session-${sessionId}`,
+        },
       );
       await this.prisma.conversationSession.update({
         where: { id: sessionId },
@@ -223,7 +244,11 @@ export class SessionsService {
         await this.sessionsQueue.add(
           'process-session',
           { sessionId, audioUrls: {}, participantIds },
-          { attempts: 3, backoff: { type: 'exponential', delay: 2000 }, jobId: `process-session-${sessionId}` },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+            jobId: `process-session-${sessionId}`,
+          },
         );
         await this.prisma.conversationSession.update({
           where: { id: sessionId },
@@ -252,10 +277,17 @@ export class SessionsService {
     // Provide a merged transcript string for mobile (CallFeedbackScreen expects session.feedback.transcript
     // or session.summaryJson.transcript). Feedback rows store per-participant segments; merge and sort by timestamp.
     try {
-      type Seg = { speaker_id?: string; text?: string; timestamp?: number | string };
-      const merged: { speaker_id: string; text: string; timestamp: number }[] = [];
+      type Seg = {
+        speaker_id?: string;
+        text?: string;
+        timestamp?: number | string;
+      };
+      const merged: { speaker_id: string; text: string; timestamp: number }[] =
+        [];
       for (const fb of (session as any).feedbacks ?? []) {
-        const arr = Array.isArray(fb.transcript) ? (fb.transcript as Seg[]) : [];
+        const arr = Array.isArray(fb.transcript)
+          ? (fb.transcript as Seg[])
+          : [];
         for (const s of arr) {
           const ts =
             typeof s.timestamp === 'number'
@@ -443,13 +475,15 @@ export class SessionsService {
     transcript?: { speaker_id: string; text: string; timestamp?: string }[],
   ): { speaker_id: string; text: string; timestamp?: string }[] {
     if (!Array.isArray(transcript) || transcript.length === 0) return [];
-    return transcript.filter(
-      (s) => s && typeof s.text === 'string' && s.text.trim().length > 0,
-    ).map((s) => ({
-      speaker_id: s.speaker_id,
-      text: s.text.trim(),
-      timestamp: s.timestamp,
-    }));
+    return transcript
+      .filter(
+        (s) => s && typeof s.text === 'string' && s.text.trim().length > 0,
+      )
+      .map((s) => ({
+        speaker_id: s.speaker_id,
+        text: s.text.trim(),
+        timestamp: s.timestamp,
+      }));
   }
 
   async endSession(
@@ -472,7 +506,9 @@ export class SessionsService {
 
       if (!session) throw new Error('Session not found');
 
-      const myParticipant = session.participants.find((p) => p.userId === userId);
+      const myParticipant = session.participants.find(
+        (p) => p.userId === userId,
+      );
       if (!myParticipant) {
         throw new Error('You are not a participant of this session');
       }

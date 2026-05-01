@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Application settings using Pydantic V2."""
     
     model_config = ConfigDict(
-        env_file=".env",
+        env_file=(".env", "backend-ai/.env"),
         case_sensitive=False,
         extra="ignore"
     )
@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     azure_speech_region: str = "eastus"
     azure_storage_connection_string: Optional[str] = None
     azure_storage_container: str = "audio-files"
+
+    # Deepgram
+    deepgram_api_key: Optional[str] = None
+    deepgram_model: str = "nova-3"
+    deepgram_language: str = "en-IN"
+    # When true and Deepgram is configured, run Nova-3 alongside Azure for a secondary
+    # display transcript. Azure stays authoritative for pronunciation / PA alignment.
+    deepgram_secondary_transcript: bool = True
     
     # Inworld AI
     inworld_api_key: Optional[str] = None
@@ -74,6 +82,8 @@ class Settings(BaseSettings):
     disk_cache_size_limit: int = 10 * 1024 * 1024 * 1024  # 10GB
     
     # Model Configuration
+    # Primary STT for pronunciation-aligned flows remains Azure unless explicitly overridden.
+    # Optional: use Deepgram Nova-3 as a secondary transcript (see deepgram_secondary_transcript).
     transcription_model: str = "azure"
     analysis_model: str = "gemini"
     pronunciation_model: str = "azure"

@@ -16,6 +16,7 @@ from app.features.tutor.pronunciation_capture import (
     session_captured_issue_count,
     strip_pron_tags_for_mobile,
 )
+from app.features.transcription.hinglish_stt_service import hinglish_stt_service
 
 logger = logging.getLogger(__name__)
 
@@ -30,20 +31,23 @@ async def _generate_stream_response(
     conversation_history: list,
 ):
     """Yield SSE events: transcript, then sentence chunks (text + audio base64), then done."""
-    # STT in-process (no extra HTTP hop)
-    user_utterance = await streaming_tutor_service.recognize_audio_bytes(audio_bytes)
-    if not user_utterance:
-        user_utterance = "(no speech detected)"
+    # Dual-pass STT + Azure PA so pronunciation context flows into Gemini and detection fires.
+    stt_result = await asyncio.to_thread(
+        hinglish_stt_service.transcribe_with_soft_assessment, audio_bytes
+    )
+    user_utterance = (stt_result.get("text") or "").strip() or "(no speech detected)"
+    phonetic_context: dict = stt_result.get("phonetic_insights") or {}
 
     # Emit transcript first so mobile can show it immediately
     yield {"type": "transcript", "text": user_utterance}
 
     # Stream Gemini + TTS sentence by sentence
+    full_response_text = ""
     async for chunk in streaming_tutor_service.generate_chunked_response(
         user_utterance,
         conversation_history,
         session_id,
-        phonetic_context=None,
+        phonetic_context=phonetic_context,
         audio_base64=None,
     ):
         if chunk.get("type") == "transcript":
@@ -51,10 +55,27 @@ async def _generate_stream_response(
             continue
         if chunk.get("type") == "sentence":
             raw_text = chunk.get("text", "") or ""
+            full_response_text += raw_text + " "
             payload = {"type": "sentence", "text": strip_pron_tags_for_mobile(raw_text)}
             if chunk.get("audio"):
                 payload["audio"] = base64.b64encode(chunk["audio"]).decode("utf-8")
             yield payload
+
+    # Capture pronunciation issues accumulated during this turn.
+    if full_response_text.strip() and session_id:
+        turn_issues = build_turn_capture(
+            full_response_text.strip(),
+            user_utterance,
+            phonetic_context=phonetic_context,
+        )
+        if turn_issues:
+            append_pronunciation_issues(session_id, turn_issues)
+            logger.info(
+                "[SSE] pronunciation issues captured session_id=%s count=%s",
+                session_id,
+                len(turn_issues),
+            )
+
     yield {"type": "done"}
 
 

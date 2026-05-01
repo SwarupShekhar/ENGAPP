@@ -57,6 +57,9 @@ async def transcribe_hinglish(
                 is_command=result.get("is_command", False),
                 matched_keyword=result.get("matched_keyword"),
                 phonetic_insights=result.get("phonetic_insights"),
+                display_text=result.get("display_text"),
+                display_provider=result.get("display_provider"),
+                display_confidence=result.get("display_confidence"),
             ),
             meta=Meta(
                 processing_time_ms=processing_time_ms,
@@ -187,6 +190,9 @@ async def transcribe_hinglish_upload(
                 is_command=transcription.get("is_command", False),
                 matched_keyword=transcription.get("matched_keyword"),
                 phonetic_insights=transcription.get("phonetic_insights"),
+                display_text=transcription.get("display_text"),
+                display_provider=transcription.get("display_provider"),
+                display_confidence=transcription.get("display_confidence"),
             )
         else:
             # Transcribe without intent (standard STT)
@@ -196,6 +202,9 @@ async def transcribe_hinglish_upload(
                 text=transcription.get("text", ""),
                 language=transcription.get("language"),
                 success=bool(transcription.get("text")),
+                display_text=transcription.get("display_text"),
+                display_provider=transcription.get("display_provider"),
+                display_confidence=transcription.get("display_confidence"),
             )
 
         processing_time_ms = int((time.time() - start_time) * 1000)

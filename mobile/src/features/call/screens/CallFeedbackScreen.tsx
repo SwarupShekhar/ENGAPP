@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
+import { useUser } from "@clerk/clerk-expo";
 import { fetchFeedbackNarration, fetchFullFeedbackNarration } from "../../../api/tts";
 import type { FeedbackSection } from "../../../api/tts";
+import { PronIssueNormalized, getPronUI, getPronLabel, getPronFix } from "../utils/pronUtils";
+import { usePulseTTS } from "../hooks/usePulseTTS";
 import {
   View,
   Text,
@@ -97,56 +100,6 @@ type PronIssueLike = {
   severity?: string;
   suggestion?: string;
 };
-
-type PronIssueNormalized = {
-  id: string;
-  correct: string;
-  spoken: string;
-  rule_category: string;
-  confidence?: number;
-  word_index?: number;
-  suggestion?: string;
-};
-
-function getPronUI(ruleCategory: string) {
-  const cat = (ruleCategory || "").trim();
-  const vowel =
-    cat === "i_to_ee" ||
-    cat === "ae_to_e" ||
-    cat === "o_to_aa" ||
-    cat.includes("vowel");
-
-  if (cat === "th_to_d") return { bg: "#FCEBEB", text: "#A32D2D", key: "TH" };
-  if (cat === "th_to_t") return { bg: "#FCEBEB", text: "#A32D2D", key: "TH" };
-  if (cat === "v_to_w" || cat === "v_to_b" || cat === "w_to_v" || cat === "v_to_w_reversal")
-    return { bg: "#FAEEDA", text: "#633806", key: "VW" };
-  if (vowel) return { bg: "#EEEDFE", text: "#3C3489", key: "V" };
-  if (cat === "r_rolling") return { bg: "#E1F5EE", text: "#085041", key: "R" };
-  return { bg: "#F1F5F9", text: "#475569", key: "PR" };
-}
-
-function getPronLabel(ruleCategory: string) {
-  const cat = (ruleCategory || "").trim();
-  if (cat === "th_to_d" || cat === "th_to_t") return "th sound";
-  if (cat === "v_to_b" || cat === "v_to_w" || cat === "w_to_v" || cat === "v_to_w_reversal")
-    return "v vs w/b";
-  if (cat === "i_to_ee" || cat.includes("vowel")) return "short i vowel";
-  if (cat === "r_rolling") return "r sound";
-  if (cat === "general_mispronunciation") return "mispronounced";
-  return cat ? cat.replace(/_/g, " ") : "pronunciation";
-}
-
-function getPronFix(ruleCategory: string) {
-  const cat = (ruleCategory || "").trim();
-  if (cat === "th_to_d" || cat === "th_to_t")
-    return "Place tongue tip lightly between teeth and breathe out.";
-  if (cat === "v_to_b" || cat === "v_to_w" || cat === "w_to_v" || cat === "v_to_w_reversal")
-    return "Touch upper teeth to lower lip, then vibrate.";
-  if (cat === "i_to_ee" || cat.includes("vowel"))
-    return "Keep the vowel short and relaxed, don't stretch it.";
-  if (cat === "r_rolling") return "Curl tongue back slightly, don't trill.";
-  return "Listen to a native speaker and repeat slowly.";
-}
 
 function _findWordRangeByIndex(text: string, wordIndex: number): { start: number; end: number } | null {
   if (!text || wordIndex == null || Number.isNaN(wordIndex) || wordIndex < 0) return null;
@@ -320,11 +273,13 @@ function PronunciationTabs({
   issues,
   transcript,
   onPractice,
+  firstName,
   enteringDelay = 400,
 }: {
   issues: PronIssueNormalized[];
   transcript: string;
-  onPractice: (ruleCategory: string) => void;
+  onPractice: (ruleCategory: string, reelId?: string) => void;
+  firstName?: string;
   enteringDelay?: number;
 }) {
   const theme = useAppTheme();
@@ -332,6 +287,7 @@ function PronunciationTabs({
   const [tab, setTab] = useState<"issues" | "transcript" | "patterns">("issues");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modalIssue, setModalIssue] = useState<PronIssueNormalized | null>(null);
+  const { playingId, play, stop } = usePulseTTS();
 
   const countsByCat: Record<string, number> = {};
   for (const i of issues) {
@@ -390,14 +346,32 @@ function PronunciationTabs({
           <View style={{ flex: 1 }}>
             <Text style={styles.pronIssueWordRow} numberOfLines={2}>
               <Text style={styles.pronIssueCorrect}>{item.correct}</Text>
-              <Text style={styles.pronIssueArrow}>{"  →  "}</Text>
-              <Text style={[styles.pronIssueSpoken, { color: ui.text }]}>{item.spoken}</Text>
+              {item.spoken && item.spoken !== "—" ? (
+                <>
+                  <Text style={styles.pronIssueArrow}>{"  →  "}</Text>
+                  <Text style={[styles.pronIssueSpoken, { color: ui.text }]}>{item.spoken}</Text>
+                </>
+              ) : null}
             </Text>
             <Text style={styles.pronIssueMeta}>
               {label}
               {acc != null ? ` • ${acc}%` : ""}
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => {
+              if (playingId === item.id) { stop(); return; }
+              if (playingId) stop();
+              play(item, firstName);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={playingId === item.id ? "stop-circle" : "volume-high-outline"}
+              size={20}
+              color={ui.text}
+            />
+          </TouchableOpacity>
           <Ionicons
             name="chevron-down"
             size={18}
@@ -410,12 +384,12 @@ function PronunciationTabs({
           <View style={styles.pronIssueExpanded}>
             <Text style={styles.pronIssueFix}>{getPronFix(item.rule_category)}</Text>
 
-            {/* eBites recommendation card */}
-            {item.rule_category && item.rule_category !== "general_mispronunciation" && (
+            {/* eBites recommendation card — show when we have a direct reel or a known error category */}
+            {(item.reel_id || (item.rule_category && item.rule_category !== "general_mispronunciation")) && (
               <TouchableOpacity
                 style={styles.ebitesRecommendCard}
                 activeOpacity={0.85}
-                onPress={() => onPractice(item.rule_category)}
+                onPress={() => onPractice(item.rule_category, item.reel_id)}
               >
                 <View style={styles.ebitesRecommendIcon}>
                   <Ionicons name="play-circle" size={22} color="#7C3AED" />
@@ -433,7 +407,7 @@ function PronunciationTabs({
             <TouchableOpacity
               style={[styles.pronPracticeBtn, { backgroundColor: ui.text }]}
               activeOpacity={0.85}
-              onPress={() => onPractice(item.rule_category)}
+              onPress={() => onPractice(item.rule_category, item.reel_id)}
             >
               <Text style={styles.pronPracticeBtnText}>Practice this sound</Text>
             </TouchableOpacity>
@@ -748,6 +722,7 @@ function getScoreColor(score: number, theme: any) {
 export default function CallFeedbackScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState<ConversationSession | null>(
     null,
@@ -1813,10 +1788,11 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               id: String(it.id ?? `${idx}`),
               correct: (it.correct ?? parsed.correctWord ?? it.word ?? "").trim() || "—",
               spoken: (it.spoken ?? parsed.spokenWord ?? it.word ?? "").trim() || "—",
-              rule_category: (it.rule_category ?? it.issueType ?? "").trim() || "general_mispronunciation",
+              rule_category: (it.rule_category ?? it.ruleCategory ?? it.issueType ?? "").trim() || "general_mispronunciation",
               confidence: it.confidence != null ? Number(it.confidence) : undefined,
               word_index: typeof it.word_index === "number" ? it.word_index : undefined,
               suggestion: it.suggestion,
+              reel_id: it.reelId ?? it.reel_id ?? undefined,
             };
           });
 
@@ -1835,11 +1811,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                 sessionData?.summaryJson?.transcript ??
                 ""
               }
-              onPractice={(ruleCategory) =>
+              onPractice={(ruleCategory, reelId) =>
                 navigation
                   .getParent()
-                  ?.navigate("MainTabs", { screen: "eBites", params: { ruleCategory } })
+                  ?.navigate("MainTabs", { screen: "eBites", params: reelId ? { reelId } : { ruleCategory } })
               }
+              firstName={user?.firstName ?? undefined}
               enteringDelay={400}
             />
           );
