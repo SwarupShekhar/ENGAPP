@@ -62,7 +62,7 @@ export class NotificationService {
       data: {
         userId,
         type,
-        payload: data as Record<string, unknown>,
+        payload: data as unknown as import('@prisma/client').Prisma.InputJsonValue,
         status: NotificationStatus.sent,
         attempts: 1,
       },
