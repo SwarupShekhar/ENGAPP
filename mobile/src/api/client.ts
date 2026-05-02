@@ -72,6 +72,16 @@ export const setAuthTokenFetcher = (fetcher: () => Promise<string | null>) => {
   getToken = fetcher;
 };
 
+/** Session JWT for Nest `client` (same source as the axios auth interceptor). */
+export async function getNestAuthToken(): Promise<string | null> {
+  if (!getToken) return null;
+  try {
+    return await getToken();
+  } catch {
+    return null;
+  }
+}
+
 client.interceptors.request.use(
   async (config) => {
     if (getToken) {

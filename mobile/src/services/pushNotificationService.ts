@@ -1,8 +1,9 @@
-import Pushy from 'pushy-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-import { tokenCache } from '../utils/tokenCache';
-import { navigate } from '../navigation/navigationRef';
+import Pushy from "pushy-react-native";
+import type { PushyPayload } from "pushy-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
+import { client, getNestAuthToken } from "../api/client";
+import { navigate } from "../navigation/navigationRef";
 
 const STORAGE_KEY = '@pushy_device_token';
 const PUSHY_ENABLED_KEY = '@pushy_enabled';
@@ -10,8 +11,8 @@ const PUSHY_ENABLED_KEY = '@pushy_enabled';
 class PushNotificationService {
   private static instance: PushNotificationService;
   private isInitialized = false;
-  private listeners: Array<(data: any) => void> = [];
-  private clickListeners: Array<(data: any) => void> = [];
+  private listeners: Array<(data: PushyPayload) => void> = [];
+  private clickListeners: Array<(data: PushyPayload) => void> = [];
 
   static getInstance(): PushNotificationService {
     if (!PushNotificationService.instance) {
@@ -31,22 +32,23 @@ class PushNotificationService {
       Pushy.listen();
 
       Pushy.setNotificationListener(async (data) => {
-        console.log('[Pushy] Received notification:', JSON.stringify(data));
+        console.log("[Pushy] Received notification:", JSON.stringify(data));
         this.listeners.forEach((cb) => cb(data));
 
-        if (Platform.OS === 'android') {
-          const title = data.title || 'EngR';
-          const message = data.message || data.body || 'New notification';
+        if (Platform.OS === "android") {
+          const title = (data.title as string) || "EngR";
+          const message =
+            (data.message as string) || (data.body as string) || "New notification";
           Pushy.notify(title, message, data);
         }
 
-        if (Platform.OS === 'ios') {
+        if (Platform.OS === "ios") {
           Pushy.setBadge(0);
         }
       });
 
       Pushy.setNotificationClickListener(async (data) => {
-        console.log('[Pushy] Notification clicked:', JSON.stringify(data));
+        console.log("[Pushy] Notification clicked:", JSON.stringify(data));
         this.clickListeners.forEach((cb) => cb(data));
         this.handleNotificationClick(data);
       });
@@ -95,24 +97,24 @@ class PushNotificationService {
 
   private async sendTokenToBackend(token: string): Promise<void> {
     try {
-      const authToken = await tokenCache.getToken();
+      const authToken = await getNestAuthToken();
       if (!authToken) {
-        console.warn('[Pushy] No auth token available, skipping backend registration');
+        console.warn("[Pushy] No auth token available, skipping backend registration");
         return;
       }
 
-      const { client } = await import('../api/client');
+      const platform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : "android";
 
-      await client.post('/users/me/device-token', {
+      await client.post("/users/me/device-token", {
         deviceToken: token,
-        platform: Platform.OS,
-        pushProvider: 'pushy',
+        platform,
+        pushProvider: "pushy",
       });
 
-      console.log('[Pushy] Token sent to backend successfully');
+      console.log("[Pushy] Token sent to backend successfully");
     } catch (error: any) {
-      console.error('[Pushy] Failed to send token to backend:', error.message || error);
-      await AsyncStorage.setItem('@pushy_pending_token', token);
+      console.error("[Pushy] Failed to send token to backend:", error.message || error);
+      await AsyncStorage.setItem("@pushy_pending_token", token);
     }
   }
 
@@ -134,23 +136,27 @@ class PushNotificationService {
 
   async unregister(): Promise<void> {
     try {
+      const storedToken = await AsyncStorage.getItem(STORAGE_KEY);
       await Pushy.unregister();
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      await this.setPushEnabled(false);
 
       try {
-        const authToken = await tokenCache.getToken();
-        if (authToken) {
-          const { client } = await import('../api/client');
-          await client.delete('/users/me/device-token');
+        const authToken = await getNestAuthToken();
+        if (authToken && storedToken) {
+          await client.delete(
+            `/users/me/device-token?token=${encodeURIComponent(storedToken)}`,
+          );
         }
       } catch (e: any) {
-        console.warn('[Pushy] Failed to remove token from backend:', e.message);
+        console.warn("[Pushy] Failed to remove token from backend:", e.message);
       }
 
-      console.log('[Pushy] Unregistered successfully');
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      // Do not call setPushEnabled(false) here — it calls unregister() and would recurse.
+      await AsyncStorage.setItem(PUSHY_ENABLED_KEY, "false");
+
+      console.log("[Pushy] Unregistered successfully");
     } catch (error: any) {
-      console.error('[Pushy] Unregistration failed:', error.message || error);
+      console.error("[Pushy] Unregistration failed:", error.message || error);
     }
   }
 
@@ -181,43 +187,45 @@ class PushNotificationService {
     return 0;
   }
 
-  onNotification(callback: (data: any) => void): () => void {
+  onNotification(callback: (data: PushyPayload) => void): () => void {
     this.listeners.push(callback);
     return () => {
       this.listeners = this.listeners.filter((cb) => cb !== callback);
     };
   }
 
-  onNotificationClick(callback: (data: any) => void): () => void {
+  onNotificationClick(callback: (data: PushyPayload) => void): () => void {
     this.clickListeners.push(callback);
     return () => {
       this.clickListeners = this.clickListeners.filter((cb) => cb !== callback);
     };
   }
 
-  private handleNotificationClick(data: any): void {
-    const { type, sessionId, conversationId } = data;
-    console.log('[Pushy] Navigating based on notification type:', type);
+  private handleNotificationClick(data: PushyPayload): void {
+    const type = data.type as string | undefined;
+    const sessionId = data.sessionId as string | undefined;
+    const conversationId = data.conversationId as string | undefined;
+    console.log("[Pushy] Navigating based on notification type:", type);
 
     switch (type) {
-      case 'message':
-        navigate('Chat', { conversationId });
+      case "message":
+        navigate("Chat", { conversationId });
         break;
-      case 'match':
-        navigate('CallPreference');
+      case "match":
+        navigate("CallPreference");
         break;
-      case 'session_ready':
-        navigate('AssessmentResult', { sessionId });
+      case "session_ready":
+        navigate("AssessmentResult", { sessionId });
         break;
-      case 'milestone':
-        navigate('MainTabs', { screen: 'Progress' });
+      case "milestone":
+        navigate("MainTabs", { screen: "Progress" });
         break;
-      case 'reminder':
-      case 'streak_risk':
-        navigate('MainTabs', { screen: 'Home' });
+      case "reminder":
+      case "streak_risk":
+        navigate("MainTabs", { screen: "Home" });
         break;
       default:
-        navigate('MainTabs');
+        navigate("MainTabs");
     }
   }
 
