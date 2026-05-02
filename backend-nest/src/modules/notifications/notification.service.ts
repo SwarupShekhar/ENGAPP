@@ -62,7 +62,7 @@ export class NotificationService {
       data: {
         userId,
         type,
-        payload: data as any,
+        payload: data as Record<string, unknown>,
         status: NotificationStatus.sent,
         attempts: 1,
       },
@@ -104,7 +104,11 @@ export class NotificationService {
         where: { id: log.id },
         data: { status: NotificationStatus.retrying },
       });
-      await this.notify(log.userId, log.type as NotificationType, log.payload as Record<string, unknown>);
+      try {
+        await this.notify(log.userId, log.type as NotificationType, log.payload as Record<string, unknown>);
+      } catch (err) {
+        this.logger.error(`[Notification] Retry failed for log ${log.id}: ${(err as Error).message}`);
+      }
     }
   }
 }
