@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class PointsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService,
+  ) {}
 
   async awardPoints(
     userId: string,
@@ -104,8 +108,9 @@ export class PointsService {
     // Award level-up badge
     await this.checkAndAwardBadge(userId, 'level_milestone', newLevel);
 
-    // Notify user
-    // TODO: Send push notification "🎉 You reached Level {newLevel}!"
+    await this.notificationService.notify(userId, 'milestone', {
+      label: `Level ${newLevel}`,
+    });
   }
 
   async checkAndAwardBadge(userId: string, badgeType: string, value?: number) {
