@@ -1,7 +1,8 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, UseGuards, Request, Body, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { TasksService } from '../tasks/tasks.service';
+import { DeviceTokenDto } from './dto/device-token.dto';
 
 @Controller('users')
 @UseGuards(ClerkGuard)
@@ -26,5 +27,25 @@ export class UsersController {
     async getPendingTasks(@Request() req) {
         const tasks = await this.tasksService.getPendingTasksForUser(req.user.id, 10);
         return { tasks };
+    }
+
+    @Post('me/device-token')
+    async registerDeviceToken(
+        @Body() dto: DeviceTokenDto,
+        @Request() req: any,
+    ): Promise<{ ok: boolean }> {
+        const userId = req.user.id;
+        await this.usersService.upsertDeviceToken(userId, dto.deviceToken, dto.platform);
+        return { ok: true };
+    }
+
+    @Delete('me/device-token')
+    async removeDeviceToken(
+        @Query('token') token: string,
+        @Request() req: any,
+    ): Promise<{ ok: boolean }> {
+        const userId = req.user.id;
+        await this.usersService.removeDeviceToken(userId, token);
+        return { ok: true };
     }
 }
