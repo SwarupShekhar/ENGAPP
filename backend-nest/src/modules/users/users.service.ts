@@ -252,6 +252,18 @@ export class UsersService {
     return levels[idx + 1] || 'C2';
   }
 
+  async upsertDeviceToken(userId: string, token: string, platform: 'ios' | 'android'): Promise<void> {
+    await this.prisma.deviceToken.upsert({
+      where: { token },
+      create: { userId, token, platform: platform as any },
+      update: { userId, updatedAt: new Date() },
+    });
+  }
+
+  async removeDeviceToken(userId: string, token: string): Promise<void> {
+    await this.prisma.deviceToken.deleteMany({ where: { userId, token } });
+  }
+
   private async calculateStreak(userId: string): Promise<number> {
     const sessions = await this.prisma.assessmentSession.findMany({
       where: { userId },
