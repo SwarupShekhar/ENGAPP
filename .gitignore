@@ -77,3 +77,9 @@ docs/superpowers/
 
 # Project-specific
 /generated/prisma
+
+# Claude Code local helpers (runtime files, not for repo)
+.claude/helpers/
+
+# Git worktrees (local development only)
+worktrees/
