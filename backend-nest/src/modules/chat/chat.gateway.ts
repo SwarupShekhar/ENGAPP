@@ -14,6 +14,7 @@ import { ChatService } from './chat.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
+import { NotificationService } from '../notifications/notification.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -43,6 +44,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private chatService: ChatService,
     private sessionsService: SessionsService,
     private redisService: RedisService,
+    private notificationService: NotificationService,
   ) {}
 
   // ── Connection ──────────────────────────────────────
@@ -167,12 +169,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       if (conversation) {
+        const offlineUserIds: string[] = [];
         conversation.participants.forEach((p) => {
           this.server.to(`user:${p.userId}`).emit('new_message', {
             conversationId: data.conversationId,
             message,
           });
+          if (p.userId !== client.userId && !this.onlineUsers.has(p.userId)) {
+            offlineUserIds.push(p.userId);
+          }
         });
+
+        if (offlineUserIds.length) {
+          const preview = data.content.length > 80 ? data.content.slice(0, 80) + '…' : data.content;
+          await this.notificationService.notifyMany(offlineUserIds, 'message', {
+            senderName: client.userName ?? 'New message',
+            preview,
+            conversationId: data.conversationId,
+          });
+        }
       }
 
       return { success: true, messageId: message.id };
