@@ -60,6 +60,7 @@ model User {
   topicScores            UserTopicScore[]
   callQualityScores      CallQualityScore[]
   deviceTokens           DeviceToken[]
+  notificationLogs       NotificationLog[]
 
   @@index([clerkId])
 }
@@ -83,6 +84,8 @@ model DeviceToken {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model NotificationLog {
@@ -93,6 +96,10 @@ model NotificationLog {
   sentAt   DateTime           @default(now())
   status   NotificationStatus @default(sent)
   attempts Int                @default(0)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }
 
 model UserAchievement {
