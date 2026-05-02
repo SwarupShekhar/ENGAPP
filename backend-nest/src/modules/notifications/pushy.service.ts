@@ -25,10 +25,21 @@ export class PushyService {
   }
 
   async send(tokens: string[], payload: PushPayload): Promise<SendResult[]> {
+    if (!this.apiKey.trim()) {
+      this.logger.warn('[Pushy] PUSHY_API_KEY is not set; skipping push delivery');
+      return tokens.map((token) => ({
+        token,
+        success: false,
+        error: 'PUSHY_API_KEY not configured',
+      }));
+    }
     return Promise.all(tokens.map((token) => this.sendOne(token, payload)));
   }
 
   private async sendOne(token: string, payload: PushPayload): Promise<SendResult> {
+    if (!this.apiKey.trim()) {
+      return { token, success: false, error: 'PUSHY_API_KEY not configured' };
+    }
     try {
       await axios.post(
         `https://api.pushy.me/push?api_key=${this.apiKey}`,

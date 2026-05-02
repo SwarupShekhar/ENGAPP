@@ -12,14 +12,27 @@ export interface StreamChunk {
 
 type StreamCallback = (chunk: StreamChunk) => void;
 
+const MAX_PENDING_SENDS = 32;
+
 class StreamingTutorService {
   private ws: WebSocket | null = null;
   private callbacks: StreamCallback[] = [];
+  /** JSON payloads waiting until the socket is OPEN (fixes race: send before onopen). */
+  private pendingSends: string[] = [];
+
+  private flushPendingSends() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    while (this.pendingSends.length > 0) {
+      const raw = this.pendingSends.shift();
+      if (raw) this.ws.send(raw);
+    }
+  }
 
   connect(sessionId: string, userId: string) {
     if (this.ws) {
       this.ws.close();
     }
+    this.pendingSends = [];
     const IS_PROD = !__DEV__;
     let wsUrl: string;
 
@@ -48,6 +61,7 @@ class StreamingTutorService {
 
     this.ws.onopen = () => {
       if (__DEV__) console.log("[StreamingTutor] Connected");
+      this.flushPendingSends();
     };
 
     this.ws.onmessage = (event) => {
@@ -70,15 +84,26 @@ class StreamingTutorService {
   }
 
   sendText(text: string | null, phoneticContext?: any, audioBase64?: string) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const payload: any = {};
-      if (text) payload.text = text;
-      if (phoneticContext) payload.phonetic_context = phoneticContext;
-      if (audioBase64) payload.audio_base64 = audioBase64;
+    const payload: Record<string, unknown> = {};
+    if (text) payload.text = text;
+    if (phoneticContext) payload.phonetic_context = phoneticContext;
+    if (audioBase64) payload.audio_base64 = audioBase64;
+    const raw = JSON.stringify(payload);
 
-      this.ws.send(JSON.stringify(payload));
-    } else {
-      console.warn("[StreamingTutor] WS not open");
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(raw);
+      return;
+    }
+
+    if (this.pendingSends.length >= MAX_PENDING_SENDS) {
+      this.pendingSends.shift();
+    }
+    this.pendingSends.push(raw);
+    if (__DEV__) {
+      console.warn(
+        "[StreamingTutor] WS not open — queued send (will flush on connect)",
+        { queueLen: this.pendingSends.length },
+      );
     }
   }
 
@@ -95,6 +120,7 @@ class StreamingTutorService {
   }
 
   disconnect() {
+    this.pendingSends = [];
     if (this.ws) {
       this.ws.close();
       this.ws = null;

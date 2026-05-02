@@ -7,9 +7,12 @@
  * for preview/production — release builds will then call your laptop instead of Render.
  */
 try {
-  // .env.local takes precedence (written by scripts/set-local-ip.sh for local device builds)
-  require("dotenv").config({ path: require("path").resolve(__dirname, ".env.local"), override: true });
-  require("dotenv").config();
+  const path = require("path");
+  const envDir = __dirname;
+  // Always load from the mobile/ folder — bare `dotenv.config()` uses process.cwd(),
+  // so starting Expo from the repo root skipped `mobile/.env` and broke BRIDGE_INTERNAL_SECRET.
+  require("dotenv").config({ path: path.resolve(envDir, ".env") });
+  require("dotenv").config({ path: path.resolve(envDir, ".env.local"), override: true });
 } catch {
   // dotenv optional; EAS provides env without it
 }
@@ -90,6 +93,17 @@ module.exports = {
         },
       ],
       "expo-speech-recognition",
+      // Embeds pushy-react-native native code (MainApplication / iOS). Rebuild dev client after changing this.
+      [
+        "pushy-expo-plugin",
+        {
+          "aps-environment":
+            process.env.EAS_BUILD_PROFILE === "production" ||
+            process.env.EAS_BUILD_PROFILE === "store"
+              ? "production"
+              : "development",
+        },
+      ],
     ],
     runtimeVersion: {
       policy: "appVersion",

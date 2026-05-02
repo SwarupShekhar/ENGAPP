@@ -83,12 +83,17 @@ export const joinBookedSession = (sessionId: string): Promise<LiveSessionToken> 
 export const joinSession = joinBookedSession;
 
 /**
- * GET /api/livekit/token — provision an instant tutor room.
- * No mode param = human tutor session.
- * Backend finds an available tutor, creates a room, returns token.
+ * GET /api/livekit/token?mode=human&category — provision an instant tutor room.
+ * Backend checks quota, creates a category room, returns token + freeMinutesRemaining.
  */
-export const getInstantTutorToken = (): Promise<LiveSessionToken> =>
-  client.get<LiveSessionToken>("/api/livekit/token").then((r) => r.data);
+export const getInstantTutorToken = (
+  category: "basics" | "general" | "business" = "general",
+): Promise<LiveSessionToken> =>
+  client
+    .get<LiveSessionToken>("/api/livekit/token", {
+      params: { mode: "human", category },
+    })
+    .then((r) => r.data);
 
 // ─── AI Tutor ─────────────────────────────────────────────────────────────────
 

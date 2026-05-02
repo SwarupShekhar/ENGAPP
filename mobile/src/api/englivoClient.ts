@@ -1,7 +1,6 @@
 import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-import { client as nestClient } from "./client";
 import { coerceReleaseApiOverride } from "./releaseUrlOverride";
 
 const IS_PROD = !__DEV__;
@@ -117,16 +116,18 @@ client.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-/** Conversation session counts — NestJS `GET /sessions/count` (not Englivo `/api`). */
+/** Conversation session counts — Core `GET /api/sessions/count`. */
 export async function getSessionsCount(): Promise<number> {
-  const r = await nestClient.get<{ count: number }>("/sessions/count");
-  return r.data.count;
+  const r = await client.get<{ count?: number } | number>("/api/sessions/count");
+  const payload = r.data as any;
+  if (typeof payload === "number") return payload;
+  return Number(payload?.count ?? 0);
 }
 
-/** Next scheduled peer session — NestJS `GET /sessions/upcoming`. */
+/** Next scheduled peer session — Core `GET /api/sessions/upcoming`. */
 export async function getUpcomingSession(): Promise<any | null> {
   try {
-    const r = await nestClient.get("/sessions/upcoming");
+    const r = await client.get("/api/sessions/upcoming");
     return r.data;
   } catch (error: any) {
     if (error.response?.status === 404) return null;
@@ -159,10 +160,10 @@ if (__DEV__) {
         );
       } else if (
         status === 404 &&
-        (url.includes("/api/me") || url.includes("/api/livekit/token"))
+        (url.includes("/api/me") || url.includes("/api/livekit/token") || url.includes("/api/sessions/upcoming"))
       ) {
         console.warn(
-          `[Englivo API] 404 on ${url} (route not available on local backend-ai)`,
+          `[Englivo API] 404 on ${url} (expected empty state)`,
           data,
         );
       } else if (status === 500 || status === 502 || status === 503) {

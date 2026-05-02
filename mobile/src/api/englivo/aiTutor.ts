@@ -96,15 +96,23 @@ export async function fetchLiveKitAiToken(): Promise<{ token: string } | string>
   return r.data as { token: string };
 }
 
+/** Max transcript length for /api/ai-tutor/report (avoids oversized payloads / server errors). */
+const AI_TUTOR_REPORT_TRANSCRIPT_MAX = 24_000;
+
 /** Compile messages into a single transcript string + word count for /api/ai-tutor/report. */
 export function buildAiTutorReportPayload(input: {
   sessionId: string;
   messages: { role: string; content: string }[];
   durationSeconds: number;
 }): AiTutorReportPayload {
-  const transcript = input.messages
+  let transcript = input.messages
     .map((m) => `${m.role === "user" ? "User" : "Englivo"}: ${m.content}`)
     .join("\n\n");
+  if (transcript.length > AI_TUTOR_REPORT_TRANSCRIPT_MAX) {
+    transcript =
+      transcript.slice(0, AI_TUTOR_REPORT_TRANSCRIPT_MAX) +
+      "\n\n[… transcript truncated for report …]";
+  }
   const words = transcript.trim().split(/\s+/).filter(Boolean).length;
   return {
     sessionId: input.sessionId,

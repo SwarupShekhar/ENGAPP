@@ -34,6 +34,28 @@ import { bridgeApi } from "../../../api/bridgeApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
+/** Target phrase when the tutor asks the user to repeat / say / pronounce (SSE + WS + playback). */
+function extractReferenceForPronunciation(aiMessage: string): string | null {
+  if (!aiMessage?.trim()) return null;
+  const patterns: RegExp[] = [
+    /(?:say|saying|repeat|try|pronounce|speak|boli(?:ye|o)?)\s*(?:after me|this|the word|it)?\s*[:-]?\s*["']([^"']{1,140})["']/i,
+    /(?:repeat\s+after\s+me)\s*[:-]?\s*["']([^"']{1,140})["']/i,
+    /(?:I'd like you to|I want you to|can you|could you|please)\s+(?:say|repeat|pronounce)\s*[:-]?\s*["']([^"']{1,140})["']/i,
+    /(?:the word|phrase|sentence)\s+is\s*["']([^"']{1,140})["']/i,
+    /(?:hear you say|listen for)\s*[:-]?\s*["']([^"']{1,140})["']/i,
+  ];
+  for (const re of patterns) {
+    const m = aiMessage.match(re);
+    if (m?.[1]?.trim()) return m[1].trim();
+  }
+  const lower = aiMessage.toLowerCase();
+  if (/\bpractice\b/.test(lower)) {
+    const m = aiMessage.match(/["']([^"']{2,80})["']/);
+    if (m?.[1]?.trim()) return m[1].trim();
+  }
+  return null;
+}
+
 // ─── Typing Dots ──────────────────────────────────────────
 function TypingDots() {
   const theme = useAppTheme();
@@ -197,6 +219,9 @@ export default function AITutorScreen({ navigation }: any) {
   const [transcript, setTranscript] = useState<any[]>([]);
 
   const sessionIdRef = useRef<string | null>(null);
+  const transcriptRef = useRef<any[]>([]);
+  const streamHandlerRef = useRef<(chunk: StreamChunk) => void>(() => {});
+  transcriptRef.current = transcript;
   const scrollRef = useRef<ScrollView>(null);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -303,7 +328,7 @@ export default function AITutorScreen({ navigation }: any) {
 
         // 4. Connect WebSocket + Setup Audio (non-blocking)
         streamingTutor.connect(res.sessionId, user?.id || "test");
-        streamingTutor.onMessage(handleStreamMessage);
+        streamingTutor.onMessage((c) => streamHandlerRef.current(c));
 
         Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
@@ -402,53 +427,43 @@ export default function AITutorScreen({ navigation }: any) {
           }
         });
       }
+    } else if (chunk.type === "done") {
+      setIsStreaming(false);
+      setTranscript((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.speaker === "ai" && last.isStreaming) {
+          const u = [...prev];
+          u[u.length - 1] = { ...last, isStreaming: false };
+          return u;
+        }
+        return prev;
+      });
+      setTimeout(() => evaluateLastMessageForPronunciation(), 0);
     }
 
     // Always check for audio in any chunk
     if (chunk.audio) {
       queueAudio(chunk.audio);
     }
-
-    // --- NEW: Detect if Maya is asking the user to repeat something ---
-    // Basic heuristic: check if the string contains a quoted phrase after words like "say", "saying", "repeat"
-    if (chunk.text && chunk.is_final !== false) {
-      // Wait for the chunk to assemble or just check the full string
-      // We'll run the check on the accumulated string once we know the stream is done,
-      // but since chunk.text comes in pieces, we'll wait for the `playNext` queue finish to evaluate the whole last message.
-    }
   };
 
-  // Evaluate last message for repetition prompts
+  // Evaluate last message for repetition prompts (uses ref so audio callbacks see latest transcript)
   const evaluateLastMessageForPronunciation = () => {
-    if (transcript.length === 0) return;
-    const lastMsg = transcript[transcript.length - 1];
+    const t = transcriptRef.current;
+    if (t.length === 0) return;
+    const lastMsg = t[t.length - 1];
     if (lastMsg.speaker !== "ai") return;
 
-    const txt = lastMsg.text.toLowerCase();
-
-    // Match patterns like:
-    // - "say: 'word'"
-    // - "repeat after me: 'phrase'"
-    // - "try saying 'this'"
-
-    const match = lastMsg.text.match(
-      /(?:say|saying|repeat|try|boli(?:ye|o))\s*(?:after me|this|say)?\s*[:,-]?\s*['"]([^'"]+)['"]/i,
-    );
-
-    if (match && match[1]) {
-      if (__DEV__) console.log("[Pronunciation] Detected reference text:", match[1]);
-      setReferenceTextForNextTurn(match[1]);
+    const ref = extractReferenceForPronunciation(lastMsg.text);
+    if (ref) {
+      if (__DEV__) console.log("[Pronunciation] Reference text:", ref);
+      setReferenceTextForNextTurn(ref);
     } else {
-      // Check if user explicitly asked to practice
-      const userMatch = lastMsg.text.match(/['"]([^'"]+)['"]/i); // Fallback: just grab quotes if it feels like a correction
-      if (txt.includes("practice") && userMatch && userMatch[1]) {
-        if (__DEV__) console.log("[Pronunciation] Detected practice word:", userMatch[1]);
-        setReferenceTextForNextTurn(userMatch[1]);
-      } else {
-        setReferenceTextForNextTurn(null);
-      }
+      setReferenceTextForNextTurn(null);
     }
   };
+
+  streamHandlerRef.current = handleStreamMessage;
 
   // ─── Audio Queue ────────────────────────────────────────
   const queueAudio = (base64: string) => {
@@ -709,8 +724,33 @@ export default function AITutorScreen({ navigation }: any) {
                     }
                   }
                 }
+                if (buffer.trim().startsWith("data: ")) {
+                  try {
+                    const chunk = JSON.parse(buffer.slice(6).trim());
+                    if (chunk.type === "transcript" && chunk.text)
+                      userTranscript = chunk.text;
+                    if (chunk.type === "sentence" && chunk.text)
+                      aiText += (aiText ? " " : "") + chunk.text;
+                    handleStreamMessage(chunk);
+                  } catch (_) {
+                    /* trailing incomplete JSON */
+                  }
+                }
+                if (aiText.trim()) {
+                  const ref = extractReferenceForPronunciation(aiText.trim());
+                  if (ref) {
+                    if (__DEV__)
+                      console.log("[Pronunciation] From SSE aggregate:", ref);
+                    setReferenceTextForNextTurn(ref);
+                  }
+                }
+                if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+                  setIsStreaming(false);
+                }
                 if (userTranscript && aiText.trim()) {
-                  tutorApi.appendTurn(sessionId, userTranscript, aiText.trim()).catch(() => {});
+                  tutorApi
+                    .appendTurn(sessionId, userTranscript, aiText.trim())
+                    .catch(() => {});
                 }
               }
             } catch (_) {

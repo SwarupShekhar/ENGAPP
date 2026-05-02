@@ -27,6 +27,13 @@ class PushNotificationService {
       return;
     }
 
+    if (Pushy == null || typeof (Pushy as { listen?: () => void }).listen !== "function") {
+      console.warn(
+        "[Pushy] Native module not linked. Rebuild the dev client after adding pushy-expo-plugin (npx expo prebuild --clean, then expo run:android / EAS). Skipping push init.",
+      );
+      return;
+    }
+
     try {
       console.log('[Pushy] Initializing SDK...');
       Pushy.listen();
