@@ -26,6 +26,7 @@ import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
+import PushNotificationService from "./services/pushNotificationService";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { SuperAppProvider } from "./context/SuperAppContext";
 import { SplashAnimation } from "./components/SplashAnimation";
@@ -232,6 +233,28 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppPushHandler({ children }: { children: React.ReactNode }) {
+  const { isSignedIn } = useAuth();
+  const pushService = PushNotificationService.getInstance();
+
+  useEffect(() => {
+    if (isSignedIn) {
+      pushService.initialize();
+    }
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: string) => {
+      if (nextState === 'active' && isSignedIn) {
+        pushService.retryPendingToken();
+      }
+    });
+    return () => subscription.remove();
+  }, [isSignedIn]);
+
+  return <>{children}</>;
+}
+
 /**
  * OnboardingGate checks if the signed-in user has completed:
  * 1. Profile creation (firstName exists)
@@ -381,6 +404,7 @@ export default function App() {
       <StartupReachabilityProbe />
       <AuthTokenInjector>
         <AppSocketHandler>
+          <AppPushHandler>
           <SafeAreaProvider>
             <SuperAppProvider>
               <ThemeProvider>
@@ -439,6 +463,7 @@ export default function App() {
               </ThemeProvider>
             </SuperAppProvider>
           </SafeAreaProvider>
+          </AppPushHandler>
         </AppSocketHandler>
       </AuthTokenInjector>
     </ClerkProvider>
