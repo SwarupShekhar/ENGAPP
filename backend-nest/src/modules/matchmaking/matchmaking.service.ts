@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../../redis/redis.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class MatchmakingService {
@@ -10,6 +11,7 @@ export class MatchmakingService {
   constructor(
     private redisService: RedisService,
     private prisma: PrismaService,
+    private notificationService: NotificationService,
   ) {}
 
   async joinQueue(userId: string, level: string, topic: string = 'general') {
@@ -215,6 +217,18 @@ export class MatchmakingService {
 
             // Clear initiator's meta (returning directly)
             await this.redisService.getClient().del(`user:${dbUserIdVal}:meta`);
+
+            // Notify both users
+            await Promise.all([
+              this.notificationService.notify(dbUserIdVal, 'match', {
+                partnerName: matchResultForInitiator.partnerName,
+                sessionId: session.id,
+              }),
+              this.notificationService.notify(dbPartnerId, 'match', {
+                partnerName: matchResultForPartner.partnerName,
+                sessionId: session.id,
+              }),
+            ]);
 
             return {
               matched: true,
