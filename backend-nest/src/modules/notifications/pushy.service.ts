@@ -45,8 +45,8 @@ export class PushyService {
         { timeout: 5000 },
       );
       return { token, success: true };
-    } catch (err: any) {
-      const errorMsg: string = err?.response?.data?.error ?? err?.message ?? 'unknown';
+    } catch (err) {
+      const errorMsg: string = (err as any)?.response?.data?.error ?? (err as Error)?.message ?? 'unknown';
       const isInvalid =
         errorMsg.includes('DeviceNotRegistered') ||
         errorMsg.includes('InvalidToken') ||
