@@ -693,6 +693,7 @@ export default function HomeScreen() {
   const goRetake   = () => navigation.navigate('AssessmentIntro');
   const goAssess   = () => navigation.navigate('AssessmentIntro');
   const goCall     = () => navigation.navigate('CallPreference');
+  const goBooking  = () => navigation.navigate('EnglivoBooking');
   const goChat     = () => navigation.navigate('Conversations');
   const goNotifs   = () => navigation.navigate('Notifications');
 
@@ -770,8 +771,12 @@ export default function HomeScreen() {
         )}
 
         {/* ── Call CTA ────────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(210).duration(380).springify()}>
+        <Animated.View entering={FadeInDown.delay(210).duration(380).springify()} style={{ gap: 8 }}>
           <CallCard theme={theme} onPress={goCall} />
+          <TouchableOpacity onPress={goBooking} activeOpacity={0.75} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 }}>
+            <Ionicons name="calendar-outline" size={15} color={c.primary} />
+            <Text style={{ color: c.primary, fontSize: 13, fontWeight: '600' }}>Book a Tutor Session</Text>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* ── Phrase of the Day carousel ──────────────────────────────────── */}

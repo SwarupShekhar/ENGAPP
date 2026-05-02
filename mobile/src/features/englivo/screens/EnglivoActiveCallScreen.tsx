@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -22,8 +23,10 @@ export default function EnglivoActiveCallScreen() {
   const { messages = [], durationSeconds = 0 } = route.params || {};
   const [phase, setPhase] = useState<"generating" | "report" | "error" | "done">("generating");
   const [report, setReport] = useState<SessionReport | null>(null);
+  const [reportAttempt, setReportAttempt] = useState(0);
 
-  useEffect(() => {
+  const runGenerateReport = useCallback(() => {
+    setPhase("generating");
     const sessionId = `session_${Date.now()}`;
     const reportBody = buildAiTutorReportPayload({
       sessionId,
@@ -50,11 +53,15 @@ export default function EnglivoActiveCallScreen() {
         console.error("[Englivo] generateReport failed:", err);
         setPhase("error");
       });
-  }, [durationSeconds, messages]);
+  }, [clerkUser?.id, durationSeconds, messages]);
+
+  useEffect(() => {
+    runGenerateReport();
+  }, [runGenerateReport, reportAttempt]);
 
   if (phase === "generating") {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
+      <SafeAreaView style={[styles.container, styles.centered]} edges={["top", "bottom"]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </SafeAreaView>
     );
@@ -62,10 +69,21 @@ export default function EnglivoActiveCallScreen() {
 
   if (phase === "error") {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
-        <Text style={[styles.summaryText, { textAlign: "center", marginBottom: 20 }]}>
+      <SafeAreaView style={[styles.container, styles.centered]} edges={["top", "bottom"]}>
+        <Text style={[styles.summaryText, { textAlign: "center", marginBottom: 12, paddingHorizontal: 24 }]}>
           Could not generate your session report. Your session has ended.
         </Text>
+        <Text style={[styles.summaryText, { textAlign: "center", marginBottom: 20, paddingHorizontal: 24, fontSize: 13 }]}>
+          You can try again once, or return home.
+        </Text>
+        {reportAttempt < 1 && (
+          <TouchableOpacity
+            style={[styles.saveButton, { marginBottom: 12 }]}
+            onPress={() => setReportAttempt((a) => a + 1)}
+          >
+            <Text style={styles.saveButtonText}>Retry report</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.saveButton}
           onPress={() => navigation.reset({ index: 0, routes: [{ name: "MainTabs" }] })}
@@ -77,7 +95,7 @@ export default function EnglivoActiveCallScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <LinearGradient colors={theme.colors.gradients.surface as any} style={styles.header}>
         <Text style={styles.headerTitle}>Session Report</Text>
       </LinearGradient>
