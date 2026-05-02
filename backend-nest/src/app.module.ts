@@ -31,6 +31,7 @@ import { HomeModule } from './modules/home/home.module';
 import { BrainModule } from './modules/brain/brain.module';
 import { InternalModule } from './modules/internal/internal.module';
 import { TtsModule } from './modules/tts/tts.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { TtsModule } from './modules/tts/tts.module';
     BrainModule,
     InternalModule,
     TtsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
