@@ -9,6 +9,7 @@ import { Logger } from '@nestjs/common';
 import axios from 'axios';
 import { Job, Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { NotificationService } from '../notifications/notification.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { TasksService } from '../tasks/tasks.service';
 import { SessionHandlerService } from '../home/services/session-handler.service';
@@ -22,6 +23,7 @@ export class SessionsProcessor {
 
   constructor(
     private prisma: PrismaService,
+    private notificationService: NotificationService,
     private assessmentService: AssessmentService,
     private tasksService: TasksService,
     private sessionHandlerService: SessionHandlerService,
@@ -325,6 +327,20 @@ export class SessionsProcessor {
         where: { id: sessionId },
         data: { status: 'COMPLETED' },
       });
+
+      // Notify each participant that their session analysis is ready
+      if (sessionData?.participants) {
+        await Promise.all(
+          sessionData.participants.map((sp) => {
+            const scores = (sp.analysis?.scores as Record<string, number> | null) ?? {};
+            const overall = scores.overall_score ?? scores.fluency ?? null;
+            return this.notificationService.notify(sp.userId, 'session_ready', {
+              sessionId,
+              score: overall != null ? Math.round(overall) : null,
+            });
+          }),
+        );
+      }
 
       this.logger.log(
         `Session ${sessionId} processing completed successfully.`,
