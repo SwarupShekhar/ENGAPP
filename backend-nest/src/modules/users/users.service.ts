@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { DevicePlatform } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 
 @Injectable()
@@ -255,7 +256,7 @@ export class UsersService {
   async upsertDeviceToken(userId: string, token: string, platform: 'ios' | 'android'): Promise<void> {
     await this.prisma.deviceToken.upsert({
       where: { token },
-      create: { userId, token, platform: platform as any },
+      create: { userId, token, platform: platform as DevicePlatform },
       update: { userId, updatedAt: new Date() },
     });
   }
