@@ -3,7 +3,7 @@ import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useUser } from "@clerk/clerk-expo";
 import { fetchFeedbackNarration, fetchFullFeedbackNarration } from "../../../api/tts";
-import type { FeedbackSection } from "../../../api/tts";
+import type { FeedbackSection, WordTimestamp } from "../../../api/tts";
 import { PronIssueNormalized, getPronUI, getPronLabel, getPronFix } from "../utils/pronUtils";
 import { usePulseTTS } from "../hooks/usePulseTTS";
 import {
@@ -748,12 +748,18 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [isPlayingFullFeedback, setIsPlayingFullFeedback] = useState(false);
   const [isLoadingFullFeedback, setIsLoadingFullFeedback] = useState(false);
   const fullFeedbackSoundRef = useRef<Audio.Sound | null>(null);
+  const [ttsSubtitle, setTtsSubtitle] = useState<string | null>(null);
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [wordTimestamps, setWordTimestamps] = useState<WordTimestamp[]>([]);
+  const [currentWordIdx, setCurrentWordIdx] = useState<number>(-1);
+  const subtitlePollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Clean up audio on unmount
   useEffect(() => {
     return () => {
       soundRef.current?.unloadAsync().catch(() => {});
       fullFeedbackSoundRef.current?.unloadAsync().catch(() => {});
+      if (subtitlePollerRef.current) clearInterval(subtitlePollerRef.current);
     };
   }, []);
 
@@ -886,6 +892,30 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     return `${m}m ${s}s`;
   };
 
+  const startWordTracking = (sound: Audio.Sound, timestamps: WordTimestamp[]) => {
+    if (!timestamps.length) return;
+    setWordTimestamps(timestamps);
+    subtitlePollerRef.current = setInterval(async () => {
+      const status = await sound.getStatusAsync().catch(() => null);
+      if (!status || !status.isLoaded) return;
+      const posMs = status.positionMillis;
+      let idx = -1;
+      for (let i = timestamps.length - 1; i >= 0; i--) {
+        if (timestamps[i].startMs <= posMs) { idx = i; break; }
+      }
+      setCurrentWordIdx(idx);
+    }, 80);
+  };
+
+  const stopWordTracking = () => {
+    if (subtitlePollerRef.current) {
+      clearInterval(subtitlePollerRef.current);
+      subtitlePollerRef.current = null;
+    }
+    setCurrentWordIdx(-1);
+    setWordTimestamps([]);
+  };
+
   // handlePlay must be declared before any early returns to satisfy Rules of Hooks.
   // It reads from sessionData (state) directly so it's safe to call from any render path.
   const handlePlay = useCallback(
@@ -953,6 +983,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           score: sectionScores[section] ?? 0,
           justification: sectionJustifications[section],
           errors: sectionErrors[section],
+          first_name: user?.firstName ?? undefined,
         });
 
         if (!result.audio_base64) {
@@ -1002,6 +1033,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       await fullFeedbackSoundRef.current?.unloadAsync().catch(() => {});
       fullFeedbackSoundRef.current = null;
       setIsPlayingFullFeedback(false);
+      setTtsSubtitle(null);
+      stopWordTracking();
       return;
     }
 
@@ -1048,6 +1081,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           vocabulary: aiFeedback?.vocabulary?.justification,
           fluency: aiFeedback?.fluency?.justification,
         },
+        first_name: user?.firstName ?? undefined,
       });
 
       if (!result.audio_base64) {
@@ -1063,17 +1097,21 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const { sound } = await Audio.Sound.createAsync(
         { uri: tmpUri },
-        { shouldPlay: true },
+        { shouldPlay: true, rate: 0.9, shouldCorrectPitch: true },
       );
       fullFeedbackSoundRef.current = sound;
       setIsLoadingFullFeedback(false);
       setIsPlayingFullFeedback(true);
+      setTtsSubtitle(result.text);
+      startWordTracking(sound, result.word_timestamps ?? []);
 
       sound.setOnPlaybackStatusUpdate((status) => {
         if ((status as any).didJustFinish) {
           sound.unloadAsync().catch(() => {});
           fullFeedbackSoundRef.current = null;
           setIsPlayingFullFeedback(false);
+          setTtsSubtitle(null);
+          stopWordTracking();
         }
       });
     } catch (err) {
@@ -1460,6 +1498,28 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </Animated.View>
 
+        {ttsSubtitle && (
+          <Animated.View entering={FadeInDown.delay(0).springify()} style={styles.subtitleBox}>
+            {wordTimestamps.length > 0 ? (
+              <Text style={styles.subtitleText}>
+                {wordTimestamps.map((wt, i) => (
+                  <Text
+                    key={i}
+                    style={[
+                      styles.subtitleWord,
+                      i === currentWordIdx && styles.subtitleWordActive,
+                    ]}
+                  >
+                    {wt.word}{' '}
+                  </Text>
+                ))}
+              </Text>
+            ) : (
+              <Text style={styles.subtitleText}>{ttsSubtitle}</Text>
+            )}
+          </Animated.View>
+        )}
+
         {/* Cap notification banner: pronunciation is holding score back */}
         {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
           (data?.scores?.pronunciation != null &&
@@ -1499,41 +1559,56 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             entering={FadeInDown.delay(80).springify()}
             style={styles.transcriptSection}
           >
-            <Text style={styles.sectionTitle}>Conversation</Text>
-            {(data.mistakes.length > 0 || data.pronunciationIssues.length > 0) && (
-              <View style={styles.transcriptLegend}>
-                {data.mistakes.length > 0 && (
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: theme.colors.error + "40" }]} />
-                    <Text style={styles.legendText}>Grammar</Text>
+            <TouchableOpacity
+              style={styles.transcriptToggleRow}
+              activeOpacity={0.8}
+              onPress={() => setTranscriptExpanded((v) => !v)}
+            >
+              <Text style={styles.sectionTitle}>Conversation</Text>
+              <Ionicons
+                name={transcriptExpanded ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={theme.colors.text.secondary}
+              />
+            </TouchableOpacity>
+            {transcriptExpanded && (
+              <>
+                {(data.mistakes.length > 0 || data.pronunciationIssues.length > 0) && (
+                  <View style={styles.transcriptLegend}>
+                    {data.mistakes.length > 0 && (
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: theme.colors.error + "40" }]} />
+                        <Text style={styles.legendText}>Grammar</Text>
+                      </View>
+                    )}
+                    {data.pronunciationIssues.length > 0 && (
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: theme.colors.warning + "50" }]} />
+                        <Text style={styles.legendText}>Pronunciation</Text>
+                      </View>
+                    )}
                   </View>
                 )}
-                {data.pronunciationIssues.length > 0 && (
-                  <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: theme.colors.warning + "50" }]} />
-                    <Text style={styles.legendText}>Pronunciation</Text>
-                  </View>
-                )}
-              </View>
+                <View style={styles.transcriptCard}>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={styles.transcriptScroll}
+                  >
+                    <TranscriptWithHighlights
+                      transcript={
+                        sessionData?.feedback?.transcript ??
+                        sessionData?.summaryJson?.transcript ??
+                        ""
+                      }
+                      mistakes={data.mistakes}
+                      pronunciationIssues={data.pronunciationIssues}
+                      participants={sessionData?.participants}
+                    />
+                  </ScrollView>
+                </View>
+              </>
             )}
-            <View style={styles.transcriptCard}>
-              <ScrollView
-                nestedScrollEnabled
-                showsVerticalScrollIndicator
-                style={styles.transcriptScroll}
-              >
-                <TranscriptWithHighlights
-                  transcript={
-                    sessionData?.feedback?.transcript ??
-                    sessionData?.summaryJson?.transcript ??
-                    ""
-                  }
-                  mistakes={data.mistakes}
-                  pronunciationIssues={data.pronunciationIssues}
-                  participants={sessionData?.participants}
-                />
-              </ScrollView>
-            </View>
           </Animated.View>
         )}
 
@@ -2194,6 +2269,35 @@ const getStyles = (theme: any) => {
       color: "#fff",
       fontSize: 15,
       fontWeight: "700",
+    },
+    subtitleBox: {
+      marginHorizontal: 16,
+      marginTop: 8,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.12)',
+    },
+    subtitleText: {
+      color: 'rgba(255,255,255,0.88)',
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    subtitleWord: {
+      color: 'rgba(255,255,255,0.55)',
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    subtitleWordActive: {
+      color: '#ffffff',
+      fontWeight: '700',
+    },
+    transcriptToggleRow: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
+      marginBottom: 8,
     },
     headerTitle: {
       fontSize: theme.typography.sizes.l,

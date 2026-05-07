@@ -56,7 +56,7 @@ def build_pronunciation_script(
             if spoken and correct and spoken.lower() != correct.lower():
                 tip = _pron_tip(rule)
                 parts.append(
-                    f"For example, you said '{spoken}' but the correct word is '{correct}'. {tip}"
+                    f"You said '{spoken}' — try to say '{correct}' instead. {tip}"
                 )
     parts.append(_closing(score))
     return " ".join(parts)
@@ -138,6 +138,7 @@ def build_full_feedback_script(
     vocabulary_issues: Optional[List[dict]] = None,
     scores: Optional[dict] = None,
     justifications: Optional[dict] = None,
+    first_name: Optional[str] = None,
 ) -> str:
     """
     Builds one complete sequential feedback narration covering ALL sections.
@@ -150,18 +151,19 @@ def build_full_feedback_script(
     scores = scores or {}
     justifications = justifications or {}
 
-    parts.append("Here is your feedback from today's call.")
+    greeting = f"Hey {first_name}!" if first_name else "Hey!"
+    parts.append(f"{greeting} Let me walk you through your feedback from today's call.")
 
     # ── Pronunciation ────────────────────────────────────────────────────
     pron_score = int(scores.get("pronunciation", 0))
     pron_issues = pronunciation_issues or []
     if pron_score > 0 or pron_issues:
         if pron_score >= 80:
-            parts.append(f"Pronunciation: Great job! Your score is {pron_score} out of 100.")
+            parts.append(f"For pronunciation, you scored {pron_score} out of 100. That is excellent work.")
         elif pron_score >= 55:
-            parts.append(f"Pronunciation: Your score is {pron_score} out of 100. A few areas to refine.")
+            parts.append(f"For pronunciation, you scored {pron_score} out of 100. There are a couple of things to work on.")
         else:
-            parts.append(f"Pronunciation: Your score is {pron_score} out of 100. Focus on these sounds.")
+            parts.append(f"For pronunciation, you scored {pron_score} out of 100. Let us focus on a few key sounds.")
 
         for err in pron_issues[:4]:
             spoken = (err.get("spoken") or err.get("word") or "").strip()
@@ -170,7 +172,7 @@ def build_full_feedback_script(
             if spoken and correct and spoken.lower() != correct.lower():
                 tip = _pron_tip(rule)
                 parts.append(
-                    f"You said '{spoken}' — the correct pronunciation is '{correct}'. {tip}"
+                    f"I noticed you said '{spoken}'. The correct word is '{correct}'. {tip}"
                 )
         jus = (justifications.get("pronunciation") or "").strip()
         if jus and len(pron_issues) == 0:
@@ -181,15 +183,15 @@ def build_full_feedback_script(
     grammar_errors = grammar_mistakes or []
     if grammar_score > 0 or grammar_errors:
         if grammar_score >= 80:
-            parts.append(f"Grammar: Excellent! Your score is {grammar_score} out of 100.")
+            parts.append(f"Moving on to grammar — you scored {grammar_score} out of 100. Excellent work.")
         else:
-            parts.append(f"Grammar: Your score is {grammar_score} out of 100.")
+            parts.append(f"Moving on to grammar — you scored {grammar_score} out of 100.")
 
         for err in grammar_errors[:3]:
             original = (err.get("original_text") or err.get("original") or "").strip()
             corrected = (err.get("corrected_text") or err.get("corrected") or "").strip()
             if original and corrected and original.lower() != corrected.lower():
-                parts.append(f"You said '{original}' — the correct form is '{corrected}'.")
+                parts.append(f"Instead of '{original}', say '{corrected}'.")
         jus = (justifications.get("grammar") or "").strip()
         if jus and len(grammar_errors) == 0:
             parts.append(jus[:160])
@@ -199,9 +201,9 @@ def build_full_feedback_script(
     if vocab_score > 0:
         jus = (justifications.get("vocabulary") or "").strip()
         if vocab_score >= 80:
-            parts.append(f"Vocabulary: Impressive range — {vocab_score} out of 100.")
+            parts.append(f"For vocabulary, you scored {vocab_score} out of 100. Impressive range of words.")
         else:
-            parts.append(f"Vocabulary: Your score is {vocab_score} out of 100.")
+            parts.append(f"For vocabulary, you scored {vocab_score} out of 100.")
             if jus:
                 parts.append(jus[:140])
 
@@ -210,9 +212,9 @@ def build_full_feedback_script(
     if fluency_score > 0:
         jus = (justifications.get("fluency") or "").strip()
         if fluency_score >= 80:
-            parts.append(f"Fluency: You spoke smoothly — {fluency_score} out of 100.")
+            parts.append(f"And for fluency, you scored {fluency_score} out of 100. You spoke very smoothly.")
         else:
-            parts.append(f"Fluency: Your score is {fluency_score} out of 100.")
+            parts.append(f"And for fluency, you scored {fluency_score} out of 100.")
             if jus:
                 parts.append(jus[:140])
 

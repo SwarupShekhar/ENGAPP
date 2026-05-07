@@ -15,11 +15,19 @@ export interface FeedbackNarrationPayload {
   score: number;
   justification?: string;
   errors?: NarrationError[];
+  first_name?: string;
+}
+
+export interface WordTimestamp {
+  word: string;
+  startMs: number;
+  endMs: number;
 }
 
 export interface FeedbackNarrationResponse {
   audio_base64: string;
   text: string;
+  word_timestamps?: WordTimestamp[];
 }
 
 /**
@@ -54,6 +62,7 @@ export interface FullFeedbackNarrationPayload {
     vocabulary?: string;
     fluency?: string;
   };
+  first_name?: string;
 }
 
 /**

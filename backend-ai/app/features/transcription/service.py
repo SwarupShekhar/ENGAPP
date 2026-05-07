@@ -247,24 +247,17 @@ class TranscriptionService:
             audio_bytes = base64.b64decode(request.audio_base64)
             audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
         else:
-            import tempfile
-            from app.features.transcription.audio_utils import download_audio_streamed
+            import httpx
 
             audio_url = str(request.audio_url)
-            ext = os.path.splitext(audio_url.split("?")[0])[-1] or ".mp4"
-            fd, tmp_path = tempfile.mkstemp(suffix=ext)
-            os.close(fd)
-            try:
-                await download_audio_streamed(audio_url, tmp_path)
-                file_size = os.path.getsize(tmp_path)
-                logger.info(f"Downloaded audio from URL: {file_size} bytes, ext={ext}")
-
-                audio_segment = await asyncio.to_thread(AudioSegment.from_file, tmp_path)
-            finally:
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(audio_url)
+                resp.raise_for_status()
+                audio_data = resp.content
+            logger.info(f"Downloaded audio from URL: {len(audio_data)} bytes")
+            audio_segment = await asyncio.to_thread(
+                AudioSegment.from_file, io.BytesIO(audio_data)
+            )
 
         audio_segment = audio_segment.set_frame_rate(16000).set_channels(1).set_sample_width(2)
         pcm_audio = audio_segment.raw_data

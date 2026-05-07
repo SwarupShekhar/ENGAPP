@@ -17,10 +17,9 @@ export class InternalController {
     @Headers('x-internal-secret') secret: string,
     @Body() body: { clerkId: string; email: string; fullName: string },
   ) {
-    // Make sure this matches the variable name in your .env (INTERNAL_API_KEY or INTERNAL_BRIDGE_SECRET)
-    const expectedSecret = process.env.INTERNAL_API_KEY || process.env.INTERNAL_BRIDGE_SECRET;
+    const expectedSecret = process.env.INTERNAL_SECRET || process.env.INTERNAL_API_KEY || process.env.INTERNAL_BRIDGE_SECRET;
 
-    if (secret !== expectedSecret) {
+    if (!expectedSecret || secret !== expectedSecret) {
       throw new UnauthorizedException('Invalid internal secret');
     }
 
@@ -73,7 +72,7 @@ export class InternalController {
       process.env.INTERNAL_API_KEY ||
       process.env.INTERNAL_BRIDGE_SECRET;
 
-    if (secret !== expectedSecret) {
+    if (!expectedSecret || secret !== expectedSecret) {
       throw new UnauthorizedException('Invalid internal secret');
     }
 

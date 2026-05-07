@@ -32,10 +32,12 @@ import { BrainModule } from './modules/brain/brain.module';
 import { InternalModule } from './modules/internal/internal.module';
 import { TtsModule } from './modules/tts/tts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SentryModule } from '@sentry/nestjs/setup';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, redisConfig, livekitConfig],

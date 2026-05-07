@@ -2,19 +2,20 @@ import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { coerceReleaseApiOverride } from "./releaseUrlOverride";
+import { readExpoExtra } from "./expoExtra";
+import { getCachedToken } from "./authToken";
 
 const IS_PROD = !__DEV__;
 // Set to true only when you intentionally run backend-ai locally with matching routes.
 const FORCE_LOCAL = false;
 
-const LOCAL_IP = "192.168.1.34";
+const LOCAL_IP = "172.20.10.13";
 /** backend-ai (FastAPI) local port — not Nest (3000/3002). */
 const LOCAL_PORT = "8001";
 const isDevice = Constants.isDevice;
 
 const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
-  (Constants.expoConfig as any)?.extra?.englivoApiUrlOverride ||
-    (Constants.manifest as any)?.extra?.englivoApiUrlOverride,
+  readExpoExtra("englivoApiUrlOverride"),
   "Englivo API",
 );
 
@@ -80,7 +81,7 @@ client.interceptors.request.use(
   async (config) => {
     if (getToken) {
       try {
-        const token = await getToken();
+        const token = await getCachedToken(getToken);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
           // One-time diagnostic: log which Clerk instance issued this token
@@ -115,25 +116,6 @@ client.interceptors.request.use(
   },
   (error) => Promise.reject(error),
 );
-
-/** Conversation session counts — Core `GET /api/sessions/count`. */
-export async function getSessionsCount(): Promise<number> {
-  const r = await client.get<{ count?: number } | number>("/api/sessions/count");
-  const payload = r.data as any;
-  if (typeof payload === "number") return payload;
-  return Number(payload?.count ?? 0);
-}
-
-/** Next scheduled peer session — Core `GET /api/sessions/upcoming`. */
-export async function getUpcomingSession(): Promise<any | null> {
-  try {
-    const r = await client.get("/api/sessions/upcoming");
-    return r.data;
-  } catch (error: any) {
-    if (error.response?.status === 404) return null;
-    throw error;
-  }
-}
 
 if (__DEV__) {
   client.interceptors.response.use(

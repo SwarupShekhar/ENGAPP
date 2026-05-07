@@ -9,9 +9,13 @@ logger = logging.getLogger(__name__)
 
 class StreamingGeminiService:
     def __init__(self):
+        self.enabled = bool(settings.google_api_key)
         if not settings.google_api_key:
-            raise RuntimeError("GOOGLE_API_KEY is required but not configured")
-        
+            logger.warning("GOOGLE_API_KEY is not configured; Gemini tutor responses are disabled.")
+            self.model = None
+            self.model_name = ""
+            return
+
         genai.configure(api_key=settings.google_api_key)
         self.model_name = 'gemini-2.5-flash'
         self.model = genai.GenerativeModel(self.model_name)
@@ -36,6 +40,10 @@ class StreamingGeminiService:
         Stream tokens from Gemini and yield complete sentences as they form.
         If audio_base64 is provided, Gemini receives the raw audio to analyze pronunciation.
         """
+        if not self.enabled or self.model is None:
+            yield "I'm not fully configured yet. Please set GOOGLE_API_KEY and restart the AI service."
+            return
+
         full_prompt = self._build_conversation_prompt(prompt, conversation_history, phonetic_context)
         logger.info(f"GEMINI PROMPT: {prompt[:50]}... context={bool(phonetic_context)}, audio={bool(audio_base64)}")
         

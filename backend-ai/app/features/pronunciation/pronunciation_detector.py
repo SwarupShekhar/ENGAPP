@@ -13,13 +13,15 @@ import logging
 from typing import Any
 
 from app.phoneme_loader import get_phoneme_map, get_reel_map
+from app.features.pronunciation.g2p_fallback import g2p_phonemes
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ACCURACY_THRESHOLD = 78  # Stricter default for better mispronunciation recall.
-FUNCTION_WORD_THRESHOLD = 84     # Function words (the/this/that) need tighter scoring.
-PHONEME_BAD_THRESHOLD = 72       # Catch weaker phoneme realizations earlier.
-FALSE_POSITIVE_SUPPRESSION = 95  # Suppress only when confidence is very high.
+DEFAULT_ACCURACY_THRESHOLD = 82  # Stricter default for better mispronunciation recall.
+FUNCTION_WORD_THRESHOLD = 86     # Function words (the/this/that) need tighter scoring.
+PHONEME_BAD_THRESHOLD = 70       # Lowered: general phonemes flagged more aggressively.
+CRITICAL_PHONEME_THRESHOLD = 70  # Explicit threshold for V/W/TH/zh/r/h — even more sensitive.
+FALSE_POSITIVE_SUPPRESSION = 97  # Suppress only when confidence is very high.
 # Layer 2: max phoneme edit distance (CMU or aligned IPA) to call it a substitution
 PHONEME_SUBSTITUTION_MAX_DISTANCE = 3
 
@@ -247,76 +249,33 @@ def _ensure_pronouncing():
     return _pronouncing_available
 
 
-def _ensure_phonemizer():
-    """Lazy-load phonemizer (espeak backend) for CMU gaps."""
-    global _phonemizer_loaded, _phonemizer_available
-    if _phonemizer_loaded:
-        return _phonemizer_available
-    _phonemizer_loaded = True
-    try:
-        import phonemizer  # noqa: F401
-        _phonemizer_available = True
-    except ImportError:
-        logger.warning("phonemizer/espeak not installed — phonemizer fallback disabled")
-        _phonemizer_available = False
-    return _phonemizer_available
-
-
-def _phonemizer_fallback(word: str) -> list[str]:
-    """IPA phone sequence via espeak; uses | between phones for stable tokenization."""
-    if not _ensure_phonemizer():
-        return []
-    try:
-        from phonemizer import phonemize
-        from phonemizer.separator import Separator
-
-        sep = Separator(phone="|", word=" ")
-        raw = phonemize(
-            word.strip(),
-            language="en-us",
-            backend="espeak",
-            strip=True,
-            separator=sep,
-        )
-        if not raw or not str(raw).strip():
-            return []
-        tokens: list[str] = []
-        for part in str(raw).strip().split("|"):
-            tok = part.strip()
-            tok = tok.lstrip("ˈˌ")
-            tok = tok.rstrip("012")
-            if tok:
-                tokens.append(tok)
-        return tokens
-    except Exception:
-        return []
-
-
 def _phoneme_edit_distance(word_a: str, word_b: str) -> int | None:
     """
-    Compute phoneme-level edit distance between two English words using CMU dict.
-    If either word is missing from CMU, uses phonemizer (IPA) for *both* words so
-    sequences are comparable (mixed CMU+IPA inflated distances).
-    Returns None if either word has no phoneme sequence from either source.
+    Compute phoneme-level edit distance using CMU dict, with g2p-en fallback.
+    Returns None if either word has no phoneme sequence.
     """
     import pronouncing
     import editdistance as ed
 
-    phones_a = pronouncing.phones_for_word(word_a.lower())
-    phones_b = pronouncing.phones_for_word(word_b.lower())
+    word_a_l = word_a.lower().strip()
+    word_b_l = word_b.lower().strip()
+
+    phones_a = pronouncing.phones_for_word(word_a_l)
+    phones_b = pronouncing.phones_for_word(word_b_l)
 
     if phones_a and phones_b:
         a_seq = [p.rstrip("012") for p in phones_a[0].split()]
         b_seq = [p.rstrip("012") for p in phones_b[0].split()]
         return ed.eval(a_seq, b_seq)
 
-    if not _ensure_phonemizer():
-        return None
-    seq_a = _phonemizer_fallback(word_a)
-    seq_b = _phonemizer_fallback(word_b)
-    if not seq_a or not seq_b:
-        return None
-    return ed.eval(seq_a, seq_b)
+    # Fallback: use g2p-en for BOTH words if either is missing from CMU
+    seq_a = g2p_phonemes(word_a_l)
+    seq_b = g2p_phonemes(word_b_l)
+    if seq_a and seq_b:
+        return ed.eval(seq_a, seq_b)
+
+    logger.debug(f"No phoneme sequence for '{word_a_l}' or '{word_b_l}'")
+    return None
 
 
 def _run_phoneme_distance_pass(
@@ -371,17 +330,100 @@ def _run_phoneme_distance_pass(
     return extra_flags
 
 
+def _run_nbest_word_substitution_check(
+    azure_result: dict[str, Any],
+    words: list[dict[str, Any]],
+    reference_words: set[str],
+) -> list[dict[str, Any]]:
+    """
+    Layer 3: Check N-Best word candidates for hidden substitutions.
+
+    Scenario: User says "very", Azure's top hypothesis is "berry" (conf 0.85),
+    but candidate 2 is "very" (conf 0.82). Top word not in reference, but
+    a lower candidate IS → flag as substitution even if top word scored high.
+    """
+    flags: list[dict[str, Any]] = []
+
+    # Preferred path: Azure top-level NBest hypotheses (actual SDK shape).
+    nbest_hyps = (
+        azure_result.get("NBest")
+        or azure_result.get("Nbests")
+        or azure_result.get("nbest")
+        or []
+    )
+    if isinstance(nbest_hyps, list) and len(nbest_hyps) >= 2:
+        top_words = nbest_hyps[0].get("Words") or nbest_hyps[0].get("words") or []
+        for idx, top_word_entry in enumerate(top_words):
+            top_word = _normalize(top_word_entry.get("Word", ""))
+            if not top_word or top_word in reference_words:
+                continue
+
+            # Scan same word position across alternate hypotheses.
+            for alt_hyp in nbest_hyps[1:]:
+                alt_words = alt_hyp.get("Words") or alt_hyp.get("words") or []
+                if idx >= len(alt_words):
+                    continue
+                cand_word = _normalize(alt_words[idx].get("Word", ""))
+                if cand_word in reference_words:
+                    flags.append({
+                        "spoken": top_word,
+                        "correct": cand_word,
+                        "rule_category": "nbest_word_substitution",
+                        "reel_id": None,
+                        "confidence": float(alt_hyp.get("Confidence", 50.0)),
+                    })
+                    logger.info(
+                        "Layer 3 N-Best substitution: top='%s' → candidate='%s' (alt_conf=%s)",
+                        top_word,
+                        cand_word,
+                        alt_hyp.get("Confidence"),
+                    )
+                    break
+        if flags:
+            return flags
+
+    # Backward-compatible fallback: per-word NBest alternatives (if provided by caller/tests).
+    for word_entry in words:
+        top_word = _normalize(word_entry.get("Word", ""))
+        if not top_word or top_word in reference_words:
+            continue
+        local_nbests = word_entry.get("NBest", [])
+        if len(local_nbests) < 2:
+            continue
+        for candidate in local_nbests[1:]:
+            cand_word = _normalize(candidate.get("Word", ""))
+            if cand_word in reference_words:
+                flags.append({
+                    "spoken": top_word,
+                    "correct": cand_word,
+                    "rule_category": "nbest_word_substitution",
+                    "reel_id": None,
+                    "confidence": float(candidate.get("Confidence", 50.0)),
+                })
+                logger.info(
+                    "Layer 3 N-Best substitution (fallback): top='%s' → candidate='%s' (candidate_conf=%s)",
+                    top_word,
+                    cand_word,
+                    candidate.get("Confidence"),
+                )
+                break
+    return flags
+
+
 def _run_stt_confusion_check(
     recognized_words: list[str],
+    by_approx: dict,
 ) -> list[dict[str, Any]]:
     """
     Layer 4 standalone: Flag any recognized word that appears in the STT confusion table.
-    Runs independently of Azure PA scores.
+    PLUS dynamically generate pairs for any by_approximation entry with a sound-confusion category.
     """
     flags: list[dict[str, Any]] = []
     seen = set()
+
+    # Predefined hardcoded pairs
     for word in recognized_words:
-        wl = word.lower().strip()
+        wl = _normalize(word)
         if wl in seen:
             continue
         if wl in STT_CONFUSION_PAIRS:
@@ -394,6 +436,36 @@ def _run_stt_confusion_check(
                 "reel_id": None,
                 "confidence": 30.0,
             })
+
+    # DYNAMIC GENERATION: Add by_approximation entries that follow sound-confusion patterns
+    sound_confusion_categories = {
+        "v_w_confusion", "w_to_v", "v_to_w_reversal",
+        "th_d_confusion", "th_to_d", "th_to_t",
+        "zh_j_confusion", "zh_to_j", "z_j",
+        "h_dropping",
+        "i_to_ee", "ae_to_e", "o_to_aa",
+    }
+
+    for word in recognized_words:
+        wl = _normalize(word)
+        if wl in seen:
+            continue
+        if wl in by_approx:
+            entry = by_approx[wl]
+            cat = entry.get("rule_category", "").strip()
+            if cat in sound_confusion_categories:
+                correct = entry.get("correct_word", "").lower().strip()
+                if correct and correct != wl:
+                    seen.add(wl)
+                    flags.append({
+                        "spoken": wl,
+                        "correct": correct,
+                        "rule_category": cat,
+                        "reel_id": None,
+                        "confidence": 40.0,
+                    })
+                    logger.info(f"Layer 4 dynamic STT confusion: '{wl}' → '{correct}' ({cat})")
+
     return flags
 
 
@@ -568,9 +640,17 @@ def detect_from_azure_result(
             # Word-level score below threshold
             is_bad = True
         elif min_phoneme_score < PHONEME_BAD_THRESHOLD and worst_phoneme_name in INDIAN_ENGLISH_ERROR_PHONEMES:
-            # A specific Indian English error phoneme scored below our threshold
-            is_bad = True
-            logger.info(f"Low phoneme score: {min_phoneme_score:.1f} for phoneme '{worst_phoneme_name}' in word '{word_lower}'")
+            # Different thresholds for critical vs general phonemes
+            critical_phonemes = {"w", "v", "th", "dh", "zh", "z", "jh", "r", "h"}
+            effective_phoneme_threshold = (
+                CRITICAL_PHONEME_THRESHOLD if worst_phoneme_name in critical_phonemes
+                else PHONEME_BAD_THRESHOLD
+            )
+            if min_phoneme_score < effective_phoneme_threshold:
+                is_bad = True
+                logger.info(
+                    f"Low phoneme score: {min_phoneme_score:.1f} for phoneme '{worst_phoneme_name}' in word '{word_lower}'"
+                )
         elif accuracy < 90 and phonemes:
             # Layer 5: Even if word accuracy looks "acceptable", still catch weak
             # Indian-English-sensitive phonemes that Azure may not hard-flag.
@@ -623,22 +703,27 @@ def detect_from_azure_result(
 
         # ----------------------------------------------------------------
         # STEP 3: Suppress high-confidence false positives.
-        # If accuracy is high AND no ErrorType AND the word is not in our
-        # by_correct map at all — it's likely noise (consonant cluster, etc.)
+        # Require ALL phonemes to be strong, not just the min.
         # ----------------------------------------------------------------
         if (
             accuracy >= FALSE_POSITIVE_SUPPRESSION
-            and min_phoneme_score >= 85
             and (error_type in ("None", "", "none") or not error_type)
+            and word_lower not in by_correct
         ):
-            if word_lower not in by_correct:
-                # Not a word we track and high confidence — suppress
+            all_phonemes_strong = True
+            if phonemes:
+                for p in phonemes:
+                    p_score = _extract_phoneme_score(p)
+                    if p_score < 85:
+                        all_phonemes_strong = False
+                        break
+            else:
+                all_phonemes_strong = False  # no phoneme data — be conservative
+
+            if all_phonemes_strong:
                 logger.info(
-                    "Suppressed potential false positive for '%s' (accuracy=%.1f, min_phoneme=%.1f, errorType=%s)",
-                    word_lower,
-                    accuracy,
-                    min_phoneme_score,
-                    error_type or "None",
+                    "Suppressed potential false positive for '%s' (accuracy=%.1f, all phonemes ≥85)",
+                    word_lower, accuracy
                 )
                 continue
 
@@ -694,13 +779,24 @@ def detect_from_azure_result(
     already_flagged_words = {e["correct"] for e in flagged} | {e["spoken"] for e in flagged}
 
     # Layer 4: STT confusion pairs (fast, no deps)
-    stt_flags = _run_stt_confusion_check(recognized_word_list)
+    by_approx = phoneme_map.get("by_approximation") or {}
+    stt_flags = _run_stt_confusion_check(recognized_word_list, by_approx)
     for sf in stt_flags:
         if sf["spoken"] not in already_flagged_words and sf["correct"] not in already_flagged_words:
             flagged.append(sf)
             already_flagged_words.add(sf["spoken"])
             already_flagged_words.add(sf["correct"])
             logger.info(f"  Layer 4 STT confusion: '{sf['spoken']}' → '{sf['correct']}' ({sf['rule_category']})")
+
+    # Layer 3: N-Best word substitution (requires reference_words)
+    if reference_words:
+        nbest_flags = _run_nbest_word_substitution_check(azure_result, words, reference_words)
+        for nf in nbest_flags:
+            if nf["spoken"] not in already_flagged_words and nf["correct"] not in already_flagged_words:
+                flagged.append(nf)
+                already_flagged_words.add(nf["spoken"])
+                already_flagged_words.add(nf["correct"])
+                logger.info(f"  Layer 3 N-Best: '{nf['spoken']}' → '{nf['correct']}' ({nf['rule_category']})")
 
     # Layer 2: Phoneme edit distance (requires pronouncing + editdistance)
     if reference_words:

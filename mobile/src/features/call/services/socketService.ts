@@ -33,17 +33,9 @@ class SocketService {
    * connection and reconnection attempt (Clerk tokens expire every ~60s).
    */
   connect(getToken: (() => Promise<string | null>) | string, userId?: string) {
-    if (this.socket?.connected || this.isConnecting) return;
-    // Prevent parallel socket instances/reconnect loops after hot reloads or repeated connect() calls.
-    if (this.socket && !this.socket.connected) {
-      try {
-        this.socket.removeAllListeners();
-        this.socket.disconnect();
-      } catch {
-        // no-op
-      }
-      this.socket = null;
-    }
+    // If a socket instance exists in ANY state (connected, reconnecting, etc.) don't replace it.
+    // Only proceed after an explicit disconnect() call which sets this.socket = null.
+    if (this.socket !== null || this.isConnecting) return;
     this.isConnecting = true;
 
     if (userId) {
@@ -74,10 +66,10 @@ class SocketService {
           cb({ token: "" });
         }
       },
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 45000,
       reconnectionAttempts: Infinity,
     });
 

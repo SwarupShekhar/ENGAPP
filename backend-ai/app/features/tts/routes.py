@@ -24,11 +24,13 @@ class FeedbackNarrationRequest(BaseModel):
     score: int
     justification: Optional[str] = None
     errors: Optional[List[NarrationError]] = None
+    first_name: Optional[str] = None
 
 
 class FeedbackNarrationResponse(BaseModel):
     audio_base64: str
     text: str
+    word_timestamps: list = []
 
 
 @router.post("/feedback-narration", response_model=FeedbackNarrationResponse)
@@ -47,18 +49,18 @@ async def feedback_narration(request: Request, body: FeedbackNarrationRequest):
     log.info(f"feedback_narration_script_built words={len(script.split())}")
 
     # 2. Synthesize with Inworld TTS (async, ~800-1200ms)
-    audio_bytes = await inworld_tts_service.synthesize_async(script)
+    audio_bytes, word_timestamps = await inworld_tts_service.synthesize_with_timestamps(script)
 
     if not audio_bytes:
         log.error("feedback_narration_tts_failed no audio returned")
         # Return empty audio_base64 — mobile will show silent fail
-        return FeedbackNarrationResponse(audio_base64="", text=script)
+        return FeedbackNarrationResponse(audio_base64="", text=script, word_timestamps=[])
 
     audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
     ms = int((time.time() - start) * 1000)
     log.info(f"feedback_narration_completed ms={ms} audio_bytes={len(audio_bytes)}")
 
-    return FeedbackNarrationResponse(audio_base64=audio_base64, text=script)
+    return FeedbackNarrationResponse(audio_base64=audio_base64, text=script, word_timestamps=word_timestamps)
 
 
 class MistakeEntry(BaseModel):
@@ -75,6 +77,7 @@ class FullFeedbackNarrationRequest(BaseModel):
     vocabulary_issues: Optional[List[MistakeEntry]] = None
     scores: Optional[dict] = None          # {pronunciation, grammar, vocabulary, fluency}
     justifications: Optional[dict] = None  # {pronunciation, grammar, vocabulary, fluency}
+    first_name: Optional[str] = None
 
 
 @router.post("/full-feedback-narration", response_model=FeedbackNarrationResponse)
@@ -98,20 +101,21 @@ async def full_feedback_narration(request: Request, body: FullFeedbackNarrationR
         vocabulary_issues=[e.model_dump() for e in (body.vocabulary_issues or [])],
         scores=body.scores,
         justifications=body.justifications,
+        first_name=body.first_name,
     )
     log.info(f"full_feedback_script_built words={len(script.split())}")
 
-    audio_bytes = await inworld_tts_service.synthesize_async(script)
+    audio_bytes, word_timestamps = await inworld_tts_service.synthesize_with_timestamps(script)
 
     if not audio_bytes:
         log.error("full_feedback_narration_tts_failed no audio returned")
-        return FeedbackNarrationResponse(audio_base64="", text=script)
+        return FeedbackNarrationResponse(audio_base64="", text=script, word_timestamps=[])
 
     audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
     ms = int((time.time() - start) * 1000)
     log.info(f"full_feedback_narration_completed ms={ms} audio_bytes={len(audio_bytes)}")
 
-    return FeedbackNarrationResponse(audio_base64=audio_base64, text=script)
+    return FeedbackNarrationResponse(audio_base64=audio_base64, text=script, word_timestamps=word_timestamps)
 
 
 class SpeakRequest(BaseModel):

@@ -9,7 +9,6 @@ datasource db {
 model User {
   id                     String                    @id @default(uuid())
   clerkId                String                    @unique
-  email                  String                    @unique
   fname                  String
   lname                  String
   gender                 String?
@@ -34,12 +33,15 @@ model User {
   lastResolvedStage      Int?
   lastSessionAt          DateTime?
   totalSessions          Int                       @default(0)
+  email                  String                    @unique
   assessments            AssessmentSession[]
   blockedBy              BlockedUser[]             @relation("BlockedUser")
   blockedUsers           BlockedUser[]             @relation("BlockingUser")
+  callQualityScores      CallQualityScore[]
   receivedMessages       ChatMessage[]             @relation("MessageReceiver")
   sentMessages           ChatMessage[]             @relation("MessageSender")
   chatParticipants       ConversationParticipant[]
+  deviceTokens           DeviceToken[]
   friendRequestsReceived FriendRequest[]           @relation("FriendRequestReceiver")
   friendRequestsSent     FriendRequest[]           @relation("FriendRequestSender")
   friendshipsReceived    Friendship[]              @relation("FriendshipAddressee")
@@ -47,6 +49,7 @@ model User {
   tasks                  LearningTask[]
   matchmakingQueue       MatchmakingQueue[]
   chatMessages           Message[]                 @relation("ChatMessagesSent")
+  notificationLogs       NotificationLog[]
   reviewsReceived        PartnerReview[]           @relation("ReviewsReceived")
   reviewsGiven           PartnerReview[]           @relation("ReviewsGiven")
   profile                Profile?
@@ -58,22 +61,8 @@ model User {
   reelHistory            UserReelHistory[]
   reliability            UserReliability?
   topicScores            UserTopicScore[]
-  callQualityScores      CallQualityScore[]
-  deviceTokens           DeviceToken[]
-  notificationLogs       NotificationLog[]
 
   @@index([clerkId])
-}
-
-enum DevicePlatform {
-  ios
-  android
-}
-
-enum NotificationStatus {
-  sent
-  failed
-  retrying
 }
 
 model DeviceToken {
@@ -225,40 +214,40 @@ model Profile {
 }
 
 model ConversationSession {
-  id                 String               @id @default(uuid())
-  topic              String?
-  status             String               @default("CREATED")
-  startedAt          DateTime             @default(now())
-  endedAt            DateTime?
-  duration           Int?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  interactionMetrics Json?
-  peerComparison     Json?
-  structure          String?
-  objectives         Json?
-  checkpoints        Json?
-  egressId           String?
-  recordingUrl       String?
-  summaryJson        Json?
-  analyses           Analysis[]
-  feedbacks          Feedback[]
-  tasks              LearningTask[]
-  reviews            PartnerReview[]
-  participants       SessionParticipant[]
-  callQualityScores  CallQualityScore[]
+  id                  String               @id @default(uuid())
+  topic               String?
+  status              String               @default("CREATED")
+  startedAt           DateTime             @default(now())
+  endedAt             DateTime?
+  duration            Int?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  interactionMetrics  Json?
+  peerComparison      Json?
+  structure           String?
+  objectives          Json?
+  checkpoints         Json?
+  egressId            String?
+  recordingUrl        String?
+  summaryJson         Json?
   callDurationSeconds Float?
   userSpokeSeconds    Float?
+  analyses            Analysis[]
+  callQualityScores   CallQualityScore[]
+  feedbacks           Feedback[]
+  tasks               LearningTask[]
+  reviews             PartnerReview[]
+  participants        SessionParticipant[]
 }
 
 model SessionParticipant {
-  id            String              @id @default(uuid())
-  sessionId     String
-  userId        String
-  audioUrl      String?
-  speakingTime  Int                 @default(0)
-  turnsTaken    Int                 @default(0)
-  lastHeartbeat DateTime            @default(now())
+  id                      String              @id @default(uuid())
+  sessionId               String
+  userId                  String
+  audioUrl                String?
+  speakingTime            Int                 @default(0)
+  turnsTaken              Int                 @default(0)
+  lastHeartbeat           DateTime            @default(now())
   participantEgressId     String?
   participantRecordingUrl String?
   analysis                Analysis?
@@ -312,45 +301,45 @@ model Mistake {
 }
 
 model PronunciationIssue {
-  id               String   @id @default(uuid())
+  id               String                   @id @default(uuid())
   analysisId       String
-  word             String   // kept for compat — stores the spoken (mispronounced) word
-  spoken           String?  // what the user actually said (e.g. "pepul")
-  correct          String?  // correct pronunciation (e.g. "people")
-  ruleCategory     String?  // error category (e.g. "th_to_d", "w_to_v")
-  reelId           String?  // eBites reel ID matching this error category
+  word             String
   segmentId        String?
   phoneticExpected String?
   phoneticActual   String?
-  issueType        String?  // legacy alias for ruleCategory
-  severity         String   @default("medium")
+  issueType        String?
+  severity         String                   @default("medium")
   suggestion       String?
   audioStart       Float?
   audioEnd         Float?
   confidence       Float?
-  createdAt        DateTime @default(now())
-  analysis         Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  createdAt        DateTime                 @default(now())
+  correct          String?
+  reelId           String?
+  ruleCategory     String?
+  spoken           String?
+  analysis         Analysis                 @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   tasks            TaskPronunciationIssue[]
 
   @@index([analysisId])
 }
 
 model LearningTask {
-  id               String               @id @default(uuid())
-  userId           String
-  sessionId        String?
-  type             String
-  title            String
-  content          Json
-  status           String               @default("pending")
-  estimatedMinutes Int                  @default(5)
-  dueDate          DateTime
-  completedAt      DateTime?
-  score            Float?
-  createdAt        DateTime             @default(now())
-  session          ConversationSession? @relation(fields: [sessionId], references: [id])
-  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mistakes         TaskMistake[]
+  id                  String                   @id @default(uuid())
+  userId              String
+  sessionId           String?
+  type                String
+  title               String
+  content             Json
+  status              String                   @default("pending")
+  estimatedMinutes    Int                      @default(5)
+  dueDate             DateTime
+  completedAt         DateTime?
+  score               Float?
+  createdAt           DateTime                 @default(now())
+  session             ConversationSession?     @relation(fields: [sessionId], references: [id])
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mistakes            TaskMistake[]
   pronunciationIssues TaskPronunciationIssue[]
 
   @@index([userId])
@@ -369,8 +358,8 @@ model TaskMistake {
 model TaskPronunciationIssue {
   taskId               String
   pronunciationIssueId String
-  task                 LearningTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  pronunciationIssue   PronunciationIssue  @relation(fields: [pronunciationIssueId], references: [id], onDelete: Cascade)
+  pronunciationIssue   PronunciationIssue @relation(fields: [pronunciationIssueId], references: [id], onDelete: Cascade)
+  task                 LearningTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@id([taskId, pronunciationIssueId])
 }
@@ -533,25 +522,36 @@ model RecurringErrorPattern {
 
 model CallQualityScore {
   id                 String              @id @default(uuid())
-  sessionId         String
-  userId            String
-  cqs                Float // 0–100 overall CQS
-  pqs                Float // Pronunciation Quality Score
-  depthScore         Float // Depth Score
-  complexityScore    Float // Complexity Score
-  engagementScore    Float // Engagement Score
+  sessionId          String
+  userId             String
+  cqs                Float
+  pqs                Float
+  depthScore         Float
+  complexityScore    Float
+  engagementScore    Float
   pronunciationDelta Float
   fluencyDelta       Float
   grammarDelta       Float
   vocabularyDelta    Float
   comprehensionDelta Float
-  phaseComputed      String? @map("phase_computed") // Track which phase generated the score
   computedAt         DateTime            @default(now())
+  phaseComputed      String?             @map("phase_computed")
   session            ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([userId])
+}
+
+enum DevicePlatform {
+  ios
+  android
+}
+
+enum NotificationStatus {
+  sent
+  failed
+  retrying
 }
 
 enum TalkStyle {

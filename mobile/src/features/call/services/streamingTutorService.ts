@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
-import { API_URL } from "../../../api/client";
+import { API_URL as NEST_API_URL } from "../../../api/client";
+import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
 
 export interface StreamChunk {
   type: "sentence" | "audio" | "error" | "timeout" | "transcription" | "transcript" | "done";
@@ -33,6 +34,7 @@ class StreamingTutorService {
       this.ws.close();
     }
     this.pendingSends = [];
+    this.callbacks = [];
     const IS_PROD = !__DEV__;
     let wsUrl: string;
 
@@ -41,17 +43,21 @@ class StreamingTutorService {
     if (wsOverride) {
       wsUrl = wsOverride;
     } else if (IS_PROD) {
-      wsUrl = "wss://englivo-ai.onrender.com";
+      // Keep WS host aligned with Englivo REST host in production.
+      const base = ENGLIVO_API_URL.replace(/\/$/, "");
+      wsUrl = base.startsWith("https://")
+        ? base.replace("https://", "wss://")
+        : base.replace("http://", "ws://");
     } else {
       // Dev: derive from API_URL host, backend-ai on 8001
       try {
-        const base = API_URL.replace(/\/$/, "");
+        const base = NEST_API_URL.replace(/\/$/, "");
         const u = new URL(base.startsWith("http") ? base : `http://${base}`);
         const host = u.hostname;
         const wsScheme = u.protocol === "https:" ? "wss" : "ws";
         wsUrl = `${wsScheme}://${host}:8001`;
       } catch {
-        wsUrl = API_URL.replace("http", "ws").replace(":3000", ":8001");
+        wsUrl = NEST_API_URL.replace("http", "ws").replace(":3000", ":8001");
       }
     }
 

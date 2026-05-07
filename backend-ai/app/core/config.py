@@ -3,7 +3,7 @@ Application configuration using Pydantic Settings.
 Loads from environment variables and .env file.
 """
 from typing import List, Optional, Any
-from pydantic import field_validator, ConfigDict
+from pydantic import field_validator, model_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     pronunciation_model: str = "azure"
     cefr_model: str = "huggingface"
     tts_provider: str = "inworld"  # "azure" or "inworld"
+    disable_azure_tts: bool = False
     
     # Feature Flags
     enable_pronunciation_scoring: bool = True
@@ -138,6 +139,16 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [fmt.strip() for fmt in v.split(",") if fmt.strip()]
         return v
+
+    @model_validator(mode="after")
+    def reject_default_api_key_in_prod(self) -> "Settings":
+        if self.environment not in ("development", "dev", "local", "test") and \
+                self.internal_api_key == "change-me-in-production":
+            raise ValueError(
+                "internal_api_key must be changed from the default in production. "
+                "Set INTERNAL_API_KEY in your .env file."
+            )
+        return self
 
 
 # Global settings instance

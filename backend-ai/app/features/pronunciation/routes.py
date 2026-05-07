@@ -5,6 +5,7 @@ Pronunciation Assessment API.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import tempfile
@@ -46,25 +47,6 @@ def _compute_word_accuracy_average(azure_result: dict[str, Any]) -> float:
             total += float(acc)
             count += 1
     return total / count if count else 0.0
-    words: list[dict] = []
-    nbests = azure_result.get("NBest") or azure_result.get("Nbests") or azure_result.get("nbest")
-    if nbests and isinstance(nbests, list) and len(nbests) > 0:
-        first = nbests[0]
-        words = first.get("Words") or first.get("words") or []
-    elif "Words" in azure_result:
-        words = azure_result["Words"]
-    elif "words" in azure_result:
-        words = azure_result["words"]
-    if not words:
-        return 100.0
-    total = 0.0
-    count = 0
-    for w in words:
-        acc = w.get("AccuracyScore") or (w.get("PronunciationAssessment") or {}).get("AccuracyScore")
-        if acc is not None:
-            total += float(acc)
-            count += 1
-    return total / count if count else 100.0
 
 
 def _clean_reference_text(text: str) -> str:
@@ -86,10 +68,46 @@ AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
 
 
+def _check_audio_quality(wav_bytes: bytes) -> tuple[bool, str]:
+    """
+    Validate audio quality before sending to Azure.
+    Returns: (is_valid, error_message)
+    """
+    try:
+        import numpy as np
+        import io
+        from pydub import AudioSegment
+
+        seg = AudioSegment.from_wav(io.BytesIO(wav_bytes))
+        samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
+
+        # RMS (volume) check — very quiet audio
+        rms = np.sqrt(np.mean(samples**2))
+        if rms < 200:
+            return False, "Audio too quiet — please speak louder and move closer to mic"
+
+        # Peak/clipping check — too loud/distorted
+        peak = np.max(np.abs(samples))
+        if peak > 32000:
+            return False, "Audio is distorted — move mic away or speak softer"
+
+        # Silence ratio check — too much silence wastes API calls
+        silence_threshold = 500
+        silence_count = np.sum(np.abs(samples) < silence_threshold)
+        silence_ratio = silence_count / len(samples)
+        if silence_ratio > 0.85:
+            return False, "Mostly silence detected — please speak after pressing mic"
+
+        return True, ""
+    except Exception as e:
+        logger.warning(f"Audio quality check failed: {e}")
+        return True, ""  # fail open — let Azure handle it
+
+
 def _run_continuous_pa_sync(
     audio_path: str,
     reference_text: str,
-) -> list[dict]:
+) -> tuple[list[dict], float | None, float | None]:
     """
     Run Azure PA with continuous recognition so the ENTIRE audio file is assessed,
     not just the first utterance.  Returns a flat list of word dicts with
@@ -100,7 +118,7 @@ def _run_continuous_pa_sync(
     import threading
 
     speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
-    speech_config.speech_recognition_language = "en-IN"
+    speech_config.speech_recognition_language = "en-US"
 
     audio_config = speechsdk.audio.AudioConfig(filename=audio_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
@@ -111,7 +129,11 @@ def _run_continuous_pa_sync(
         granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
         enable_miscue=True,
     )
-    pa_config.enable_prosody_assessment = True
+    pa_config.json_string = json.dumps({
+        "NBestPhonemeCount": 5,
+        "WordLevelTiming": True
+    })
+    pa_config.enable_prosody_assessment()
     pa_config.apply_to(recognizer)
 
     all_words: list[dict] = []
@@ -375,6 +397,15 @@ async def assess_pronunciation(
 
         if not wav_ready or not os.path.isfile(tmp_wav) or os.path.getsize(tmp_wav) == 0:
             raise HTTPException(400, "Could not produce valid WAV from audio")
+
+        # Read WAV bytes for quality pre-check
+        with open(tmp_wav, "rb") as f:
+            wav_bytes = f.read()
+
+        # Audio quality validation — catch silent/distorted audio before Azure call
+        audio_ok, audio_error = _check_audio_quality(wav_bytes)
+        if not audio_ok:
+            raise HTTPException(400, audio_error)
 
         try:
             import azure.cognitiveservices.speech as speechsdk

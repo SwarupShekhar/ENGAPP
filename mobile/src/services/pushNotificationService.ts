@@ -82,14 +82,6 @@ class PushNotificationService {
 
       await AsyncStorage.setItem(STORAGE_KEY, deviceToken);
       await this.sendTokenToBackend(deviceToken);
-
-      const update = await Pushy.checkForUpdate();
-      if (update.available) {
-        console.log('[Pushy] Update available:', update);
-      }
-
-      const badge = await Pushy.getBadge();
-      console.log('[Pushy] Current badge count:', badge);
     } catch (error: any) {
       if (error.message?.includes('permission') || error.message?.includes('denied')) {
         console.warn('[Pushy] User denied push notification permissions');
@@ -188,9 +180,6 @@ class PushNotificationService {
   }
 
   async getBadge(): Promise<number> {
-    if (Platform.OS === 'ios') {
-      return await Pushy.getBadge();
-    }
     return 0;
   }
 

@@ -6,6 +6,7 @@ import logging
 import os
 from .streaming_gemini_service import StreamingGeminiService
 from .pronunciation_capture import strip_pron_tags_for_mobile
+from app.core.config import settings
 
 try:
     from ..transcription.optimized_tts_service import OptimizedTTSService
@@ -29,15 +30,18 @@ class StreamingTutorService:
 
         # Determine the order of TTS services to try
         use_inworld_primary = os.getenv('USE_INWORLD_TTS', 'false').lower() == 'true'
+        azure_tts_disabled = settings.disable_azure_tts
+        if azure_tts_disabled:
+            logger.info("DISABLE_AZURE_TTS=true — Azure TTS fallback is disabled")
 
         tts_service_candidates = []
         if use_inworld_primary:
             if InworldTTSService is not None:
                 tts_service_candidates.append(("InworldTTS", InworldTTSService))
-            if OptimizedTTSService is not None:
+            if not azure_tts_disabled and OptimizedTTSService is not None:
                 tts_service_candidates.append(("OptimizedTTS", OptimizedTTSService))
         else:
-            if OptimizedTTSService is not None:
+            if not azure_tts_disabled and OptimizedTTSService is not None:
                 tts_service_candidates.append(("OptimizedTTS", OptimizedTTSService))
             if InworldTTSService is not None:
                 tts_service_candidates.append(("InworldTTS", InworldTTSService))
@@ -60,7 +64,7 @@ class StreamingTutorService:
             subscription=self.speech_key,
             region=self.speech_region
         )
-        self.speech_config.speech_recognition_language = "en-IN"
+        self.speech_config.speech_recognition_language = "en-US"
         
         # Enable streaming
         self.speech_config.set_property(

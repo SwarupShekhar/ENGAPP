@@ -25,7 +25,7 @@ class HinglishSTTService:
             subscription=settings.azure_speech_key,
             region=settings.azure_speech_region,
         )
-        self.speech_config.speech_recognition_language = "en-IN"
+        self.speech_config.speech_recognition_language = "en-US"
         self.auto_detect_config = None
 
     # ─── Audio Conversion ─────────────────────────────────────
@@ -97,6 +97,8 @@ class HinglishSTTService:
                     azure_result["display_confidence"] = dg.confidence
             except Exception as e:
                 logger.warning("Deepgram display transcript failed (non-fatal): %s", e, exc_info=True)
+        else:
+            logger.info("Secondary transcription skipped (DEEPGRAM_SECONDARY_TRANSCRIPT=false or Deepgram not configured)")
 
         azure_result.setdefault("provider", "azure")
         return azure_result
@@ -119,7 +121,7 @@ class HinglishSTTService:
         result = recognizer.recognize_once()
 
         if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            return {"text": result.text, "language": "en-IN", "success": True}
+            return {"text": result.text, "language": "en-US", "success": True}
         elif result.reason == speechsdk.ResultReason.NoMatch:
             return {"text": "", "language": None, "success": False, "error": "No speech detected"}
         else:
@@ -148,7 +150,8 @@ class HinglishSTTService:
                 "gradingSystem": "HundredMark",
                 "granularity": "Phoneme",
                 "enableMiscue": True,
-                "nbestPhonemeCount": 3
+                "NBestPhonemeCount": 5,
+                "WordLevelTiming": True
             }
             pronunciation_config = speechsdk.PronunciationAssessmentConfig(
                 json_string=json.dumps(config_json)
@@ -162,7 +165,7 @@ class HinglishSTTService:
                 subscription=settings.azure_speech_key,
                 region=settings.azure_speech_region,
             )
-            speech_cfg.speech_recognition_language = "en-IN"
+            speech_cfg.speech_recognition_language = "en-US"
 
             recognizer = speechsdk.SpeechRecognizer(
                 speech_config=speech_cfg,
@@ -687,6 +690,10 @@ class HinglishSTTService:
                 elif pron_result is not None:
                     # backwards compat: old callers returning insights directly
                     phoneme_insights = pron_result
+                logger.warning(
+                    "[PA_DEBUG] raw_words=%s",
+                    json.dumps(raw_words[:3], indent=2),
+                )
             except Exception as e:
                 logger.warning(f"Soft pronunciation pass failed (non-fatal): {e}")
 
@@ -844,126 +851,80 @@ class HinglishSTTService:
 
     def _soft_pronunciation_pass(self, audio_data: bytes, recognized_text: str) -> dict | None:
         """
-        Run Azure Pronunciation Assessment in free-speech mode (empty reference_text).
-        Extracts raw spoken words (pre-normalization), AccuracyScore, ErrorType, and
-        phoneme breakdown. Returns {"insights": ..., "raw_words": [...]}.
-
-        Using empty reference_text prevents the self-reference trap where "vater"→"water"
-        (STT-normalized) is compared against itself, inflating scores to 100.
-        In free-speech mode Azure returns the RAW spoken word and genuine AccuracyScores.
+        Run Azure Pronunciation Assessment in free-speech mode (empty reference_text)
+        using continuous recognition to process the entire audio (no 15s truncation).
+        Extracts raw spoken words, AccuracyScore, ErrorType, and phoneme breakdown.
+        Returns {"insights": ..., "raw_words": [...]}.
         """
         if not self.speech_config:
             return None
 
         try:
             wav_bytes = self._convert_to_wav(audio_data)
+            # Write WAV to temporary file for continuous PA (which expects a file path)
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(wav_bytes)
+                tmp_path = tmp.name
+            try:
+                # Import the shared continuous PA function
+                from app.features.pronunciation.routes import _run_continuous_pa_sync as run_continuous_pa
+                # Run continuous PA with empty reference (free-speech)
+                all_words, avg_fluency, avg_prosody = run_continuous_pa(tmp_path, "")
+                # all_words are raw Azure word dicts
+                raw_words = all_words
 
-            # Empty referenceText = free-speech mode: no self-reference trap.
-            # Azure returns raw spoken words and genuine AccuracyScores.
-            config_json = {
-                "referenceText": "",
-                "gradingSystem": "HundredMark",
-                "granularity": "Phoneme",
-                "enableMiscue": True,
-                "nbestPhonemeCount": 3,
-            }
-            pronunciation_config = speechsdk.PronunciationAssessmentConfig(
-                json_string=json.dumps(config_json)
-            )
+                # Build WordDetail list for classification
+                words_data: list[WordDetail] = []
+                for word_raw in all_words:
+                    word_text = word_raw.get("Word", "")
+                    wp = word_raw.get("PronunciationAssessment", {})
+                    word_accuracy = wp.get("AccuracyScore", 0)
+                    word_error = wp.get("ErrorType", "None")
 
-            audio_stream = speechsdk.audio.PushAudioInputStream()
-            audio_config = speechsdk.audio.AudioConfig(stream=audio_stream)
+                    phonemes = []
+                    for p in word_raw.get("Phonemes", []):
+                        pa = p.get("PronunciationAssessment", {})
+                        phoneme_score = pa.get("AccuracyScore", 0)
+                        expected_phoneme = p.get("Phoneme", "")
+                        nbest_phonemes = pa.get("NBestPhonemes", [])
+                        actually_said = nbest_phonemes[0].get("Phoneme", "") if nbest_phonemes else None
+                        is_correct = self._is_phoneme_acceptable(expected_phoneme, actually_said)
+                        phonemes.append(PhonemeDetail(
+                            phoneme=expected_phoneme,
+                            accuracy_score=phoneme_score,
+                            actually_said=actually_said if not is_correct else None,
+                            is_correct=is_correct,
+                            nbest=nbest_phonemes,
+                        ))
 
-            speech_cfg = speechsdk.SpeechConfig(
-                subscription=settings.azure_speech_key,
-                region=settings.azure_speech_region,
-            )
-            speech_cfg.speech_recognition_language = "en-IN"
-
-            recognizer = speechsdk.SpeechRecognizer(
-                speech_config=speech_cfg,
-                audio_config=audio_config,
-            )
-            pronunciation_config.apply_to(recognizer)
-
-            audio_stream.write(wav_bytes)
-            audio_stream.close()
-
-            result = recognizer.recognize_once()
-
-            if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-                logger.info(f"Soft pronunciation pass: no speech recognized ({result.reason})")
-                return None
-
-            import os as _os
-            if _os.getenv("PRON_DEBUG") == "1":
-                logger.info(f"[Azure raw] {result.properties.get(speechsdk.PropertyId.SpeechServiceResponse_JsonResult)}")
-
-            raw_json_str = result.properties.get(
-                speechsdk.PropertyId.SpeechServiceResponse_JsonResult, "{}"
-            )
-            raw_json = json.loads(raw_json_str)
-            logger.debug(f"SOFT PA RAW (truncated): {json.dumps(raw_json, indent=2)[:800]}")
-
-            # Extract word and phoneme data
-            words_data: list[WordDetail] = []
-            raw_words: list[dict] = []  # Raw Azure word entries for phonetic_context
-            nbest = raw_json.get("NBest", [])
-            if not nbest:
-                return None
-
-            for word_raw in nbest[0].get("Words", []):
-                word_text = word_raw.get("Word", "")
-                wp = word_raw.get("PronunciationAssessment", {})
-                word_accuracy = wp.get("AccuracyScore", 0)
-                word_error = wp.get("ErrorType", "None")
-
-                # Collect raw word entry for Layer A / Layer D consumption
-                raw_words.append({
-                    "Word": word_text,
-                    "AccuracyScore": word_accuracy,
-                    "ErrorType": word_error,
-                    "Phonemes": word_raw.get("Phonemes", []),
-                })
-
-                phonemes = []
-                for p in word_raw.get("Phonemes", []):
-                    pa = p.get("PronunciationAssessment", {})
-                    phoneme_score = pa.get("AccuracyScore", 0)
-                    expected_phoneme = p.get("Phoneme", "")
-                    nbest_phonemes = pa.get("NBestPhonemes", [])
-                    actually_said = nbest_phonemes[0].get("Phoneme", "") if nbest_phonemes else None
-
-                    is_correct = self._is_phoneme_acceptable(expected_phoneme, actually_said)
-
-                    phonemes.append(PhonemeDetail(
-                        phoneme=expected_phoneme,
-                        accuracy_score=phoneme_score,
-                        actually_said=actually_said if not is_correct else None,
-                        is_correct=is_correct,
-                        nbest=nbest_phonemes,
+                    words_data.append(WordDetail(
+                        word=word_text,
+                        accuracy_score=word_accuracy,
+                        error_type=word_error,
+                        phonemes=phonemes,
                     ))
 
-                words_data.append(WordDetail(
-                    word=word_text,
-                    accuracy_score=word_accuracy,
-                    error_type=word_error,
-                    phonemes=phonemes,
-                ))
+                if not words_data:
+                    return None
 
-            if not words_data:
-                return None
+                # Run pattern classification on extracted phoneme data
+                insights = self._classify_pronunciation_errors(words_data)
 
-            # Run pattern classification on extracted phoneme data
-            insights = self._classify_pronunciation_errors(words_data)
-
-            detected_count = (
-                len(insights.get("indian_english_patterns", []))
-                + len(insights.get("critical_errors", []))
-                + len(insights.get("minor_errors", []))
-            )
-            logger.info(f"SOFT PA RESULT: {detected_count} issue(s) found, raw_words={len(raw_words)}")
-            return {"insights": insights, "raw_words": raw_words}
+                detected_count = (
+                    len(insights.get("indian_english_patterns", []))
+                    + len(insights.get("critical_errors", []))
+                    + len(insights.get("minor_errors", []))
+                )
+                logger.info(f"SOFT PA RESULT: {detected_count} issue(s) found, raw_words={len(raw_words)}")
+                return {"insights": insights, "raw_words": raw_words}
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+        except Exception as e:
+            logger.warning(f"Soft pronunciation pass error (non-fatal): {e}")
+            return None
 
         except Exception as e:
             logger.warning(f"Soft pronunciation pass error (non-fatal): {e}")

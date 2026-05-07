@@ -32,7 +32,7 @@ export class BrainService implements OnModuleInit {
   /**
    * Every 5 minutes: ping the AI engine to verify it's alive
    */
-  @Interval(5 * 60 * 1000) // 5 minutes
+  @Interval(4 * 60 * 1000) // 4 minutes — keep Render from cold-starting
   async periodicHealthCheck() {
     await this.checkAiEngineHealth();
   }
@@ -49,7 +49,8 @@ export class BrainService implements OnModuleInit {
     );
     try {
       const response = await lastValueFrom(
-        this.httpService.get(`${this.aiEngineUrl.replace(/\/$/, '')}/`, {
+        // backend-ai mounts health at /api/health (see app.main include_router health_router prefix=/api)
+        this.httpService.get(`${this.aiEngineUrl.replace(/\/$/, '')}/api/health`, {
           timeout: timeoutMs,
         }),
       );
@@ -305,7 +306,7 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
 
       const response = await lastValueFrom(
         this.httpService.post(
-          `${this.aiEngineUrl}/pronunciation/assess`,
+          `${this.aiEngineUrl}/api/pronunciation/assess`,
           formData,
           {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

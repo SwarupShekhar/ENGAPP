@@ -12,13 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useClerk } from "@clerk/clerk-expo";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { ModeSwitcher } from "../../../components/navigation/ModeSwitcher";
 import { getHistory, getMe } from "../../../api/englivo/user";
 import { getBridgeUser } from "../../../api/bridgeClient";
-import { getSessionsCount, getUpcomingSession } from "../../../api/englivoClient";
+import { getSessionsCount, getUpcomingSession } from "../../../api/client";
 import { SessionHistory, User } from "../../../types/user";
 
 const { width } = Dimensions.get("window");
@@ -46,6 +46,7 @@ export default function EnglivoHomeScreen() {
   const styles = getStyles(theme);
   const navigation = useNavigation<any>();
   const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
 
   const [userData, setUserData] = useState<User | null>(null);
   const [history, setHistory] = useState<SessionHistory[]>([]);
@@ -59,9 +60,11 @@ export default function EnglivoHomeScreen() {
   const [sessionsCount, setSessionsCount] = useState(0);
   const [upcomingSession, setUpcomingSession] = useState<any | null>(null);
   const [bridgeLoading, setBridgeLoading] = useState(false);
+  const [authError, setAuthError] = useState(false);
 
   const load = async () => {
     try {
+      setAuthError(false);
       const [me, hist] = await Promise.all([getMe(), getHistory()]);
       setUserData(me);
       setHistory(Array.isArray(hist) ? hist : []);
@@ -81,6 +84,10 @@ export default function EnglivoHomeScreen() {
       } catch (error) {
         console.warn("[EnglivoHome] Upcoming session error:", error);
         setUpcomingSession(null);
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        setAuthError(true);
       }
     } finally {
       setLoading(false);
@@ -152,6 +159,28 @@ export default function EnglivoHomeScreen() {
       : totalSessions > 0
         ? "A short AI session now will keep your speaking habit active."
         : "Take your first guided speaking session and build momentum.";
+
+  if (authError) {
+    return (
+      <SafeAreaView style={[styles.safeArea]}>
+        <View style={[styles.scrollView, styles.centered, { padding: 32 }]}>
+          <Text style={[styles.name, { textAlign: "center", marginBottom: 12 }]}>
+            Session Expired
+          </Text>
+          <Text style={[styles.greeting, { textAlign: "center", marginBottom: 32, lineHeight: 22 }]}>
+            Your Englivo session could not be verified. Sign out and sign back in with your Englivo account.
+          </Text>
+          <TouchableOpacity
+            style={styles.bookSessionBtn}
+            onPress={() => signOut()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.bookSessionBtnText}>Sign Out & Re-authenticate</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (loading) {
     return (

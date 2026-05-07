@@ -9,12 +9,15 @@ import {
 import { Response, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
     private readonly logger = new Logger(AllExceptionsFilter.name);
 
     catch(exception: any, host: ArgumentsHost) {
+        this._captureToSentry(exception);
+
         const ctx = host.switchToHttp();
         const response = ctx.getResponse<Response>();
         const request = ctx.getRequest<Request>();
@@ -33,14 +36,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
                 };
 
         // Logging the error
+        const isProd = process.env.NODE_ENV === 'production';
         const errorLog = {
             statusCode: status,
             timestamp: new Date().toISOString(),
             path: request.url,
             method: request.method,
             message: exception.message || (typeof message === 'object' ? (message as any).message : message),
-            responseBody: message, // Capture full response body including debug info
-            stack: exception.stack,
+            ...(!isProd && { responseBody: message, stack: exception.stack }),
         };
 
         this.logger.error(
@@ -57,5 +60,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
 
         response.status(status).json(message);
+    }
+
+    @SentryExceptionCaptured()
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private _captureToSentry(_exception: unknown): void {
+        // This method exists only so the decorator can report exceptions to Sentry
+        // while we keep using our custom filter for response shaping and file logging.
     }
 }

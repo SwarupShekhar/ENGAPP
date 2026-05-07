@@ -23,10 +23,12 @@ nltk>=3.8.1
 lexical-diversity>=0.1.1
 pronouncing>=0.2.0
 editdistance>=0.8.1
-# Phoneme fallback for non-dictionary words (Layer 2). Requires espeak-ng at OS level:
-#   macOS: brew install espeak-ng
-#   Debian/Ubuntu: apt install espeak-ng
-phonemizer>=3.2.1
+# Pure-Python phonemizer fallback for non-dictionary words (Layer 2).
+# Replaces phonemizer/espeak which requires OS-level installation.
+g2p-en>=2.1.0
+
+# Phonemizer REMOVED — replaced with g2p-en (pure Python, no system deps)
+# phonemizer>=3.2.1  # REMOVED: requires espeak-ng
 
 # Database
 asyncpg>=0.29.0

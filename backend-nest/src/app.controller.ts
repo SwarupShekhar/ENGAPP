@@ -18,4 +18,9 @@ export class AppController {
     this.logger.log('GET /health');
     return this.appService.getHealth();
   }
+
+  @Get('debug-sentry')
+  debugSentry(): string {
+    throw new Error('My first Sentry error!');
+  }
 }
