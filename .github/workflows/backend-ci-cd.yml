@@ -1,4 +1,4 @@
-name: Backend CI/CD
+name: Backend Nest CI
 
 on:
   push:
@@ -20,12 +20,12 @@ jobs:
         working-directory: ./backend-nest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           cache: "npm"
           cache-dependency-path: backend-nest/package-lock.json
 
@@ -35,26 +35,5 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # - name: Unit Tests
-      #   run: npm run test
-
-      # - name: Build Check
-      #   run: npm run build
-
-  deploy:
-    name: Deploy to Render
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Deploy to Render
-        # Trigger deployment using Deploy Hook or Render API
-        # Using a simple curl request to the Deploy Hook URL stored in secrets
-        if: success()
-        run: |
-          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
-            curl "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          else
-            echo "RENDER_DEPLOY_HOOK_URL secret not set, skipping deployment trigger."
-          fi
+      - name: Build Check
+        run: npm run build

@@ -1,4 +1,4 @@
-import { client, API_URL } from "../../../api/client";
+import { client, API_URL } from "../../../api/englivoClient";
 
 export const tutorApi = {
     startSession: async (userId: string) => {
@@ -22,10 +22,12 @@ export const tutorApi = {
     streamSpeech: (
         formData: FormData,
         headers?: Record<string, string>,
+        signal?: AbortSignal,
     ): Promise<Response> => {
         return fetch(`${API_URL}/conversational-tutor/stream-speech`, {
             method: 'POST',
             body: formData,
+            signal,
             headers: {
                 Accept: 'text/event-stream',
                 ...(headers ?? {}),

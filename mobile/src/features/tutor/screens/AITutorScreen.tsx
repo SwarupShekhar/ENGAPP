@@ -25,12 +25,14 @@ import Animated, {
   withDelay,
 } from "react-native-reanimated";
 import { useUser, useAuth } from "@clerk/clerk-expo";
+import { useFocusEffect } from "@react-navigation/native";
 import { Audio } from "expo-av";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { tutorApi } from "../services/tutorApi";
 import { streamingTutor, StreamChunk } from "../../call/services/streamingTutorService";
 import { PronunciationBreakdown } from "../../../components/PronunciationBreakdown";
 import { bridgeApi } from "../../../api/bridgeApi";
+import { getCachedToken } from "../../../api/authToken";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -201,6 +203,9 @@ function TranscriptBubble({ item, index }: { item: any; index: number }) {
   );
 }
 
+let _msgSeq = 0;
+const nextMsgId = () => `msg-${++_msgSeq}`;
+
 // ─── Main Screen ──────────────────────────────────────────
 export default function AITutorScreen({ navigation }: any) {
   const theme = useAppTheme();
@@ -213,6 +218,14 @@ export default function AITutorScreen({ navigation }: any) {
   const [isStreaming, setIsStreaming] = useState(false); // Receiving AI response
   const [error, setError] = useState<string | null>(null);
   const [turnCount, setTurnCount] = useState(0);
+  const [streamPath, setStreamPath] = useState<
+    "idle" | "sse" | "ws-fallback" | "sse-skipped"
+  >("idle");
+  const [streamDebugReason, setStreamDebugReason] = useState<string>("none");
+  const [turnStartAtLabel, setTurnStartAtLabel] = useState<string>("--:--:--");
+  const [firstChunkLatencyMs, setFirstChunkLatencyMs] = useState<number | null>(
+    null,
+  );
   const [referenceTextForNextTurn, setReferenceTextForNextTurn] = useState<
     string | null
   >(null);
@@ -227,7 +240,13 @@ export default function AITutorScreen({ navigation }: any) {
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const soundPoolRef = useRef<(Audio.Sound | null)[]>([null, null, null]);
+  const soundPoolIndexRef = useRef(0);
   const cefrSyncTriggeredRef = useRef(false);
+  const prewarmRef = useRef<Promise<[Awaited<ReturnType<typeof Audio.requestPermissionsAsync>>, any]> | null>(null);
+  const sseAbortRef = useRef<AbortController | null>(null);
+  const turnStartMsRef = useRef<number | null>(null);
+  const firstChunkSeenRef = useRef<boolean>(false);
 
   const syncCefrLevelOnce = async () => {
     if (cefrSyncTriggeredRef.current) return;
@@ -248,7 +267,28 @@ export default function AITutorScreen({ navigation }: any) {
   const isSpeakingRef = useRef(false);
   const silenceThresholdDb = -50; // Silence threshold
   const speechThresholdDb = -45; // Speech threshold
-  const silenceDurationMs = 2000; // 2 seconds to trigger end
+  const silenceDurationMs = 800; // 800ms silence to trigger end
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!prewarmRef.current && user?.id) {
+        prewarmRef.current = Promise.all([
+          Audio.requestPermissionsAsync(),
+          tutorApi.startSession(user.id),
+        ]);
+      }
+    }, [user?.id]),
+  );
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    }).catch((err) => console.warn("Audio mode error:", err));
+  }, []);
 
   // Pulse Rings
   const pulseScale1 = useSharedValue(1);
@@ -303,11 +343,22 @@ export default function AITutorScreen({ navigation }: any) {
           },
         ]);
 
-        // 2. Parallelize Permission + API Call
-        const [perm, res] = await Promise.all([
-          Audio.requestPermissionsAsync(),
-          tutorApi.startSession(user?.id || "test"),
-        ]);
+        // Split into independent promises so WS connects as soon as session resolves
+        const permPromise = prewarmRef.current
+          ? prewarmRef.current.then(([p]) => p)
+          : Audio.requestPermissionsAsync();
+        const sessionPromise = prewarmRef.current
+          ? prewarmRef.current.then(([, r]) => r)
+          : tutorApi.startSession(user?.id || "test");
+
+        // Fire WS connect the moment session resolves — don't wait for perm
+        const wsAndSessionPromise = sessionPromise.then((res) => {
+          streamingTutor.connect(res.sessionId, user?.id || "test");
+          streamingTutor.onMessage((c) => streamHandlerRef.current(c));
+          return res;
+        });
+
+        const [perm, res] = await Promise.all([permPromise, wsAndSessionPromise]);
 
         if (perm.status !== "granted") {
           Alert.alert("Permission Required", "Microphone access is needed.");
@@ -317,7 +368,6 @@ export default function AITutorScreen({ navigation }: any) {
         setSessionId(res.sessionId);
         sessionIdRef.current = res.sessionId;
 
-        // 3. Update bubble with actual greeting
         setTranscript([
           {
             id: "welcome",
@@ -325,18 +375,6 @@ export default function AITutorScreen({ navigation }: any) {
             text: res.message,
           },
         ]);
-
-        // 4. Connect WebSocket + Setup Audio (non-blocking)
-        streamingTutor.connect(res.sessionId, user?.id || "test");
-        streamingTutor.onMessage((c) => streamHandlerRef.current(c));
-
-        Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        }).catch((err) => console.warn("Audio mode error:", err));
 
         if (res.audioBase64) {
           queueAudio(res.audioBase64);
@@ -349,8 +387,12 @@ export default function AITutorScreen({ navigation }: any) {
     init();
 
     return () => {
+      sseAbortRef.current?.abort();
       streamingTutor.disconnect();
       if (soundRef.current) soundRef.current.unloadAsync();
+      for (const s of soundPoolRef.current) {
+        if (s) s.unloadAsync().catch(() => {});
+      }
       if (recordingRef.current) stopRecording(); // Ensure recording stops
 
       // Trigger final analysis and save session
@@ -371,6 +413,19 @@ export default function AITutorScreen({ navigation }: any) {
 
   // ─── Stream Handling ────────────────────────────────────
   const handleStreamMessage = (chunk: StreamChunk) => {
+    // First meaningful chunk latency marker for this turn.
+    if (!firstChunkSeenRef.current) {
+      const isMeaningfulChunk =
+        (chunk.type === "transcript" || chunk.type === "transcription") &&
+          Boolean(chunk.text) ||
+        (chunk.type === "sentence" && Boolean(chunk.text)) ||
+        (chunk.type === "audio" && Boolean(chunk.audio));
+      if (isMeaningfulChunk && turnStartMsRef.current) {
+        firstChunkSeenRef.current = true;
+        setFirstChunkLatencyMs(Date.now() - turnStartMsRef.current);
+      }
+    }
+
     // "transcript" = first chunk from stream (backend-ai); "transcription" = legacy WebSocket key
     if (chunk.type === "transcription" || chunk.type === "transcript") {
       // Update the placeholder user bubble with the actual transcription
@@ -394,7 +449,7 @@ export default function AITutorScreen({ navigation }: any) {
           return [
             ...prev,
             {
-              id: Date.now().toString(),
+              id: nextMsgId(),
               speaker: "user",
               text: chunk.text,
               assessmentResult: chunk.assessmentResult,
@@ -418,7 +473,7 @@ export default function AITutorScreen({ navigation }: any) {
             return [
               ...prev,
               {
-                id: Date.now().toString(),
+                id: nextMsgId(),
                 speaker: "ai",
                 text: chunk.text,
                 isStreaming: true,
@@ -484,16 +539,19 @@ export default function AITutorScreen({ navigation }: any) {
         return;
       }
 
-      // Ensure mode allows playback
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
+      // Round-robin through pool of 3 sounds — avoids createAsync overhead per chunk
+      const poolIndex = soundPoolIndexRef.current;
+      soundPoolIndexRef.current = (poolIndex + 1) % 3;
 
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: `data:audio/mp3;base64,${nextAudio}` },
-        { shouldPlay: true },
-      );
+      let sound = soundPoolRef.current[poolIndex];
+      if (sound) {
+        try { await sound.unloadAsync(); } catch (_) {}
+      } else {
+        sound = new Audio.Sound();
+        soundPoolRef.current[poolIndex] = sound;
+      }
+
+      await sound.loadAsync({ uri: `data:audio/mp3;base64,${nextAudio}` });
       soundRef.current = sound;
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
@@ -501,15 +559,16 @@ export default function AITutorScreen({ navigation }: any) {
           playNext();
 
           if (audioQueueRef.current.length === 0) {
-            setIsStreaming(false); // Enable mic again
-            evaluateLastMessageForPronunciation(); // Check if we need to assess next
+            setIsStreaming(false);
+            evaluateLastMessageForPronunciation();
           }
         }
       });
+      await sound.playAsync();
     } catch (e) {
       console.error("Play error", e);
       isPlayingRef.current = false;
-      setIsStreaming(false); // Enable mic on error
+      setIsStreaming(false);
       playNext();
     }
   };
@@ -533,12 +592,6 @@ export default function AITutorScreen({ navigation }: any) {
     try {
       const perm = await Audio.requestPermissionsAsync();
       if (perm.status !== "granted") return;
-
-      // Switch to recording mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
 
       // Validate previous recording is cleared
       if (recordingRef.current) {
@@ -618,12 +671,16 @@ export default function AITutorScreen({ navigation }: any) {
       }
 
       if (uri) {
+        // Mark turn start timing for debug visibility.
+        turnStartMsRef.current = Date.now();
+        firstChunkSeenRef.current = false;
+        setFirstChunkLatencyMs(null);
+        setTurnStartAtLabel(new Date(turnStartMsRef.current).toLocaleTimeString());
+
         // 1. Prepare Audio Base64 (always needed now)
         let audioBase64: string | undefined;
         try {
-          const { File } = require("expo-file-system");
-          const file = new File(uri);
-          audioBase64 = await file.base64();
+          audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
         } catch (e) {
           console.warn("[AITutor] Could not read audio file:", e);
         }
@@ -653,7 +710,7 @@ export default function AITutorScreen({ navigation }: any) {
           setTranscript((prev) => [
             ...prev,
             {
-              id: Date.now().toString(),
+              id: nextMsgId(),
               speaker: "user",
               text: text || "(Audio Sent)",
               assessmentResult: assessmentData,
@@ -661,13 +718,15 @@ export default function AITutorScreen({ navigation }: any) {
           ]);
 
           // Send to Stream (include raw audio for Gemini analysis)
+          setStreamPath("ws-fallback");
+          setStreamDebugReason("pronunciation route");
           streamingTutor.sendText(text, phoneticContext, audioBase64);
         } else {
           // Fast path: prefer SSE for lower latency (first audio ~2–3s), fallback to WebSocket
           setTranscript((prev) => [
             ...prev,
             {
-              id: Date.now().toString(),
+              id: nextMsgId(),
               speaker: "user",
               text: "...",
               tempId: true,
@@ -685,21 +744,32 @@ export default function AITutorScreen({ navigation }: any) {
 
           // Primary path: SSE stream (first audio ~2–3s). Fallback: WebSocket.
           let usedSSE = false;
-          const token = await getToken?.();
+          let sseSkipped = false;
+          const token = getToken ? await getCachedToken(getToken) : null;
           if (token && sessionId) {
             try {
+              sseAbortRef.current?.abort();
+              const abortController = new AbortController();
+              sseAbortRef.current = abortController;
               const response = await tutorApi.streamSpeech(formData, {
                 Authorization: `Bearer ${token}`,
-              });
+              }, abortController.signal);
               if (!response.ok) {
                 const errText = await response.text().catch(() => "");
                 console.warn(
                   `[Tutor SSE] ${response.status} ${response.statusText}`,
                   errText.slice(0, 500),
                 );
+                if (__DEV__) {
+                  console.log("[Tutor SSE] Falling back to WS due to non-2xx response");
+                }
+                setStreamPath("ws-fallback");
+                setStreamDebugReason(`sse_non_2xx_${response.status}`);
               }
               if (response.ok && response.body) {
                 usedSSE = true;
+                setStreamPath("sse");
+                setStreamDebugReason("ok");
                 let userTranscript = "";
                 let aiText = "";
                 const reader = response.body.getReader();
@@ -752,13 +822,38 @@ export default function AITutorScreen({ navigation }: any) {
                     .appendTurn(sessionId, userTranscript, aiText.trim())
                     .catch(() => {});
                 }
+                if (sseAbortRef.current === abortController) {
+                  sseAbortRef.current = null;
+                }
               }
-            } catch (_) {
+            } catch (err: any) {
+              if (err?.name === "AbortError") {
+                if (__DEV__) console.log("[Tutor SSE] aborted");
+              } else {
+                console.warn("[Tutor SSE] request failed, falling back to WS:", err?.message || err);
+                setStreamPath("ws-fallback");
+                setStreamDebugReason("sse_request_error");
+              }
               usedSSE = false;
+            } finally {
+              sseAbortRef.current = null;
             }
+          } else if (__DEV__) {
+            console.warn(
+              "[Tutor SSE] skipped (missing auth token or sessionId), using WS fallback",
+            );
+            sseSkipped = true;
+            setStreamPath("sse-skipped");
+            setStreamDebugReason("missing_token_or_session");
           }
           if (!usedSSE && audioBase64) {
+            if (!sseSkipped) {
+              setStreamPath("ws-fallback");
+            }
             streamingTutor.sendText(null, null, audioBase64);
+          } else if (!usedSSE && !audioBase64) {
+            setStreamPath("ws-fallback");
+            setStreamDebugReason("no_audio_base64");
           }
         }
         setTurnCount((c) => c + 1);
@@ -905,6 +1000,17 @@ export default function AITutorScreen({ navigation }: any) {
                   ? "Listening..."
                   : "Hold to Speak"}
           </Text>
+          {__DEV__ && (
+            <View style={styles.debugBadge}>
+              <Text style={styles.debugBadgeText}>
+                stream: {streamPath} ({streamDebugReason})
+              </Text>
+              <Text style={styles.debugBadgeText}>
+                turnStart: {turnStartAtLabel} • firstChunk:{" "}
+                {firstChunkLatencyMs === null ? "pending" : `${firstChunkLatencyMs}ms`}
+              </Text>
+            </View>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -1043,6 +1149,21 @@ const getStyles = (theme: any) =>
       fontSize: 14,
       fontWeight: "500",
       letterSpacing: 0.5,
+    },
+    debugBadge: {
+      marginTop: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: "rgba(250, 204, 21, 0.5)",
+      backgroundColor: "rgba(250, 204, 21, 0.12)",
+    },
+    debugBadgeText: {
+      color: "#fde68a",
+      fontSize: 11,
+      fontWeight: "600",
+      letterSpacing: 0.2,
     },
 
     // Typing

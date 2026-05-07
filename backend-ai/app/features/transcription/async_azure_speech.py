@@ -5,6 +5,7 @@ Handles both transcription and pronunciation assessment.
 import asyncio
 import io
 import json
+import os
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 import azure.cognitiveservices.speech as speechsdk
@@ -18,7 +19,10 @@ from tenacity import (
 )
 
 # Thread pool for CPU-bound Azure SDK operations
-_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="azure_speech")
+_executor = ThreadPoolExecutor(
+    max_workers=int(os.environ.get("AZURE_THREAD_POOL_SIZE", "12")),
+    thread_name_prefix="azure_speech",
+)
 
 
 class AsyncAzureSpeech:
@@ -55,7 +59,7 @@ class AsyncAzureSpeech:
     async def transcribe_from_bytes(
         self,
         audio_bytes: bytes,
-        language: str = "en-IN"
+        language: str = "en-US"
     ) -> dict:
         """
         Transcribe audio from bytes asynchronously.
@@ -177,7 +181,7 @@ class AsyncAzureSpeech:
         self,
         audio_bytes: bytes,
         reference_text: str,
-        language: str = "en-IN"
+        language: str = "en-US"
     ) -> dict:
         """
         Assess pronunciation asynchronously.
@@ -220,15 +224,19 @@ class AsyncAzureSpeech:
             subscription=settings.azure_speech_key,
             region=settings.azure_speech_region
         )
-        config.speech_recognition_language = language
-        
+        config.speech_recognition_language = "en-US"  # Prosody only supported on en-US
+
         pronunciation_config = speechsdk.PronunciationAssessmentConfig(
             reference_text=reference_text,
             grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
             granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
             enable_miscue=True,
         )
-        pronunciation_config.enable_prosody_assessment = True
+        pronunciation_config.json_string = json.dumps({
+            "NBestPhonemeCount": 5,
+            "WordLevelTiming": True
+        })
+        pronunciation_config.enable_prosody_assessment()
 
         # Create recognizer
         recognizer = speechsdk.SpeechRecognizer(

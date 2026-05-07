@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Core Backend (NestJS) — connects to Neon + external Redis
+  backend-nest:
+    build:
+      context: ./backend-nest
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend-nest/.env
+    environment:
+      AI_ENGINE_URL: http://backend-ai:8001
+      PORT: 3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { if (r.statusCode !== 200) process.exit(1) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # AI Backend (Python) — connects to same Redis
+  backend-ai:
+    build:
+      context: ./backend-ai
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      PORT: 8001
+      ENVIRONMENT: production
+    env_file:
+      - ./backend-ai/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+

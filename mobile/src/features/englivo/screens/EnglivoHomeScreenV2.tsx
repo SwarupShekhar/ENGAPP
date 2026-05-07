@@ -47,7 +47,7 @@ import { getMe } from "../../../api/englivo/user";
 import { getMe as getQuotaMe, type MeResponse } from "../../../api/englivo/quota";
 import { getBridgeUser, syncBridgeCefr } from "../../../api/bridgeClient";
 import UpgradeSheet from "../components/UpgradeSheet";
-import { getSessionsCount, getUpcomingSession } from "../../../api/englivoClient";
+import { getSessionsCount, getUpcomingSession } from "../../../api/client";
 import { joinSession, getInstantTutorToken } from "../../../api/englivoApi";
 import { ModeSwitcher } from "../../../components/navigation/ModeSwitcher";
 import { ENGLIVO_AI_TUTOR_TITLE } from "../constants";
@@ -542,17 +542,17 @@ export default function EnglivoHomeScreenV2() {
 
         {/* ── QUICK ACTIONS ─────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(240).duration(500)} style={s.quickRow}>
-          {/* Book Tutor */}
+          {/* AI Tutor CTA — navigates to Core AI Tutor, not Pulse booking flow */}
           <TouchableOpacity
             style={s.quickCard}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate("EnglivoSessions")}
+            onPress={() => navigation.navigate("AITutor")}
           >
             <View style={s.quickIconRing}>
-              <Ionicons name="person" size={22} color={C.goldMid} />
+              <Ionicons name="mic" size={22} color={C.goldMid} />
             </View>
-            <Text style={s.quickTitle}>Book Tutor</Text>
-            <Text style={s.quickSub}>Live session</Text>
+            <Text style={s.quickTitle}>AI Tutor</Text>
+            <Text style={s.quickSub}>Practice now</Text>
             <Ionicons name="chevron-forward" size={14} color={C.ash} style={{ marginTop: 8 }} />
           </TouchableOpacity>
 

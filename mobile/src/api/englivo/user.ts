@@ -26,12 +26,17 @@ export async function getMe(): Promise<User> {
 }
 
 export async function getHistory(): Promise<SessionHistory[]> {
-  const r = await client.get<any>("/api/history");
-  const raw = r.data;
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw?.history)) return raw.history;
-  if (Array.isArray(raw?.data)) return raw.data;
-  return [];
+  try {
+    const r = await client.get<any>("/api/history");
+    const raw = r.data;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.history)) return raw.history;
+    if (Array.isArray(raw?.data)) return raw.data;
+    return [];
+  } catch (err: any) {
+    if (err?.response?.status === 404) return [];
+    throw err;
+  }
 }
 
 export async function getCefrPath(): Promise<{ levels: string[]; current: string }> {

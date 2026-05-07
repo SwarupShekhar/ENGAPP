@@ -58,7 +58,12 @@ class AzureHinglishTTSService:
         return b""
 
 # Factory initialization based on config
-if settings.tts_provider == "inworld":
+if settings.tts_provider == "inworld" or settings.disable_azure_tts:
+    if settings.disable_azure_tts and settings.tts_provider != "inworld":
+        logger.warning(
+            "DISABLE_AZURE_TTS=true overrides tts_provider=%s; forcing Inworld TTS",
+            settings.tts_provider,
+        )
     logger.info("Initializing Inworld AI TTS service")
     hinglish_tts_service = inworld_tts_service
     HinglishTTSService = InworldTTSService

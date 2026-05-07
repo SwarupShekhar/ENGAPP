@@ -15,6 +15,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "APP_API_URL_OVERRIDE": "http://139.84.163.249:3008",
+        "EXPO_PUBLIC_NEST_API_URL": "http://139.84.163.249:3008"
       }
     },
     "production": {

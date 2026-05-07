@@ -124,15 +124,24 @@ def calculate_pronunciation_score(
         logger.info("Fluency multiplier: %.2f (fluency_score=%.1f)", fluency_mult, fluency_score)
 
     # Prosody blend: Azure word accuracy can stay high while stress/rhythm is weak.
-    # Mixing ~45% toward ProsodyScore prevents inflated scores when only prosody is poor.
+    # Tiered weighting — poor prosody drags score down harder.
     if prosody_score is not None:
         before = score
-        score = 0.56 * score + 0.44 * float(prosody_score)
+        p = float(prosody_score)
+        if p < 60:
+            # Very poor prosody — heavily weight prosody (70% prosody, 30% word accuracy)
+            score = 0.3 * score + 0.7 * p
+        elif p < 75:
+            # Moderate prosody — equal blend
+            score = 0.5 * score + 0.5 * p
+        else:
+            # Good prosody — keep word accuracy dominant
+            score = 0.7 * score + 0.3 * p
+
         logger.info(
-            "Prosody blend: %.1f -> %.1f (prosody_score=%.1f)",
-            before,
-            score,
-            prosody_score,
+            "Prosody blend: %.1f -> %.1f (prosody=%.1f, weight=%.0f%% prosody)",
+            before, score, p,
+            70 if p < 60 else (50 if p < 75 else 30)
         )
 
     score = max(10.0, min(100.0, round(score, 1)))

@@ -8,7 +8,7 @@ export class FastApiClient {
     private readonly baseUrl: string;
 
     constructor(private configService: ConfigService) {
-        this.baseUrl = this.configService.get<string>('FASTAPI_SERVICE_URL') || 'http://localhost:8000';
+        this.baseUrl = this.configService.get<string>('FASTAPI_SERVICE_URL') || 'http://localhost:8001';
     }
 
     async transcribe(audioUrl: string, sessionId: string) {

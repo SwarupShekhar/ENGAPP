@@ -7,8 +7,13 @@ services:
       - ./backend-nest/.env
     environment:
       AI_ENGINE_URL: http://backend-ai:8001
+      FASTAPI_SERVICE_URL: http://backend-ai:8001
       PORT: 3000
       NODE_ENV: production
+    ports:
+      # Direct port for mobile preview builds (no Caddy/domain needed).
+      # Port 3008 is free on the shared Vultr server.
+      - "0.0.0.0:3008:3000"
     restart: unless-stopped
     networks:
       - internal
@@ -34,6 +39,10 @@ services:
       PORT: 8001
       ENVIRONMENT: production
       DEBUG: "false"
+      PRON_DEBUG: ""
+      TTS_PROVIDER: inworld
+      DISABLE_AZURE_TTS: "true"
+    # No external ports — only backend-nest can reach this service.
     restart: unless-stopped
     networks:
       - internal
@@ -77,4 +86,3 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
-

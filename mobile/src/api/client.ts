@@ -1,7 +1,13 @@
 import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-import { coerceReleaseApiOverride } from "./releaseUrlOverride";
+import {
+  coerceReleaseApiOverride,
+  rewriteDevLanOverride,
+} from "./releaseUrlOverride";
+import { readExpoExtra } from "./expoExtra";
+import { getDevBundleHostname } from "./devPackagerHost";
+import { getCachedToken } from "./authToken";
 
 // Access localhost from emulator/device or use production URL
 const IS_PROD = !__DEV__;
@@ -10,18 +16,36 @@ const IS_PROD = !__DEV__;
 // Use true only for temporary local testing on a physical device.
 const FORCE_LOCAL = false;
 
-// Your Mac's LAN IP for physical devices (same Wi‑Fi). Emulator ignores this for Android.
-const LOCAL_IP = "192.168.1.34";
-// Align with backend-nest .env PORT (health responds on 3004)
-const LOCAL_PORT = 3004;
+// Local dev default: docker-compose exposes Nest on 3000.
+// If you override `EXPO_PUBLIC_NEST_API_URL`/`APP_API_URL_OVERRIDE`, that URL (and its port)
+// will be used instead.
+const LOCAL_PORT = 3000;
 const isDevice = Constants.isDevice;
 
-// Optional override for internal builds / device testing.
-// Optional override: app.config.js `extra.apiUrlOverride` via APP_API_URL_OVERRIDE (.env / EAS).
-// Example: "http://192.168.1.34:3000"
+// Dev fallback host for Nest: prefer bundle script origin (tracks hotspot / Wi‑Fi), then Expo hostUri.
+const _hostUri: string | undefined = (Constants.expoConfig as { hostUri?: string } | null)
+  ?.hostUri;
+const DEV_BUNDLE_HOST = getDevBundleHostname();
+const LOCAL_IP =
+  DEV_BUNDLE_HOST ||
+  (_hostUri ? _hostUri.split(":")[0] : undefined) ||
+  "172.20.10.13";
+
+// Nest base URL overrides (same host for REST + Socket.IO `/chat`):
+// 1) EXPO_PUBLIC_NEST_API_URL — inlined when Metro bundles; set in .env.local and reload (best when LAN IP changes often).
+// 2) extra.apiUrlOverride — from app.config.js via APP_API_URL_OVERRIDE (.env / EAS); read from manifest fallback too.
+const nestUrlFromPublicEnv =
+  typeof process.env.EXPO_PUBLIC_NEST_API_URL === "string"
+    ? process.env.EXPO_PUBLIC_NEST_API_URL.trim()
+    : "";
+const nestUrlFromExtra = (readExpoExtra("apiUrlOverride") ?? "").trim();
+const DEV_REWRITTEN_NEST_OVERRIDE = rewriteDevLanOverride(
+  nestUrlFromPublicEnv || nestUrlFromExtra || null,
+  DEV_BUNDLE_HOST,
+  "Nest API",
+);
 const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
-  (Constants.expoConfig as any)?.extra?.apiUrlOverride ||
-    (Constants.manifest as any)?.extra?.apiUrlOverride,
+  DEV_REWRITTEN_NEST_OVERRIDE,
   "Nest API",
 );
 
@@ -34,7 +58,7 @@ export const API_URL =
     : null) ||
   // 1) Default behavior
   (IS_PROD
-    ? "https://engapp-3210.onrender.com"
+    ? (process.env.EXPO_PUBLIC_NEST_API_URL || (() => { console.error("[EngR] EXPO_PUBLIC_NEST_API_URL not set — production requests will fail"); return ""; })())
     : FORCE_LOCAL
       ? `http://${LOCAL_IP}:${LOCAL_PORT}`
       : Platform.select({
@@ -86,7 +110,7 @@ client.interceptors.request.use(
   async (config) => {
     if (getToken) {
       try {
-        const token = await getToken();
+        const token = await getCachedToken(getToken);
         if (token) {
           // console.log('[API] Attaching auth token');
           config.headers.Authorization = `Bearer ${token}`;
@@ -132,3 +156,22 @@ client.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+/** Conversation session counts — Core `GET /api/sessions/count`. */
+export async function getSessionsCount(): Promise<number> {
+  const r = await client.get<{ count?: number } | number>("/api/sessions/count");
+  const payload = r.data as any;
+  if (typeof payload === "number") return payload;
+  return Number(payload?.count ?? 0);
+}
+
+/** Next scheduled peer session — Core `GET /api/sessions/upcoming`. */
+export async function getUpcomingSession(): Promise<any | null> {
+  try {
+    const r = await client.get("/api/sessions/upcoming");
+    return r.data;
+  } catch (error: any) {
+    if (error.response?.status === 404) return null;
+    throw error;
+  }
+}

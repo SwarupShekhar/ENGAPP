@@ -151,6 +151,29 @@ def extract_structured_tags(gemini_response: str) -> tuple[list[dict[str, Any]],
     return out, cleaned
 
 
+def _worst_phoneme_detail(word_raw: dict[str, Any]) -> tuple[str, float] | None:
+    """
+    Lowest AccuracyScore among Azure PA phoneme segments for one word.
+    Returns None when Phonemes are missing or have no scores.
+    """
+    worst_phoneme = ""
+    worst_score: float | None = None
+    for ph in word_raw.get("Phonemes") or []:
+        ph_pa = ph.get("PronunciationAssessment") or {}
+        ph_score = ph_pa.get("AccuracyScore")
+        if ph_score is None:
+            ph_score = ph.get("AccuracyScore")
+        if ph_score is None:
+            continue
+        ps = float(ph_score)
+        if worst_score is None or ps < worst_score:
+            worst_score = ps
+            worst_phoneme = str(ph.get("Phoneme") or "")
+    if worst_score is None:
+        return None
+    return (worst_phoneme, worst_score)
+
+
 def _phonetic_insights_dict(phonetic_context: dict[str, Any] | None) -> dict[str, Any]:
     """Unwrap optional { phonetic_insights: {...}, reference_text, ... } from client."""
     if not phonetic_context:
@@ -228,14 +251,20 @@ def issues_from_phonetic_context(
     # --- Raw words from free-speech Azure PA (accuracy threshold check) ---
     # In free-speech mode Azure sets genuine AccuracyScores instead of inflated
     # self-reference scores. Flag any word below threshold regardless of ErrorType.
+    # Also flag when word-level score passes but at least one phoneme is below threshold
+    # (Azure often omits ErrorType=Mispronunciation for substitutions aligned as another word).
     _ACCURACY_THRESHOLD = PHONEME_BAD_THRESHOLD
     for rw in raw_words:
         rw_word = (rw.get("Word") or "").strip().lower()
         if not rw_word:
             continue
-        rw_acc = float(rw.get("AccuracyScore") or 100)
-        rw_err = (rw.get("ErrorType") or "None").strip()
-        if rw_acc >= _ACCURACY_THRESHOLD and rw_err not in ("Mispronunciation", "Omission", "Insertion"):
+        wp = rw.get("PronunciationAssessment") or {}
+        rw_acc = float(wp.get("AccuracyScore") if wp else rw.get("AccuracyScore") or 100)
+        rw_err = str(wp.get("ErrorType") or rw.get("ErrorType") or "None").strip()
+        worst_detail = _worst_phoneme_detail(rw)
+        low_any_phoneme = worst_detail is not None and worst_detail[1] < _ACCURACY_THRESHOLD
+        explicit_word_issue = rw_err in ("Mispronunciation", "Omission", "Insertion")
+        if rw_acc >= _ACCURACY_THRESHOLD and not explicit_word_issue and not low_any_phoneme:
             continue
         # Resolve correct word and rule from phoneme map
         raw = by_correct.get(rw_word)
@@ -243,7 +272,10 @@ def issues_from_phonetic_context(
         approx = entry.get("indian_spelling_approximation") or entry.get("approximation")
         heard_l = str(approx).lower().strip() if approx else rw_word
         rule = str(entry.get("rule_category") or "phoneme_score")
-        conf = max(0.0, min(1.0, 1.0 - (rw_acc / 100.0)))
+        score_for_conf = rw_acc
+        if worst_detail:
+            score_for_conf = min(score_for_conf, worst_detail[1])
+        conf = max(0.0, min(1.0, 1.0 - (score_for_conf / 100.0)))
         tip = str(entry.get("tip") or "")
         suggestion = _compose_feedback_suggestion(
             correct=rw_word,
@@ -252,19 +284,15 @@ def issues_from_phonetic_context(
             confidence=conf,
             base_tip=tip,
         )
-        severity = "high" if rw_acc < 50 else "medium"
-        # Include worst phoneme info so feedback UI can show which phoneme failed
-        phonemes = rw.get("Phonemes") or []
         worst_phoneme = ""
         worst_score = 100.0
-        for ph in phonemes:
-            ph_pa = ph.get("PronunciationAssessment") or {}
-            ph_score = ph_pa.get("AccuracyScore")
-            if ph_score is None:
-                ph_score = ph.get("AccuracyScore")
-            if ph_score is not None and float(ph_score) < worst_score:
-                worst_score = float(ph_score)
-                worst_phoneme = ph.get("Phoneme") or ""
+        if worst_detail:
+            worst_phoneme, worst_score = worst_detail
+        severity = (
+            "high"
+            if rw_acc < 50 or (worst_detail is not None and worst_detail[1] < 50)
+            else "medium"
+        )
         issue: dict[str, Any] = {
             "word": rw_word,
             "heard": heard_l,

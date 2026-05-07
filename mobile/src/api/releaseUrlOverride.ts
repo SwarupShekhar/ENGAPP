@@ -20,6 +20,41 @@ function looksLikeNonPublicHost(url: string): boolean {
   }
 }
 
+export function isNonPublicUrl(url: string): boolean {
+  return looksLikeNonPublicHost(url);
+}
+
+/**
+ * In dev, stale LAN overrides (e.g. old hotspot IP) cause hard network failures.
+ * If a private-host override is present and Metro exposes the current host IP,
+ * rewrite the override hostname to the Metro host while preserving scheme/port/path.
+ */
+export function rewriteDevLanOverride(
+  raw: string | null | undefined,
+  devHost: string | undefined,
+  label: string,
+): string | null {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if (!v) return null;
+  if (!__DEV__) return v;
+  if (!devHost) return v;
+  if (!looksLikeNonPublicHost(v)) return v;
+
+  try {
+    const u = new URL(v);
+    if (u.hostname === devHost) return v;
+    const before = u.hostname;
+    u.hostname = devHost;
+    const rewritten = u.toString().replace(/\/$/, "");
+    console.warn(
+      `[${label}] Rewriting dev LAN override host ${before} -> ${devHost} (${rewritten})`,
+    );
+    return rewritten;
+  } catch {
+    return v;
+  }
+}
+
 /** Use extra.* URL from app config only if valid for this build profile. */
 export function coerceReleaseApiOverride(
   raw: unknown,

@@ -38,6 +38,7 @@ class InworldTTSService:
             "voiceId": settings.inworld_character_id or "Abby",
             "modelId": "inworld-tts-1.5-max",
             "timestampType": "WORD",
+            "speakingRate": 0.85,
         }
 
     def synthesize_hinglish(self, text: str, gender: str = 'female') -> bytes:
@@ -93,6 +94,41 @@ class InworldTTSService:
         except Exception as e:
             logger.error(f"Inworld TTS async error: {e}")
             return b""
+
+    async def synthesize_with_timestamps(self, text: str) -> tuple:
+        """Returns (audio_bytes, word_timestamps). Timestamps list may be empty."""
+        if not self.auth_header:
+            logger.error("Inworld TTS service is not configured.")
+            return b"", []
+        headers = {"Authorization": self.auth_header, "Content-Type": "application/json"}
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.endpoint,
+                    json=self._build_payload(text),
+                    headers=headers,
+                    timeout=30.0,
+                )
+                if response.status_code != 200:
+                    logger.error(f"Inworld TTS error: {response.status_code} - {response.text}")
+                    return b"", []
+                result = response.json()
+                audio_content = result.get("audioContent", "")
+                # Inworld returns word timestamps because we send timestampType: WORD
+                raw = result.get("wordTimestamps") or result.get("timestamps") or []
+                word_timestamps = []
+                for t in raw:
+                    word = (t.get("word") or t.get("text") or "").strip()
+                    # Inworld may use seconds (float) or milliseconds (int)
+                    start = t.get("startMs") or int((t.get("start") or 0) * 1000)
+                    end = t.get("endMs") or int((t.get("end") or 0) * 1000)
+                    if word:
+                        word_timestamps.append({"word": word, "startMs": int(start), "endMs": int(end)})
+                audio_bytes = base64.b64decode(audio_content) if audio_content else b""
+                return audio_bytes, word_timestamps
+        except Exception as e:
+            logger.error(f"Inworld TTS synthesize_with_timestamps error: {e}")
+            return b"", []
 
     async def synthesize_sentence(self, text: str) -> bytes:
         """Alias for synthesize_async — called by StreamingTutorService."""

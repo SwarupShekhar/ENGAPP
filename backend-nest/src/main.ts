@@ -1,3 +1,5 @@
+import './instrument';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -55,10 +57,13 @@ async function bootstrap() {
   );
 
   // Enable CORS for mobile app integration
+  // origin:'*' + credentials:true is invalid in browsers — credentials only when origin is explicit
+  const frontendUrl = process.env.FRONTEND_URL;
+  const useWildcard = !frontendUrl || frontendUrl === '*';
   app.enableCors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: useWildcard ? '*' : frontendUrl.split(',').map((s) => s.trim()),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+    credentials: !useWildcard,
   });
 
   // Setup Swagger documentation

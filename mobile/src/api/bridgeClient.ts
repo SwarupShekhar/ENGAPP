@@ -1,60 +1,53 @@
 import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-import { coerceReleaseApiOverride } from "./releaseUrlOverride";
+import {
+  coerceReleaseApiOverride,
+  rewriteDevLanOverride,
+} from "./releaseUrlOverride";
+import { readExpoExtra } from "./expoExtra";
+import { getDevBundleHostname } from "./devPackagerHost";
+import { getCachedToken } from "./authToken";
 
 const IS_PROD = !__DEV__;
-const LOCAL_IP = "192.168.1.34";
-const BRIDGE_PORT = "3012";
 const isDevice = Constants.isDevice;
 
-const EXTRA_BRIDGE_URL_OVERRIDE = coerceReleaseApiOverride(
-  (Constants.expoConfig as any)?.extra?.bridgeApiUrl ||
-    (Constants.manifest as any)?.extra?.bridgeApiUrl,
+const _hostUri: string | undefined = (Constants.expoConfig as { hostUri?: string } | null)
+  ?.hostUri;
+const DEV_BUNDLE_HOST = getDevBundleHostname();
+const LOCAL_IP =
+  DEV_BUNDLE_HOST ||
+  (_hostUri ? _hostUri.split(":")[0] : undefined) ||
+  "172.20.10.13";
+
+const bridgeUrlFromPublicEnv =
+  typeof process.env.EXPO_PUBLIC_BRIDGE_API_URL === "string"
+    ? process.env.EXPO_PUBLIC_BRIDGE_API_URL.trim()
+    : "";
+const bridgeUrlFromExtra = readExpoExtra("bridgeApiUrl");
+const DEV_REWRITTEN_BRIDGE_OVERRIDE = rewriteDevLanOverride(
+  bridgeUrlFromPublicEnv || bridgeUrlFromExtra || null,
+  DEV_BUNDLE_HOST,
   "Bridge API",
 );
-const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
-  (Constants.expoConfig as any)?.extra?.apiUrlOverride ||
-    (Constants.manifest as any)?.extra?.apiUrlOverride,
-  "Bridge API (from Nest override)",
-);
 
-const toBridgeUrlFromApi = (apiUrl: string): string => {
-  const trimmed = apiUrl.replace(/\/$/, "");
-  if (trimmed.match(/:\d+$/)) return trimmed.replace(/:\d+$/, `:${BRIDGE_PORT}`);
-  return `${trimmed}:${BRIDGE_PORT}`;
-};
+const EXTRA_BRIDGE_URL_OVERRIDE = coerceReleaseApiOverride(
+  DEV_REWRITTEN_BRIDGE_OVERRIDE,
+  "Bridge API",
+);
 
 const BRIDGE_API_URL =
   (typeof EXTRA_BRIDGE_URL_OVERRIDE === "string" && EXTRA_BRIDGE_URL_OVERRIDE.trim()
     ? EXTRA_BRIDGE_URL_OVERRIDE.trim()
     : null) ||
-  // If app API URL override is configured, keep the same host and switch to Bridge port.
-  (typeof EXTRA_API_URL_OVERRIDE === "string" && EXTRA_API_URL_OVERRIDE.trim()
-    ? toBridgeUrlFromApi(EXTRA_API_URL_OVERRIDE.trim())
-    : null) ||
-  (IS_PROD
-    ? "https://bridge-api-3m4n.onrender.com"
-    : (() => {
-        // iOS simulator can use localhost, but physical iOS devices cannot.
-        if (Platform.OS === "ios" && isDevice === false) {
-          return `http://localhost:${BRIDGE_PORT}`;
-        }
-        // Android emulator uses 10.0.2.2 host loopback.
-        if (Platform.OS === "android" && isDevice === false) {
-          return `http://10.0.2.2:${BRIDGE_PORT}`;
-        }
-        // Physical devices on both platforms should use the LAN IP.
-        return `http://${LOCAL_IP}:${BRIDGE_PORT}`;
-      })());
+  // Bridge has no local server — always use the hosted URL.
+  "https://bridge-api-3m4n.onrender.com";
 
 if (__DEV__) console.log("[Bridge API] Resolved URL:", BRIDGE_API_URL);
-if (__DEV__) console.log("[Bridge API] Internal secret loaded:", Boolean(
-  (Constants.expoConfig as any)?.extra?.bridgeInternalSecret
-));
+if (__DEV__) console.log("[Bridge API] Internal secret loaded:", Boolean(readExpoExtra("bridgeInternalSecret")));
 
 const INTERNAL_SECRET =
-  (Constants.expoConfig as any)?.extra?.bridgeInternalSecret ||
+  readExpoExtra("bridgeInternalSecret") ||
   process.env.BRIDGE_INTERNAL_SECRET ||
   process.env.EXPO_PUBLIC_BRIDGE_INTERNAL_SECRET ||
   "";
@@ -66,9 +59,14 @@ let hasWarnedBridgeSecretMissing = false;
 const warnBridgeSecretMissing = () => {
   if (hasWarnedBridgeSecretMissing) return;
   hasWarnedBridgeSecretMissing = true;
-  console.warn(
-    "[Bridge API] Skipping protected Bridge request: BRIDGE_INTERNAL_SECRET is not configured.",
-  );
+  const message =
+    "[Bridge API] Skipping protected Bridge request: BRIDGE_INTERNAL_SECRET is not configured.";
+  if (__DEV__) {
+    console.warn(message);
+  } else {
+    // In production keep one strong signal so this does not fail silently forever.
+    console.error(`${message} Bridge syncs are disabled until this env var is set.`);
+  }
 };
 
 const bridgeClient = axios.create({
@@ -77,7 +75,7 @@ const bridgeClient = axios.create({
     "Content-Type": "application/json",
     ...(INTERNAL_SECRET ? { "x-internal-secret": INTERNAL_SECRET } : {}),
   },
-  timeout: 90000,
+  timeout: 5000,
 });
 
 let getToken: (() => Promise<string | null>) | null = null;
@@ -94,7 +92,7 @@ bridgeClient.interceptors.request.use(
       config.headers["x-internal-secret"] = INTERNAL_SECRET;
     }
     if (getToken) {
-      const token = await getToken();
+      const token = await getCachedToken(getToken);
       if (token) config.headers.Authorization = `Bearer ${token}`;
     }
     if (__DEV__) {
@@ -154,7 +152,10 @@ export async function getBridgeUser(clerkId: string): Promise<any> {
           "[Bridge API] Unauthorized on GET /user/:clerkId. Check bridgeInternalSecret in Expo config vs Bridge backend INTERNAL_SECRET.",
         );
       }
-      // Degrade gracefully so home/mode restore can continue with local fallback data.
+      return null;
+    }
+    // Network error (unreachable host, timeout, no local bridge server) — degrade silently.
+    if (!error?.response) {
       return null;
     }
     throw error;

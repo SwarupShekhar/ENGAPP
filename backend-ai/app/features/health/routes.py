@@ -16,12 +16,14 @@ async def health_check():
     # Check Redis
     if settings.enable_cache:
         try:
-            # Simple check
-            if cache.redis:
-                await cache.redis.set("health_check", "ok", ttl=10)
-                checks["redis"] = "online"
-            else:
+            if cache.redis_client is None:
                 checks["redis"] = "disabled/unavailable"
+                return checks
+
+            # Ping + simple write with expiry
+            await cache.redis_client.ping()
+            await cache.redis_client.set("health_check", "ok", ex=10)
+            checks["redis"] = "online"
         except Exception:
             checks["redis"] = "offline"
             
