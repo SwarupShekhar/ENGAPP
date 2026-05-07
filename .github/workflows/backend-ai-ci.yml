@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - "backend-ai/**"
+      - "!backend-ai/**/*.md"
+      - "!backend-ai/docs/**"
       - ".github/workflows/backend-ai-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "backend-ai/**"
+      - "!backend-ai/**/*.md"
+      - "!backend-ai/docs/**"
 
 jobs:
   test:

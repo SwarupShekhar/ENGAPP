@@ -1,0 +1,106 @@
+name: Deploy to Vultr
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend-nest/**"
+      - "backend-ai/**"
+      - "docker-compose.prod.yml"
+      - "config/caddy/**"
+      - "config/systemd/**"
+      - ".github/workflows/deploy-vultr.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vultr-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate deploy configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate production compose config
+        run: docker compose -f docker-compose.prod.yml config
+
+  deploy_with_ssh_key:
+    name: Deploy on Vultr (SSH key)
+    needs: validate
+    if: github.ref == 'refs/heads/main' && secrets.VULTR_SSH_KEY != ''
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH key
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VULTR_HOST }}
+          username: ${{ secrets.VULTR_USER }}
+          key: ${{ secrets.VULTR_SSH_KEY }}
+          port: ${{ secrets.VULTR_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            APP_DIR="/opt/engr-app"
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "Repository not found at $APP_DIR. Clone it first and add server .env files."
+              exit 1
+            fi
+
+            cd "$APP_DIR"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+
+            if [ ! -f "backend-nest/.env" ] || [ ! -f "backend-ai/.env" ]; then
+              echo "Missing backend-nest/.env or backend-ai/.env on server."
+              exit 1
+            fi
+
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml ps
+
+  deploy_with_password:
+    name: Deploy on Vultr (password)
+    needs: validate
+    if: github.ref == 'refs/heads/main' && secrets.VULTR_SSH_KEY == '' && secrets.VULTR_PASSWORD != ''
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH password
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VULTR_HOST }}
+          username: ${{ secrets.VULTR_USER }}
+          password: ${{ secrets.VULTR_PASSWORD }}
+          port: ${{ secrets.VULTR_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            APP_DIR="/opt/engr-app"
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "Repository not found at $APP_DIR. Clone it first and add server .env files."
+              exit 1
+            fi
+
+            cd "$APP_DIR"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+
+            if [ ! -f "backend-nest/.env" ] || [ ! -f "backend-ai/.env" ]; then
+              echo "Missing backend-nest/.env or backend-ai/.env on server."
+              exit 1
+            fi
+
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml ps
