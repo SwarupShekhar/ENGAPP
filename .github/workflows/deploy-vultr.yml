@@ -24,8 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create placeholder env files for compose validation
+        run: |
+          mkdir -p backend-nest backend-ai
+          [ -f backend-nest/.env ] || echo "PLACEHOLDER=ci" > backend-nest/.env
+          [ -f backend-ai/.env ] || echo "PLACEHOLDER=ci" > backend-ai/.env
+
       - name: Validate production compose config
-        run: docker compose -f docker-compose.prod.yml config
+        run: docker compose -f docker-compose.prod.yml config --quiet
 
   deploy_with_ssh_key:
     name: Deploy on Vultr (SSH key)
