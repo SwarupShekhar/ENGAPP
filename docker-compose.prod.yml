@@ -11,10 +11,10 @@ services:
       PORT: 3000
       NODE_ENV: production
     ports:
-      # Port 3000 is firewall-whitelisted on this Vultr server.
-      # Mobile preview builds connect here directly (http://139.84.163.249:3000).
+      # Port 4001 is firewall-whitelisted on this Vultr server.
+      # Mobile preview builds connect here directly (http://139.84.163.249:4001).
       # Caddy on port 80 also reverse-proxies to this service internally.
-      - "0.0.0.0:3000:3000"
+      - "0.0.0.0:4001:3000"
     restart: unless-stopped
     networks:
       - internal
@@ -43,7 +43,8 @@ services:
       PRON_DEBUG: ""
       TTS_PROVIDER: inworld
       DISABLE_AZURE_TTS: "true"
-    # No external ports — only backend-nest can reach this service.
+    ports:
+      - "0.0.0.0:4002:8001"
     restart: unless-stopped
     networks:
       - internal
