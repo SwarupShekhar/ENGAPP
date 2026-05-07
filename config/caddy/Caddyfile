@@ -1,0 +1,23 @@
+{
+	# Email used for Let's Encrypt registration (set this on the server).
+	# email you@example.com
+}
+
+# Set your real domain on the server, e.g. api.yourdomain.com
+# For quick IP-only testing (no TLS), replace this site label with:
+# :80
+your-domain.example.com {
+	encode gzip
+
+	# Optional: security headers (tune as needed)
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+	}
+
+	# Reverse proxy to NestJS (keeps backend-ai private)
+	reverse_proxy backend-nest:3000
+}
+
