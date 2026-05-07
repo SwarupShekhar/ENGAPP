@@ -68,11 +68,10 @@ graphify-out/
 /uploads/
 public/uploads/
 
-# Internal drafts & generated trees (not blanket *.md)
+# Internal drafts & generated trees
 archive/
 generated/
-/*.md
-docs/*.md
+*.md
 docs/superpowers/
 
 # Project-specific
