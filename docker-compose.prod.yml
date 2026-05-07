@@ -11,9 +11,10 @@ services:
       PORT: 3000
       NODE_ENV: production
     ports:
-      # Direct port for mobile preview builds (no Caddy/domain needed).
-      # Port 3008 is free on the shared Vultr server.
-      - "0.0.0.0:3008:3000"
+      # Port 3000 is firewall-whitelisted on this Vultr server.
+      # Mobile preview builds connect here directly (http://139.84.163.249:3000).
+      # Caddy on port 80 also reverse-proxies to this service internally.
+      - "0.0.0.0:3000:3000"
     restart: unless-stopped
     networks:
       - internal
