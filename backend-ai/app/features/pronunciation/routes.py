@@ -79,23 +79,28 @@ def _check_audio_quality(wav_bytes: bytes) -> tuple[bool, str]:
         from pydub import AudioSegment
 
         seg = AudioSegment.from_wav(io.BytesIO(wav_bytes))
-        samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
+        # Normalise to [-1.0, 1.0] so thresholds are bit-depth agnostic
+        # (OGG Opus decodes as 32-bit; raw thresholds like 32000 assumed 16-bit)
+        max_val = float(2 ** (seg.sample_width * 8 - 1))
+        samples = np.array(seg.get_array_of_samples(), dtype=np.float32) / max_val
 
-        # RMS (volume) check — very quiet audio
+        relaxed_mode = os.getenv("PRONUNCIATION_RELAXED_AUDIO_GATE", "").lower() in {"1", "true", "yes"}
+
         rms = np.sqrt(np.mean(samples**2))
-        if rms < 200:
+        min_rms = 0.002 if relaxed_mode else 0.003
+        if rms < min_rms:
             return False, "Audio too quiet — please speak louder and move closer to mic"
 
-        # Peak/clipping check — too loud/distorted
-        peak = np.max(np.abs(samples))
-        if peak > 32000:
+        # Clipping ratio: reject only when >1% of samples are at full scale.
+        # A lone peak touching 1.0 is normal; sustained clipping means real distortion.
+        clipping_ratio = np.sum(np.abs(samples) >= 0.999) / len(samples)
+        if clipping_ratio > 0.01 and not relaxed_mode:
             return False, "Audio is distorted — move mic away or speak softer"
 
-        # Silence ratio check — too much silence wastes API calls
-        silence_threshold = 500
-        silence_count = np.sum(np.abs(samples) < silence_threshold)
+        silence_count = np.sum(np.abs(samples) < 0.015)
         silence_ratio = silence_count / len(samples)
-        if silence_ratio > 0.85:
+        max_silence_ratio = 0.92 if relaxed_mode else 0.85
+        if silence_ratio > max_silence_ratio:
             return False, "Mostly silence detected — please speak after pressing mic"
 
         return True, ""

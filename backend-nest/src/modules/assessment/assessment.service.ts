@@ -1082,7 +1082,7 @@ export class AssessmentService {
     sessionId: string,
     audioUrls: Record<string, string>,
     transcript?: string,
-    segmentsInput?: { speaker_id: string; text: string; timestamp?: number }[],
+    segmentsInput?: { speaker_id: string; text: string; timestamp?: number; pa_flagged_errors?: any[] }[],
   ) {
     this.logger.log(`Starting joint analysis for session ${sessionId}`);
 
@@ -1094,7 +1094,7 @@ export class AssessmentService {
     if (!session) throw new NotFoundException('Session not found');
 
     const participantEvidence: Record<string, any> = {};
-    let segments: { speaker_id: string; text: string; timestamp?: number; context?: string }[] = [];
+    let segments: { speaker_id: string; text: string; timestamp?: number; context?: string; pa_flagged_errors?: any[] }[] = [];
 
     if (segmentsInput && segmentsInput.length > 0) {
       // Per-participant transcripts from each device — use as-is
@@ -1102,10 +1102,41 @@ export class AssessmentService {
         speaker_id: s.speaker_id,
         text: s.text,
         timestamp: s.timestamp ?? 0,
+        pa_flagged_errors: s.pa_flagged_errors ?? [],
       }));
       this.logger.log(
         `Using ${segments.length} segments from per-participant feedback (Session: ${sessionId})`,
       );
+
+      // Enrich segments with pronunciation issues saved by the realtime gateway during the call.
+      // audioUrls is always {} in the live call flow, so we query the DB instead of re-running Azure PA.
+      const pronEnrichJobs = session.participants.map(async (p) => {
+        try {
+          const existingAnalysis = await this.prisma.analysis.findFirst({
+            where: { sessionId, participantId: p.id },
+            include: { pronunciationIssues: true },
+            orderBy: { createdAt: 'desc' },
+          });
+          const issues = existingAnalysis?.pronunciationIssues ?? [];
+          if (issues.length === 0) return;
+          const seg = segments.find((s) => s.speaker_id === p.userId);
+          if (!seg) return;
+          seg.pa_flagged_errors = issues.map((i: any) => ({
+            correct: i.correct ?? i.word ?? '',
+            spoken: i.spoken ?? '',
+            rule_category: i.ruleCategory ?? 'general_mispronunciation',
+            confidence: i.confidence != null ? Number(i.confidence) : 50,
+          }));
+          this.logger.log(
+            `Enriched segment for ${p.userId} with ${issues.length} saved pronunciation issue(s) (Session: ${sessionId})`,
+          );
+        } catch (e: any) {
+          this.logger.warn(
+            `Pronunciation enrichment skipped for ${p.userId} (Session: ${sessionId}): ${e?.message}`,
+          );
+        }
+      });
+      await Promise.all(pronEnrichJobs);
     } else {
       // Legacy: build segments from string transcript or audio URLs
       const participantLines: Record<string, string[]> = {};
@@ -1133,6 +1164,7 @@ export class AssessmentService {
             speaker_id: participant.userId,
             text: evidence.transcript,
             timestamp: 0,
+            pa_flagged_errors: evidence?.pronunciationEvidence ?? [],
           });
         } else if (transcript && transcript.trim()) {
           const role = i === 0 ? 'user' : 'partner';

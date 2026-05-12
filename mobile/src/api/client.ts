@@ -157,18 +157,18 @@ client.interceptors.response.use(
   },
 );
 
-/** Conversation session counts — Core `GET /api/sessions/count`. */
+/** Conversation session counts — Core `GET /sessions/count`. */
 export async function getSessionsCount(): Promise<number> {
-  const r = await client.get<{ count?: number } | number>("/api/sessions/count");
+  const r = await client.get<{ count?: number } | number>("/sessions/count");
   const payload = r.data as any;
   if (typeof payload === "number") return payload;
   return Number(payload?.count ?? 0);
 }
 
-/** Next scheduled peer session — Core `GET /api/sessions/upcoming`. */
+/** Next scheduled peer session — Core `GET /sessions/upcoming`. */
 export async function getUpcomingSession(): Promise<any | null> {
   try {
-    const r = await client.get("/api/sessions/upcoming");
+    const r = await client.get("/sessions/upcoming");
     return r.data;
   } catch (error: any) {
     if (error.response?.status === 404) return null;

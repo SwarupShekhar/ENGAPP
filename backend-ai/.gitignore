@@ -25,3 +25,9 @@ htmlcov/
 
 # Tooling caches
 .ruff_cache/
+
+# Local voice recordings / batch-test media (large binaries; keep out of git)
+/*.ogg
+/*.mpeg
+/*.wav
+/*.mp4

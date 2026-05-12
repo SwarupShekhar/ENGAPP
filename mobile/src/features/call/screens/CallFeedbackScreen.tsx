@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useUser } from "@clerk/clerk-expo";
-import { fetchFeedbackNarration, fetchFullFeedbackNarration } from "../../../api/tts";
+import { fetchFeedbackNarration, fetchFullFeedbackNarration, fetchErrorSpeak } from "../../../api/tts";
 import type { FeedbackSection, WordTimestamp } from "../../../api/tts";
 import { PronIssueNormalized, getPronUI, getPronLabel, getPronFix } from "../utils/pronUtils";
 import { usePulseTTS } from "../hooks/usePulseTTS";
@@ -42,6 +42,30 @@ import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
 import { getCQSScore, CQSResults } from "../../../api/scoring";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// ─── Step-by-step feedback types ─────────────────────────
+type FeedbackPhase = 'intro' | 'step' | 'summary' | 'detail';
+
+type FeedbackStep = {
+  id: string;
+  category: 'pronunciation' | 'grammar' | 'vocabulary';
+  youSaid: string;
+  correct: string;
+  correctionLabel: string;
+  ttsText: string;
+};
+
+const STEP_CATEGORY_COLORS = {
+  pronunciation: '#F59E0B',
+  grammar: '#10B981',
+  vocabulary: '#3B82F6',
+} as const;
+
+const STEP_CATEGORY_BG = {
+  pronunciation: '#FFFBEB',
+  grammar: '#F0FDF4',
+  vocabulary: '#EFF6FF',
+} as const;
 
 // ─── Skill Bar Component ──────────────────────────────────
 function SkillBar({
@@ -754,11 +778,19 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [currentWordIdx, setCurrentWordIdx] = useState<number>(-1);
   const subtitlePollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Step-by-step feedback phase state
+  const [feedbackPhase, setFeedbackPhase] = useState<FeedbackPhase>('intro');
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [stepAudioPlaying, setStepAudioPlaying] = useState(false);
+  const [stepAudioLoading, setStepAudioLoading] = useState(false);
+  const stepSoundRef = useRef<Audio.Sound | null>(null);
+
   // Clean up audio on unmount
   useEffect(() => {
     return () => {
       soundRef.current?.unloadAsync().catch(() => {});
       fullFeedbackSoundRef.current?.unloadAsync().catch(() => {});
+      stepSoundRef.current?.unloadAsync().catch(() => {});
       if (subtitlePollerRef.current) clearInterval(subtitlePollerRef.current);
     };
   }, []);
@@ -1418,6 +1450,375 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
   const overallColor = getScoreColor(data.overallScore, theme);
 
+  // ── Build step items: up to 3 severe per category ────────
+  const feedbackSteps: FeedbackStep[] = (() => {
+    const steps: FeedbackStep[] = [];
+    const PER_CAT = 3;
+
+    // Pronunciation — sort ascending by confidence (lower = more severe)
+    const sortedPron = [...(data.pronunciationIssues as any[])]
+      .filter((p) => {
+        const spoken = (p.spoken ?? p.word ?? '').trim();
+        const correct = (p.correct ?? '').trim();
+        return spoken && correct && spoken.toLowerCase() !== correct.toLowerCase();
+      })
+      .sort((a, b) => (a.confidence ?? 100) - (b.confidence ?? 100));
+    for (const p of sortedPron.slice(0, PER_CAT)) {
+      const spoken = (p.spoken ?? p.word ?? '').trim();
+      const correct = (p.correct ?? '').trim();
+      steps.push({
+        id: `pron_${steps.length}`,
+        category: 'pronunciation',
+        youSaid: spoken,
+        correct,
+        correctionLabel: 'Correct:',
+        ttsText: `You said "${spoken}". The correct pronunciation is "${correct}".`,
+      });
+    }
+
+    // Grammar — sort by severity field if present, else keep backend order
+    const sortedGram = [...(data.mistakes as any[])]
+      .filter((m) => (m.original_text ?? m.original ?? '').trim() && (m.corrected_text ?? m.corrected ?? '').trim())
+      .sort((a, b) => {
+        const sevOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        return (sevOrder[a.severity] ?? 1) - (sevOrder[b.severity] ?? 1);
+      });
+    for (const m of sortedGram.slice(0, PER_CAT)) {
+      const youSaid = (m.original_text ?? m.original ?? '').trim();
+      const correct = (m.corrected_text ?? m.corrected ?? '').trim();
+      steps.push({
+        id: `gram_${steps.length}`,
+        category: 'grammar',
+        youSaid,
+        correct,
+        correctionLabel: 'Correct:',
+        ttsText: `You said "${youSaid}". The correct form is "${correct}".`,
+      });
+    }
+
+    // Vocabulary from aiFeedback examples
+    const vocabExamples = ((rawData as any)?.ai_detailed_feedback?.vocabulary?.examples) as any[] | undefined;
+    if (vocabExamples?.length) {
+      for (const ex of vocabExamples.slice(0, PER_CAT)) {
+        const youSaid = (ex.original ?? ex.used ?? '').trim();
+        const correct = (ex.better ?? ex.alternative ?? '').trim();
+        if (!youSaid || !correct) continue;
+        steps.push({
+          id: `vocab_${steps.length}`,
+          category: 'vocabulary',
+          youSaid,
+          correct,
+          correctionLabel: 'Can also be:',
+          ttsText: `You said "${youSaid}". You could also say "${correct}".`,
+        });
+      }
+    }
+
+    return steps;
+  })();
+
+  const currentStep = feedbackSteps[currentStepIdx] ?? null;
+
+  const stopStepAudio = async () => {
+    if (stepSoundRef.current) {
+      await stepSoundRef.current.stopAsync().catch(() => {});
+      await stepSoundRef.current.unloadAsync().catch(() => {});
+      stepSoundRef.current = null;
+      setStepAudioPlaying(false);
+    }
+  };
+
+  const startStepAudio = async (step: FeedbackStep) => {
+    setStepAudioLoading(true);
+    try {
+      const result = await fetchErrorSpeak(step.ttsText);
+      if (!result.audio_base64) { setStepAudioLoading(false); return; }
+      const tmpUri = `${FileSystem.cacheDirectory}step_${step.id}_${Date.now()}.mp3`;
+      await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, { encoding: FileSystem.EncodingType.Base64 });
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync({ uri: tmpUri }, { shouldPlay: true });
+      stepSoundRef.current = sound;
+      setStepAudioLoading(false);
+      setStepAudioPlaying(true);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          stepSoundRef.current = null;
+          setStepAudioPlaying(false);
+        }
+      });
+    } catch {
+      setStepAudioLoading(false);
+      setStepAudioPlaying(false);
+    }
+  };
+
+  // Play button: toggles (tap again to stop)
+  const handleStepPlay = async (step: FeedbackStep) => {
+    if (stepAudioPlaying) { await stopStepAudio(); return; }
+    await startStepAudio(step);
+  };
+
+  // Replay button: always restarts from beginning
+  const handleStepReplay = async (step: FeedbackStep) => {
+    await stopStepAudio();
+    await startStepAudio(step);
+  };
+
+  const handleNextStep = async () => {
+    await stopStepAudio();
+    if (currentStepIdx < feedbackSteps.length - 1) {
+      setCurrentStepIdx((i) => i + 1);
+    } else {
+      setFeedbackPhase('summary');
+    }
+  };
+
+  const scoreLabel =
+    data.overallScore >= 85 ? 'Great Progress!' :
+    data.overallScore >= 70 ? 'Good Work!' :
+    data.overallScore >= 55 ? 'Keep Practicing!' : 'Keep Going!';
+
+  // ── Intro phase ───────────────────────────────────────────
+  if (feedbackPhase === 'intro') return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
+          <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+        </TouchableOpacity>
+        <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+          Feedback
+        </Text>
+        <View style={{ width: 22 }} />
+      </View>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => feedbackSteps.length > 0 ? setFeedbackPhase('step') : setFeedbackPhase('summary')}
+          style={{ width: '100%', borderRadius: 20, overflow: 'hidden' }}
+        >
+          <LinearGradient
+            colors={theme.colors.gradients.primary as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={{ paddingVertical: 52, paddingHorizontal: 24, alignItems: 'center' }}
+          >
+            <View style={{
+              width: 76, height: 76, borderRadius: 38,
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+            }}>
+              <Ionicons name="play" size={32} color="white" />
+            </View>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: 'white', marginBottom: 10 }}>Your Feedback</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 }}>
+              Tap the play button to listen to your personalized feedback
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFeedbackPhase('detail')} style={{ marginTop: 28 }} activeOpacity={0.7}>
+          <Text style={{ color: theme.colors.text.secondary, fontSize: 14 }}>Skip to full analysis</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+
+  // ── Step phase ────────────────────────────────────────────
+  if (feedbackPhase === 'step' && currentStep) {
+    const catColor = STEP_CATEGORY_COLORS[currentStep.category];
+    const catBg = STEP_CATEGORY_BG[currentStep.category];
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }} edges={['top', 'bottom']}>
+        <StatusBar barStyle="dark-content" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+          <TouchableOpacity
+            onPress={async () => {
+              await stopStepAudio();
+              if (currentStepIdx > 0) setCurrentStepIdx((i) => i - 1);
+              else setFeedbackPhase('intro');
+            }}
+            hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
+          >
+            <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+            Feedback
+          </Text>
+          <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
+            {currentStepIdx + 1} / {feedbackSteps.length}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 }}>
+          {feedbackSteps.map((_, i) => (
+            <View key={i} style={{
+              width: i === currentStepIdx ? 20 : 7, height: 7, borderRadius: 4,
+              backgroundColor: i === currentStepIdx ? theme.colors.primary : '#D1D5DB',
+            }} />
+          ))}
+        </View>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16 }}>
+          <View style={{
+            backgroundColor: 'white', borderRadius: 16, padding: 28, alignItems: 'center', marginBottom: 20,
+            shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3,
+          }}>
+            <TouchableOpacity
+              onPress={() => handleStepPlay(currentStep)}
+              activeOpacity={0.85}
+              style={{
+                width: 72, height: 72, borderRadius: 36,
+                borderWidth: 3,
+                borderColor: stepAudioPlaying || stepAudioLoading ? theme.colors.primary : '#E5E7EB',
+                alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+              }}
+            >
+              {stepAudioLoading
+                ? <ActivityIndicator size="small" color={theme.colors.primary} />
+                : <Ionicons name={stepAudioPlaying ? 'pause' : 'play'} size={28} color={theme.colors.primary} />
+              }
+            </TouchableOpacity>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 6 }}>Your Feedback</Text>
+            <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 20 }}>
+              Tap the play button to listen to your personalized feedback
+            </Text>
+          </View>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: catColor, marginBottom: 12 }}>
+            {currentStep.category.charAt(0).toUpperCase() + currentStep.category.slice(1)}
+          </Text>
+          <View style={{ borderLeftWidth: 4, borderLeftColor: '#EF4444', backgroundColor: '#FEF2F2', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+            <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '700', marginBottom: 6 }}>You Said:</Text>
+            <Text style={{ fontSize: 15, color: '#111827', lineHeight: 22 }}>{currentStep.youSaid}</Text>
+          </View>
+          <View style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}>
+            <Text style={{ fontSize: 12, color: catColor, fontWeight: '700', marginBottom: 6 }}>{currentStep.correctionLabel}</Text>
+            <Text style={{ fontSize: 15, color: '#111827', lineHeight: 22 }}>{currentStep.correct}</Text>
+          </View>
+        </ScrollView>
+        <View style={{
+          flexDirection: 'row', gap: 12, paddingHorizontal: 20,
+          paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12, backgroundColor: '#F3F4F6',
+        }}>
+          <TouchableOpacity
+            onPress={() => handleStepReplay(currentStep)}
+            activeOpacity={0.8}
+            style={{ flex: 1, paddingVertical: 16, borderRadius: 50, borderWidth: 1.5, borderColor: '#D1D5DB', alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600', color: '#374151' }}>Replay</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleNextStep}
+            activeOpacity={0.85}
+            style={{ flex: 1, paddingVertical: 16, borderRadius: 50, backgroundColor: theme.colors.primary, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600', color: 'white' }}>
+              {currentStepIdx < feedbackSteps.length - 1 ? 'Next' : 'Done'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Summary phase (also catches step-with-no-currentStep edge case) ─
+  if (feedbackPhase === 'summary' || (feedbackPhase === 'step' && !currentStep)) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+        <TouchableOpacity
+          onPress={() => {
+            if (feedbackSteps.length > 0) { setCurrentStepIdx(feedbackSteps.length - 1); setFeedbackPhase('step'); }
+            else setFeedbackPhase('intro');
+          }}
+          hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
+        >
+          <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+        </TouchableOpacity>
+        <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+          Feedback
+        </Text>
+        <View style={{ width: 22 }} />
+      </View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 }}>
+        <LinearGradient
+          colors={theme.colors.gradients.primary as any}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={{ borderRadius: 20, paddingVertical: 36, paddingHorizontal: 24, alignItems: 'center', marginBottom: 28 }}
+        >
+          <View style={{
+            width: 100, height: 100, borderRadius: 50,
+            backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', marginBottom: 18,
+          }}>
+            <Text style={{ fontSize: 30, fontWeight: '800', color: theme.colors.primary }}>{data.overallScore}%</Text>
+          </View>
+          <Text style={{ fontSize: 22, fontWeight: '700', color: 'white', marginBottom: 8 }}>{scoreLabel}</Text>
+          <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>You're improving your English skills</Text>
+        </LinearGradient>
+        {feedbackSteps.length > 0 && (
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 16 }}>Areas Reviewed</Text>
+            {(['pronunciation', 'grammar', 'vocabulary'] as const).map((cat) => {
+              const catSteps = feedbackSteps.filter((s) => s.category === cat);
+              if (!catSteps.length) return null;
+              const catCol = STEP_CATEGORY_COLORS[cat];
+              const catBgColor = STEP_CATEGORY_BG[cat];
+              const catIcon: any = cat === 'pronunciation' ? 'mic' : cat === 'grammar' ? 'document-text' : 'book';
+              return (
+                <View key={cat} style={{ marginBottom: 16 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <View style={{
+                      width: 30, height: 30, borderRadius: 8,
+                      backgroundColor: catBgColor, alignItems: 'center', justifyContent: 'center', marginRight: 10,
+                    }}>
+                      <Ionicons name={catIcon} size={15} color={catCol} />
+                    </View>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: catCol }}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </Text>
+                  </View>
+                  {catSteps.map((step) => (
+                    <View key={step.id} style={{
+                      backgroundColor: 'white', borderRadius: 12, padding: 14, marginBottom: 8,
+                      flexDirection: 'row', alignItems: 'flex-start',
+                      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1,
+                    }}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ backgroundColor: '#FEF2F2', borderRadius: 6, padding: 10, marginBottom: 8 }}>
+                          <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '700', marginBottom: 3 }}>You Said:</Text>
+                          <Text style={{ fontSize: 14, color: '#374151' }}>{step.youSaid}</Text>
+                        </View>
+                        <View style={{ backgroundColor: catBgColor, borderRadius: 6, padding: 10 }}>
+                          <Text style={{ fontSize: 11, color: catCol, fontWeight: '700', marginBottom: 3 }}>{step.correctionLabel}</Text>
+                          <Text style={{ fontSize: 14, color: '#374151' }}>{step.correct}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity onPress={() => handleStepPlay(step)} style={{ padding: 8, marginLeft: 10 }} activeOpacity={0.7}>
+                        <Ionicons name="volume-medium-outline" size={22} color={catCol} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        )}
+        <TouchableOpacity
+          onPress={() => setFeedbackPhase('detail')}
+          activeOpacity={0.85}
+          style={{ borderRadius: 16, overflow: 'hidden' }}
+        >
+          <LinearGradient
+            colors={theme.colors.gradients.primary as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={{ paddingVertical: 18, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '700', color: 'white' }}>View Full Analysis</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
+
+  // ── Detail phase (existing full feedback screen) ──────────
+
   return (
     <SafeAreaView edges={["bottom"]} style={styles.container}>
       <ScrollView
@@ -1436,7 +1837,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         >
           <TouchableOpacity
             style={styles.backChip}
-            onPress={() => navigation.goBack()}
+            onPress={() => setFeedbackPhase('summary')}
             activeOpacity={0.8}
           >
             <Ionicons
@@ -1853,6 +2254,128 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             )}
           </Animated.View>
         )}
+
+        {/* Dominant Pronunciation Pattern Card */}
+        {(() => {
+          const issues = (data.pronunciationIssues || []) as any[];
+          if (issues.length < 2) return null;
+
+          const byCategory: Record<string, any[]> = {};
+          for (const issue of issues) {
+            const cat =
+              (
+                (issue.rule_category ?? issue.ruleCategory ?? issue.issueType ?? "") as string
+              ).trim() || "general_mispronunciation";
+            if (!byCategory[cat]) byCategory[cat] = [];
+            byCategory[cat].push(issue);
+          }
+
+          const sorted = Object.entries(byCategory).sort((a, b) => b[1].length - a[1].length);
+          const top = sorted.find(([, items]) => items.length >= 2);
+          if (!top) return null;
+          const [cat, catIssues] = top;
+
+          const LABELS: Record<string, string> = {
+            th_to_d: "th→d substitution",
+            th_to_t: "th→t substitution",
+            v_to_w: "v→w substitution",
+            w_to_v: "w→v substitution",
+            h_dropping: "h-dropping",
+            ae_to_e: "vowel ae→e",
+            i_to_ee: "vowel i→ee",
+            retroflex_substitution: "retroflex consonants",
+            vowel_shift: "vowel shift",
+            general_mispronunciation: "mispronunciation",
+            syllable_compression: "syllable compression",
+            final_cluster_reduction: "final consonant reduction",
+            consonant_cluster_simplification: "cluster simplification",
+            unknown_substitution: "unknown substitution",
+          };
+
+          const TIPS: Record<string, string> = {
+            th_to_d: "Put your tongue between your teeth for 'th' sounds.",
+            th_to_t: "Put your tongue between your teeth for 'th' sounds.",
+            v_to_w: "Bite your lower lip lightly for 'v' sounds.",
+            w_to_v: "Round your lips fully for 'w' — no teeth contact.",
+            h_dropping: "Push a breath of air out before starting 'h' words.",
+            ae_to_e: "Open your mouth wider for the 'a' sound, like in 'cat'.",
+            i_to_ee: "Relax your lips — don't stretch them for the short 'i' in 'bit'.",
+            retroflex_substitution: "Keep your tongue tip at the gum ridge, not curled back.",
+            vowel_shift: "Open your mouth more on stressed vowels.",
+            general_mispronunciation: "Slow the word down and say each syllable separately.",
+            syllable_compression: "Say every syllable — do not skip any.",
+            final_cluster_reduction: "Finish the final consonant fully before stopping.",
+            consonant_cluster_simplification: "Say both consonants at the start of the word.",
+            unknown_substitution: "Listen to the word carefully and repeat it slowly three times.",
+          };
+
+          const label = LABELS[cat] ?? cat.replace(/_/g, " ");
+          const tip = TIPS[cat] ?? "Focus on each syllable carefully.";
+
+          const example = catIssues.find((i) => {
+            const spoken = ((i.spoken ?? "") as string).trim();
+            const correct = ((i.correct ?? i.word ?? "") as string).trim();
+            return spoken && correct && spoken !== correct && spoken !== "—" && correct !== "—";
+          });
+          const spokenWord = example ? ((example.spoken ?? "") as string).trim() : null;
+          const correctWord = example
+            ? ((example.correct ?? example.word ?? "") as string).trim()
+            : null;
+
+          return (
+            <Animated.View
+              entering={FadeInDown.delay(350).springify()}
+              style={{ marginHorizontal: 16, marginBottom: 12 }}
+            >
+              <View
+                style={{
+                  backgroundColor: "#1e1b4b",
+                  borderRadius: 16,
+                  padding: 16,
+                  borderLeftWidth: 4,
+                  borderLeftColor: "#7C3AED",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <Ionicons name="mic" size={16} color="#a78bfa" style={{ marginRight: 6 }} />
+                  <Text
+                    style={{
+                      color: "#a78bfa",
+                      fontSize: 11,
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    Dominant Pattern · {catIssues.length}×
+                  </Text>
+                </View>
+                <Text
+                  style={{ color: "#fff", fontSize: 15, fontWeight: "700", marginBottom: 4 }}
+                >
+                  {label}
+                </Text>
+                {spokenWord && correctWord && (
+                  <Text style={{ color: "#d1d5db", fontSize: 13, marginBottom: 8 }}>
+                    {"You said "}
+                    <Text style={{ color: "#f87171", fontWeight: "600" }}>"{spokenWord}"</Text>
+                    {" — correct: "}
+                    <Text style={{ color: "#6ee7b7", fontWeight: "600" }}>"{correctWord}"</Text>
+                  </Text>
+                )}
+                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={14}
+                    color="#7C3AED"
+                    style={{ marginRight: 4, marginTop: 1 }}
+                  />
+                  <Text style={{ color: "#a78bfa", fontSize: 12, flex: 1 }}>{tip}</Text>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })()}
 
         {/* Pronunciation 3-tab component (replaces Words + Accent sections). */}
         {(() => {

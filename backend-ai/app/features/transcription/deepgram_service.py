@@ -29,9 +29,9 @@ class DeepgramTranscriptionService:
         return {
             "model": self.model,
             "language": language or self.language,
-            "smart_format": "true",
+            "smart_format": "false",  # Keep grammar errors literal — don't normalize
             "punctuate": "true",
-            "numerals": "true",
+            "alternatives": "3",      # Word-level phonetic alternatives for pronunciation mining
         }
 
     def _parse_response(self, payload: dict[str, Any], processing_time: float) -> TranscriptionResponse:

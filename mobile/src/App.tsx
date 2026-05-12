@@ -30,6 +30,7 @@ import PushNotificationService from "./services/pushNotificationService";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { SuperAppProvider } from "./context/SuperAppContext";
 import { SplashAnimation } from "./components/SplashAnimation";
+import { assessmentApi } from "./features/assessment/services/assessment";
 
 class AppErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -68,15 +69,19 @@ class AppErrorBoundary extends Component<
 }
 
 /** Same fallback as app.config.js — EAS may expose extra on manifest or expoConfig. */
-const CLERK_PUBLISHABLE_KEY_FALLBACK =
+const CLERK_PUBLISHABLE_KEY_FALLBACK_DEV =
   "pk_test_cmlnaHQtYmFzaWxpc2stOTEuY2xlcmsuYWNjb3VudHMuZGV2JA";
 
-const CLERK_PUBLISHABLE_KEY =
+const CLERK_KEY_FROM_EXTRA =
   (Constants.expoConfig as { extra?: { clerkPublishableKey?: string } })?.extra
     ?.clerkPublishableKey ||
   (Constants.manifest as { extra?: { clerkPublishableKey?: string } })?.extra
-    ?.clerkPublishableKey ||
-  CLERK_PUBLISHABLE_KEY_FALLBACK;
+    ?.clerkPublishableKey;
+const CLERK_KEY_FROM_ENV = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const CLERK_PUBLISHABLE_KEY =
+  CLERK_KEY_FROM_EXTRA ||
+  CLERK_KEY_FROM_ENV ||
+  (__DEV__ ? CLERK_PUBLISHABLE_KEY_FALLBACK_DEV : "");
 
 /** Logcat / Xcode: Clerk does not call Render; this confirms pk baked into the build. */
 console.warn(
@@ -266,12 +271,13 @@ function OnboardingGate() {
   const { user, isLoaded } = useUser();
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
+    let cancelled = false;
 
     if (!isLoaded || !user) {
-      // If it takes more than 10s to load user data, show an error (likely API unreachable)
       timeout = setTimeout(() => {
         if (!initialRoute) {
           console.warn("[OnboardingGate] Timed out waiting for user data");
@@ -281,27 +287,74 @@ function OnboardingGate() {
       return () => clearTimeout(timeout);
     }
 
-    const hasProfile = !!(user.unsafeMetadata as any)?.profileCompleted;
-    const hasCompletedAssessment = !!(user.unsafeMetadata as any)
-      ?.assessmentCompleted;
+    const resolveInitialRoute = async () => {
+      const hasProfile =
+        !!(user.unsafeMetadata as any)?.profileCompleted || !!user.firstName;
+      const hasCompletedAssessment = !!(user.unsafeMetadata as any)
+        ?.assessmentCompleted;
 
-    if (!hasProfile) {
-      setInitialRoute("CreateProfile");
-    } else if (!hasCompletedAssessment) {
-      setInitialRoute("AssessmentIntro");
-    } else {
-      setInitialRoute("MainTabs");
-      // Use the injected token automatically, but delay slightly to ensure
-      // the AuthTokenInjector's useEffect has completed
-      setTimeout(() => {
-        FeedPrefetchService.getInstance().prefetch();
-      }, 500);
-    }
-  }, [isLoaded, user]);
+      if (!hasProfile) {
+        if (!cancelled) setInitialRoute("CreateProfile");
+        return;
+      }
+
+      if (hasCompletedAssessment) {
+        if (!cancelled) setInitialRoute("MainTabs");
+        setTimeout(() => {
+          FeedPrefetchService.getInstance().prefetch();
+        }, 500);
+        return;
+      }
+
+      // Clerk metadata can become stale; verify completed assessment state from backend.
+      try {
+        const dashboard = await assessmentApi.getDashboard();
+        const backendHasAssessment =
+          dashboard?.state === "DASHBOARD" || !!dashboard?.assessmentId;
+
+        if (backendHasAssessment) {
+          try {
+            await user.update({
+              unsafeMetadata: {
+                ...(user.unsafeMetadata || {}),
+                assessmentCompleted: true,
+              },
+            });
+          } catch (metaErr) {
+            console.warn(
+              "[OnboardingGate] Failed to sync assessmentCompleted metadata:",
+              metaErr,
+            );
+          }
+
+          if (!cancelled) setInitialRoute("MainTabs");
+          setTimeout(() => {
+            FeedPrefetchService.getInstance().prefetch();
+          }, 500);
+          return;
+        }
+      } catch (dashboardErr) {
+        console.warn(
+          "[OnboardingGate] Dashboard check failed; falling back to AssessmentIntro:",
+          dashboardErr,
+        );
+      }
+
+      if (!cancelled) setInitialRoute("AssessmentIntro");
+    };
+
+    void resolveInitialRoute();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [isLoaded, user, retryKey]);
 
   const handleRetry = () => {
     setError(null);
-    // This will trigger a re-render and re-run the effect
+    setInitialRoute(null);
+    setRetryKey((k) => k + 1);
   };
 
   if (error) {
@@ -395,6 +448,20 @@ function AuthGate() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
+
+  if (!CLERK_PUBLISHABLE_KEY) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="warning" size={48} color="#F59E0B" />
+        <Text style={styles.errorTitle}>Configuration Error</Text>
+        <Text style={styles.errorDetail}>
+          Clerk publishable key is missing for this build profile.
+          {"\n\n"}
+          Rebuild with EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY set.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ClerkProvider

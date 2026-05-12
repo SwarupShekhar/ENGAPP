@@ -22,6 +22,20 @@ FUNCTION_WORD_THRESHOLD = 86     # Function words (the/this/that) need tighter s
 PHONEME_BAD_THRESHOLD = 70       # Lowered: general phonemes flagged more aggressively.
 CRITICAL_PHONEME_THRESHOLD = 70  # Explicit threshold for V/W/TH/zh/r/h — even more sensitive.
 FALSE_POSITIVE_SUPPRESSION = 97  # Suppress only when confidence is very high.
+
+# Accent-level function words: only flag if Azure accuracy is below this threshold.
+# Above it = accent difference, not an intelligibility error.
+FUNCTION_WORD_EXEMPT_THRESHOLD = 50
+
+FUNCTION_WORD_EXEMPTION: frozenset[str] = frozenset({
+    "was", "for", "that", "from", "have", "good", "is",
+    "are", "the", "a", "an", "and", "to", "of", "in",
+    "it", "at", "by", "be", "do", "he", "we", "on",
+    "as", "or", "but", "not", "so", "if", "me", "my",
+    "us", "up", "go", "no", "had", "has", "did", "got",
+    "get", "him", "his", "her", "our", "its",
+})
+
 # Layer 2: max phoneme edit distance (CMU or aligned IPA) to call it a substitution
 PHONEME_SUBSTITUTION_MAX_DISTANCE = 3
 
@@ -488,11 +502,77 @@ def _extract_phoneme_score(phoneme: dict[str, Any]) -> float:
     return 100.0
 
 
+def _count_syllables(word: str) -> int:
+    """Vowel-run heuristic syllable counter."""
+    word = word.lower().strip(".,!?;:'\"")
+    count = 0
+    prev_vowel = False
+    for ch in word:
+        is_v = ch in "aeiouy"
+        if is_v and not prev_vowel:
+            count += 1
+        prev_vowel = is_v
+    if word.endswith("e") and count > 1:
+        count -= 1
+    return max(1, count)
+
+
+def _classify_phonological_error(word: str, phonemes: list, accuracy: float) -> str:
+    """
+    Classify WHY a general_mispronunciation occurred, using Azure phoneme data
+    and lexical heuristics. Returns one of:
+      retroflex_substitution, syllable_compression, final_cluster_reduction,
+      vowel_shift, consonant_cluster_simplification, general_mispronunciation.
+    """
+    word_lower = word.lower()
+    VOWELS = {"aa", "ae", "ah", "ao", "aw", "ay", "eh", "er", "ey", "ih", "iy", "ow", "oy", "uh", "uw"}
+    TH_PHONEMES = {"th", "dh"}
+
+    bad_vowels: list[str] = []
+    bad_consonants: list[str] = []
+    if phonemes:
+        for p in phonemes:
+            score = _extract_phoneme_score(p)
+            ph = (p.get("Phoneme") or p.get("phoneme") or "").lower()
+            if score < PHONEME_BAD_THRESHOLD and ph:
+                if ph in TH_PHONEMES or (ph in ("t", "d") and word_lower in FUNCTION_WORDS_TH):
+                    return "retroflex_substitution"
+                if ph in VOWELS:
+                    bad_vowels.append(ph)
+                else:
+                    bad_consonants.append(ph)
+
+    # Long words with low accuracy → syllable compression
+    if _count_syllables(word_lower) >= 4 and accuracy < 78:
+        return "syllable_compression"
+
+    # Words ending in consonant clusters → final cluster reduction
+    FINAL_CLUSTERS = ("nths", "ths", "nds", "nts", "sts", "rds", "lds", "mps", "lts", "rts", "cts", "xts", "sks")
+    if any(word_lower.endswith(c) for c in FINAL_CLUSTERS) and accuracy < 82:
+        return "final_cluster_reduction"
+
+    # Words starting with consonant clusters → cluster simplification
+    INITIAL_CLUSTERS = (
+        "str", "spr", "spl", "scr", "thr", "shr",
+        "fl", "fr", "gl", "gr", "bl", "br", "cl", "cr",
+        "dr", "pr", "tr", "sl", "sm", "sn", "sp", "st", "sw", "sk",
+    )
+    if any(word_lower.startswith(c) for c in INITIAL_CLUSTERS) and bad_consonants:
+        return "consonant_cluster_simplification"
+
+    # Vowel-dominant phoneme errors → vowel shift
+    if bad_vowels and len(bad_vowels) >= len(bad_consonants):
+        return "vowel_shift"
+
+    return "general_mispronunciation"
+
+
 def detect_from_azure_result(
     azure_result: dict[str, Any],
     *,
     reference_text: str = "",
     accuracy_threshold: int = DEFAULT_ACCURACY_THRESHOLD,
+    proper_nouns: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
     """
     Consumes Azure Pronunciation Assessment result and returns flagged Indian English errors.
@@ -557,6 +637,9 @@ def detect_from_azure_result(
         word_text = w.get("Word") or w.get("word") or ""
         word_lower = _normalize(word_text)
         if not word_lower:
+            continue
+        if word_lower in proper_nouns:
+            logger.info("Proper noun skip: '%s'", word_lower)
             continue
 
         pa = w.get("PronunciationAssessment", {})
@@ -740,13 +823,33 @@ def detect_from_azure_result(
             # If Azure explicitly flagged it as Mispronunciation, keep it — it's a
             # genuine error Azure's forced aligner detected, just not in our dictionary.
             if error_type == "Mispronunciation":
-                rule_category = "general_mispronunciation"
-                spoken_approx = f"[mispronounced: {word_lower}]"
+                rule_category = _classify_phonological_error(word_lower, phonemes, accuracy)
+                spoken_approx = word_lower
                 correct_word = word_lower
             else:
                 rule_category = "unknown_substitution"
                 spoken_approx = word_lower
                 correct_word = word_lower
+
+        # ----------------------------------------------------------------
+        # STEP 3b (post-category): Function word exemption.
+        # Suppress accent-level errors on function words. Keep only the
+        # diagnostically meaningful Indian English categories: th_to_d,
+        # th_to_t, h_dropping, v_to_w, w_to_v, retroflex_substitution.
+        # ----------------------------------------------------------------
+        _ACCENT_LEVEL_CATS = frozenset({
+            "general_mispronunciation",
+            "vowel_shift",
+            "final_cluster_reduction",
+            "consonant_cluster_simplification",
+            "syllable_compression",
+        })
+        if word_lower in FUNCTION_WORD_EXEMPTION and rule_category in _ACCENT_LEVEL_CATS:
+            logger.info(
+                "Function word exemption: suppressed '%s' (%s = accent noise)",
+                word_lower, rule_category,
+            )
+            continue
 
         # Guard B: prioritize STT confusion table IF word triggered as bad
         if word_lower in STT_CONFUSION_PAIRS:
@@ -758,6 +861,14 @@ def detect_from_azure_result(
             continue
 
         reel_id = reel_map.get(rule_category) or None
+
+        # Skip: Azure flagged it but we have no substitution data (spoken==correct)
+        if spoken_approx == correct_word and rule_category == "general_mispronunciation":
+            logger.info(
+                "No-substitution skip: '%s' (spoken==correct, no useful data for feedback)",
+                word_lower,
+            )
+            continue
 
         flagged.append({
             "spoken": spoken_approx,
