@@ -18,6 +18,8 @@ try {
 }
 
 const projectId = "2286e998-c3a9-4582-bf36-0cfde9a7dc57";
+const buildProfile = process.env.EAS_BUILD_PROFILE || "development";
+const allowHttpApis = buildProfile !== "production";
 
 const clerkPublishableKey =
   process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ||
@@ -69,6 +71,13 @@ module.exports = {
         ITSAppUsesNonExemptEncryption: false,
         NSSpeechRecognitionUsageDescription:
           "EngR uses speech recognition to provide real-time pronunciation feedback and transcription.",
+        ...(allowHttpApis
+          ? {
+              NSAppTransportSecurity: {
+                NSAllowsArbitraryLoads: true,
+              },
+            }
+          : {}),
       },
     },
     android: {
@@ -79,6 +88,7 @@ module.exports = {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: "com.swarupshekhar.mobile",
+      usesCleartextTraffic: allowHttpApis,
     },
     web: {
       favicon: "./assets/favicon.png",

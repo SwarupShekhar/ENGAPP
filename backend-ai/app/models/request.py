@@ -19,6 +19,15 @@ class AnalysisRequest(BaseModel):
     task_type: AnalysisTaskType = AnalysisTaskType.GENERAL
     # Optional: Pulse live-tutor captures; merged with WebSocket store in analyze()
     pronunciation_issues: Optional[List[Dict[str, Any]]] = None
+    # Optional: structured PA flagged_errors from /pronunciation/assess; injected into Gemini prompt
+    pa_flagged_errors: Optional[List[Dict[str, Any]]] = None
+    # Optional: pronunciation score (0-100) from /pronunciation/assess; overrides Gemini estimate
+    pa_pronunciation_score: Optional[float] = None
+    # Optional: fluency and prosody scores from /pronunciation/assess for richer Gemini context
+    pa_fluency_score: Optional[float] = None
+    pa_prosody_score: Optional[float] = None
+    # Optional: Deepgram secondary transcript (less normalized, preserves grammar errors)
+    secondary_text: Optional[str] = None
 
 class PronunciationRequest(BaseModel):
     audio_url: Optional[str] = None
@@ -34,6 +43,7 @@ class SpeakerSegment(BaseModel):
     timestamp: float
     context: Optional[str] = None
     user_native_language: Optional[str] = None
+    pa_flagged_errors: Optional[List[Dict[str, Any]]] = None
 
 
 class JointAnalysisRequest(BaseModel):

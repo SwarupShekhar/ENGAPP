@@ -6,7 +6,7 @@ import uuid
 from typing import Dict, Any, List, Optional, Tuple
 import google.generativeai as genai
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 
 from app.core.config import settings
 from app.core.logger import logger
@@ -23,6 +23,72 @@ from app.features.tutor.pronunciation_capture import (
     extend_from_body_and_pop_store,
     merge_issue_batches,
 )
+from app.features.assessment.grammar_analyzer import analyze_grammar as _det_analyze_grammar, score_grammar as _det_score_grammar
+from app.features.assessment.error_model import (
+    ErrorEvent,
+    GRAMMAR_SEVERITY,
+    PRONUNCIATION_SEVERITY,
+    compute_weighted_pronunciation_score,
+    severity_max,
+    sort_key as _error_sort_key,
+)
+
+_DET_TO_LLM_ERROR_TYPE: Dict[str, str] = {
+    "tense_error": "wrong_tense",
+    "pluralization_error": "plural_form_error",
+    "word_order": "word_order",
+    "preposition_error": "preposition_error",
+    "article_missing": "article_error",
+    "other_grammar": "subject_verb_disagreement",
+}
+_DET_TIER: Dict[str, str] = {
+    "tense_error": "TIER_1",
+    "pluralization_error": "TIER_1",
+    "word_order": "TIER_2",
+    "preposition_error": "TIER_2",
+    "article_missing": "TIER_3",
+    "other_grammar": "TIER_2",
+}
+
+
+def _det_errors_to_gemini_shape(det_errors: Dict[str, Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for cat, data in det_errors.items():
+        if not isinstance(data, dict) or data.get("count", 0) == 0:
+            continue
+        for ex in data.get("examples", [])[:2]:
+            out.append({
+                "original": ex.get("error_text", ""),
+                "corrected": ex.get("suggestion", ""),
+                "error_type": _DET_TO_LLM_ERROR_TYPE.get(cat, "other_grammar"),
+                "severity": _DET_TIER.get(cat, "TIER_2"),
+                "explanation": (ex.get("context") or "")[:80],
+                "_source": "deterministic",
+            })
+    return out
+
+
+def _merge_grammar_errors(
+    llm_errors: List[Dict[str, Any]],
+    det_errors: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    seen: set = set()
+    merged: List[Dict[str, Any]] = []
+
+    def _key(e: Dict) -> str:
+        return (e.get("original") or "").lower().strip()
+
+    for e in llm_errors:
+        k = _key(e)
+        if k and k not in seen:
+            seen.add(k)
+            merged.append(e)
+    for e in det_errors:
+        k = _key(e)
+        if k and k not in seen:
+            seen.add(k)
+            merged.append(e)
+    return merged
 
 
 def _pronunciation_penalty_from_severities(issues: List[Dict[str, Any]]) -> int:
@@ -123,6 +189,135 @@ Focus on:
 4. Domain-appropriate vocabulary
 """
 
+def _aggregate_pronunciation_patterns(
+    flagged_errors: List[Dict[str, Any]], top_n: int = 2
+) -> List[Dict[str, Any]]:
+    """Group flagged errors by category, return top N dominant patterns with real spoken examples."""
+    by_cat: Dict[str, List[Dict]] = defaultdict(list)
+    for e in flagged_errors:
+        cat = e.get("rule_category", "unknown")
+        by_cat[cat].append(e)
+    sorted_cats = sorted(by_cat.items(), key=lambda x: -len(x[1]))
+    patterns = []
+    for cat, errors in sorted_cats[:top_n]:
+        with_sub = [e for e in errors if e.get("spoken", "") != e.get("correct", "")]
+        examples_src = with_sub if with_sub else errors
+        examples = [
+            {"spoken": e.get("spoken", ""), "correct": e.get("correct", "")}
+            for e in examples_src[:3]
+        ]
+        patterns.append({"category": cat, "count": len(errors), "examples": examples})
+    return patterns
+
+
+def _build_unified_errors(
+    grammar_errors: Dict[str, Any],
+    flagged_errors: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Merge grammar errors dict + pronunciation flagged_errors into one sorted list."""
+    merged: Dict[str, Dict] = {}
+
+    for cat, data in grammar_errors.items():
+        if not isinstance(data, dict) or data.get("count", 0) == 0:
+            continue
+        for ex in data.get("examples", [])[:1]:
+            word = (ex.get("error_text") or "").strip("'\" ").lower()
+            if not word:
+                continue
+            sev = GRAMMAR_SEVERITY.get(cat, "medium")
+            if word in merged:
+                merged[word]["error_type"] = "both"
+                merged[word]["grammar_category"] = cat
+            else:
+                merged[word] = {
+                    "word": word,
+                    "error_type": "grammar",
+                    "grammar_category": cat,
+                    "pronunciation_category": None,
+                    "severity": sev,
+                    "confidence": 1.0,
+                    "example": (ex.get("context") or "")[:100],
+                }
+
+    for e in flagged_errors:
+        word = (e.get("correct") or e.get("word") or "").lower().strip()
+        if not word:
+            continue
+        cat = e.get("rule_category", "unknown")
+        sev = PRONUNCIATION_SEVERITY.get(cat, "medium")
+        conf = min(float(e.get("confidence") or 50) / 100.0, 1.0)
+        if word in merged:
+            merged[word]["error_type"] = "both"
+            merged[word]["pronunciation_category"] = cat
+            merged[word]["severity"] = severity_max(merged[word].get("severity", "low"), sev)
+        else:
+            spoken = e.get("spoken", "")
+            merged[word] = {
+                "word": word,
+                "error_type": "pronunciation",
+                "grammar_category": None,
+                "pronunciation_category": cat,
+                "severity": sev,
+                "confidence": conf,
+                "example": f"spoken: '{spoken}' → correct: '{word}'" if spoken and spoken != word else word,
+            }
+
+    unified = list(merged.values())
+    unified.sort(key=_error_sort_key)
+    return unified
+
+
+def _extract_proper_nouns(text: str) -> frozenset:
+    """Extract proper nouns from transcript via spaCy NER (reuses grammar_analyzer singleton)."""
+    try:
+        from app.features.assessment.grammar_analyzer import _nlp
+        if _nlp is None or not text:
+            return frozenset()
+        doc = _nlp(text[:4000])
+        return frozenset(
+            ent.text.lower()
+            for ent in doc.ents
+            if ent.label_ in {"GPE", "ORG", "PERSON", "NORP", "FAC", "LOC"}
+        )
+    except Exception:
+        return frozenset()
+
+
+_PATTERN_LABELS: Dict[str, str] = {
+    "th_to_d": "th→d substitution",
+    "th_to_t": "th→t substitution",
+    "v_to_w": "v→w substitution",
+    "w_to_v": "w→v substitution",
+    "h_dropping": "h-dropping",
+    "ae_to_e": "vowel ae→e",
+    "i_to_ee": "vowel i→ee",
+    "retroflex_substitution": "retroflex consonants",
+    "vowel_shift": "vowel shift",
+    "general_mispronunciation": "mispronunciation",
+    "syllable_compression": "syllable compression",
+    "final_cluster_reduction": "final consonant reduction",
+    "consonant_cluster_simplification": "cluster simplification",
+    "unknown_substitution": "unknown substitution",
+}
+
+_MOUTH_TIPS: Dict[str, str] = {
+    "th_to_d": "put your tongue between your teeth for 'th' sounds",
+    "th_to_t": "put your tongue between your teeth for 'th' sounds",
+    "v_to_w": "bite your lower lip lightly for 'v' sounds",
+    "w_to_v": "round your lips fully for 'w' — no teeth contact",
+    "h_dropping": "push a breath of air out before starting 'h' words",
+    "ae_to_e": "open your mouth wider for the 'a' sound in words like 'cat'",
+    "i_to_ee": "relax your lips — don't stretch them for the short 'i' in 'bit'",
+    "retroflex_substitution": "keep your tongue tip at the gum ridge, not curled back",
+    "vowel_shift": "open your mouth more on stressed vowels",
+    "general_mispronunciation": "slow the word down and say each syllable separately",
+    "syllable_compression": "say every syllable — do not skip any",
+    "final_cluster_reduction": "finish the final consonant fully before stopping",
+    "consonant_cluster_simplification": "say both consonants at the start of the word",
+    "unknown_substitution": "listen to the word and repeat it slowly three times",
+}
+
+
 class AnalysisService:
     """
     Multi-stage analysis service with validation and confidence scoring.
@@ -158,28 +353,46 @@ class AnalysisService:
     
     def _create_grammar_prompt(self, text: str, cefr_level: CEFRLevel) -> str:
         """
-        Focused grammar analysis with examples for calibration.
-        Shorter, more precise than your original.
+        Constrained grammar analysis with Indian English calibration anchors.
+        Hard rule: non-empty grammatical_errors → grammar_score ≤ 85.
         """
-        return f"""You are a grammar expert. Analyze ONLY grammar in this text.
+        return f"""You are a strict grammar examiner evaluating Indian English speakers.
 
-Expected level: {cefr_level.value}
-
+Expected CEFR level: {cefr_level.value}
 Text: "{text}"
 
-Find grammar errors and rate grammar quality 0-100.
+TASK: Detect ALL grammar errors. Score grammar quality 0-100.
 
-CALIBRATION EXAMPLES:
-- "I go to school yesterday" (A1): 25/100 - Wrong tense
-- "Although I was tired, but I continued working" (B1): 55/100 - Redundant conjunction
-- "Having finished the project, we celebrated" (C1): 90/100 - Correct participle clause
-- "Me and John went shopping" (A2): 40/100 - Pronoun case error
+INDIAN ENGLISH ERROR PATTERNS TO DETECT (very common, do NOT miss these):
+- Tense confusion: "I was joined in 2019" (should be "I joined"), "I am working since 5 years" (should be "I have been working for")
+- Missing/wrong article: "I have one year experience" (should be "one year of experience"), "I work in sales field"
+- Wrong preposition: "I am good in English", "discuss about the issue"
+- Plural/uncountable errors: "informations", "staffs", "advices", "feedbacks"
+- Subject-verb disagreement: "the team are", "he don't know"
+- Missing auxiliary: "I working here", "she not coming"
+- Redundant conjunction: "although X, but Y", "even though X, still Y"
 
-STRICT RULES:
-- Simple correct sentence (A1-A2): max 50/100
-- No complex structures (B1): max 65/100
-- Perfect simple + some complex (B2): 70-85/100
-- Native-like complexity (C1-C2): 85-100/100
+CALIBRATION ANCHORS (these are ground truth — match your scores to these):
+- "I am in this company since 3 year and handling team of 7 staffs." → 18/100 (tense + article + plural errors)
+- "I was joined this company in 2019 and I am good in communication." → 25/100 (wrong passive + preposition error)
+- "I have 5 year of experience in sales and I am handling many clients." → 45/100 (article + tense inconsistency)
+- "Although I have limited experience, but I am eager to learn new things." → 52/100 (redundant conjunction)
+- "I joined this company in 2019 and have been managing a team of seven people." → 78/100 (correct, moderate complexity)
+- "Having led cross-functional teams, I bring a proven track record in stakeholder management." → 92/100 (advanced, correct)
+
+HARD RULES:
+1. If grammatical_errors list is NON-EMPTY → grammar_score MUST be ≤ 85. No exceptions.
+2. grammar_score = 100 is ONLY valid when zero errors exist AND text is grammatically perfect.
+3. Each TIER_1 error (tense, auxiliary, plural) subtracts 15-20 points from 100.
+4. Each TIER_2 error (article, preposition, agreement) subtracts 8-12 points.
+5. Each TIER_3 error (style, redundancy) subtracts 3-5 points.
+6. Word count < 30: cap at 70 (insufficient evidence for higher).
+
+COMPLEXITY CEILING:
+- Only simple sentences (no subordinate clauses): max 60/100
+- Some complex structures but errors present: max 72/100
+- Rich complex structures, minimal errors: up to 90/100
+- Native-level accuracy + complexity: 90-100/100
 
 Respond ONLY with JSON:
 {{
@@ -188,7 +401,7 @@ Respond ONLY with JSON:
     {{
       "original": "exact phrase with error",
       "corrected": "correct version",
-      "error_type": "wrong_tense_context|subject_verb_disagreement|missing_auxiliary|word_order_chaos|article_error|preposition_error|plural_form_error|wrong_verb_form|article_omission_casual|uncountable_plural|redundant_preposition|colloquial_contraction",
+      "error_type": "wrong_tense|missing_auxiliary|article_error|preposition_error|plural_form_error|subject_verb_disagreement|redundant_conjunction|uncountable_plural|word_order",
       "severity": "TIER_1|TIER_2|TIER_3",
       "explanation": "brief explanation"
     }}
@@ -201,7 +414,7 @@ Respond ONLY with JSON:
     }}
   ],
   "complexity_level": "simple|intermediate|advanced",
-  "justification": "1 sentence explaining the score"
+  "justification": "1 sentence citing specific errors found and why the score is what it is"
 }}"""
 
     def _create_vocabulary_prompt(self, text: str, cefr_level: CEFRLevel) -> str:
@@ -294,7 +507,15 @@ Respond ONLY with JSON:
   "justification": "1 sentence"
 }}"""
 
-    def _create_pronunciation_prompt(self, text: str, native_lang: str, azure_data: Optional[str]) -> str:
+    def _create_pronunciation_prompt(
+        self,
+        text: str,
+        native_lang: str,
+        azure_data: Optional[str],
+        pa_errors: Optional[list] = None,
+        pa_fluency_score: Optional[float] = None,
+        pa_prosody_score: Optional[float] = None,
+    ) -> str:
         """Focused pronunciation analysis"""
         
         l1_patterns = {
@@ -315,21 +536,53 @@ Azure Pronunciation Data:
 
 This is GROUND TRUTH. Weight Azure data at 80% in your final score.
 """
-        
+
+        errors_section = ""
+        if pa_errors:
+            acoustic_lines = ["\nAcoustic assessment results (GROUND TRUTH — use these directly):"]
+            if pa_fluency_score is not None:
+                acoustic_lines.append(f"  Fluency score: {pa_fluency_score:.1f}/100")
+            if pa_prosody_score is not None:
+                acoustic_lines.append(f"  Prosody score: {pa_prosody_score:.1f}/100")
+
+            dominant = _aggregate_pronunciation_patterns(pa_errors, top_n=2)
+            if dominant:
+                acoustic_lines.append(
+                    "\nDOMINANT ERROR PATTERNS (from acoustic analysis — use ONLY these, do not invent others):"
+                )
+                for p in dominant:
+                    ex_str = ", ".join(
+                        f'"{ex["spoken"]}"→"{ex["correct"]}"'
+                        for ex in p["examples"]
+                        if ex.get("spoken") and ex.get("correct") and ex["spoken"] != ex["correct"]
+                    )
+                    count_label = f"({p['count']} word{'s' if p['count'] != 1 else ''} affected)"
+                    acoustic_lines.append(
+                        f"  [{p['category']}] {count_label}"
+                        + (f": e.g. {ex_str}" if ex_str else "")
+                    )
+                acoustic_lines.append(
+                    "\nIn 'justification': name ONLY the pattern labels above, cite the example words shown."
+                )
+                acoustic_lines.append(
+                    "In 'problematic_words': include the specific words from the examples above."
+                )
+            errors_section = "\n".join(acoustic_lines) + "\n"
+
         return f"""You are a pronunciation expert specializing in L1 transfer analysis.
 
 Native language: {native_lang}
 Expected L1 patterns: {expected_patterns}
 
 Text: "{text}"
-{azure_section}
-
+{azure_section}{errors_section}
 Rate pronunciation 0-100.
 
 IMPORTANT:
 - Accent ≠ Error. Hindi accent is fine if intelligible.
 - Only penalize errors that impede understanding.
 - If Azure data shows word-level scores, use those primarily.
+- If known errors list is provided, address each word specifically in your feedback.
 
 WITHOUT Azure data, you can only give rough estimates based on typical L1 patterns.
 WITH Azure data, you have objective evidence.
@@ -343,7 +596,7 @@ Respond ONLY with JSON:
   ],
   "l1_influence": "description of detected L1 patterns",
   "accent_vs_error": "Clarify which features are accent (acceptable) vs errors",
-  "justification": "1 sentence"
+  "justification": "1-2 sentences referencing specific mispronounced words"
 }}"""
 
     # ─────────────────────────────────────────────────────────────
@@ -418,8 +671,8 @@ Answer with JSON:
     ) -> Tuple[AnalysisMetrics, CEFRAssessment]:
         """Combine individual analyses into final metrics"""
         
-        grammar_score = min(max(grammar_data.get("grammar_score", 50), 0), 100)
-        vocab_score = min(max(vocab_data.get("vocabulary_score", 50), 0), 100)
+        grammar_score = min(max(grammar_data.get("overall_grammar", grammar_data.get("grammar_score", 50)), 0), 100)
+        vocab_score = min(max(vocab_data.get("overall_vocabulary", vocab_data.get("vocabulary_score", 50)), 0), 100)
         fluency_score = min(max(fluency_data.get("fluency_score", 50), 0), 100)
         pronunciation_score = min(max(pronunciation_data.get("pronunciation_score", 50), 0), 100)
         
@@ -489,7 +742,7 @@ Answer with JSON:
         
         # Stage 2: Parallel specialized analyses
         tasks = [
-            self._analyze_grammar(request.text, cefr_assessment.level),
+            self._analyze_grammar(request.text, cefr_assessment.level, secondary_text=request.secondary_text),
             self._analyze_vocabulary(request.text, cefr_assessment.level),
             self._analyze_fluency(request.text, request.context),
             self._analyze_pronunciation(
@@ -497,6 +750,10 @@ Answer with JSON:
                 request.user_native_language or "Unknown",
                 request.context,
                 captured_issues=captured_for_pron,
+                pa_errors=request.pa_flagged_errors or [],
+                pa_pronunciation_score=request.pa_pronunciation_score,
+                pa_fluency_score=request.pa_fluency_score,
+                pa_prosody_score=request.pa_prosody_score,
             ),
         ]
 
@@ -533,6 +790,21 @@ Answer with JSON:
                     or []
                 )
 
+            # Backfill pronunciation_issues from PA flagged_errors when live-tutor path is empty
+            if not captured_pron_normalized and request.pa_flagged_errors:
+                captured_pron_normalized = [
+                    {
+                        "word": (e.get("correct") or e.get("word") or ""),
+                        "heard": (e.get("spoken") or e.get("spoken_approx") or ""),
+                        "rule_category": e.get("rule_category", "general_mispronunciation"),
+                        "severity": "high" if float(e.get("confidence") or 100) < 30 else "medium",
+                        "confidence": min(float(e.get("confidence") or 50) / 100, 1.0),
+                        "issueType": "substitution",
+                        "suggestion": f"Practice the word '{e.get('correct', '')}'",
+                    }
+                    for e in request.pa_flagged_errors
+                ]
+
         except Exception as e:
             logger.error(f"Parallel analysis failed: {e}", exc_info=True)
             # Return basic fallback
@@ -542,6 +814,8 @@ Answer with JSON:
         gemini_grammar = grammar_data.copy()
         grammar_data = self.grammar_classifier.classify_errors(gemini_grammar)
         grammar_data["justification"] = gemini_grammar.get("justification", "")
+        # Preserve the blended deterministic+LLM score — classifier only provides breakdown
+        grammar_data["overall_grammar"] = gemini_grammar.get("grammar_score", grammar_data.get("overall_grammar", 50))
         
         # Vocabulary: Merge LLM analysis with specialized analyzer
         # First preserve LLM-derived vocabulary results
@@ -571,15 +845,23 @@ Answer with JSON:
             cefr_assessment.level
         )
         
-        # Build feedback
+        # Build unified errors and dominant patterns BEFORE feedback
+        unified = _build_unified_errors(
+            gemini_grammar.get("errors", {}),
+            request.pa_flagged_errors or [],
+        )
+        dominant = _aggregate_pronunciation_patterns(request.pa_flagged_errors or [], top_n=2)
+
+        # Build feedback using dominant patterns
         feedback = self._generate_feedback(
             grammar_data,
             vocab_data,
             fluency_data,
             pronunciation_data,
-            metrics
+            metrics,
+            dominant_patterns=dominant,
         )
-        
+
         # Build strengths and weaknesses
         strengths, weaknesses = self._extract_strengths_weaknesses(
             grammar_data,
@@ -623,19 +905,83 @@ Answer with JSON:
             scores={"pronunciation": int(round(metrics.pronunciation_score))},
             pronunciation_issues=pron_api,
             ai_feedback={"pronunciation": {"justification": pj}},
+            unified_errors=unified or None,
         )
     
     # ─────────────────────────────────────────────────────────────
     # HELPER METHODS
     # ─────────────────────────────────────────────────────────────
     
-    async def _analyze_grammar(self, text: str, cefr: CEFRLevel) -> Dict:
+    async def _analyze_grammar(
+        self, text: str, cefr: CEFRLevel, secondary_text: str | None = None
+    ) -> Dict:
         prompt = self._create_grammar_prompt(text, cefr)
-        response = await asyncio.wait_for(
-            self.fast_model.generate_content_async(prompt),
-            timeout=15.0
+        task_list: list = [
+            asyncio.to_thread(_det_analyze_grammar, text),
+            asyncio.wait_for(self.fast_model.generate_content_async(prompt), timeout=15.0),
+        ]
+        use_secondary = bool(
+            secondary_text
+            and secondary_text.strip()
+            and secondary_text.strip().lower() != text.strip().lower()
         )
-        return robust_json_parser(response.text)
+        if use_secondary:
+            task_list.append(asyncio.to_thread(_det_analyze_grammar, secondary_text))
+
+        results = await asyncio.gather(*task_list, return_exceptions=True)
+        det_result = results[0]
+        llm_response = results[1]
+        det_secondary = results[2] if use_secondary else None
+
+        if isinstance(llm_response, Exception):
+            logger.warning("Gemini grammar analysis failed: %s", llm_response)
+            llm_data: Dict = {"grammar_score": 50, "grammatical_errors": [], "justification": ""}
+        else:
+            llm_data = robust_json_parser(llm_response.text)
+
+        if isinstance(det_result, Exception):
+            logger.warning("Deterministic grammar (primary) failed: %s", det_result)
+            det_result = {"score": 50, "errors": {}, "total_errors": 0, "justification": ""}
+
+        # Augment primary det errors with secondary (Deepgram) det errors
+        if det_secondary and not isinstance(det_secondary, Exception):
+            for cat, sec_data in det_secondary.get("errors", {}).items():
+                sec_count = sec_data.get("count", 0)
+                if sec_count == 0:
+                    continue
+                pri = det_result["errors"].setdefault(cat, {"count": 0, "examples": []})
+                pri["count"] = max(pri["count"], sec_count)
+                seen = {ex.get("error_text", "") for ex in pri["examples"]}
+                for ex in sec_data.get("examples", []):
+                    if ex.get("error_text", "") not in seen:
+                        pri["examples"].append(ex)
+            # Recompute deterministic score with augmented error counts
+            error_counts = {c: det_result["errors"][c]["count"] for c in det_result["errors"]}
+            word_count = max(det_result.get("word_count", 1), len(text.split()))
+            det_result["score"] = _det_score_grammar(error_counts, word_count)
+            det_result["total_errors"] = sum(error_counts.values())
+            logger.info(
+                "Deepgram secondary grammar: +%d total errors after merge",
+                det_secondary.get("total_errors", 0),
+            )
+
+        det_errors_shaped = _det_errors_to_gemini_shape(det_result.get("errors", {}))
+        llm_errors = llm_data.get("grammatical_errors", [])
+        merged_errors = _merge_grammar_errors(llm_errors, det_errors_shaped)
+
+        det_score = float(det_result.get("score", 50))
+        llm_score = float(llm_data.get("grammar_score", 50))
+        blended = round(det_score * 0.6 + llm_score * 0.4)
+        if merged_errors:
+            blended = min(blended, 85)
+
+        return {
+            "grammar_score": blended,
+            "grammatical_errors": merged_errors,
+            "sentence_structures": llm_data.get("sentence_structures", []),
+            "complexity_level": llm_data.get("complexity_level", "simple"),
+            "justification": det_result.get("justification") or llm_data.get("justification", ""),
+        }
     
     async def _analyze_vocabulary(self, text: str, cefr: CEFRLevel) -> Dict:
         prompt = self._create_vocabulary_prompt(text, cefr)
@@ -659,6 +1005,10 @@ Answer with JSON:
         native_lang: str,
         azure_data: Optional[str],
         captured_issues: Optional[List[Dict[str, Any]]] = None,
+        pa_errors: Optional[List[Dict[str, Any]]] = None,
+        pa_pronunciation_score: Optional[float] = None,
+        pa_fluency_score: Optional[float] = None,
+        pa_prosody_score: Optional[float] = None,
     ) -> Dict:
         raw = [x for x in (captured_issues or []) if x]
         if raw:
@@ -691,28 +1041,91 @@ Answer with JSON:
                 "_captured_pronunciation_issues_normalized": deduped,
             }
 
-        prompt = self._create_pronunciation_prompt(text, native_lang, azure_data)
+        # Confidence floor: filter general_mispronunciation below 40 (low-quality detections)
+        filtered_pa = [
+            e for e in (pa_errors or [])
+            if not (
+                e.get("rule_category") == "general_mispronunciation"
+                and float(e.get("confidence") or 100) < 40
+            )
+        ]
+
+        prompt = self._create_pronunciation_prompt(
+            text, native_lang, azure_data,
+            pa_errors=filtered_pa or None,
+            pa_fluency_score=pa_fluency_score,
+            pa_prosody_score=pa_prosody_score,
+        )
         response = await asyncio.wait_for(
             self.fast_model.generate_content_async(prompt),
             timeout=15.0
         )
-        return robust_json_parser(response.text)
+        result = robust_json_parser(response.text)
+        if pa_pronunciation_score is not None:
+            result["pronunciation_score"] = float(pa_pronunciation_score)
+        elif filtered_pa:
+            result["pronunciation_score"] = compute_weighted_pronunciation_score(filtered_pa)
+        return result
     
-    def _generate_feedback(self, grammar, vocab, fluency, pronunciation, metrics) -> str:
-        """Combine justifications into coherent feedback"""
-        parts = []
-        
-        if metrics.overall_score >= 80:
-            parts.append("Excellent work! Your English proficiency is strong.")
-        elif metrics.overall_score >= 60:
-            parts.append("Good progress! You're communicating effectively.")
+    def _generate_feedback(
+        self,
+        grammar,
+        vocab,
+        fluency,
+        pronunciation,
+        metrics,
+        dominant_patterns: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Pattern-based feedback: top 2 pronunciation patterns + WPM band + drill sentence."""
+        if not dominant_patterns:
+            if metrics.overall_score >= 80:
+                return "Your English is clear and well-structured. Keep pushing toward natural flow."
+            if metrics.overall_score >= 60:
+                return "You're communicating effectively — focus on consistency in your strongest areas."
+            return "Keep practicing daily. Target your most common patterns one at a time."
+
+        parts: List[str] = []
+        p1 = dominant_patterns[0]
+        cat1 = p1["category"]
+        label1 = _PATTERN_LABELS.get(cat1, cat1.replace("_", " "))
+        tip1 = _MOUTH_TIPS.get(cat1, "focus on each syllable carefully")
+        ex1 = next(
+            (e for e in p1.get("examples", []) if e.get("spoken") and e.get("correct") and e["spoken"] != e["correct"]),
+            None,
+        )
+        if ex1:
+            parts.append(f"You said '{ex1['spoken']}' instead of '{ex1['correct']}' — classic {label1}; {tip1}.")
         else:
-            parts.append("Keep practicing! You're building your skills.")
-        
-        parts.append(grammar.get("justification", ""))
-        parts.append(vocab.get("justification", ""))
-        
-        return " ".join(parts)
+            parts.append(f"Watch out for {label1} — {tip1}.")
+
+        if len(dominant_patterns) > 1:
+            p2 = dominant_patterns[1]
+            cat2 = p2["category"]
+            label2 = _PATTERN_LABELS.get(cat2, cat2.replace("_", " "))
+            ex2 = next(
+                (e for e in p2.get("examples", []) if e.get("spoken") and e.get("correct") and e["spoken"] != e["correct"]),
+                None,
+            )
+            if ex2:
+                parts.append(f"Also: '{ex2['spoken']}' for '{ex2['correct']}' shows {label2}.")
+            else:
+                parts.append(f"Also work on {label2}.")
+
+        wpm = metrics.wpm if metrics.wpm > 0 else None
+        if wpm:
+            if wpm < 100:
+                parts.append("You spoke slowly — aim for 110-130 words per minute for more natural flow.")
+            elif wpm > 160:
+                parts.append("You spoke quite fast — slow down a little so each word lands clearly.")
+
+        if len(dominant_patterns) > 1:
+            cat2 = dominant_patterns[1]["category"]
+            label2 = _PATTERN_LABELS.get(cat2, cat2.replace("_", " "))
+            parts.append(f"Today: drill five words with {label1}, then five with {label2}.")
+        else:
+            parts.append(f"Drill {label1} — say five target words slowly, then at full speed.")
+
+        return " ".join(parts[:4])
     
     def _extract_strengths_weaknesses(self, grammar, vocab, fluency, pronunciation) -> Tuple[List[str], List[str]]:
         strengths = []
@@ -966,6 +1379,9 @@ Analyze the following multi-speaker transcript of an English practice session.
             # Fallback / Error handling
             raise e
 
+        # Build speaker_id → segment lookup for per-participant PA data
+        _seg_by_speaker: Dict[str, Any] = {s.speaker_id: s for s in request.segments}
+
         # Construct JointAnalysisResponse
         participant_analyses = []
         for pa in analysis_data.get("participant_analyses", []):
@@ -984,6 +1400,10 @@ Analyze the following multi-speaker transcript of an English practice session.
                 logger.warning(f"Invalid CEFR level '{cefr_level_str}' defaulting to B1")
                 cefr_level = CEFRLevel.B1
             
+            _seg = _seg_by_speaker.get(pa["participant_id"])
+            _pa_flagged = list(_seg.pa_flagged_errors or []) if _seg and _seg.pa_flagged_errors else []
+            _unified = _build_unified_errors({}, _pa_flagged) if _pa_flagged else None
+
             participant_analyses.append(ParticipantAnalysis(
                 participant_id=pa["participant_id"],
                 analysis=AnalysisResponse(
@@ -1009,7 +1429,8 @@ Analyze the following multi-speaker transcript of an English practice session.
                     strengths=ad.get("strengths", []),
                     improvement_areas=ad.get("improvement_areas", []),
                     recommended_tasks=[],
-                    processing_time=0
+                    processing_time=0,
+                    unified_errors=_unified or None,
                 ),
                 confidence_timeline=pa.get("confidence_timeline"),
                 hesitation_markers=pa.get("hesitation_markers"),

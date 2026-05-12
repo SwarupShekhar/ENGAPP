@@ -8,6 +8,8 @@ import {
   StatusBar,
   RefreshControl,
   Text,
+  TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAppTheme } from "../../../theme/useAppTheme";
@@ -35,12 +37,15 @@ export default function HomeScreenRedesigned() {
   const [notifCount, setNotifCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   const fetchData = async (isRefresh = false) => {
     if (!user) return;
     if (isRefresh) setRefreshing(true);
 
     try {
+      setFetchError(false);
+
       // 1. Instant load from local cache if not refreshing
       if (!isRefresh) {
         const cachedHome = await AsyncStorage.getItem("@home_data_cache");
@@ -61,10 +66,12 @@ export default function HomeScreenRedesigned() {
       setUnreadCount(unreadData.count || 0);
       const pendingCount = Array.isArray(pendingReqs) ? pendingReqs.length : 0;
       setNotifCount(pendingCount);
+      setFetchError(false);
 
       AsyncStorage.setItem("@home_data_cache", JSON.stringify(homeDataResp));
     } catch (error) {
       console.error("Failed to fetch home data:", error);
+      if (!homeData) setFetchError(true);
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -99,12 +106,47 @@ export default function HomeScreenRedesigned() {
   };
 
   useEffect(() => {
-    if (isLoaded && user && !user.firstName) {
+    const hasProfile =
+      !!(user?.unsafeMetadata as any)?.profileCompleted || !!user?.firstName;
+    if (isLoaded && user && !hasProfile) {
       navigation.replace("CreateProfile");
     }
   }, [isLoaded, user]);
 
-  if (!isLoaded || !homeData) return null;
+  if (!isLoaded) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (fetchError && !homeData) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: "center", alignItems: "center", padding: 32 }]}>
+        <Text style={{ fontSize: 18, fontWeight: "600", color: theme.colors.text, marginBottom: 8, textAlign: "center" }}>
+          Couldn't load your dashboard
+        </Text>
+        <Text style={{ fontSize: 14, color: theme.colors.secondaryText, marginBottom: 20, textAlign: "center" }}>
+          Please check your connection and try again.
+        </Text>
+        <TouchableOpacity
+          onPress={() => fetchData(true)}
+          style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "600", fontSize: 15 }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!homeData) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   const { header, primaryCTA, skills, contextualCards, weeklyActivity } =
     homeData;

@@ -37,11 +37,14 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
   });
   const [attempt, setAttempt] = useState(1);
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [isInitializingAssessment, setIsInitializingAssessment] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [initAttempts, setInitAttempts] = useState(0);
 
   // Phase 1 initialization — wait for auth to be ready
   useEffect(() => {
     if (isAuthLoaded && isSignedIn) {
-      startAssessment();
+      void startAssessment();
     }
   }, [isAuthLoaded, isSignedIn]);
 
@@ -59,6 +62,8 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
 
   const startAssessment = async () => {
     try {
+      setIsInitializingAssessment(true);
+      setInitError(null);
       console.log("[Assessment] Starting assessment, API_URL:", API_URL);
 
       // Ensure audio permissions are requested early
@@ -74,24 +79,36 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
       // No userId needed — backend extracts from auth token
       const res = await assessmentApi.startAssessment();
       console.log("[Assessment] Started successfully:", res?.id);
-      if (res && res.id) {
-        setAssessmentId(res.id);
+      const startedId = res?.id || res?.assessmentId || null;
+      if (startedId) {
+        setAssessmentId(startedId);
+        setIsInitializingAssessment(false);
+        setInitError(null);
+        return;
       }
+      throw new Error("Assessment session ID missing in response");
     } catch (err: any) {
       console.error("Failed to start assessment:", err);
       const status = err?.response?.status || "No response";
       const serverMsg =
         err?.response?.data?.message || err?.message || "Unknown error";
-      Alert.alert(
-        "Assessment Error",
-        `Status: ${status}\nURL: ${API_URL}\nError: ${serverMsg}`,
-      );
+      const msg = `Status: ${status} | ${serverMsg}`;
+      setInitError(msg);
+      setIsInitializingAssessment(false);
+      setInitAttempts((prev) => prev + 1);
     }
   };
 
   const startRecording = async () => {
-    if (!assessmentId) {
+    if (isInitializingAssessment) {
       Alert.alert("Please Wait", "Assessment is still initializing...");
+      return;
+    }
+    if (!assessmentId) {
+      Alert.alert(
+        "Assessment Not Ready",
+        "Couldn't initialize assessment. Tap Retry Initialization.",
+      );
       return;
     }
     try {
@@ -253,6 +270,28 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
         </View>
 
         <View style={styles.contentContainer}>{renderContent()}</View>
+        {isInitializingAssessment && (
+          <View style={styles.initStatusCard}>
+            <ActivityIndicator color={theme.colors.primary} />
+            <Text style={styles.initStatusText}>Initializing assessment...</Text>
+          </View>
+        )}
+        {!!initError && !assessmentId && (
+          <View style={styles.initStatusCard}>
+            <Text style={styles.initErrorText}>
+              Assessment initialization failed.
+            </Text>
+            <Text style={styles.initDetailText}>{initError}</Text>
+            <TouchableOpacity
+              style={styles.retryInitButton}
+              onPress={() => {
+                void startAssessment();
+              }}
+            >
+              <Text style={styles.retryInitText}>Retry Initialization</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.footer}>
           <View style={styles.timerContainer}>
@@ -267,7 +306,8 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
             style={[
               styles.recordButton,
               isRecording && styles.recordingActive,
-              isSubmitting && styles.buttonDisabled,
+              (isSubmitting || isInitializingAssessment || !assessmentId) &&
+                styles.buttonDisabled,
             ]}
           >
             {isSubmitting ? (
@@ -281,7 +321,13 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
             )}
           </TouchableOpacity>
           <Text style={styles.hintText}>
-            {isRecording ? "Tap to Stop" : "Tap to Record"}
+            {isRecording
+              ? "Tap to Stop"
+              : isInitializingAssessment
+                ? "Initializing..."
+                : !assessmentId
+                  ? "Retry initialization"
+                  : "Tap to Record"}
           </Text>
         </View>
       </ScrollView>
@@ -405,5 +451,38 @@ const getStyles = (theme: any) =>
     hintText: {
       color: theme.colors.text.secondary,
       fontSize: theme.typography.sizes.s,
+    },
+    initStatusCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.m,
+      padding: theme.spacing.m,
+      alignItems: "center",
+      gap: theme.spacing.s,
+      marginBottom: theme.spacing.m,
+    },
+    initStatusText: {
+      color: theme.colors.text.secondary,
+      fontSize: theme.typography.sizes.s,
+    },
+    initErrorText: {
+      color: theme.colors.error || "#EF4444",
+      fontWeight: "600",
+      textAlign: "center",
+    },
+    initDetailText: {
+      color: theme.colors.text.secondary,
+      fontSize: theme.typography.sizes.xs,
+      textAlign: "center",
+    },
+    retryInitButton: {
+      marginTop: theme.spacing.s,
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: theme.spacing.m,
+      paddingVertical: theme.spacing.s,
+      borderRadius: theme.borderRadius.s,
+    },
+    retryInitText: {
+      color: "#fff",
+      fontWeight: "600",
     },
   });

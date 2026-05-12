@@ -135,7 +135,7 @@ export default function EnglivoSessionsScreen() {
 
   const loadUpcoming = async () => {
     try {
-      const r = await client.get<UpcomingSession[]>("/api/sessions/upcoming");
+      const r = await client.get<UpcomingSession[]>("/sessions/upcoming");
       setUpcoming(Array.isArray(r.data) ? r.data : []);
     } catch {
       setUpcoming([]);

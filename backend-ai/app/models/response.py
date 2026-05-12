@@ -60,6 +60,11 @@ class AnalysisResponse(BaseModel):
         default=None,
         serialization_alias="aiFeedback",
     )
+    # Unified error model — merged grammar + pronunciation events, sorted by severity
+    unified_errors: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        serialization_alias="unifiedErrors",
+    )
     # Deep Intelligence Additions
     linguistic_fingerprint_updates: Optional[Dict[str, Any]] = None
     shadowing_audio_url: Optional[str] = None

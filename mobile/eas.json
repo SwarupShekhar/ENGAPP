@@ -22,7 +22,11 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "APP_API_URL_OVERRIDE": "http://139.84.163.249:4001",
+        "EXPO_PUBLIC_NEST_API_URL": "http://139.84.163.249:4001"
+      }
     }
   },
   "submit": {

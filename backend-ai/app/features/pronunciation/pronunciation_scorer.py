@@ -108,14 +108,17 @@ def calculate_pronunciation_score(
         }
     score = base
 
-    # Apply per-error deductions weighted by intelligibility impact
+    # Apply per-error deductions weighted by intelligibility impact.
+    # Cap total deduction at 60 so score never hits the floor purely from error count.
+    total_deduction = 0.0
     for err in flagged_errors:
         cat = (err.get("rule_category") or "").strip()
         if not cat or cat == "unknown_substitution":
             continue
         weight = INTELLIGIBILITY_WEIGHT.get(cat, MEDIUM_IMPACT)
         deduction = _get_deduction(cat)
-        score -= deduction * weight
+        total_deduction += deduction * weight
+    score -= min(total_deduction, 60.0)
 
     # Fluency multiplier: poor fluency drags pronunciation down
     if fluency_score is not None and fluency_score < 100:
