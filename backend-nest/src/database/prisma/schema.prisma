@@ -324,6 +324,16 @@ model PronunciationIssue {
   @@index([analysisId])
 }
 
+enum SrState {
+  LEARNING
+  GRADUATED
+}
+
+enum SrAttemptResult {
+  PASS
+  FAIL
+}
+
 model LearningTask {
   id                  String                   @id @default(uuid())
   userId              String
@@ -336,6 +346,14 @@ model LearningTask {
   dueDate             DateTime
   completedAt         DateTime?
   score               Float?
+  srState             SrState                  @default(LEARNING)
+  srStep              Int                      @default(0)
+  correctStreak       Int                      @default(0)
+  dueAt               DateTime                 @default(now())
+  lastAttemptAt       DateTime?
+  lastResult          SrAttemptResult?
+  mistakeKey          String?
+  attemptCount        Int                      @default(0)
   createdAt           DateTime                 @default(now())
   session             ConversationSession?     @relation(fields: [sessionId], references: [id])
   user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -344,6 +362,8 @@ model LearningTask {
 
   @@index([userId])
   @@index([status])
+  @@index([userId, srState, dueAt])
+  @@index([mistakeKey])
 }
 
 model TaskMistake {

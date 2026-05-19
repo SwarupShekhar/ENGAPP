@@ -33,6 +33,7 @@ import Animated, {
 
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
+import PracticeCarousel from '../../../components/home/PracticeCarousel';
 import { getHomeData, HomeData } from '../services/homeApi';
 
 let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
@@ -511,32 +512,6 @@ function ScoreSkeleton({ theme }: { theme: any }) {
   );
 }
 
-// ─── Call CTA Card ────────────────────────────────────────────────────────────
-function CallCard({ theme, onPress }: { theme: any; onPress: () => void }) {
-  const c = theme.colors;
-  const glowOp = usePulse(0.25, 0.65, 1700);
-  const glowSt = useAnimatedStyle(() => ({ opacity: glowOp.value }));
-  return (
-    <TouchableOpacity activeOpacity={0.87} onPress={onPress}>
-      <LinearGradient
-        colors={[c.secondary, c.primary] as any}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[st.callCard, { borderRadius: theme.borderRadius.l }]}
-      >
-        <Animated.View style={[st.callBlob, { backgroundColor: c.accent }, glowSt]} />
-        <View style={st.callBody}>
-          <Text style={st.callEye}>FIND A PARTNER</Text>
-          <Text style={st.callTitle}>Find a Partner</Text>
-          <Text style={st.callSub}>Start a live speaking session</Text>
-        </View>
-        <View style={[st.callIcon, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
-          <Ionicons name="call" size={22} color="#fff" />
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
-
 // ─── Phrase Card ──────────────────────────────────────────────────────────────
 function PhraseCard({ phrase, theme, onPractice }: { phrase: Phrase; theme: any; onPractice: () => void }) {
   const c = theme.colors;
@@ -692,8 +667,6 @@ export default function HomeScreen() {
   const goResults  = () => latestId ? navigation.navigate('AssessmentResult', { sessionId: latestId }) : navigation.navigate('AssessmentIntro');
   const goRetake   = () => navigation.navigate('AssessmentIntro');
   const goAssess   = () => navigation.navigate('AssessmentIntro');
-  const goCall     = () => navigation.navigate('CallPreference');
-  const goBooking  = () => navigation.navigate('EnglivoBooking');
   const goChat     = () => navigation.navigate('Conversations');
   const goNotifs   = () => navigation.navigate('Notifications');
 
@@ -770,16 +743,12 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {/* ── Call CTA ────────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(210).duration(380).springify()} style={{ gap: 8 }}>
-          <CallCard theme={theme} onPress={goCall} />
-          <TouchableOpacity onPress={goBooking} activeOpacity={0.75} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 }}>
-            <Ionicons name="calendar-outline" size={15} color={c.primary} />
-            <Text style={{ color: c.primary, fontSize: 13, fontWeight: '600' }}>Book a Tutor Session</Text>
-          </TouchableOpacity>
+        {/* ── Practice carousel (spaced-repetition) ───────────────────────── */}
+        <Animated.View entering={FadeInDown.delay(210).duration(380).springify()} style={{ gap: 10 }}>
+          <PracticeCarousel />
         </Animated.View>
 
-        {/* ── Phrase of the Day carousel ──────────────────────────────────── */}
+        {/* ── Phrase of the Day ───────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(290).duration(380).springify()} style={{ gap: 10 }}>
           {loadingPhrase ? (
             <PhraseSkeleton theme={theme} />
