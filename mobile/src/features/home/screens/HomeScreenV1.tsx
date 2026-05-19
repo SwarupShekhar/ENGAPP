@@ -31,10 +31,13 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
-import PracticeCarousel from '../../../components/home/PracticeCarousel';
+import PulseHomeCarousel from '../../../components/home/PulseHomeCarousel';
 import { getHomeData, HomeData } from '../services/homeApi';
+
+const HOME_DATA_CACHE_KEY = '@home_data_cache';
 
 let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
   impactAsync: async () => {},
@@ -578,16 +581,40 @@ export default function HomeScreen() {
 
   const c = theme.colors;
 
-  // ── Fetch home data ────────────────────────────────────────────────────────
+  // ── Fetch home data (stale-while-revalidate) ───────────────────────────────
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      setLoadingHome(true);
-      getHomeData()
-        .then(d => { if (alive) setHomeData(d); })
-        .catch(e => console.warn('[HomeV1] home data:', e))
-        .finally(() => { if (alive) setLoadingHome(false); });
-      return () => { alive = false; };
+
+      const loadHome = async () => {
+        try {
+          const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
+          if (cached && alive) {
+            setHomeData(JSON.parse(cached) as HomeData);
+            setLoadingHome(false);
+          } else if (alive) {
+            setLoadingHome(true);
+          }
+        } catch {
+          if (alive) setLoadingHome(true);
+        }
+
+        try {
+          const fresh = await getHomeData();
+          if (!alive) return;
+          setHomeData(fresh);
+          await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
+        } catch (e) {
+          console.warn('[HomeV1] home data:', e);
+        } finally {
+          if (alive) setLoadingHome(false);
+        }
+      };
+
+      void loadHome();
+      return () => {
+        alive = false;
+      };
     }, []),
   );
 
@@ -743,26 +770,9 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {/* ── Practice carousel (spaced-repetition) ───────────────────────── */}
+        {/* ── Practice + phrase carousel ──────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(210).duration(380).springify()} style={{ gap: 10 }}>
-          <PracticeCarousel />
-        </Animated.View>
-
-        {/* ── Phrase of the Day ───────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(290).duration(380).springify()} style={{ gap: 10 }}>
-          {loadingPhrase ? (
-            <PhraseSkeleton theme={theme} />
-          ) : (
-            <>
-              {phrases[0] && (
-                <PhraseCard
-                  phrase={phrases[0]}
-                  theme={theme}
-                  onPractice={() => navigation.navigate('AITutor', { phrase: phrases[0] })}
-                />
-              )}
-            </>
-          )}
+          <PulseHomeCarousel phrase={phrases[0] ?? null} loadingPhrase={loadingPhrase} />
         </Animated.View>
       </ScrollView>
 

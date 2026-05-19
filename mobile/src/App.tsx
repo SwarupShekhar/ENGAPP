@@ -19,6 +19,7 @@ import {
   Alert,
   Text,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -449,7 +450,7 @@ function AuthGate() {
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(Platform.OS !== "web");
 
   if (!CLERK_PUBLISHABLE_KEY) {
     return (

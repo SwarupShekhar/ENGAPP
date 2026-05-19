@@ -43,11 +43,18 @@ class StreamingTutorService {
     if (wsOverride) {
       wsUrl = wsOverride;
     } else if (IS_PROD) {
-      // Keep WS host aligned with Englivo REST host in production.
-      const base = ENGLIVO_API_URL.replace(/\/$/, "");
-      wsUrl = base.startsWith("https://")
-        ? base.replace("https://", "wss://")
-        : base.replace("http://", "ws://");
+      // REST may hit Nest (:4001); tutor WebSocket is on backend-ai (:4002 on Vultr).
+      const nestBase = NEST_API_URL.replace(/\/$/, "");
+      try {
+        const u = new URL(nestBase.startsWith("http") ? nestBase : `http://${nestBase}`);
+        const wsScheme = u.protocol === "https:" ? "wss" : "ws";
+        wsUrl = `${wsScheme}://${u.hostname}:4002`;
+      } catch {
+        const base = ENGLIVO_API_URL.replace(/\/$/, "");
+        wsUrl = base.startsWith("https://")
+          ? base.replace("https://", "wss://")
+          : base.replace("http://", "ws://");
+      }
     } else {
       // Dev: derive from API_URL host, backend-ai on 8001
       try {
