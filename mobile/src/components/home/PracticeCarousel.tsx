@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '../../theme/useAppTheme';
 import { tasksApi, type LearningTask } from '../../api/tasks';
+import { AnalyticsEvents } from '../../analytics/events';
+import { useAnalytics } from '../../analytics/useAnalytics';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_MARGIN = 20;
@@ -24,16 +26,27 @@ export default function PracticeCarousel({ fallback }: { fallback?: React.ReactN
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const navigation = useNavigation<any>();
+  const analytics = useAnalytics();
   const [tasks, setTasks] = useState<LearningTask[] | null>(null);
   const [active, setActive] = useState(0);
   const listRef = useRef<FlatList>(null);
+  const trackedCarousel = useRef(false);
 
   useEffect(() => {
     let alive = true;
     tasksApi
       .getDueTasks()
       .then((t) => {
-        if (alive) setTasks(t);
+        if (alive) {
+          setTasks(t);
+          if (!trackedCarousel.current && t.length > 0) {
+            trackedCarousel.current = true;
+            analytics.capture(AnalyticsEvents.PRACTICE_CAROUSEL_VIEWED, {
+              due_count: t.length,
+              types: [...new Set(t.map((x) => x.type))],
+            });
+          }
+        }
       })
       .catch(() => {
         if (alive) setTasks([]);
@@ -41,7 +54,7 @@ export default function PracticeCarousel({ fallback }: { fallback?: React.ReactN
     return () => {
       alive = false;
     };
-  }, []);
+  }, [analytics]);
 
   if (tasks === null) return null;
   if (tasks.length === 0) {
@@ -67,7 +80,14 @@ export default function PracticeCarousel({ fallback }: { fallback?: React.ReactN
         </Text>
         <TouchableOpacity
           style={styles.btn}
-          onPress={() => navigation.navigate('PracticeTask', { task: item })}
+          onPress={() => {
+            analytics.capture(AnalyticsEvents.PRACTICE_TASK_OPENED, {
+              task_id: item.id,
+              task_type: item.type,
+              source: 'carousel',
+            });
+            navigation.navigate('PracticeTask', { task: item });
+          }}
         >
           <Text style={styles.btnText}>Practice</Text>
           <Ionicons name="arrow-forward" size={16} color="#fff" />

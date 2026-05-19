@@ -27,6 +27,8 @@ import Animated, {
 
 import { useAppTheme } from "../../theme/useAppTheme";
 import { tasksApi, type LearningTask } from "../../api/tasks";
+import { AnalyticsEvents } from "../../analytics/events";
+import { useAnalytics } from "../../analytics/useAnalytics";
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
@@ -90,9 +92,12 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const analytics = useAnalytics();
 
   const task = (route?.params?.task ?? null) as LearningTask | null;
   const isPronunciation = (task?.type || "").toLowerCase() === "pronunciation";
+  const openSource =
+    (route?.params?.source as string | undefined) ?? "direct";
 
   const [state, setState] = useState<ScreenState>("READY");
   const [timerSec, setTimerSec] = useState(0);
@@ -124,6 +129,33 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
       pulse.value = withTiming(0, { duration: 150 });
     }
   }, [state]);
+
+  useEffect(() => {
+    if (!task) return;
+    analytics.capture(AnalyticsEvents.PRACTICE_TASK_OPENED, {
+      task_id: task.id,
+      task_type: task.type,
+      source: openSource,
+    });
+  }, [analytics, task, openSource]);
+
+  const emitAttempt = useCallback(
+    (
+      mode: "text" | "audio",
+      outcome: { pass: boolean; errored: boolean; graduated: boolean },
+    ) => {
+      if (!task) return;
+      analytics.capture(AnalyticsEvents.PRACTICE_ATTEMPT_SUBMITTED, {
+        task_id: task.id,
+        task_type: task.type,
+        mode,
+        pass: outcome.pass,
+        errored: outcome.errored,
+        graduated: outcome.graduated,
+      });
+    },
+    [analytics, task],
+  );
 
   useEffect(() => {
     return () => {
@@ -214,14 +246,21 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
         if (res.errored) {
           setErrorMsg("Couldn't score that — try again.");
           setScore(null);
+          emitAttempt("text", { pass: false, errored: true, graduated: false });
         } else {
           setScore(res.pass ? 100 : 40);
           setErrorMsg(null);
           setGraduated(!!res.graduated);
+          emitAttempt("text", {
+            pass: !!res.pass,
+            errored: false,
+            graduated: !!res.graduated,
+          });
         }
       } catch (e: any) {
         setErrorMsg(e?.message || "Assessment failed.");
         setScore(null);
+        emitAttempt("text", { pass: false, errored: true, graduated: false });
       }
       setState("RESULT");
       return;
@@ -247,9 +286,15 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
       if (res.errored) {
         setErrorMsg("Couldn't score that — try again.");
         setScore(null);
+        emitAttempt("audio", { pass: false, errored: true, graduated: false });
       } else {
         setScore(res.pass ? 100 : 40);
         setGraduated(!!res.graduated);
+        emitAttempt("audio", {
+          pass: !!res.pass,
+          errored: false,
+          graduated: !!res.graduated,
+        });
       }
       setState("RESULT");
     } catch (e: any) {
@@ -257,11 +302,12 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
       // STATE TRANSITION: ANALYZING → RESULT (error)
       setErrorMsg(msg);
       setScore(null);
+      emitAttempt("audio", { pass: false, errored: true, graduated: false });
       setState("RESULT");
     } finally {
       setTimerSec(0);
     }
-  }, [task, isPronunciation, textInput]);
+  }, [task, isPronunciation, textInput, emitAttempt]);
 
   const handleComplete = useCallback(async () => {
     await AsyncStorage.removeItem("@home_pending_task_cache");
