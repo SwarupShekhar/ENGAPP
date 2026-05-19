@@ -31,17 +31,23 @@ async def _generate_stream_response(
     conversation_history: list,
 ):
     """Yield SSE events: transcript, then sentence chunks (text + audio base64), then done."""
-    # Dual-pass STT + Azure PA so pronunciation context flows into Gemini and detection fires.
-    stt_result = await asyncio.to_thread(
-        hinglish_stt_service.transcribe_with_soft_assessment, audio_bytes
+    # Fast path: Pass-1 STT only, then stream; enrich PA in parallel for post-turn capture.
+    transcription = await asyncio.to_thread(
+        hinglish_stt_service.transcribe_hinglish, audio_bytes
     )
-    user_utterance = (stt_result.get("text") or "").strip() or "(no speech detected)"
-    phonetic_context: dict = stt_result.get("phonetic_insights") or {}
+    user_utterance = (transcription.get("text") or "").strip() or "(no speech detected)"
 
-    # Emit transcript first so mobile can show it immediately
     yield {"type": "transcript", "text": user_utterance}
 
-    # Stream Gemini + TTS sentence by sentence
+    pa_task = asyncio.create_task(
+        asyncio.to_thread(
+            hinglish_stt_service.enrich_phonetic_insights,
+            audio_bytes,
+            user_utterance,
+        )
+    )
+
+    phonetic_context: dict = {}
     full_response_text = ""
     async for chunk in streaming_tutor_service.generate_chunked_response(
         user_utterance,
@@ -61,7 +67,13 @@ async def _generate_stream_response(
                 payload["audio"] = base64.b64encode(chunk["audio"]).decode("utf-8")
             yield payload
 
-    # Capture pronunciation issues accumulated during this turn.
+    try:
+        enriched = await pa_task
+        if enriched:
+            phonetic_context = enriched
+    except Exception as e:
+        logger.warning("SSE phonetic enrichment failed (non-fatal): %s", e)
+
     if full_response_text.strip() and session_id:
         turn_issues = build_turn_capture(
             full_response_text.strip(),
@@ -167,8 +179,9 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                     flush=True,
                 )
                 user_utterance = message.get("text")
-                phonetic_context = message.get("phonetic_context") # Optional context from assessment
-                audio_base64 = message.get("audio_base64") # Raw audio for Gemini pronunciation analysis
+                phonetic_context = message.get("phonetic_context")  # from client assess (optional)
+                audio_base64 = message.get("audio_base64")
+                pa_task = None
                 
                 if phonetic_context:
                     logger.info("Received phonetic_context for next turn")
@@ -176,41 +189,44 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                     logger.info(f"Received audio_base64 for pronunciation analysis ({len(audio_base64)} chars)")
                 
                 if not user_utterance and audio_base64:
-                    import base64
-                    from app.features.transcription.hinglish_stt_service import hinglish_stt_service
                     try:
                         audio_bytes = base64.b64decode(audio_base64)
-                        logger.info("Transcribing audio on the fly via WebSocket...")
-                        stt_res = hinglish_stt_service.transcribe_with_soft_assessment(audio_bytes)
-                        user_utterance = stt_res.get("text")
-                        
-                        if stt_res.get("phonetic_insights"):
-                            phonetic_context = stt_res["phonetic_insights"]
-                            
-                        # Immediately send transcription back to UI
+                        logger.info("Transcribing audio on the fly via WebSocket (fast STT)...")
+                        transcription = await asyncio.to_thread(
+                            hinglish_stt_service.transcribe_hinglish, audio_bytes
+                        )
+                        user_utterance = transcription.get("text")
+
+                        pa_task = asyncio.create_task(
+                            asyncio.to_thread(
+                                hinglish_stt_service.enrich_phonetic_insights,
+                                audio_bytes,
+                                user_utterance or "",
+                            )
+                        )
+
                         if user_utterance:
                             await websocket.send_json({
                                 "type": "transcription",
                                 "text": user_utterance,
-                                "assessmentResult": {"phonetic_insights": phonetic_context} if phonetic_context else None
                             })
                     except Exception as e:
                         logger.error(f"WebSocket on-the-fly STT error: {e}")
+                        pa_task = None
                 
                 if not user_utterance:
                     continue
                     
-                # Store user turn
                 conversation_history.append({"role": "user", "content": user_utterance})
-                
-                # Stream response
+
+                stream_phonetic = phonetic_context or {}
                 full_response_text = ""
                 async for chunk in streaming_tutor_service.generate_chunked_response(
-                    user_utterance, 
-                    conversation_history, 
+                    user_utterance,
+                    conversation_history,
                     session_id,
-                    phonetic_context,
-                    audio_base64
+                    stream_phonetic,
+                    audio_base64,
                 ):
                     # Convert bytes to base64 if audio present (JSON safe)
                     out_chunk = dict(chunk)
@@ -228,7 +244,15 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                 # Explicit end marker so clients can deterministically restart capture.
                 await websocket.send_json({"type": "done"})
 
-                # Store assistant turn after completion; capture pronunciation for post-call /analyze
+                capture_phonetic = stream_phonetic
+                if pa_task is not None:
+                    try:
+                        enriched = await pa_task
+                        if enriched:
+                            capture_phonetic = enriched
+                    except Exception as e:
+                        logger.warning("WS phonetic enrichment failed (non-fatal): %s", e)
+
                 if full_response_text:
                     assistant_raw = full_response_text.strip()
                     assistant_clean = strip_pron_tags_for_mobile(assistant_raw)
@@ -236,14 +260,14 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                         print(
                             f"[Pulse DEBUG] about to call build_turn_capture "
                             f"audio_base64={'present' if audio_base64 else 'MISSING'} "
-                            f"phonetic_context={'present' if phonetic_context else 'MISSING'} "
+                            f"phonetic_context={'present' if capture_phonetic else 'MISSING'} "
                             f"transcript='{(user_utterance or '')[:30] if user_utterance else 'NONE'}'",
                             flush=True,
                         )
                         turn_issues = build_turn_capture(
                             assistant_raw,
                             (user_utterance or "").strip(),
-                            phonetic_context=phonetic_context or {},
+                            phonetic_context=capture_phonetic or {},
                             conversation_history=conversation_history,
                         )
                         if turn_issues:
