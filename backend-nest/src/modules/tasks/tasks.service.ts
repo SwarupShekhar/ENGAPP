@@ -508,8 +508,8 @@ export class TasksService {
         const task = await this.prisma.learningTask.findFirst({ where: { id: taskId, userId } });
         if (!task) throw new NotFoundException({ message: 'Task not found' });
 
-        let pass = false;
-        let errored = false;
+        let pass: boolean;
+        let errored: boolean;
         let reason: string | undefined;
 
         if (task.type === 'pronunciation') {

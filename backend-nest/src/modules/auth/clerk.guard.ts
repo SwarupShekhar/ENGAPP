@@ -32,7 +32,7 @@ export class ClerkGuard implements CanActivate {
       throw new UnauthorizedException('Bearer token is missing');
     }
 
-    let session: any = null;
+    let session: any;
     try {
       session = await this.clerkService.verifyToken(token);
     } catch (err: any) {
