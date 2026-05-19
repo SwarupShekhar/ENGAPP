@@ -33,11 +33,13 @@ import { InternalModule } from './modules/internal/internal.module';
 import { TtsModule } from './modules/tts/tts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SentryModule } from '@sentry/nestjs/setup';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     SentryModule.forRoot(),
+    MetricsModule,
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig, databaseConfig, redisConfig, livekitConfig],

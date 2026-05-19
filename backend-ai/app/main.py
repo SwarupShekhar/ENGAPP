@@ -137,9 +137,10 @@ app.include_router(streaming_tutor_router, prefix="/api/tutor", tags=["Streaming
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(practice_router)
 
-# 5. Monitoring
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
+# 5. Monitoring (Prometheus — scraped by config/prometheus/prometheus.yml)
+if settings.enable_prometheus:
+    metrics_app = make_asgi_app()
+    app.mount("/metrics", metrics_app)
 
 
 @app.get("/")

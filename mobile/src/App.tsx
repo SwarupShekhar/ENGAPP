@@ -31,6 +31,8 @@ import { ThemeProvider } from "./theme/ThemeProvider";
 import { SuperAppProvider } from "./context/SuperAppContext";
 import { SplashAnimation } from "./components/SplashAnimation";
 import { assessmentApi } from "./features/assessment/services/assessment";
+import { AnalyticsProvider } from "./analytics/AnalyticsProvider";
+import { PostHogUserSync } from "./analytics/PostHogUserSync";
 
 class AppErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -468,6 +470,8 @@ export default function App() {
       publishableKey={CLERK_PUBLISHABLE_KEY}
       tokenCache={tokenCache}
     >
+      <AnalyticsProvider>
+      <PostHogUserSync />
       <StartupReachabilityProbe />
       <AuthTokenInjector>
         <AppSocketHandler>
@@ -533,6 +537,7 @@ export default function App() {
           </AppPushHandler>
         </AppSocketHandler>
       </AuthTokenInjector>
+      </AnalyticsProvider>
     </ClerkProvider>
   );
 }

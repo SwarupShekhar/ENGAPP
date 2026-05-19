@@ -22,6 +22,16 @@ services:
       start_period: 40s
 
   # AI Backend (Python) — connects to same Redis
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - backend-nest
+      - backend-ai
+
   backend-ai:
     build:
       context: ./backend-ai
