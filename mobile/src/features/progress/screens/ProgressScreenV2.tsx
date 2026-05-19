@@ -234,12 +234,17 @@ export default function ProgressScreenV2() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [masteredCount, setMasteredCount] = useState(0);
 
   const fetchMetrics = useCallback(async () => {
     try {
       setError(false);
-      const response = await client.get("/progress/detailed-metrics");
+      const [response, mastered] = await Promise.all([
+        client.get("/progress/detailed-metrics"),
+        tasksApi.getMasteredCount().catch(() => 0),
+      ]);
       setMetrics(response.data);
+      setMasteredCount(mastered);
     } catch (err) {
       console.error("[ProgressV2] Failed to fetch progress metrics:", err);
       setError(true);
@@ -402,6 +407,11 @@ export default function ProgressScreenV2() {
                   <Ionicons name="book" size={18} color={tokensV2.colors.accentMint} />
                   <Text style={styles.microStatValue}>{totalSessions}</Text>
                   <Text style={styles.microStatLabel}>Sessions</Text>
+                </View>
+                <View style={styles.microStat}>
+                  <Ionicons name="checkmark-circle" size={18} color={tokensV2.colors.primaryViolet} />
+                  <Text style={styles.microStatValue}>{masteredCount}</Text>
+                  <Text style={styles.microStatLabel}>Mistakes mastered</Text>
                 </View>
               </View>
             </View>
