@@ -80,8 +80,8 @@ services:
     image: caddy:2.8
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      # Host port 80/443 are used by other services on this VPS; expose Caddy on 4008.
+      - "0.0.0.0:4008:80"
     volumes:
       - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
