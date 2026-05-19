@@ -3,7 +3,13 @@ import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { useUser } from "@clerk/clerk-expo";
 import { fetchFeedbackNarration, fetchFullFeedbackNarration, fetchErrorSpeak } from "../../../api/tts";
-import type { FeedbackSection, WordTimestamp } from "../../../api/tts";
+import { getOrFetchTtsFileUri, prefetchTtsFileUri } from "../../../utils/ttsAudioCache";
+import type {
+  FeedbackNarrationPayload,
+  FeedbackSection,
+  NarrationError,
+  WordTimestamp,
+} from "../../../api/tts";
 import { PronIssueNormalized, getPronUI, getPronLabel, getPronFix } from "../utils/pronUtils";
 import { usePulseTTS } from "../hooks/usePulseTTS";
 import {
@@ -54,6 +60,20 @@ type FeedbackStep = {
   correctionLabel: string;
   ttsText: string;
 };
+
+/** One screen per skill area (max 4: pronunciation, grammar, vocabulary, fluency). */
+type FeedbackSegment = {
+  id: string;
+  category: FeedbackSection;
+  youSaid?: string;
+  correct?: string;
+  correctionLabel: string;
+  /** When false, show a single insight card (fluency). */
+  hasCorrectionCards: boolean;
+  fluencyNote?: string;
+};
+
+type CardRevealPhase = 'none' | 'youSaid' | 'both';
 
 const STEP_CATEGORY_COLORS = {
   pronunciation: '#F59E0B',
@@ -784,6 +804,9 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [stepAudioPlaying, setStepAudioPlaying] = useState(false);
   const [stepAudioLoading, setStepAudioLoading] = useState(false);
   const stepSoundRef = useRef<Audio.Sound | null>(null);
+  const [cardReveal, setCardReveal] = useState<CardRevealPhase>('none');
+  const [segmentListened, setSegmentListened] = useState(false);
+  const introAudioStartedRef = useRef(false);
 
   // Clean up audio on unmount
   useEffect(() => {
@@ -829,10 +852,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               : "The AI is finalizing your speech metrics.",
           );
           // Keep polling until analysis is ready (was missing: we never re-fetched on PROCESSING)
-          if (isMounted && retryCount < 24) {
+          if (isMounted && retryCount < 12) {
             setTimeout(() => {
               if (isMounted) setRetryCount((prev) => prev + 1);
-            }, 3000); // Poll every 3s while processing so the user who ended first sees feedback sooner
+            }, 3000); // Poll every 3s while processing (~36s max)
           }
           return;
         } else if (data.status === "ANALYSIS_FAILED") {
@@ -850,13 +873,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           if (isMounted) {
             setSessionData(data);
             setLoading(false);
-            
-            // Also fetch CQS results
-            const cqs = await getCQSScore(sessionId);
-            setCqsData(cqs);
+            // CQS in parallel — do not block first paint
+            void getCQSScore(sessionId)
+              .then((cqs) => {
+                if (isMounted) setCqsData(cqs);
+              })
+              .catch((err) => console.warn('[CallFeedback] CQS fetch:', err));
           }
-        } else if (retryCount < 40) {
-          // ~2 min total at 3s per poll (both users see feedback sooner)
+        } else if (retryCount < 20) {
+          // ~60s total at 3s per poll
           if (retryCount === 5) {
             setErrorHeader("Still working...");
             setErrorDetail(
@@ -900,7 +925,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     if (loading || !sessionData || !sessionId) return;
     const hasPronIssues =
       (sessionData.analyses?.[0]?.pronunciationIssues?.length ?? 0) > 0;
-    const MAX_PRON_POLLS = 18; // 18 * 5s = 90s
+    const MAX_PRON_POLLS = 8; // 8 * 5s = 40s background refresh
     if (hasPronIssues || pronPollCount >= MAX_PRON_POLLS) return;
 
     const timer = setTimeout(async () => {
@@ -1517,9 +1542,124 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     return steps;
   })();
 
-  const currentStep = feedbackSteps[currentStepIdx] ?? null;
+  const aiDetailedFeedback = (rawData as any)?.ai_detailed_feedback ?? null;
+
+  const feedbackSegments: FeedbackSegment[] = (() => {
+    const segments: FeedbackSegment[] = [];
+
+    const sortedPron = [...(data.pronunciationIssues as any[])]
+      .filter((p) => {
+        const spoken = (p.spoken ?? p.word ?? '').trim();
+        const correct = (p.correct ?? '').trim();
+        return spoken && correct && spoken.toLowerCase() !== correct.toLowerCase();
+      })
+      .sort((a, b) => (a.confidence ?? 100) - (b.confidence ?? 100));
+    if (sortedPron.length) {
+      const p = sortedPron[0];
+      segments.push({
+        id: 'pronunciation',
+        category: 'pronunciation',
+        youSaid: (p.spoken ?? p.word ?? '').trim(),
+        correct: (p.correct ?? '').trim(),
+        correctionLabel: 'Correct:',
+        hasCorrectionCards: true,
+      });
+    }
+
+    const sortedGram = [...(data.mistakes as any[])]
+      .filter((m) => (m.original_text ?? m.original ?? '').trim() && (m.corrected_text ?? m.corrected ?? '').trim())
+      .sort((a, b) => {
+        const sevOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        return (sevOrder[a.severity] ?? 1) - (sevOrder[b.severity] ?? 1);
+      });
+    if (sortedGram.length) {
+      const m = sortedGram[0];
+      segments.push({
+        id: 'grammar',
+        category: 'grammar',
+        youSaid: (m.original_text ?? m.original ?? '').trim(),
+        correct: (m.corrected_text ?? m.corrected ?? '').trim(),
+        correctionLabel: 'Correct:',
+        hasCorrectionCards: true,
+      });
+    }
+
+    const vocabExamples = aiDetailedFeedback?.vocabulary?.examples as any[] | undefined;
+    if (vocabExamples?.length) {
+      const ex = vocabExamples[0];
+      const youSaid = (ex.original ?? ex.used ?? '').trim();
+      const correct = (ex.better ?? ex.alternative ?? '').trim();
+      if (youSaid && correct) {
+        segments.push({
+          id: 'vocabulary',
+          category: 'vocabulary',
+          youSaid,
+          correct,
+          correctionLabel: 'Can also be:',
+          hasCorrectionCards: true,
+        });
+      }
+    }
+
+    const fluencyJust = aiDetailedFeedback?.fluency?.justification as string | undefined;
+    if (fluencyJust?.trim() || data.scores.fluency > 0) {
+      segments.push({
+        id: 'fluency',
+        category: 'fluency',
+        correctionLabel: '',
+        hasCorrectionCards: false,
+        fluencyNote:
+          fluencyJust?.trim() ||
+          'Focus on speaking at a steady pace with natural pauses between ideas.',
+      });
+    }
+
+    return segments.slice(0, 4);
+  })();
+
+  const currentSegment = feedbackSegments[currentStepIdx] ?? null;
+
+  const buildSegmentNarrationPayload = (segment: FeedbackSegment): FeedbackNarrationPayload => {
+    const scores = sessionData?.analyses?.[0]?.scores as Record<string, number> | undefined;
+    const summary = sessionData?.summaryJson;
+    const sectionScores: Record<FeedbackSection, number> = {
+      pronunciation: Math.min(100, summary?.pronunciation_score ?? scores?.pronunciation ?? data.scores.pronunciation ?? 0),
+      grammar: Math.min(100, summary?.grammar_score ?? scores?.grammar ?? data.scores.grammar ?? 0),
+      vocabulary: Math.min(100, summary?.vocabulary_score ?? scores?.vocabulary ?? data.scores.vocabulary ?? 0),
+      fluency: Math.min(100, summary?.fluency_score ?? scores?.fluency ?? data.scores.fluency ?? 0),
+    };
+    const pronErrors = (data.pronunciationIssues as any[]).slice(0, 2).map((p) => ({
+      spoken: p.spoken ?? p.word,
+      correct: p.correct ?? p.word,
+      rule_category: p.rule_category ?? p.issueType,
+    }));
+    const grammarErrors = (data.mistakes as any[]).slice(0, 2).map((m) => ({
+      original_text: m.original_text ?? m.original,
+      corrected_text: m.corrected_text ?? m.corrected,
+    }));
+    const sectionErrors: Record<FeedbackSection, NarrationError[]> = {
+      pronunciation: pronErrors,
+      grammar: grammarErrors,
+      vocabulary: [],
+      fluency: [],
+    };
+    const sectionJustifications: Record<FeedbackSection, string | undefined> = {
+      pronunciation: aiDetailedFeedback?.pronunciation?.justification,
+      grammar: aiDetailedFeedback?.grammar?.justification,
+      vocabulary: aiDetailedFeedback?.vocabulary?.justification,
+      fluency: aiDetailedFeedback?.fluency?.justification ?? segment.fluencyNote,
+    };
+    return {
+      section: segment.category,
+      score: sectionScores[segment.category] ?? 0,
+      justification: sectionJustifications[segment.category],
+      errors: sectionErrors[segment.category],
+      first_name: user?.firstName ?? undefined,
+    };
+  };
 
   const stopStepAudio = async () => {
+    stopWordTracking();
     if (stepSoundRef.current) {
       await stepSoundRef.current.stopAsync().catch(() => {});
       await stepSoundRef.current.unloadAsync().catch(() => {});
@@ -1528,13 +1668,131 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     }
   };
 
-  const startStepAudio = async (step: FeedbackStep) => {
+  const attachSegmentPlaybackHandlers = (
+    sound: Audio.Sound,
+    segment: FeedbackSegment,
+    options?: { transitionFromIntro?: boolean },
+  ) => {
+    const hasCards = segment.hasCorrectionCards;
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (!status.isLoaded) return;
+      if (options?.transitionFromIntro && status.isPlaying && !introAudioStartedRef.current) {
+        introAudioStartedRef.current = true;
+        setFeedbackPhase('step');
+      }
+      const duration = status.durationMillis ?? 0;
+      const position = status.positionMillis ?? 0;
+      if (duration > 0) {
+        const ratio = position / duration;
+        if (hasCards) {
+          if (ratio >= 0.22) setCardReveal((prev) => (prev === 'none' ? 'youSaid' : prev));
+          if (ratio >= 0.52) setCardReveal('both');
+        } else if (ratio >= 0.18) {
+          setCardReveal('both');
+        }
+      } else if (hasCards && position > 400) {
+        setCardReveal('youSaid');
+      } else if (!hasCards && position > 300) {
+        setCardReveal('both');
+      }
+      if (status.didJustFinish) {
+        if (hasCards) setCardReveal('both');
+        setSegmentListened(true);
+        sound.unloadAsync().catch(() => {});
+        stepSoundRef.current = null;
+        setStepAudioPlaying(false);
+        stopWordTracking();
+      }
+    });
+  };
+
+  const prefetchSegmentNarration = (segment: FeedbackSegment) => {
+    const payload = buildSegmentNarrationPayload(segment);
+    const key = JSON.stringify(payload);
+    prefetchTtsFileUri(key, async () => {
+      const result = await fetchFeedbackNarration(payload);
+      return result.audio_base64 ?? '';
+    });
+  };
+
+  const startSegmentAudio = async (
+    segment: FeedbackSegment,
+    options?: { transitionFromIntro?: boolean },
+  ) => {
+    setStepAudioLoading(true);
+    setCardReveal('none');
+    setSegmentListened(false);
+    if (options?.transitionFromIntro) introAudioStartedRef.current = false;
+    try {
+      const payload = buildSegmentNarrationPayload(segment);
+      const cacheKey = JSON.stringify(payload);
+      const tmpUri = await getOrFetchTtsFileUri(cacheKey, async () => {
+        const result = await fetchFeedbackNarration(payload);
+        return result.audio_base64 ?? '';
+      });
+      if (!tmpUri) {
+        setStepAudioLoading(false);
+        if (options?.transitionFromIntro) setFeedbackPhase('step');
+        if (!segment.hasCorrectionCards) {
+          setCardReveal('both');
+          setSegmentListened(true);
+        }
+        return;
+      }
+      const segIdx = feedbackSegments.findIndex((s) => s.id === segment.id);
+      const nextSeg = segIdx >= 0 ? feedbackSegments[segIdx + 1] : undefined;
+      if (nextSeg) prefetchSegmentNarration(nextSeg);
+
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: tmpUri },
+        { shouldPlay: true, rate: 0.92, shouldCorrectPitch: true },
+      );
+      stepSoundRef.current = sound;
+      setStepAudioLoading(false);
+      setStepAudioPlaying(true);
+      attachSegmentPlaybackHandlers(sound, segment, options);
+    } catch {
+      setStepAudioLoading(false);
+      setStepAudioPlaying(false);
+      if (options?.transitionFromIntro) setFeedbackPhase('step');
+      if (!segment.hasCorrectionCards) {
+        setCardReveal('both');
+        setSegmentListened(true);
+      }
+    }
+  };
+
+  const handleStepPlay = async (segment: FeedbackSegment) => {
+    if (stepAudioPlaying) {
+      await stopStepAudio();
+      return;
+    }
+    await startSegmentAudio(segment);
+  };
+
+  const handleStepReplay = async (segment: FeedbackSegment) => {
+    await stopStepAudio();
+    await startSegmentAudio(segment);
+  };
+
+  /** Summary list: replay one correction clip (not the full segment narration). */
+  const playFeedbackStepSnippet = async (step: FeedbackStep) => {
+    if (stepAudioPlaying) {
+      await stopStepAudio();
+      return;
+    }
     setStepAudioLoading(true);
     try {
-      const result = await fetchErrorSpeak(step.ttsText);
-      if (!result.audio_base64) { setStepAudioLoading(false); return; }
-      const tmpUri = `${FileSystem.cacheDirectory}step_${step.id}_${Date.now()}.mp3`;
-      await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, { encoding: FileSystem.EncodingType.Base64 });
+      const cacheKey = `snippet:${step.ttsText}`;
+      const tmpUri = await getOrFetchTtsFileUri(cacheKey, async () => {
+        const result = await fetchErrorSpeak(step.ttsText);
+        return result.audio_base64 ?? '';
+      });
+      if (!tmpUri) {
+        setStepAudioLoading(false);
+        return;
+      }
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const { sound } = await Audio.Sound.createAsync({ uri: tmpUri }, { shouldPlay: true });
       stepSoundRef.current = sound;
@@ -1553,25 +1811,25 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     }
   };
 
-  // Play button: toggles (tap again to stop)
-  const handleStepPlay = async (step: FeedbackStep) => {
-    if (stepAudioPlaying) { await stopStepAudio(); return; }
-    await startStepAudio(step);
-  };
-
-  // Replay button: always restarts from beginning
-  const handleStepReplay = async (step: FeedbackStep) => {
-    await stopStepAudio();
-    await startStepAudio(step);
-  };
-
   const handleNextStep = async () => {
     await stopStepAudio();
-    if (currentStepIdx < feedbackSteps.length - 1) {
-      setCurrentStepIdx((i) => i + 1);
+    if (currentStepIdx < feedbackSegments.length - 1) {
+      const nextIdx = currentStepIdx + 1;
+      const nextSeg = feedbackSegments[nextIdx];
+      setCurrentStepIdx(nextIdx);
+      if (nextSeg) await startSegmentAudio(nextSeg);
     } else {
       setFeedbackPhase('summary');
     }
+  };
+
+  const handleIntroPlay = async () => {
+    if (!feedbackSegments.length) {
+      setFeedbackPhase('summary');
+      return;
+    }
+    setCurrentStepIdx(0);
+    await startSegmentAudio(feedbackSegments[0], { transitionFromIntro: true });
   };
 
   const scoreLabel =
@@ -1579,9 +1837,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     data.overallScore >= 70 ? 'Good Work!' :
     data.overallScore >= 55 ? 'Keep Practicing!' : 'Keep Going!';
 
+  const screenBg = theme.colors.background;
+  const segmentCategoryLabel = (cat: FeedbackSection) =>
+    cat.charAt(0).toUpperCase() + cat.slice(1);
+
   // ── Intro phase ───────────────────────────────────────────
   if (feedbackPhase === 'intro') return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16 }}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
@@ -1595,7 +1857,14 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => feedbackSteps.length > 0 ? setFeedbackPhase('step') : setFeedbackPhase('summary')}
+          onPress={() => {
+            if (stepAudioPlaying && feedbackSegments[0]) {
+              handleStepPlay(feedbackSegments[0]);
+              return;
+            }
+            if (!stepAudioLoading) handleIntroPlay();
+          }}
+          disabled={stepAudioLoading && !stepAudioPlaying}
           style={{ width: '100%', borderRadius: 20, overflow: 'hidden' }}
         >
           <LinearGradient
@@ -1608,7 +1877,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               backgroundColor: 'rgba(255,255,255,0.25)',
               alignItems: 'center', justifyContent: 'center', marginBottom: 20,
             }}>
-              <Ionicons name="play" size={32} color="white" />
+              {stepAudioLoading
+                ? <ActivityIndicator size="small" color="white" />
+                : <Ionicons name={stepAudioPlaying ? 'pause' : 'play'} size={32} color="white" />
+              }
             </View>
             <Text style={{ fontSize: 22, fontWeight: '700', color: 'white', marginBottom: 10 }}>Your Feedback</Text>
             <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 }}>
@@ -1623,19 +1895,39 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     </SafeAreaView>
   );
 
-  // ── Step phase ────────────────────────────────────────────
-  if (feedbackPhase === 'step' && currentStep) {
-    const catColor = STEP_CATEGORY_COLORS[currentStep.category];
-    const catBg = STEP_CATEGORY_BG[currentStep.category];
+  // ── Step phase (4 segments: pronunciation, grammar, vocabulary, fluency) ─
+  if (feedbackPhase === 'step' && currentSegment) {
+    const catColor =
+      currentSegment.category === 'fluency'
+        ? theme.colors.primary
+        : STEP_CATEGORY_COLORS[currentSegment.category as keyof typeof STEP_CATEGORY_COLORS] ?? theme.colors.primary;
+    const catBg =
+      currentSegment.category === 'fluency'
+        ? theme.colors.surface
+        : STEP_CATEGORY_BG[currentSegment.category as keyof typeof STEP_CATEGORY_BG] ?? theme.colors.surface;
+    const showYouSaid =
+      currentSegment.hasCorrectionCards &&
+      (cardReveal === 'youSaid' || cardReveal === 'both');
+    const showCorrect =
+      currentSegment.hasCorrectionCards && cardReveal === 'both';
+
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }} edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top', 'bottom']}>
         <StatusBar barStyle="dark-content" />
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
           <TouchableOpacity
             onPress={async () => {
               await stopStepAudio();
-              if (currentStepIdx > 0) setCurrentStepIdx((i) => i - 1);
-              else setFeedbackPhase('intro');
+              if (currentStepIdx > 0) {
+                const prev = feedbackSegments[currentStepIdx - 1];
+                setCurrentStepIdx((i) => i - 1);
+                setCardReveal('none');
+                setSegmentListened(false);
+                if (prev) await startSegmentAudio(prev);
+              } else {
+                introAudioStartedRef.current = false;
+                setFeedbackPhase('intro');
+              }
             }}
             hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
           >
@@ -1645,29 +1937,29 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             Feedback
           </Text>
           <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
-            {currentStepIdx + 1} / {feedbackSteps.length}
+            {currentStepIdx + 1} / {feedbackSegments.length}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 }}>
-          {feedbackSteps.map((_, i) => (
+          {feedbackSegments.map((_, i) => (
             <View key={i} style={{
               width: i === currentStepIdx ? 20 : 7, height: 7, borderRadius: 4,
-              backgroundColor: i === currentStepIdx ? theme.colors.primary : '#D1D5DB',
+              backgroundColor: i === currentStepIdx ? theme.colors.primary : theme.colors.text.secondary + '40',
             }} />
           ))}
         </View>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16 }}>
           <View style={{
-            backgroundColor: 'white', borderRadius: 16, padding: 28, alignItems: 'center', marginBottom: 20,
+            backgroundColor: theme.colors.surface, borderRadius: 16, padding: 28, alignItems: 'center', marginBottom: 20,
             shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3,
           }}>
             <TouchableOpacity
-              onPress={() => handleStepPlay(currentStep)}
+              onPress={() => handleStepPlay(currentSegment)}
               activeOpacity={0.85}
               style={{
                 width: 72, height: 72, borderRadius: 36,
                 borderWidth: 3,
-                borderColor: stepAudioPlaying || stepAudioLoading ? theme.colors.primary : '#E5E7EB',
+                borderColor: stepAudioPlaying || stepAudioLoading ? theme.colors.primary : theme.colors.text.secondary + '30',
                 alignItems: 'center', justifyContent: 'center', marginBottom: 16,
               }}
             >
@@ -1676,51 +1968,84 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                 : <Ionicons name={stepAudioPlaying ? 'pause' : 'play'} size={28} color={theme.colors.primary} />
               }
             </TouchableOpacity>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 6 }}>Your Feedback</Text>
-            <Text style={{ fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 20 }}>
-              Tap the play button to listen to your personalized feedback
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 6 }}>Your Feedback</Text>
+            <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 20 }}>
+              {stepAudioPlaying
+                ? 'Listen to your personalized feedback…'
+                : 'Tap the play button to listen to your personalized feedback'}
             </Text>
           </View>
           <Text style={{ fontSize: 15, fontWeight: '700', color: catColor, marginBottom: 12 }}>
-            {currentStep.category.charAt(0).toUpperCase() + currentStep.category.slice(1)}
+            {segmentCategoryLabel(currentSegment.category)}
           </Text>
-          <View style={{ borderLeftWidth: 4, borderLeftColor: '#EF4444', backgroundColor: '#FEF2F2', borderRadius: 10, padding: 16, marginBottom: 10 }}>
-            <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '700', marginBottom: 6 }}>You Said:</Text>
-            <Text style={{ fontSize: 15, color: '#111827', lineHeight: 22 }}>{currentStep.youSaid}</Text>
-          </View>
-          <View style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}>
-            <Text style={{ fontSize: 12, color: catColor, fontWeight: '700', marginBottom: 6 }}>{currentStep.correctionLabel}</Text>
-            <Text style={{ fontSize: 15, color: '#111827', lineHeight: 22 }}>{currentStep.correct}</Text>
-          </View>
+          {currentSegment.hasCorrectionCards ? (
+            <>
+              {showYouSaid && (
+                <Animated.View
+                  entering={FadeInDown.duration(280)}
+                  style={{ borderLeftWidth: 4, borderLeftColor: theme.colors.error, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 16, marginBottom: 10 }}
+                >
+                  <Text style={{ fontSize: 12, color: theme.colors.error, fontWeight: '700', marginBottom: 6 }}>You Said:</Text>
+                  <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.youSaid}</Text>
+                </Animated.View>
+              )}
+              {showCorrect && (
+                <Animated.View
+                  entering={FadeInDown.duration(280)}
+                  style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+                >
+                  <Text style={{ fontSize: 12, color: catColor, fontWeight: '700', marginBottom: 6 }}>{currentSegment.correctionLabel}</Text>
+                  <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.correct}</Text>
+                </Animated.View>
+              )}
+            </>
+          ) : (
+            (cardReveal === 'both' || segmentListened) && (
+              <Animated.View
+                entering={FadeInDown.duration(280)}
+                style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+              >
+                <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.fluencyNote}</Text>
+              </Animated.View>
+            )
+          )}
         </ScrollView>
-        <View style={{
-          flexDirection: 'row', gap: 12, paddingHorizontal: 20,
-          paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12, backgroundColor: '#F3F4F6',
-        }}>
-          <TouchableOpacity
-            onPress={() => handleStepReplay(currentStep)}
-            activeOpacity={0.8}
-            style={{ flex: 1, paddingVertical: 16, borderRadius: 50, borderWidth: 1.5, borderColor: '#D1D5DB', alignItems: 'center' }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '600', color: '#374151' }}>Replay</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleNextStep}
-            activeOpacity={0.85}
-            style={{ flex: 1, paddingVertical: 16, borderRadius: 50, backgroundColor: theme.colors.primary, alignItems: 'center' }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '600', color: 'white' }}>
-              {currentStepIdx < feedbackSteps.length - 1 ? 'Next' : 'Done'}
+        {segmentListened ? (
+          <View style={{
+            flexDirection: 'row', gap: 12, paddingHorizontal: 20,
+            paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12, backgroundColor: screenBg,
+          }}>
+            <TouchableOpacity
+              onPress={() => handleStepReplay(currentSegment)}
+              activeOpacity={0.8}
+              style={{ flex: 1, paddingVertical: 16, borderRadius: 50, borderWidth: 1.5, borderColor: theme.colors.text.secondary + '40', alignItems: 'center', backgroundColor: theme.colors.surface }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Replay</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleNextStep}
+              activeOpacity={0.85}
+              style={{ flex: 1, paddingVertical: 16, borderRadius: 50, backgroundColor: theme.colors.primary, alignItems: 'center' }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '600', color: 'white' }}>
+                {currentStepIdx < feedbackSegments.length - 1 ? 'Next' : 'Done'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 8, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+              Replay and Next unlock after you finish listening
             </Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
       </SafeAreaView>
     );
   }
 
-  // ── Summary phase (also catches step-with-no-currentStep edge case) ─
-  if (feedbackPhase === 'summary' || (feedbackPhase === 'step' && !currentStep)) return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F4F6' }} edges={['top', 'bottom']}>
+  // ── Summary phase (also catches step-with-no-currentSegment edge case) ─
+  if (feedbackPhase === 'summary' || (feedbackPhase === 'step' && !currentSegment)) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
         <TouchableOpacity
@@ -1790,7 +2115,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                           <Text style={{ fontSize: 14, color: '#374151' }}>{step.correct}</Text>
                         </View>
                       </View>
-                      <TouchableOpacity onPress={() => handleStepPlay(step)} style={{ padding: 8, marginLeft: 10 }} activeOpacity={0.7}>
+                      <TouchableOpacity onPress={() => playFeedbackStepSnippet(step)} style={{ padding: 8, marginLeft: 10 }} activeOpacity={0.7}>
                         <Ionicons name="volume-medium-outline" size={22} color={catCol} />
                       </TouchableOpacity>
                     </View>

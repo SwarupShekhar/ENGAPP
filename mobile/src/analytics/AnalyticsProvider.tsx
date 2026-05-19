@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { Platform } from "react-native";
 import { PostHogProvider, usePostHog } from "posthog-react-native";
 import { buildPostHogOptions } from "./posthogOptions";
 import { isPostHogEnabled, POSTHOG_API_KEY } from "./posthogConfig";
@@ -26,7 +27,8 @@ function PostHogBridge({ children }: { children: React.ReactNode }) {
 }
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  if (!isPostHogEnabled) {
+  // PostHog RN session replay / native bits break web startup — skip on web for local UI dev.
+  if (Platform.OS === "web" || !isPostHogEnabled) {
     if (__DEV__) {
       console.warn(
         "[PostHog] EXPO_PUBLIC_POSTHOG_API_KEY not set — product analytics disabled",

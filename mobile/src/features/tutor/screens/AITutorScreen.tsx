@@ -685,68 +685,63 @@ export default function AITutorScreen({ navigation }: any) {
           console.warn("[AITutor] Could not read audio file:", e);
         }
 
-        if (referenceTextForNextTurn && sessionId) {
-          // Route to specialized pronunciation assessment (REST)
-          const formData = new FormData();
-          formData.append("audio", {
-            uri,
-            type: "audio/m4a",
-            name: "audio.m4a",
-          } as any);
-          formData.append("userId", user?.id || "test");
-          formData.append("referenceText", referenceTextForNextTurn);
-          formData.append("sessionId", sessionId);
-          if (__DEV__) console.log("[AITutor] Assessing pronunciation for:", referenceTextForNextTurn);
-
-          const res = await tutorApi.assessPronunciation(formData);
-          const text = res.recognized_text || referenceTextForNextTurn; // Try to use STT result if any
-          const phoneticContext = res.phonetic_insights;
-          const assessmentData = res;
-
-          // Clear reference text after use
+        const refText = referenceTextForNextTurn;
+        const activeSessionId = sessionIdRef.current;
+        if (refText && activeSessionId) {
           setReferenceTextForNextTurn(null);
-
-          // Add User Bubble
-          setTranscript((prev) => [
-            ...prev,
-            {
-              id: nextMsgId(),
-              speaker: "user",
-              text: text || "(Audio Sent)",
-              assessmentResult: assessmentData,
-            },
-          ]);
-
-          // Send to Stream (include raw audio for Gemini analysis)
-          setStreamPath("ws-fallback");
-          setStreamDebugReason("pronunciation route");
-          streamingTutor.sendText(text, phoneticContext, audioBase64);
-        } else {
-          // Fast path: prefer SSE for lower latency (first audio ~2–3s), fallback to WebSocket
-          setTranscript((prev) => [
-            ...prev,
-            {
-              id: nextMsgId(),
-              speaker: "user",
-              text: "...",
-              tempId: true,
-            },
-          ]);
-
-          const sessionId = sessionIdRef.current;
-          const formData = new FormData();
-          formData.append("audio", {
+          const assessForm = new FormData();
+          assessForm.append("audio", {
             uri,
             type: "audio/m4a",
             name: "audio.m4a",
           } as any);
-          formData.append("sessionId", sessionId || "");
+          assessForm.append("userId", user?.id || "test");
+          assessForm.append("referenceText", refText);
+          assessForm.append("sessionId", activeSessionId);
+          void tutorApi
+            .assessPronunciation(assessForm)
+            .then((res) => {
+              setTranscript((prev) =>
+                prev.map((m) =>
+                  m.tempId && m.speaker === "user"
+                    ? {
+                        ...m,
+                        tempId: false,
+                        text: res.recognized_text || m.text || refText,
+                        assessmentResult: res,
+                      }
+                    : m,
+                ),
+              );
+            })
+            .catch((e) => {
+              if (__DEV__) console.warn("[AITutor] parallel assess failed:", e);
+            });
+        }
 
-          // Primary path: SSE stream (first audio ~2–3s). Fallback: WebSocket.
-          let usedSSE = false;
-          let sseSkipped = false;
-          const token = getToken ? await getCachedToken(getToken) : null;
-          if (token && sessionId) {
+        // SSE first (~2–3s to first audio); pronunciation assess runs in parallel when needed.
+        setTranscript((prev) => [
+          ...prev,
+          {
+            id: nextMsgId(),
+            speaker: "user",
+            text: "...",
+            tempId: true,
+          },
+        ]);
+
+        const formData = new FormData();
+        formData.append("audio", {
+          uri,
+          type: "audio/m4a",
+          name: "audio.m4a",
+        } as any);
+        formData.append("sessionId", activeSessionId || "");
+
+        let usedSSE = false;
+        let sseSkipped = false;
+        const token = getToken ? await getCachedToken(getToken) : null;
+        if (token && activeSessionId) {
             try {
               sseAbortRef.current?.abort();
               const abortController = new AbortController();
@@ -819,7 +814,7 @@ export default function AITutorScreen({ navigation }: any) {
                 }
                 if (userTranscript && aiText.trim()) {
                   tutorApi
-                    .appendTurn(sessionId, userTranscript, aiText.trim())
+                    .appendTurn(activeSessionId, userTranscript, aiText.trim())
                     .catch(() => {});
                 }
                 if (sseAbortRef.current === abortController) {
@@ -855,7 +850,6 @@ export default function AITutorScreen({ navigation }: any) {
             setStreamPath("ws-fallback");
             setStreamDebugReason("no_audio_base64");
           }
-        }
         setTurnCount((c) => c + 1);
       }
     } catch (e) {

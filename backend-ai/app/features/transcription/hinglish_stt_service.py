@@ -671,57 +671,50 @@ class HinglishSTTService:
         _classify_pronunciation_errors function compares N-Best candidates 
         against expected phonemes to find real patterns (v→w, t→θ, s→ʃ, etc).
         """
-        # Pass 1: Standard transcription
         transcription = self.transcribe_hinglish(audio_data)
         text = transcription.get("text", "")
-        
         if not text or len(text.split()) < 1:
             return {**transcription, "phonetic_insights": None}
-        
-        # Pass 2: Phoneme-level pronunciation assessment (free-speech mode)
+
+        pi = self.enrich_phonetic_insights(audio_data, text)
+        logger.info(
+            "DUAL-PASS ASSESSMENT: text='%s', has_insights=%s",
+            text,
+            pi is not None,
+        )
+        return {**transcription, "phonetic_insights": pi}
+
+    def enrich_phonetic_insights(self, audio_data: bytes, text: str) -> dict | None:
+        """
+        Pass 2+3 only (phoneme PA + text patterns). Call after fast Pass-1 transcript
+        so streaming can start LLM/TTS without waiting for Azure PA.
+        """
+        if not text or len(text.split()) < 1:
+            return None
+
         phoneme_insights = None
         raw_words: list[dict] = []
-        if len(text.split()) >= 2:  # Need >= 2 words for meaningful analysis
+        if len(text.split()) >= 2:
             try:
                 pron_result = self._soft_pronunciation_pass(audio_data, text)
                 if isinstance(pron_result, dict) and "insights" in pron_result:
                     phoneme_insights = pron_result.get("insights")
                     raw_words = pron_result.get("raw_words") or []
                 elif pron_result is not None:
-                    # backwards compat: old callers returning insights directly
                     phoneme_insights = pron_result
-                logger.warning(
-                    "[PA_DEBUG] raw_words=%s",
-                    json.dumps(raw_words[:3], indent=2),
-                )
             except Exception as e:
                 logger.warning(f"Soft pronunciation pass failed (non-fatal): {e}")
 
-        # Pass 3: Text-based detection (complementary)
         text_insights = self._detect_text_mispronunciations(text)
-
-        # Merge insights from both passes
         merged = self._merge_insights(phoneme_insights, text_insights)
-
         has_meaningful_errors = bool(
-            merged.get("indian_english_patterns") or
-            merged.get("critical_errors") or
-            merged.get("minor_errors")
+            merged.get("indian_english_patterns")
+            or merged.get("critical_errors")
+            or merged.get("minor_errors")
         )
-
-        # Always include raw_words in phonetic_insights so Layer A and Layer D
-        # in pronunciation_capture can access pre-normalization word data.
         if raw_words:
-            pi: dict | None = {**(merged if has_meaningful_errors else {}), "words": raw_words}
-        else:
-            pi = merged if has_meaningful_errors else None
-
-        logger.info(f"DUAL-PASS ASSESSMENT: text='{text}', has_errors={has_meaningful_errors}, raw_words={len(raw_words)}, phoneme_pass={'yes' if phoneme_insights else 'no'}")
-
-        return {
-            **transcription,
-            "phonetic_insights": pi
-        }
+            return {**(merged if has_meaningful_errors else {}), "words": raw_words}
+        return merged if has_meaningful_errors else None
 
     # ─── Text-Based Mispronunciation Detection ─────────────────
 
