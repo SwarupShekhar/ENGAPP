@@ -26,7 +26,6 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useAppTheme } from "../../theme/useAppTheme";
-import { tutorApi } from "../../api/tutor";
 import { tasksApi, type LearningTask } from "../../api/tasks";
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -65,20 +64,6 @@ function normalizeText(s: string) {
   return (s || "").trim().toLowerCase();
 }
 
-function computeTextScore(input: string, correct: string): number {
-  const a = normalizeText(input);
-  const b = normalizeText(correct);
-  if (!a) return 0;
-  if (a === b) return 100;
-  // Simple partial match heuristic (keeps behavior deterministic and debuggable)
-  const aTokens = a.split(/\s+/).filter(Boolean);
-  const bTokens = b.split(/\s+/).filter(Boolean);
-  const bSet = new Set(bTokens);
-  const overlap = aTokens.filter((t) => bSet.has(t)).length;
-  const ratio = bTokens.length ? overlap / bTokens.length : 0;
-  return ratio >= 0.6 ? 60 : 0;
-}
-
 const AnimatedNumber = ({ value, color }: { value: number; color: string }) => {
   const animatedValue = useSharedValue(0);
 
@@ -113,6 +98,7 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
   const [timerSec, setTimerSec] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [graduated, setGraduated] = useState(false);
 
   // For grammar/vocab typed practice
   const [textInput, setTextInput] = useState("");
@@ -161,6 +147,7 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
     setState("READY");
     setScore(null);
     setErrorMsg(null);
+    setGraduated(false);
     setTimerSec(0);
     setTextInput("");
   }, []);
@@ -221,10 +208,21 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
 
     // For grammar/vocabulary, stopping means scoring typed input
     if (!isPronunciation) {
-      // STATE TRANSITION: RECORDING(typing) → RESULT
-      const nextScore = computeTextScore(textInput, task.content?.correct || "");
-      setScore(nextScore);
-      setErrorMsg(null);
+      setState("ANALYZING");
+      try {
+        const res = await tasksApi.submitAttempt(task.id, { transcript: textInput });
+        if (res.errored) {
+          setErrorMsg("Couldn't score that — try again.");
+          setScore(null);
+        } else {
+          setScore(res.pass ? 100 : 40);
+          setErrorMsg(null);
+          setGraduated(!!res.graduated);
+        }
+      } catch (e: any) {
+        setErrorMsg(e?.message || "Assessment failed.");
+        setScore(null);
+      }
       setState("RESULT");
       return;
     }
@@ -245,27 +243,14 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
       setState("ANALYZING");
       setErrorMsg(null);
 
-      const sessionId = task.sessionId;
-      if (!sessionId) {
-        throw new Error("Task is missing sessionId (required for assessment)");
+      const res = await tasksApi.submitAttempt(task.id, { audioUri: uri });
+      if (res.errored) {
+        setErrorMsg("Couldn't score that — try again.");
+        setScore(null);
+      } else {
+        setScore(res.pass ? 100 : 40);
+        setGraduated(!!res.graduated);
       }
-
-      const formData = new FormData();
-      formData.append("audio", {
-        uri,
-        type: "audio/m4a",
-        name: "audio.m4a",
-      } as any);
-      formData.append("referenceText", task.content?.target || "");
-      formData.append("sessionId", sessionId);
-
-      const res = await tutorApi.assessPronunciation(formData);
-      const rawScore =
-        res?.accuracy_score ?? res?.pronunciation_score ?? res?.score ?? 0;
-      const nextScore = Math.max(0, Math.min(100, Math.round(rawScore)));
-
-      // STATE TRANSITION: ANALYZING → RESULT
-      setScore(nextScore);
       setState("RESULT");
     } catch (e: any) {
       const msg = e?.message || "Assessment failed. Please try again.";
@@ -279,16 +264,9 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
   }, [task, isPronunciation, textInput]);
 
   const handleComplete = useCallback(async () => {
-    if (!task) return;
-    try {
-      await tasksApi.completeTask(task.id);
-      await AsyncStorage.removeItem("@home_pending_task_cache");
-      Alert.alert("Success", "Task completed!");
-      navigation.goBack();
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Could not complete task. Try again.");
-    }
-  }, [task, navigation]);
+    await AsyncStorage.removeItem("@home_pending_task_cache");
+    navigation.goBack();
+  }, [navigation]);
 
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -478,6 +456,9 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
                   color={scoreColor(score ?? 0, theme)}
                 />
                 <Text style={styles.resultMsg}>{scoreMessage(score ?? 0)}</Text>
+                {graduated ? (
+                  <Text style={styles.typeLabel}>Mastered 🎉</Text>
+                ) : null}
 
                 {(score ?? 0) >= 80 ? (
                   <TouchableOpacity

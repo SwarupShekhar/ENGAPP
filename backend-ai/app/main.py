@@ -124,6 +124,7 @@ from app.features.tutor.streaming_routes import router as streaming_tutor_router
 from app.features.admin.routes import router as admin_router
 from app.features.scoring.routes import router as scoring_router
 from app.features.tts.routes import router as tts_router
+from app.features.practice.routes import router as practice_router
 
 app.include_router(health_router, prefix="/api", tags=["Health"])
 app.include_router(transcribe_router, prefix="/api", tags=["Transcribe"])
@@ -134,6 +135,7 @@ app.include_router(tts_router, prefix="/api", tags=["TTS"])
 app.include_router(tutor_router, prefix="/api/tutor", tags=["Tutor"])
 app.include_router(streaming_tutor_router, prefix="/api/tutor", tags=["Streaming"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
+app.include_router(practice_router)
 
 # 5. Monitoring
 metrics_app = make_asgi_app()

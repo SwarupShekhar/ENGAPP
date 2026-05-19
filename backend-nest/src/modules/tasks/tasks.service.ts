@@ -1,11 +1,20 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { BrainService } from '../brain/brain.service';
+import { PronunciationService } from '../pronunciation/pronunciation.service';
+import { PointsService } from '../gamification/points.service';
+import { applySrTransition } from './sr-scheduler';
 
 @Injectable()
 export class TasksService {
     private readonly logger = new Logger(TasksService.name);
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private brain: BrainService,
+        private pronunciation: PronunciationService,
+        private points: PointsService,
+    ) { }
 
     private severityToScore(severity?: string | null): number {
         const s = (severity || '').toLowerCase();
@@ -89,6 +98,7 @@ export class TasksService {
                 severity: string;
                 severityScore: number;
                 repetition: number;
+                ruleCategory?: string | null;
             }
             | {
                 kind: 'grammar' | 'vocabulary';
@@ -135,6 +145,7 @@ export class TasksService {
                 severity: worst.severity,
                 severityScore,
                 repetition: issues.length,
+                ruleCategory: worst.ruleCategory,
             });
         }
 
@@ -190,35 +201,51 @@ export class TasksService {
         }
 
         const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const dueAt = new Date();
 
         const created = await this.prisma.$transaction(async (tx) => {
             const tasks: any[] = [];
             for (const c of ordered) {
                 if (c.kind === 'pronunciation') {
+                    const type = 'pronunciation';
+                    const content = {
+                        sessionId,
+                        userId,
+                        type: 'pronunciation',
+                        target: c.word,
+                        userSaid: c.userSaid,
+                        correct: c.correct,
+                        rule_category: c.ruleCategory || 'general',
+                        severity: c.severity,
+                        severityScore: c.severityScore,
+                        repetition: c.repetition,
+                        phonemes: {
+                            actual: c.phoneticActual ?? null,
+                            expected: c.phoneticExpected ?? null,
+                        },
+                    };
+                    const mistakeKey = this.computeMistakeKey({ type, content });
+                    if (await this.reactivateOnRecurrence(userId, mistakeKey)) continue;
+                    const activePron = await tx.learningTask.findFirst({
+                        where: { userId, mistakeKey, srState: 'LEARNING' },
+                    });
+                    if (activePron) continue;
+
                     const task = await tx.learningTask.create({
                         data: {
                             userId,
                             sessionId,
-                            type: 'pronunciation',
+                            type,
                             title: `Pronunciation: ${c.word}`,
-                            content: {
-                                sessionId,
-                                userId,
-                                type: 'pronunciation',
-                                target: c.word,
-                                userSaid: c.userSaid,
-                                correct: c.correct,
-                                severity: c.severity,
-                                severityScore: c.severityScore,
-                                repetition: c.repetition,
-                                phonemes: {
-                                    actual: c.phoneticActual ?? null,
-                                    expected: c.phoneticExpected ?? null,
-                                },
-                            },
+                            content,
                             status: 'pending',
                             estimatedMinutes: 5,
                             dueDate,
+                            mistakeKey,
+                            srState: 'LEARNING',
+                            srStep: 0,
+                            correctStreak: 0,
+                            dueAt,
                         },
                     });
                     await tx.taskPronunciationIssue.createMany({
@@ -230,26 +257,40 @@ export class TasksService {
                     });
                     tasks.push(task);
                 } else {
+                    const type = c.kind;
+                    const content = {
+                        sessionId,
+                        userId,
+                        type: c.kind,
+                        target: c.phrase,
+                        userSaid: c.userSaid,
+                        correct: c.correct,
+                        severity: c.severity,
+                        severityScore: c.severityScore,
+                        repetition: c.repetition,
+                    };
+                    const mistakeKey = this.computeMistakeKey({ type, content });
+                    if (await this.reactivateOnRecurrence(userId, mistakeKey)) continue;
+                    const activeMistake = await tx.learningTask.findFirst({
+                        where: { userId, mistakeKey, srState: 'LEARNING' },
+                    });
+                    if (activeMistake) continue;
+
                     const task = await tx.learningTask.create({
                         data: {
                             userId,
                             sessionId,
-                            type: c.kind,
+                            type,
                             title: `${c.kind === 'grammar' ? 'Grammar' : 'Vocabulary'}: ${c.phrase}`,
-                            content: {
-                                sessionId,
-                                userId,
-                                type: c.kind,
-                                target: c.phrase,
-                                userSaid: c.userSaid,
-                                correct: c.correct,
-                                severity: c.severity,
-                                severityScore: c.severityScore,
-                                repetition: c.repetition,
-                            },
+                            content,
                             status: 'pending',
                             estimatedMinutes: 5,
                             dueDate,
+                            mistakeKey,
+                            srState: 'LEARNING',
+                            srStep: 0,
+                            correctStreak: 0,
+                            dueAt,
                         },
                     });
                     await tx.taskMistake.createMany({
@@ -383,5 +424,160 @@ export class TasksService {
             where: { id: taskId },
             data: { status: 'completed', completedAt: new Date() },
         });
+    }
+
+    computeMistakeKey(task: { type: string; content: any }): string {
+        const c = task.content || {};
+        if (task.type === 'pronunciation') {
+            const lemma = String(c.correct || c.target || '').trim().toLowerCase();
+            return `pron:${c.rule_category || 'general'}:${lemma}`;
+        }
+        const original = String(c.userSaid || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const corrected = String(c.correct || c.target || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        if (original && corrected) {
+            return `${task.type}:${original}→${corrected}`;
+        }
+        const sig = original || corrected;
+        return `${task.type}:${sig}`;
+    }
+
+    private dueTaskTypeRank(type: string): number {
+        if (type === 'pronunciation') return 0;
+        if (type === 'grammar') return 1;
+        return 2;
+    }
+
+    async getDueTasksForUser(userId: string, limit = 10) {
+        const rows = await this.prisma.learningTask.findMany({
+            where: { userId, srState: 'LEARNING', dueAt: { lte: new Date() } },
+            include: { session: { select: { id: true, createdAt: true } } },
+        });
+        rows.sort((a, b) => {
+            const tr = this.dueTaskTypeRank(a.type) - this.dueTaskTypeRank(b.type);
+            if (tr !== 0) return tr;
+            const sa = Number((a.content as { severityScore?: number })?.severityScore ?? 0);
+            const sb = Number((b.content as { severityScore?: number })?.severityScore ?? 0);
+            if (sb !== sa) return sb - sa;
+            return a.createdAt.getTime() - b.createdAt.getTime();
+        });
+        return rows.slice(0, limit);
+    }
+
+    async getMasteredCount(userId: string): Promise<number> {
+        return this.prisma.learningTask.count({
+            where: { userId, srState: 'GRADUATED' },
+        });
+    }
+
+    async reactivateOnRecurrence(userId: string, mistakeKey: string): Promise<boolean> {
+        const existing = await this.prisma.learningTask.findFirst({
+            where: { userId, mistakeKey, srState: 'GRADUATED' },
+        });
+        if (!existing) return false;
+        await this.prisma.learningTask.update({
+            where: { id: existing.id },
+            data: {
+                srState: 'LEARNING',
+                srStep: 0,
+                correctStreak: 0,
+                dueAt: new Date(),
+                lastResult: null,
+                status: 'pending',
+                completedAt: null,
+            },
+        });
+        return true;
+    }
+
+    async submitAttempt(
+        taskId: string,
+        userId: string,
+        payload: {
+            transcript?: string;
+            file?: { buffer: Buffer; originalname: string; mimetype: string };
+        },
+    ): Promise<{
+        pass: boolean;
+        errored: boolean;
+        reason?: string;
+        srState?: string;
+        dueAt?: Date;
+        correctStreak?: number;
+        graduated?: boolean;
+    }> {
+        const task = await this.prisma.learningTask.findFirst({ where: { id: taskId, userId } });
+        if (!task) throw new NotFoundException({ message: 'Task not found' });
+
+        let pass = false;
+        let errored = false;
+        let reason: string | undefined;
+
+        if (task.type === 'pronunciation') {
+            if (!payload.file) return { pass: false, errored: true, reason: 'no_audio' };
+            const ref = (task.content as any)?.target || (task.content as any)?.correct || '';
+            const r = await this.pronunciation.assessFromUploadedFile(userId, payload.file, ref);
+            errored = r.errored;
+            const threshold = Number(process.env.PRACTICE_PRON_THRESHOLD || 80);
+            pass = !errored && r.accuracy >= threshold;
+        } else {
+            const c = task.content as any;
+            const r = await this.brain.judgeCorrection({
+                originalError: String(c?.userSaid || ''),
+                target: String(c?.correct || c?.target || ''),
+                spoken: String(payload.transcript || ''),
+                kind: task.type === 'vocabulary' ? 'vocabulary' : 'grammar',
+            });
+            errored = r.errored;
+            pass = !errored && r.pass;
+            reason = r.reason;
+        }
+
+        if (errored) {
+            return { pass: false, errored: true, reason: reason || 'scoring_error' };
+        }
+
+        const t = applySrTransition(
+            {
+                srState: task.srState as 'LEARNING' | 'GRADUATED',
+                srStep: task.srStep,
+                correctStreak: task.correctStreak,
+                lastAttemptAt: task.lastAttemptAt,
+            },
+            pass,
+            new Date(),
+        );
+
+        await this.prisma.learningTask.update({
+            where: { id: task.id },
+            data: {
+                srState: t.srState,
+                srStep: t.srStep,
+                correctStreak: t.correctStreak,
+                dueAt: t.dueAt,
+                lastAttemptAt: t.lastAttemptAt,
+                lastResult: t.lastResult,
+                attemptCount: { increment: 1 },
+                status: t.graduated ? 'completed' : task.status,
+                completedAt: t.graduated ? new Date() : task.completedAt,
+            },
+        });
+
+        if (t.graduated) {
+            try {
+                await this.points.awardPoints(userId, 50, 'badge');
+            } catch (e) {
+                this.logger.warn(`points.awardPoints failed for ${task.id}: ${(e as Error).message}`);
+            }
+        }
+
+        return {
+            pass,
+            errored: false,
+            reason,
+            srState: t.srState,
+            dueAt: t.dueAt,
+            correctStreak: t.correctStreak,
+            graduated: t.graduated,
+        };
     }
 }

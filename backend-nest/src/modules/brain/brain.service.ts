@@ -481,4 +481,31 @@ Rules:
       return `Your ${data.strongestSkill} reached ${strengthScore} points. ${data.weakestSkill} needs attention at ${weaknessScore} points.`;
     }
   }
+
+  async judgeCorrection(input: {
+    originalError: string;
+    target: string;
+    spoken: string;
+    kind: 'grammar' | 'vocabulary';
+  }): Promise<{ pass: boolean; reason: string; errored: boolean }> {
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(`${this.aiEngineUrl}/api/practice/judge`, {
+          original_error: input.originalError,
+          target: input.target,
+          spoken: input.spoken,
+          kind: input.kind,
+        }),
+      );
+      const d = response.data as { pass_?: boolean; pass?: boolean; reason?: string };
+      const reason = d.reason ?? '';
+      if (reason === 'judge_error' || reason === 'unparseable') {
+        return { pass: false, reason: 'judge_error', errored: true };
+      }
+      return { pass: Boolean(d.pass_ ?? d.pass), reason, errored: false };
+    } catch (e) {
+      this.logger.error('judgeCorrection failed', e as Error);
+      return { pass: false, reason: 'judge_unreachable', errored: true };
+    }
+  }
 }
