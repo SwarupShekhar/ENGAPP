@@ -60,6 +60,22 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      # Bind locally on the VPS; do not expose publicly without auth.
+      - "127.0.0.1:9090:9090"
+    networks:
+      - internal
+    depends_on:
+      backend-nest:
+        condition: service_healthy
+      backend-ai:
+        condition: service_healthy
+
   caddy:
     image: caddy:2.8
     restart: unless-stopped

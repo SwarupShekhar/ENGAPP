@@ -30,6 +30,11 @@ const extra = {
   eas: { projectId },
   clerkPublishableKey,
   bridgeInternalSecret: process.env.BRIDGE_INTERNAL_SECRET || "",
+  posthogApiKey: process.env.EXPO_PUBLIC_POSTHOG_API_KEY || "",
+  posthogHost:
+    process.env.EXPO_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+  posthogSessionReplay:
+    process.env.EXPO_PUBLIC_POSTHOG_SESSION_REPLAY === "true",
 };
 
 // Optional overrides — only when explicitly set (local .env or EAS env)
