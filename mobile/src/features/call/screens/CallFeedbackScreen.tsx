@@ -4,6 +4,10 @@ import * as FileSystem from "expo-file-system/legacy";
 import { useUser } from "@clerk/clerk-expo";
 import { fetchFeedbackNarration, fetchFullFeedbackNarration, fetchErrorSpeak } from "../../../api/tts";
 import { getOrFetchTtsFileUri, prefetchTtsFileUri } from "../../../utils/ttsAudioCache";
+import {
+  LatencyTimeline,
+  type LatencyTrace,
+} from "../../../utils/latencyTimeline";
 import type {
   FeedbackNarrationPayload,
   FeedbackSection,
@@ -807,6 +811,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [cardReveal, setCardReveal] = useState<CardRevealPhase>('none');
   const [segmentListened, setSegmentListened] = useState(false);
   const introAudioStartedRef = useRef(false);
+  const feedbackTimelineRef = useRef(new LatencyTimeline());
+  const [feedbackLatencyTrace, setFeedbackLatencyTrace] = useState<LatencyTrace | null>(
+    null,
+  );
 
   // Clean up audio on unmount
   useEffect(() => {
@@ -827,6 +835,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   useEffect(() => {
     let isMounted = true;
     const fetchAnalysis = async () => {
+      if (retryCount === 0) {
+        feedbackTimelineRef.current.start("feedback_load", `fb_${sessionId}`);
+      }
+      feedbackTimelineRef.current.markInstant("analysis_poll", {
+        attempt: retryCount,
+      });
+
       if (!sessionId || sessionId === "session-id") {
         console.warn(
           "[CallFeedback] Invalid or placeholder sessionId provided",
@@ -871,8 +886,11 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         if (data.analyses && data.analyses.length > 0) {
           if (isMounted) {
+            feedbackTimelineRef.current.markInstant("analysis_ready");
             setSessionData(data);
             setLoading(false);
+            feedbackTimelineRef.current.finish({ status: data.status });
+            setFeedbackLatencyTrace(feedbackTimelineRef.current.getSnapshot());
             // CQS in parallel — do not block first paint
             void getCQSScore(sessionId)
               .then((cqs) => {
