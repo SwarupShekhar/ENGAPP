@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +33,15 @@ import { streamingTutor, StreamChunk } from "../../call/services/streamingTutorS
 import { PronunciationBreakdown } from "../../../components/PronunciationBreakdown";
 import { bridgeApi } from "../../../api/bridgeApi";
 import { getCachedToken } from "../../../api/authToken";
+import {
+  activeLatencyTimeline,
+  type LatencyTrace,
+} from "../../../utils/latencyTimeline";
+import { LatencyTimelinePanel } from "../../../components/debug/LatencyTimelinePanel";
+import {
+  createRecordingMeteringCallback,
+  resolveVadProvider,
+} from "../voice/voiceActivityDetector";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -226,6 +235,7 @@ export default function AITutorScreen({ navigation }: any) {
   const [firstChunkLatencyMs, setFirstChunkLatencyMs] = useState<number | null>(
     null,
   );
+  const [latencyTrace, setLatencyTrace] = useState<LatencyTrace | null>(null);
   const [referenceTextForNextTurn, setReferenceTextForNextTurn] = useState<
     string | null
   >(null);
@@ -262,12 +272,7 @@ export default function AITutorScreen({ navigation }: any) {
     }
   };
 
-  // VAD Refs
-  const silenceStartRef = useRef<number | null>(null);
-  const isSpeakingRef = useRef(false);
-  const silenceThresholdDb = -50; // Silence threshold
-  const speechThresholdDb = -45; // Speech threshold
-  const silenceDurationMs = 800; // 800ms silence to trigger end
+  const turnTraceIdRef = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -413,6 +418,17 @@ export default function AITutorScreen({ navigation }: any) {
 
   // ─── Stream Handling ────────────────────────────────────
   const handleStreamMessage = (chunk: StreamChunk) => {
+    if (chunk.type === "phonetic_ready") {
+      activeLatencyTimeline.markInstant("phonetic_ready");
+    }
+    if (chunk.type === "done") {
+      if (chunk.timings?.ms) {
+        activeLatencyTimeline.mergeServerTimings(chunk.timings.ms);
+      }
+      activeLatencyTimeline.finish();
+      setLatencyTrace(activeLatencyTimeline.getSnapshot());
+    }
+
     // First meaningful chunk latency marker for this turn.
     if (!firstChunkSeenRef.current) {
       const isMeaningfulChunk =
@@ -423,6 +439,16 @@ export default function AITutorScreen({ navigation }: any) {
       if (isMeaningfulChunk && turnStartMsRef.current) {
         firstChunkSeenRef.current = true;
         setFirstChunkLatencyMs(Date.now() - turnStartMsRef.current);
+        activeLatencyTimeline.endSpan("sse_request");
+        if (chunk.type === "transcript" || chunk.type === "transcription") {
+          activeLatencyTimeline.markInstant("sse_transcript");
+        }
+        if (chunk.type === "sentence") {
+          activeLatencyTimeline.markInstant("first_sentence");
+        }
+        if (chunk.type === "audio") {
+          activeLatencyTimeline.markInstant("first_audio");
+        }
       }
     }
 
@@ -600,35 +626,23 @@ export default function AITutorScreen({ navigation }: any) {
         } catch (e) {}
         recordingRef.current = null;
       }
+      activeLatencyTimeline.markInstant("vad_listen_start", {
+        provider: resolveVadProvider(),
+      });
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        (status) => {
-          if (status.metering !== undefined) {
-            const level = status.metering;
-
-            // Check for speech
-            if (level > speechThresholdDb) {
-              isSpeakingRef.current = true;
-              silenceStartRef.current = null; // Reset silence timer
+        createRecordingMeteringCallback(
+          () => stopRecording(),
+          (vadStatus, meta) => {
+            if (vadStatus === "speech_start") {
+              activeLatencyTimeline.markInstant("vad_speech_start", meta);
             }
-
-            // Check for silence
-            if (level < silenceThresholdDb && isSpeakingRef.current) {
-              if (silenceStartRef.current === null) {
-                silenceStartRef.current = Date.now();
-              } else {
-                const silenceDuration = Date.now() - silenceStartRef.current;
-                if (silenceDuration > silenceDurationMs) {
-                  // User finished speaking
-                  stopRecording();
-                  isSpeakingRef.current = false;
-                  silenceStartRef.current = null;
-                }
-              }
+            if (vadStatus === "speech_end") {
+              activeLatencyTimeline.markInstant("vad_speech_end", meta);
             }
-          }
-        },
-        100, // Metering interval ms
+          },
+        ),
+        100,
       );
       recordingRef.current = recording;
       setIsRecording(true);
@@ -671,24 +685,31 @@ export default function AITutorScreen({ navigation }: any) {
       }
 
       if (uri) {
-        // Mark turn start timing for debug visibility.
+        const traceId = activeLatencyTimeline.start("maya_turn");
+        turnTraceIdRef.current = traceId;
+        activeLatencyTimeline.markInstant("recording_stop");
+
         turnStartMsRef.current = Date.now();
         firstChunkSeenRef.current = false;
         setFirstChunkLatencyMs(null);
         setTurnStartAtLabel(new Date(turnStartMsRef.current).toLocaleTimeString());
 
-        // 1. Prepare Audio Base64 (always needed now)
         let audioBase64: string | undefined;
+        activeLatencyTimeline.startSpan("audio_read");
         try {
-          audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+          audioBase64 = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
         } catch (e) {
           console.warn("[AITutor] Could not read audio file:", e);
         }
+        activeLatencyTimeline.endSpan("audio_read");
 
         const refText = referenceTextForNextTurn;
         const activeSessionId = sessionIdRef.current;
         if (refText && activeSessionId) {
           setReferenceTextForNextTurn(null);
+          activeLatencyTimeline.startSpan("assess_pronunciation");
           const assessForm = new FormData();
           assessForm.append("audio", {
             uri,
@@ -701,6 +722,7 @@ export default function AITutorScreen({ navigation }: any) {
           void tutorApi
             .assessPronunciation(assessForm)
             .then((res) => {
+              activeLatencyTimeline.endSpan("assess_pronunciation");
               setTranscript((prev) =>
                 prev.map((m) =>
                   m.tempId && m.speaker === "user"
@@ -715,6 +737,7 @@ export default function AITutorScreen({ navigation }: any) {
               );
             })
             .catch((e) => {
+              activeLatencyTimeline.endSpan("assess_pronunciation");
               if (__DEV__) console.warn("[AITutor] parallel assess failed:", e);
             });
         }
@@ -737,6 +760,9 @@ export default function AITutorScreen({ navigation }: any) {
           name: "audio.m4a",
         } as any);
         formData.append("sessionId", activeSessionId || "");
+        if (turnTraceIdRef.current) {
+          formData.append("traceId", turnTraceIdRef.current);
+        }
 
         let usedSSE = false;
         let sseSkipped = false;
@@ -746,6 +772,7 @@ export default function AITutorScreen({ navigation }: any) {
               sseAbortRef.current?.abort();
               const abortController = new AbortController();
               sseAbortRef.current = abortController;
+              activeLatencyTimeline.startSpan("sse_request");
               const response = await tutorApi.streamSpeech(formData, {
                 Authorization: `Bearer ${token}`,
               }, abortController.signal);
@@ -783,6 +810,9 @@ export default function AITutorScreen({ navigation }: any) {
                       const chunk = JSON.parse(line.slice(6).trim());
                       if (chunk.type === "transcript" && chunk.text) userTranscript = chunk.text;
                       if (chunk.type === "sentence" && chunk.text) aiText += (aiText ? " " : "") + chunk.text;
+                      if (chunk.type === "done" && chunk.timings?.ms) {
+                        activeLatencyTimeline.mergeServerTimings(chunk.timings.ms);
+                      }
                       handleStreamMessage(chunk);
                     } catch (_) {
                       /* incomplete or invalid chunk */
@@ -845,7 +875,12 @@ export default function AITutorScreen({ navigation }: any) {
             if (!sseSkipped) {
               setStreamPath("ws-fallback");
             }
-            streamingTutor.sendText(null, null, audioBase64);
+            streamingTutor.sendText(
+              null,
+              null,
+              audioBase64,
+              turnTraceIdRef.current ?? undefined,
+            );
           } else if (!usedSSE && !audioBase64) {
             setStreamPath("ws-fallback");
             setStreamDebugReason("no_audio_base64");
@@ -997,12 +1032,16 @@ export default function AITutorScreen({ navigation }: any) {
           {__DEV__ && (
             <View style={styles.debugBadge}>
               <Text style={styles.debugBadgeText}>
-                stream: {streamPath} ({streamDebugReason})
+                stream: {streamPath} ({streamDebugReason}) • vad: {resolveVadProvider()}
               </Text>
               <Text style={styles.debugBadgeText}>
                 turnStart: {turnStartAtLabel} • firstChunk:{" "}
                 {firstChunkLatencyMs === null ? "pending" : `${firstChunkLatencyMs}ms`}
               </Text>
+              <LatencyTimelinePanel
+                trace={latencyTrace}
+                extra={turnTraceIdRef.current ?? undefined}
+              />
             </View>
           )}
         </View>

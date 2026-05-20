@@ -3,12 +3,21 @@ import { API_URL as NEST_API_URL } from "../../../api/client";
 import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
 
 export interface StreamChunk {
-  type: "sentence" | "audio" | "error" | "timeout" | "transcription" | "transcript" | "done";
+  type:
+    | "sentence"
+    | "audio"
+    | "error"
+    | "timeout"
+    | "transcription"
+    | "transcript"
+    | "phonetic_ready"
+    | "done";
   text?: string;
   audio?: string; // base64
   message?: string;
   is_final?: boolean;
   assessmentResult?: any;
+  timings?: { trace_id?: string; ms?: Record<string, number> };
 }
 
 type StreamCallback = (chunk: StreamChunk) => void;
@@ -96,11 +105,17 @@ class StreamingTutorService {
     };
   }
 
-  sendText(text: string | null, phoneticContext?: any, audioBase64?: string) {
+  sendText(
+    text: string | null,
+    phoneticContext?: any,
+    audioBase64?: string,
+    traceId?: string,
+  ) {
     const payload: Record<string, unknown> = {};
     if (text) payload.text = text;
     if (phoneticContext) payload.phonetic_context = phoneticContext;
     if (audioBase64) payload.audio_base64 = audioBase64;
+    if (traceId) payload.trace_id = traceId;
     const raw = JSON.stringify(payload);
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {

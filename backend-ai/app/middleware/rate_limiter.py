@@ -58,6 +58,31 @@ class RateLimiter:
         # Record request
         self.user_requests[user_id].append(now)
 
+    async def check_turn_rate_limit(
+        self,
+        user_id: str,
+        max_requests_per_minute: int = 30,
+    ) -> None:
+        """Per-turn HTTP limits (SSE stream-response) without concurrent-session gate."""
+        now = time.time()
+        if user_id in self.user_requests:
+            self.user_requests[user_id] = [
+                req_time for req_time in self.user_requests[user_id]
+                if now - req_time < 60
+            ]
+        else:
+            self.user_requests[user_id] = []
+
+        if len(self.user_requests[user_id]) >= max_requests_per_minute:
+            logger.warning("Turn rate limit exceeded for user %s", user_id)
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Rate limit exceeded. Max {max_requests_per_minute} tutor turns per minute."
+                ),
+            )
+        self.user_requests[user_id].append(now)
+
     async def snapshot_active_sessions(self) -> Dict[str, int]:
         """
         Take a thread-safe snapshot of active_sessions.

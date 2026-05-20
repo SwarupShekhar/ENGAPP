@@ -589,6 +589,7 @@ export class ConversationalTutorService implements OnModuleInit {
     userId: string,
     sessionId: string,
     res: Response,
+    traceId?: string,
   ): Promise<void> {
     const session = this.getOrCreateSession(sessionId);
     const history = session.history
@@ -600,6 +601,9 @@ export class ConversationalTutorService implements OnModuleInit {
     form.append('session_id', sessionId);
     form.append('user_id', userId);
     form.append('conversation_history', JSON.stringify(history));
+    if (traceId) {
+      form.append('trace_id', traceId);
+    }
 
     const url = `${this.aiBackendUrl}/api/tutor/stream-response`;
     try {
