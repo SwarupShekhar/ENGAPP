@@ -362,14 +362,10 @@ export default function AITutorScreen({ navigation }: any) {
           ? prewarmRef.current.then(([, r]) => r)
           : tutorApi.startSession(user?.id || "test");
 
-        // Fire WS connect the moment session resolves — don't wait for perm
-        const wsAndSessionPromise = sessionPromise.then((res) => {
-          streamingTutor.connect(res.sessionId, user?.id || "test");
-          streamingTutor.onMessage((c) => streamHandlerRef.current(c));
-          return res;
-        });
+        const [perm, res] = await Promise.all([permPromise, sessionPromise]);
 
-        const [perm, res] = await Promise.all([permPromise, wsAndSessionPromise]);
+        // SSE is primary — register WS handler now; connect lazily on SSE failure only.
+        streamingTutor.onMessage((c) => streamHandlerRef.current(c));
 
         if (perm.status !== "granted") {
           Alert.alert("Permission Required", "Microphone access is needed.");
@@ -401,8 +397,10 @@ export default function AITutorScreen({ navigation }: any) {
       sseAbortRef.current?.abort();
       streamingTutor.disconnect();
       if (soundRef.current) soundRef.current.unloadAsync();
-      for (const s of soundPoolRef.current) {
+      for (let i = 0; i < soundPoolRef.current.length; i++) {
+        const s = soundPoolRef.current[i];
         if (s) s.unloadAsync().catch(() => {});
+        soundPoolRef.current[i] = null;
       }
       if (recordingRef.current) stopRecording(); // Ensure recording stops
 
@@ -667,8 +665,11 @@ export default function AITutorScreen({ navigation }: any) {
     setIsProcessing(true);
 
     try {
+      let recordedDurationMs = 0;
       try {
         const status = await recording.getStatusAsync();
+        recordedDurationMs =
+          typeof status.durationMillis === "number" ? status.durationMillis : 0;
         if (status.isRecording) {
           await recording.stopAndUnloadAsync();
         } else if (status.isDoneRecording) {
@@ -687,6 +688,14 @@ export default function AITutorScreen({ navigation }: any) {
       const uri = recording.getURI();
       if (!uri) {
         console.warn("[AITutor] No URI found after stopping recording");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (recordedDurationMs > 0 && recordedDurationMs < 350) {
+        if (__DEV__) {
+          console.log("[AITutor] Ignoring short recording tap", recordedDurationMs, "ms");
+        }
         setIsProcessing(false);
         return;
       }
@@ -879,6 +888,12 @@ export default function AITutorScreen({ navigation }: any) {
           if (!usedSSE && audioBase64) {
             if (!sseSkipped) {
               setStreamPath("ws-fallback");
+            }
+            if (activeSessionId) {
+              streamingTutor.ensureConnected(
+                activeSessionId,
+                user?.id || "test",
+              );
             }
             streamingTutor.sendText(
               null,
