@@ -871,8 +871,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [stepAudioLoading, setStepAudioLoading] = useState(false);
   const stepSoundRef = useRef<Audio.Sound | null>(null);
   const [cardReveal, setCardReveal] = useState<CardRevealPhase>('none');
-  const [segmentListened, setSegmentListened] = useState(false);
   const introAudioStartedRef = useRef(false);
+  // Synchronous guard: blocks re-entrant intro play taps (double-tap → 2 fetches).
+  const introPlayInFlightRef = useRef(false);
+  // Monotonic token identifying the currently-attached segment playback.
+  // Stale playback-status handlers compare against this before writing the ring.
+  const segmentSeqRef = useRef(0);
   const feedbackTimelineRef = useRef(new LatencyTimeline());
   const [feedbackLatencyTrace, setFeedbackLatencyTrace] = useState<LatencyTrace | null>(
     null,
@@ -885,6 +889,19 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sheetTranslateY.value }],
   }));
+
+  // Single source of truth for the bottom-sheet position: the card rises into
+  // place whenever we enter the 'step' phase, and resets off-screen otherwise.
+  useEffect(() => {
+    if (feedbackPhase === 'step') {
+      sheetTranslateY.value = withTiming(0, {
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
+      });
+    } else {
+      sheetTranslateY.value = SCREEN_HEIGHT;
+    }
+  }, [feedbackPhase, sheetTranslateY]);
 
   // Clean up audio on unmount
   useEffect(() => {
@@ -1762,8 +1779,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     options?: { transitionFromIntro?: boolean },
   ) => {
     const hasCards = segment.hasCorrectionCards;
+    // Token captured at attach time. A handler from a superseded sound will
+    // see a stale token and must not write the ring shared value.
+    const seqToken = segmentSeqRef.current;
     sound.setOnPlaybackStatusUpdate((status) => {
       if (!status.isLoaded) return;
+      const isCurrent = segmentSeqRef.current === seqToken;
       if (options?.transitionFromIntro && status.isPlaying && !introAudioStartedRef.current) {
         introAudioStartedRef.current = true;
         setFeedbackPhase('step');
@@ -1773,7 +1794,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       if (duration > 0) {
         const ratio = position / duration;
         // Drive the circular progress ring (0→1) with the playback position.
-        segmentProgress.value = Math.min(1, Math.max(0, ratio));
+        if (isCurrent) segmentProgress.value = Math.min(1, Math.max(0, ratio));
         if (hasCards) {
           if (ratio >= 0.22) setCardReveal((prev) => (prev === 'none' ? 'youSaid' : prev));
           if (ratio >= 0.52) setCardReveal('both');
@@ -1787,13 +1808,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       }
       if (status.didJustFinish) {
         if (hasCards) setCardReveal('both');
-        // Snap the ring to full when the clip ends.
-        segmentProgress.value = withTiming(1, { duration: 180 });
-        setSegmentListened(true);
+        // Snap the ring to full when the clip ends — only if still the
+        // current segment, so a stale finish can't flash the new ring.
+        if (isCurrent) segmentProgress.value = withTiming(1, { duration: 180 });
         sound.unloadAsync().catch(() => {});
-        stepSoundRef.current = null;
-        setStepAudioPlaying(false);
-        stopWordTracking();
+        if (isCurrent) {
+          stepSoundRef.current = null;
+          setStepAudioPlaying(false);
+          stopWordTracking();
+        }
       }
     });
   };
@@ -1813,7 +1836,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   ) => {
     setStepAudioLoading(true);
     setCardReveal('none');
-    setSegmentListened(false);
+    // New segment playback → fresh token; invalidates any stale status handler.
+    segmentSeqRef.current += 1;
     segmentProgress.value = 0;
     if (options?.transitionFromIntro) introAudioStartedRef.current = false;
     try {
@@ -1828,7 +1852,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         if (options?.transitionFromIntro) setFeedbackPhase('step');
         if (!segment.hasCorrectionCards) {
           setCardReveal('both');
-          setSegmentListened(true);
         }
         return;
       }
@@ -1851,7 +1874,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       if (options?.transitionFromIntro) setFeedbackPhase('step');
       if (!segment.hasCorrectionCards) {
         setCardReveal('both');
-        setSegmentListened(true);
       }
     }
   };
@@ -1917,18 +1939,21 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   };
 
   const handleIntroPlay = async () => {
-    if (!feedbackSegments.length) {
-      setFeedbackPhase('summary');
-      return;
+    // Synchronous re-entrancy guard: a rapid double-tap must not start two
+    // TTS fetches / two Audio.Sound objects (the first would leak).
+    if (introPlayInFlightRef.current) return;
+    introPlayInFlightRef.current = true;
+    try {
+      if (!feedbackSegments.length) {
+        setFeedbackPhase('summary');
+        return;
+      }
+      setCurrentStepIdx(0);
+      // The bottom-sheet rise is driven by the feedbackPhase useEffect.
+      await startSegmentAudio(feedbackSegments[0], { transitionFromIntro: true });
+    } finally {
+      introPlayInFlightRef.current = false;
     }
-    setCurrentStepIdx(0);
-    // Rise the bottom-sheet card up into place as playback begins.
-    sheetTranslateY.value = SCREEN_HEIGHT;
-    sheetTranslateY.value = withTiming(0, {
-      duration: 460,
-      easing: Easing.out(Easing.cubic),
-    });
-    await startSegmentAudio(feedbackSegments[0], { transitionFromIntro: true });
   };
 
   const scoreLabel =
@@ -2115,11 +2140,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                     const prev = feedbackSegments[currentStepIdx - 1];
                     setCurrentStepIdx((i) => i - 1);
                     setCardReveal('none');
-                    setSegmentListened(false);
                     if (prev) await startSegmentAudio(prev);
                   } else {
+                    // The feedbackPhase useEffect resets the sheet off-screen.
                     introAudioStartedRef.current = false;
-                    sheetTranslateY.value = SCREEN_HEIGHT;
                     setFeedbackPhase('intro');
                   }
                 }}
@@ -2208,7 +2232,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                   )}
                 </>
               ) : (
-                (cardReveal === 'both' || segmentListened) && (
+                cardReveal === 'both' && (
                   <Animated.View
                     entering={FadeInDown.duration(280)}
                     style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
