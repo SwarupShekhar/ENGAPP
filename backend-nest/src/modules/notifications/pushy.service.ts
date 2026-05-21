@@ -29,6 +29,10 @@ export class PushyService {
     }
   }
 
+  hasValidConfig(): boolean {
+    return this.apiKey.trim().length > 0;
+  }
+
   async send(tokens: string[], payload: PushPayload): Promise<SendResult[]> {
     if (!this.apiKey.trim()) {
       return tokens.map((token) => ({
@@ -55,7 +59,12 @@ export class PushyService {
             badge: 1,
             sound: 'default',
           },
-          data: payload.data,
+          data: {
+            ...payload.data,
+            title: payload.title,
+            body: payload.body,
+            message: payload.body,
+          },
         },
         { timeout: 5000 },
       );

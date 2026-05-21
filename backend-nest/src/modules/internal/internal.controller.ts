@@ -7,10 +7,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { NotificationService } from '../notifications/notification.service';
 
 @Controller('internal')
 export class InternalController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationService,
+  ) {}
 
   @Post('provision')
   async provision(
@@ -93,5 +97,19 @@ export class InternalController {
     });
 
     return { status: 'updated' };
+  }
+
+  @Post('notifications-diagnostics')
+  async notificationsDiagnostics(
+    @Headers('x-internal-secret') secret: string,
+  ) {
+    const expectedSecret =
+      process.env.INTERNAL_SECRET ||
+      process.env.INTERNAL_API_KEY ||
+      process.env.INTERNAL_BRIDGE_SECRET;
+    if (!expectedSecret || secret !== expectedSecret) {
+      throw new UnauthorizedException('Invalid internal secret');
+    }
+    return this.notifications.diagnostics();
   }
 }

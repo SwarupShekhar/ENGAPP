@@ -1,9 +1,17 @@
 import { Test } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bull';
 import { NotificationService } from './notification.service';
 import { PushyService } from './pushy.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 
 const mockPushy = { send: jest.fn() };
+const mockQueue = { add: jest.fn() };
+const mockRedis = {
+  getClient: jest.fn(() => ({
+    set: jest.fn().mockResolvedValue('OK'),
+  })),
+};
 const mockPrisma = {
   deviceToken: { findMany: jest.fn(), deleteMany: jest.fn() },
   notificationLog: {
@@ -22,6 +30,8 @@ describe('NotificationService', () => {
         NotificationService,
         { provide: PushyService, useValue: mockPushy },
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: RedisService, useValue: mockRedis },
+        { provide: getQueueToken('notifications'), useValue: mockQueue },
       ],
     }).compile();
     service = module.get(NotificationService);
@@ -32,25 +42,41 @@ describe('NotificationService', () => {
   describe('notify', () => {
     it('skips silently when user has no device tokens', async () => {
       mockPrisma.deviceToken.findMany.mockResolvedValue([]);
+      mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log1' });
 
       await service.notify('user1', 'reminder', { streakDays: 3 });
 
-      expect(mockPushy.send).not.toHaveBeenCalled();
-      expect(mockPrisma.notificationLog.create).not.toHaveBeenCalled();
+      expect(mockQueue.add).toHaveBeenCalled();
+    });
+
+    it('delivers messages immediately without queue', async () => {
+      mockPrisma.deviceToken.findMany.mockResolvedValue([
+        { id: 'dt1', token: 'tok1', platform: 'android' },
+      ]);
+      mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log1' });
+      mockPushy.send.mockResolvedValue([{ token: 'tok1', success: true }]);
+      mockPrisma.notificationLog.update.mockResolvedValue({ id: 'log1' });
+
+      await service.notify('user1', 'message', {
+        senderName: 'Alice',
+        preview: 'Hello there',
+        conversationId: 'conv1',
+        messageId: 'msg1',
+      });
+
+      expect(mockQueue.add).not.toHaveBeenCalled();
+      expect(mockPushy.send).toHaveBeenCalled();
     });
 
     it('writes log before sending and marks failed on error', async () => {
-      mockPrisma.deviceToken.findMany.mockResolvedValue([
-        { token: 'tok1', platform: 'ios' },
-      ]);
       mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log1' });
-      mockPushy.send.mockRejectedValue(new Error('pushy down'));
+      mockQueue.add.mockRejectedValueOnce(new Error('queue down'));
 
       await service.notify('user1', 'reminder', { streakDays: 2 });
 
       expect(mockPrisma.notificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ userId: 'user1', type: 'reminder', status: 'sent' }),
+          data: expect.objectContaining({ userId: 'user1', type: 'reminder', status: 'retrying' }),
         }),
       );
       expect(mockPrisma.notificationLog.update).toHaveBeenCalledWith(
@@ -61,16 +87,21 @@ describe('NotificationService', () => {
       );
     });
 
-    it('removes invalid tokens after send', async () => {
+    it('removes invalid tokens after worker send', async () => {
       mockPrisma.deviceToken.findMany.mockResolvedValue([
         { id: 'dt1', token: 'dead-token', platform: 'android' },
       ]);
-      mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log1' });
       mockPushy.send.mockResolvedValue([
         { token: 'dead-token', success: false, invalidToken: true },
       ]);
+      mockPrisma.notificationLog.update.mockResolvedValue({ id: 'log1' });
 
-      await service.notify('user1', 'message', { senderName: 'Bob', preview: 'hey' });
+      await service.processDelivery({
+        logId: 'log1',
+        userId: 'user1',
+        type: 'message',
+        data: { senderName: 'Bob', preview: 'hey', conversationId: 'conv1' },
+      });
 
       expect(mockPrisma.deviceToken.deleteMany).toHaveBeenCalledWith({
         where: { token: { in: ['dead-token'] } },
@@ -89,7 +120,11 @@ describe('NotificationService', () => {
           attempts: 1,
         },
       ]);
-      mockPrisma.deviceToken.findMany.mockResolvedValue([]);
+      mockPrisma.deviceToken.findMany.mockResolvedValue([
+        { id: 'dt1', token: 'tok1', platform: 'android' },
+      ]);
+      mockPushy.send.mockResolvedValue([{ token: 'tok1', success: true }]);
+      mockPrisma.notificationLog.update.mockResolvedValue({ id: 'log1' });
 
       await service.retryFailed();
 
@@ -99,6 +134,8 @@ describe('NotificationService', () => {
           data: { status: 'retrying' },
         }),
       );
+      expect(mockPushy.send).toHaveBeenCalled();
+      expect(mockQueue.add).not.toHaveBeenCalled();
     });
   });
 });

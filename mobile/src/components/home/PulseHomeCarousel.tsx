@@ -57,39 +57,24 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
   const listRef = useRef<FlatList<PulseSlide>>(null);
 
   const [tasks, setTasks] = useState<LearningTask[] | null>(null);
-  const [loadError, setLoadError] = useState(false);
   const [active, setActive] = useState(0);
   const trackedCarousel = useRef(false);
 
   useEffect(() => {
     let alive = true;
-    const loadTasks = async () => {
-      try {
-        return await tasksApi.getDueTasks();
-      } catch {
-        // Fallback when /tasks/due fails (auth blip, empty SR queue, prod deploy mismatch)
-        return await tasksApi.getPendingTasks();
+    void (async () => {
+      const t = await tasksApi.loadPracticeCarouselTasks();
+      if (!alive) return;
+      setTasks(t);
+      if (!trackedCarousel.current) {
+        trackedCarousel.current = true;
+        analytics.capture(AnalyticsEvents.PRACTICE_CAROUSEL_VIEWED, {
+          due_count: t.length,
+          types: [...new Set(t.map((x) => x.type))],
+          unified_carousel: true,
+        });
       }
-    };
-    loadTasks()
-      .then((t) => {
-        if (!alive) return;
-        setTasks(t);
-        setLoadError(false);
-        if (!trackedCarousel.current) {
-          trackedCarousel.current = true;
-          analytics.capture(AnalyticsEvents.PRACTICE_CAROUSEL_VIEWED, {
-            due_count: t.length,
-            types: [...new Set(t.map((x) => x.type))],
-            unified_carousel: true,
-          });
-        }
-      })
-      .catch(() => {
-        if (!alive) return;
-        setTasks([]);
-        setLoadError(true);
-      });
+    })();
     return () => {
       alive = false;
     };
@@ -130,7 +115,7 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
     const c: { userSaid?: string; spoken?: string; target?: string; correct?: string } =
       item.content || {};
     const userSaid = c.userSaid || c.spoken || '—';
-    const target = c.target || c.correct || '';
+    const target = c.target || c.correct || item.title || 'Practice this correction';
 
     return (
       <View style={styles.card}>
@@ -216,9 +201,11 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
   return (
     <View style={styles.container}>
       {tasksLoading ? (
-        <Text style={styles.hint}>Loading practice cards…</Text>
-      ) : loadError && (tasks?.length ?? 0) === 0 ? (
-        <Text style={styles.hint}>Couldn&apos;t load practice cards — showing phrase only.</Text>
+        <View style={styles.stateCard}>
+          <Ionicons name="hourglass-outline" size={16} color={theme.colors.text.secondary} />
+          <Text style={styles.stateTitle}>Preparing your practice queue</Text>
+          <Text style={styles.stateHint}>Fetching your latest corrections…</Text>
+        </View>
       ) : null}
       {slides.length === 0 ? (
         <View style={[styles.card, { justifyContent: 'center', alignItems: 'center', minHeight: CAROUSEL_MIN_H }]}>
@@ -281,6 +268,40 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       color: theme.colors.text.secondary,
       textAlign: 'center',
       marginBottom: 4,
+    },
+    stateCard: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      backgroundColor: `${theme.colors.surface}EE`,
+      alignItems: 'center',
+      gap: 4,
+      marginBottom: 4,
+    },
+    stateTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.text.primary,
+      textAlign: 'center',
+    },
+    stateHint: {
+      fontSize: 11,
+      color: theme.colors.text.secondary,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: `${theme.colors.primary}20`,
+    },
+    retryButtonText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.colors.primary,
     },
     card: {
       width: CARD_W,
