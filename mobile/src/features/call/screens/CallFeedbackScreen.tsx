@@ -385,12 +385,15 @@ function PronunciationTabs({
   onPractice,
   firstName,
   enteringDelay = 400,
+  embedded = false,
 }: {
   issues: PronIssueNormalized[];
   transcript: string;
   onPractice: (ruleCategory: string, reelId?: string) => void;
   firstName?: string;
   enteringDelay?: number;
+  /** When true, parent section supplies the heading (detail phase). */
+  embedded?: boolean;
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -611,7 +614,7 @@ function PronunciationTabs({
 
   return (
     <Animated.View entering={FadeInDown.delay(enteringDelay).springify()}>
-      <Text style={styles.sectionTitle}>Pronunciation</Text>
+      {!embedded ? <Text style={styles.sectionTitle}>Pronunciation</Text> : null}
       <View style={styles.pronTabsBar}>
         <TabPill id="issues" label={`Issues (${issues.length})`} />
         <TabPill id="transcript" label="Transcript" />
@@ -2284,7 +2287,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
         <TouchableOpacity
           onPress={() => {
-            if (feedbackSteps.length > 0) { setCurrentStepIdx(feedbackSteps.length - 1); setFeedbackPhase('step'); }
+            if (feedbackSegments.length > 0) {
+              setCurrentStepIdx(feedbackSegments.length - 1);
+              setFeedbackPhase('step');
+            }
             else setFeedbackPhase('intro');
           }}
           hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
@@ -2572,6 +2578,9 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
+        <View style={styles.detailContentWrap}>
+        <Text style={styles.detailSectionLabel}>Overview</Text>
+
         {/* Meta Info */}
         <Animated.View
           entering={FadeInDown.delay(100).springify()}
@@ -2708,6 +2717,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </LinearGradient>
         </Animated.View>
 
+        <View style={styles.detailSectionBlock}>
+        <Text style={styles.detailSectionLabel}>Skill scores</Text>
         {cqsData && (
           <CallQualityScoreCard 
             cqs={cqsData.cqs} 
@@ -2737,15 +2748,29 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             onPlay={handlePlay}
           />
         </Animated.View>
+        </View>
 
         {/* Detail Toggle */}
         <TouchableOpacity
-          style={styles.detailToggle}
+          style={styles.detailToggleCard}
           onPress={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
+          activeOpacity={0.85}
         >
-          <Text style={styles.detailToggleText}>
-            {showDetailedAnalysis ? "📊 Hide" : "📊 Show"} Detailed Analysis
-          </Text>
+          <View style={styles.detailToggleRow}>
+            <View style={styles.detailToggleTextCol}>
+              <Text style={styles.detailToggleTitle}>
+                {showDetailedAnalysis ? "Hide deep dive" : "Show deep dive"}
+              </Text>
+              <Text style={styles.detailToggleHint}>
+                Word-level scores, grammar, vocabulary, and practice tips
+              </Text>
+            </View>
+            <Ionicons
+              name={showDetailedAnalysis ? "chevron-up" : "chevron-down"}
+              size={22}
+              color={theme.colors.primary}
+            />
+          </View>
         </TouchableOpacity>
 
         {/* Dev-only: re-run pronunciation for past sessions */}
@@ -2813,6 +2838,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             )}
           </Animated.View>
         )}
+
+        <View style={styles.detailSectionBlock}>
+        <Text style={styles.detailSectionLabel}>Pronunciation</Text>
+        <Text style={styles.detailSectionSubtitle}>
+          Patterns, word fixes, and your highlighted transcript
+        </Text>
 
         {/* Dominant Pronunciation Pattern Card */}
         {(() => {
@@ -2978,11 +3009,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             />
           );
         })()}
+        </View>
 
         {/* Strengths & Areas to Improve */}
         {(data.strengths.length > 0 || data.improvementAreas.length > 0) && (
-          <Animated.View entering={FadeInDown.delay(800).springify()}>
-            <Text style={styles.sectionTitle}>Performance Breakdown</Text>
+          <Animated.View entering={FadeInDown.delay(800).springify()} style={styles.detailSectionBlock}>
+            <Text style={styles.detailSectionLabel}>Performance breakdown</Text>
             <View style={styles.strengthsRow}>
               {data.strengths.length > 0 && (
                 <View
@@ -3046,9 +3078,9 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
-        {/* Key Mistakes (reference the highlighted spots in the conversation above) */}
-        <Text style={styles.sectionTitle}>
-          Key Mistakes {data.mistakes.length > 0 && `(${data.mistakes.length})`}
+        <View style={styles.detailSectionBlock}>
+        <Text style={styles.detailSectionLabel}>
+          Key mistakes{data.mistakes.length > 0 ? ` (${data.mistakes.length})` : ""}
         </Text>
         {data.mistakes.length > 0 && (sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
           <Text style={styles.keyMistakesHint}>
@@ -3079,11 +3111,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             </View>
           </View>
         )}
+        </View>
 
         {/* MAYA AI Summary – engaging, human copy + real data */}
         {mayaHasContent && (
-          <Animated.View entering={FadeInDown.delay(1000).springify()}>
-            <Text style={styles.sectionTitle}>What MAYA noticed</Text>
+          <Animated.View entering={FadeInDown.delay(1000).springify()} style={styles.detailSectionBlock}>
+            <Text style={styles.detailSectionLabel}>What MAYA noticed</Text>
             <LinearGradient
               colors={[
                 theme.colors.primary + "12",
@@ -3206,6 +3239,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           </Animated.View>
         )}
 
+        </View>
+
         {/* Action Buttons */}
         <Animated.View
           entering={FadeInDown.delay(1100).springify()}
@@ -3260,6 +3295,7 @@ const getStyles = (theme: any) => {
     },
     scrollContent: {
       paddingBottom: theme.spacing.xl,
+      gap: 0,
     },
     header: {
       flexDirection: "row",
@@ -3332,8 +3368,8 @@ const getStyles = (theme: any) => {
     },
     listenBtnWrapper: {
       paddingHorizontal: theme.spacing.l,
-      paddingTop: theme.spacing.m,
-      paddingBottom: theme.spacing.xs,
+      paddingTop: 0,
+      paddingBottom: 0,
     },
     listenBtn: {
       flexDirection: "row",
@@ -3585,6 +3621,95 @@ const getStyles = (theme: any) => {
       marginBottom: theme.spacing.m,
       marginTop: theme.spacing.m,
     },
+    detailSection: {
+      marginTop: theme.spacing.xl,
+      paddingTop: theme.spacing.xs,
+    },
+    detailSectionFirst: {
+      marginTop: theme.spacing.m,
+    },
+    detailSectionHeader: {
+      paddingHorizontal: theme.spacing.l,
+      marginBottom: theme.spacing.m,
+    },
+    detailSectionTitle: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "800",
+      color: theme.colors.text.primary,
+      letterSpacing: -0.3,
+    },
+    detailSectionSubtitle: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      marginTop: 6,
+      lineHeight: 20,
+    },
+    detailSectionBody: {
+      gap: theme.spacing.m,
+    },
+    transcriptToggleLabel: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "600",
+      color: theme.colors.text.secondary,
+    },
+    dominantPatternCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      padding: theme.spacing.m,
+      marginHorizontal: theme.spacing.l,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.primary,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadows.small,
+    },
+    dominantPatternKicker: {
+      color: theme.colors.primary,
+      fontSize: 11,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    dominantPatternLabel: {
+      color: theme.colors.text.primary,
+      fontSize: 15,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    dominantPatternExample: {
+      color: theme.colors.text.secondary,
+      fontSize: 13,
+      marginBottom: 8,
+      lineHeight: 20,
+    },
+    dominantPatternTip: {
+      color: theme.colors.text.secondary,
+      fontSize: 12,
+      flex: 1,
+      lineHeight: 18,
+    },
+    detailContentWrap: {
+      paddingHorizontal: theme.spacing.l,
+      gap: theme.spacing.xs,
+    },
+    detailSectionBlock: {
+      marginTop: theme.spacing.l,
+      marginBottom: theme.spacing.s,
+    },
+    detailSectionLabel: {
+      fontSize: theme.typography.sizes.l,
+      fontWeight: "800",
+      color: theme.colors.text.primary,
+      marginBottom: theme.spacing.s,
+      letterSpacing: 0.2,
+    },
+    detailSectionSubtitle: {
+      fontSize: theme.typography.sizes.s,
+      color: theme.colors.text.secondary,
+      lineHeight: 20,
+      marginBottom: theme.spacing.m,
+      marginTop: -theme.spacing.xs,
+    },
     wordsToWorkOnSubtitle: {
       fontSize: theme.typography.sizes.s,
       color: theme.colors.text.secondary,
@@ -3670,7 +3795,8 @@ const getStyles = (theme: any) => {
       ...theme.shadows.medium,
     },
     transcriptSection: {
-      marginBottom: theme.spacing.s,
+      marginBottom: 0,
+      paddingHorizontal: theme.spacing.l,
     },
     transcriptCard: {
       backgroundColor: glassBg,
@@ -3746,7 +3872,6 @@ const getStyles = (theme: any) => {
     keyMistakesHint: {
       fontSize: theme.typography.sizes.xs,
       color: theme.colors.text.secondary,
-      paddingHorizontal: theme.spacing.l,
       marginBottom: theme.spacing.s,
       lineHeight: 18,
     },
@@ -4440,10 +4565,50 @@ const getStyles = (theme: any) => {
       fontWeight: "600",
     },
     detailToggle: {
-      alignSelf: "center",
-      paddingVertical: 12,
-      paddingHorizontal: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      alignSelf: "stretch",
+      marginHorizontal: theme.spacing.l,
+      paddingVertical: 14,
+      paddingHorizontal: theme.spacing.m,
+      borderRadius: theme.borderRadius.l,
+      backgroundColor: theme.colors.primary + "10",
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "28",
       marginBottom: 8,
+    },
+    detailToggleCard: {
+      marginHorizontal: theme.spacing.l,
+      marginTop: theme.spacing.m,
+      marginBottom: theme.spacing.s,
+      paddingVertical: theme.spacing.m,
+      paddingHorizontal: theme.spacing.m,
+      borderRadius: theme.borderRadius.l,
+      borderWidth: 1,
+      borderColor: theme.colors.primary + "35",
+      backgroundColor: theme.colors.primary + "08",
+    },
+    detailToggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: theme.spacing.m,
+    },
+    detailToggleTextCol: {
+      flex: 1,
+    },
+    detailToggleTitle: {
+      color: theme.colors.text.primary,
+      fontSize: theme.typography.sizes.m,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    detailToggleHint: {
+      color: theme.colors.text.secondary,
+      fontSize: theme.typography.sizes.xs,
+      lineHeight: 18,
     },
     detailToggleText: {
       color: theme.colors.primary,
