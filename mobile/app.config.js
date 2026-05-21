@@ -57,7 +57,7 @@ if (process.env.ENGLIVO_WS_URL_OVERRIDE?.trim()) {
 module.exports = {
   expo: {
     name: "Englivo",
-    slug: "englivo",
+    slug: "mobile",
     scheme: "engr",
     version: "1.0.0",
     orientation: "portrait",

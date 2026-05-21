@@ -28,6 +28,66 @@ function loadPushy(): PushyModule | null {
 const STORAGE_KEY = "@pushy_device_token";
 const PUSHY_ENABLED_KEY = "@pushy_enabled";
 
+function flattenPushPayload(raw: PushyPayload): PushyPayload {
+  const nested = raw.notification;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return { ...raw, ...(nested as PushyPayload) };
+  }
+  return raw;
+}
+
+function normalizeNotification(raw: PushyPayload): { title: string; body: string } {
+  const payload = flattenPushPayload(raw);
+  const type = (payload.type as string | undefined) ?? "default";
+  const senderName = (payload.senderName as string | undefined) ?? "Your friend";
+  const callerName = (payload.callerName as string | undefined) ?? senderName;
+  const preview = (payload.preview as string | undefined) ?? "";
+  const explicitTitle = (payload.title as string | undefined)?.trim();
+  const explicitBody =
+    ((payload.message as string | undefined) ??
+      (payload.body as string | undefined) ??
+      "").trim();
+  if (explicitTitle) {
+    return {
+      title: explicitTitle,
+      body: explicitBody || preview || "Open EngR to view details.",
+    };
+  }
+
+  switch (type) {
+    case "message":
+      return {
+        title: preview ? `${senderName}: ${preview}` : `${senderName} sent you a message`,
+        body: preview || explicitBody || "Open chat to read it.",
+      };
+    case "friend_request":
+      return {
+        title: `${senderName} sent a friend request`,
+        body: "Tap to view and respond.",
+      };
+    case "incoming_call":
+      return {
+        title: `${callerName} is calling you`,
+        body: "Tap to open the app and join.",
+      };
+    case "missed_call":
+      return {
+        title: `Missed call from ${callerName}`,
+        body: "Tap to call back.",
+      };
+    case "session_ready":
+      return {
+        title: "Session analysis ready",
+        body: explicitBody || "Tap to see your feedback.",
+      };
+    default:
+      return {
+        title: explicitTitle || "New notification",
+        body: explicitBody || "Open EngR to view details.",
+      };
+  }
+}
+
 class PushNotificationService {
   private static instance: PushNotificationService;
   private isInitialized = false;
@@ -62,16 +122,18 @@ class PushNotificationService {
       Pushy.listen();
 
       Pushy.setNotificationListener(async (data) => {
-        console.log("[Pushy] Received notification:", JSON.stringify(data));
-        this.listeners.forEach((cb) => cb(data));
+        const flat = flattenPushPayload(data);
+        console.log("[Pushy] Received notification:", JSON.stringify(flat));
+        this.listeners.forEach((cb) => cb(flat));
+        const normalized = normalizeNotification(flat);
 
         if (Platform.OS === "android") {
-          const title = (data.title as string) || "EngR";
-          const message =
-            (data.message as string) ||
-            (data.body as string) ||
-            "New notification";
-          Pushy.notify(title, message, data);
+          Pushy.notify(normalized.title, normalized.body, {
+            ...flat,
+            title: normalized.title,
+            body: normalized.body,
+            message: normalized.body,
+          });
         }
 
         if (Platform.OS === "ios") {
@@ -253,6 +315,13 @@ class PushNotificationService {
     switch (type) {
       case "message":
         navigate("Chat", { conversationId });
+        break;
+      case "friend_request":
+        navigate("MainTabs", { screen: "Feedback" });
+        break;
+      case "incoming_call":
+      case "missed_call":
+        navigate("Conversations");
         break;
       case "match":
         navigate("CallPreference");

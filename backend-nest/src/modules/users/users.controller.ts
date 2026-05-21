@@ -29,6 +29,13 @@ export class UsersController {
         return { tasks };
     }
 
+    /** Merged due + pending practice cards for home carousel */
+    @Get('me/tasks/carousel')
+    async getCarouselTasks(@Request() req) {
+        const tasks = await this.tasksService.getCarouselTasksForUser(req.user.id, 8);
+        return { tasks };
+    }
+
     @Post('me/device-token')
     async registerDeviceToken(
         @Body() dto: DeviceTokenDto,

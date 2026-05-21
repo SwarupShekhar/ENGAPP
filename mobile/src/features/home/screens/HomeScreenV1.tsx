@@ -39,7 +39,26 @@ import { FeedbackReadyCard } from '../../../components/home/FeedbackReadyCard';
 import { getHomeData, HomeData } from '../services/homeApi';
 import { sessionsApi, ConversationSession } from '../../../api/sessions';
 
-const HOME_DATA_CACHE_KEY = '@home_data_cache';
+const HOME_DATA_CACHE_KEY = '@home_data_cache_v2';
+
+const STALE_RESUME_CTA = /pick up where you left|saved your progress|restart my journey/i;
+
+function resolvePracticeCta(cta?: HomeData['primaryCTA']) {
+  const blob = `${cta?.title ?? ''} ${cta?.description ?? ''} ${cta?.buttonText ?? ''}`;
+  if (!cta?.title?.trim() || cta.type === 'restart_journey' || STALE_RESUME_CTA.test(blob)) {
+    return {
+      title: 'Start a practice call',
+      description: 'Get matched with someone new — every call is a live conversation',
+      buttonText: 'Find a Partner',
+    };
+  }
+  return {
+    title: cta.title.trim(),
+    description:
+      cta.description?.trim() || 'Match with a partner or warm up with Maya first.',
+    buttonText: cta.buttonText?.trim() || 'Start a Call',
+  };
+}
 const feedbackSeenKey = (sessionId: string) => `@feedback_seen_${sessionId}`;
 
 let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
@@ -776,13 +795,10 @@ export default function HomeScreen() {
     navigation.navigate('CallFeedback', { sessionId: feedbackReadySession.id });
   };
 
-  const primaryCta = homeData?.primaryCTA;
-  const practiceTitle =
-    primaryCta?.title?.trim() || 'Start a practice call';
-  const practiceDescription =
-    primaryCta?.description?.trim() || 'Match with a partner or warm up with Maya first.';
-  const practiceButton =
-    primaryCta?.buttonText?.trim() || 'Start a Call';
+  const practiceCta = resolvePracticeCta(homeData?.primaryCTA);
+  const practiceTitle = practiceCta.title;
+  const practiceDescription = practiceCta.description;
+  const practiceButton = practiceCta.buttonText;
 
   const feedbackOverall =
     feedbackReadySession?.summaryJson?.overall_score ??

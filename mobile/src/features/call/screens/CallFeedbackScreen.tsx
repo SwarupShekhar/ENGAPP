@@ -1965,6 +1965,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     data.overallScore >= 55 ? 'Keep Practicing!' : 'Keep Going!';
 
   const screenBg = theme.colors.background;
+  const stepCardBg = `${String(theme.colors.surface)}EE`;
+  const stepCardBorder = `${String(theme.colors.border)}CC`;
+  const errorSurface = `${String(theme.colors.error)}14`;
+  const successSurface = `${String(theme.colors.success)}14`;
   const segmentCategoryLabel = (cat: FeedbackSection) =>
     cat.charAt(0).toUpperCase() + cat.slice(1);
 
@@ -2218,18 +2222,35 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                   {showYouSaid && (
                     <Animated.View
                       entering={FadeInDown.duration(280)}
-                      style={{ borderLeftWidth: 4, borderLeftColor: theme.colors.error, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 16, marginBottom: 10 }}
+                      style={{
+                        borderLeftWidth: 4,
+                        borderLeftColor: theme.colors.error,
+                        backgroundColor: errorSurface,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: `${String(theme.colors.error)}40`,
+                        padding: 16,
+                        marginBottom: 10,
+                      }}
                     >
-                      <Text style={{ fontSize: 12, color: theme.colors.error, fontWeight: '700', marginBottom: 6 }}>You Said:</Text>
+                      <Text style={{ fontSize: 12, color: theme.colors.error, fontWeight: '800', marginBottom: 6, letterSpacing: 0.3 }}>You Said</Text>
                       <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.youSaid}</Text>
                     </Animated.View>
                   )}
                   {showCorrect && (
                     <Animated.View
                       entering={FadeInDown.duration(280)}
-                      style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+                      style={{
+                        borderLeftWidth: 4,
+                        borderLeftColor: catColor,
+                        backgroundColor: successSurface,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: `${String(catColor)}50`,
+                        padding: 16,
+                      }}
                     >
-                      <Text style={{ fontSize: 12, color: catColor, fontWeight: '700', marginBottom: 6 }}>{currentSegment.correctionLabel}</Text>
+                      <Text style={{ fontSize: 12, color: catColor, fontWeight: '800', marginBottom: 6, letterSpacing: 0.3 }}>{String(currentSegment.correctionLabel).replace(':', '')}</Text>
                       <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.correct}</Text>
                     </Animated.View>
                   )}
@@ -2238,7 +2259,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                 cardReveal === 'both' && (
                   <Animated.View
                     entering={FadeInDown.duration(280)}
-                    style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+                    style={{
+                      borderLeftWidth: 4,
+                      borderLeftColor: catColor,
+                      backgroundColor: successSurface,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: `${String(catColor)}50`,
+                      padding: 16,
+                    }}
                   >
                     <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.fluencyNote}</Text>
                   </Animated.View>
@@ -2341,18 +2370,32 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                   </View>
                   {catSteps.map((step) => (
                     <View key={step.id} style={{
-                      backgroundColor: 'white', borderRadius: 12, padding: 14, marginBottom: 8,
+                      backgroundColor: stepCardBg, borderRadius: 12, padding: 14, marginBottom: 8,
+                      borderWidth: 1, borderColor: stepCardBorder,
                       flexDirection: 'row', alignItems: 'flex-start',
                       shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1,
                     }}>
                       <View style={{ flex: 1 }}>
-                        <View style={{ backgroundColor: '#FEF2F2', borderRadius: 6, padding: 10, marginBottom: 8 }}>
-                          <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '700', marginBottom: 3 }}>You Said:</Text>
-                          <Text style={{ fontSize: 14, color: '#374151' }}>{step.youSaid}</Text>
+                        <View style={{
+                          backgroundColor: errorSurface,
+                          borderRadius: 8,
+                          padding: 10,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: `${String(theme.colors.error)}40`,
+                        }}>
+                          <Text style={{ fontSize: 11, color: theme.colors.error, fontWeight: '800', marginBottom: 3, letterSpacing: 0.2 }}>You Said</Text>
+                          <Text style={{ fontSize: 14, color: theme.colors.text.primary }}>{step.youSaid}</Text>
                         </View>
-                        <View style={{ backgroundColor: catBgColor, borderRadius: 6, padding: 10 }}>
-                          <Text style={{ fontSize: 11, color: catCol, fontWeight: '700', marginBottom: 3 }}>{step.correctionLabel}</Text>
-                          <Text style={{ fontSize: 14, color: '#374151' }}>{step.correct}</Text>
+                        <View style={{
+                          backgroundColor: successSurface,
+                          borderRadius: 8,
+                          padding: 10,
+                          borderWidth: 1,
+                          borderColor: `${String(catCol)}50`,
+                        }}>
+                          <Text style={{ fontSize: 11, color: catCol, fontWeight: '800', marginBottom: 3, letterSpacing: 0.2 }}>{String(step.correctionLabel).replace(':', '')}</Text>
+                          <Text style={{ fontSize: 14, color: theme.colors.text.primary }}>{step.correct}</Text>
                         </View>
                       </View>
                       <TouchableOpacity onPress={() => playFeedbackStepSnippet(step)} style={{ padding: 8, marginLeft: 10 }} activeOpacity={0.7}>
@@ -3675,6 +3718,11 @@ const getStyles = (theme: any) => {
       marginBottom: theme.spacing.s,
       gap: theme.spacing.m,
       paddingHorizontal: theme.spacing.l,
+      paddingVertical: theme.spacing.s,
+      borderRadius: 18,
+      backgroundColor: `${String(theme.colors.surface)}88`,
+      borderWidth: 1,
+      borderColor: `${String(theme.colors.border)}88`,
     },
     detailSectionLabel: {
       fontSize: theme.typography.sizes.l,
@@ -3687,8 +3735,8 @@ const getStyles = (theme: any) => {
       fontSize: theme.typography.sizes.s,
       color: theme.colors.text.secondary,
       lineHeight: 20,
-      marginBottom: theme.spacing.m,
-      marginTop: -theme.spacing.xs,
+      marginBottom: theme.spacing.s,
+      marginTop: 0,
     },
     wordsToWorkOnSubtitle: {
       fontSize: theme.typography.sizes.s,
@@ -4252,15 +4300,15 @@ const getStyles = (theme: any) => {
     originalText: {
       flex: 1,
       fontSize: theme.typography.sizes.s,
-      color: theme.colors.error,
-      textDecorationLine: "line-through",
+      color: `${String(theme.colors.error)}`,
+      fontWeight: "600",
       lineHeight: 20,
     },
     correctedText: {
       flex: 1,
       fontSize: theme.typography.sizes.s,
-      color: theme.colors.success,
-      fontWeight: "500",
+      color: `${String(theme.colors.success)}`,
+      fontWeight: "700",
       lineHeight: 20,
     },
     explanationContainer: {
