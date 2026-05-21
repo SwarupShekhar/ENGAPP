@@ -21,16 +21,20 @@ export class PushyService {
   private readonly apiKey: string;
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = this.config.get<string>('PUSHY_API_KEY') ?? '';
+    this.apiKey = resolvePushyApiKey(config);
+    if (!this.apiKey.trim()) {
+      this.logger.warn(
+        '[Pushy] No API key (set PUSHY_API_KEY or PUSHY_ME_API_KEY in backend-nest/.env); skipping push delivery',
+      );
+    }
   }
 
   async send(tokens: string[], payload: PushPayload): Promise<SendResult[]> {
     if (!this.apiKey.trim()) {
-      this.logger.warn('[Pushy] PUSHY_API_KEY is not set; skipping push delivery');
       return tokens.map((token) => ({
         token,
         success: false,
-        error: 'PUSHY_API_KEY not configured',
+        error: 'Pushy API key not configured',
       }));
     }
     return Promise.all(tokens.map((token) => this.sendOne(token, payload)));
@@ -38,7 +42,7 @@ export class PushyService {
 
   private async sendOne(token: string, payload: PushPayload): Promise<SendResult> {
     if (!this.apiKey.trim()) {
-      return { token, success: false, error: 'PUSHY_API_KEY not configured' };
+      return { token, success: false, error: 'Pushy API key not configured' };
     }
     try {
       await axios.post(
@@ -66,4 +70,11 @@ export class PushyService {
       return { token, success: false, error: errorMsg, invalidToken: isInvalid };
     }
   }
+}
+
+/** Nest reads PUSHY_API_KEY; some deployments use PUSHY_ME_API_KEY from the Pushy dashboard label. */
+export function resolvePushyApiKey(config: ConfigService): string {
+  const primary = config.get<string>('PUSHY_API_KEY')?.trim() ?? '';
+  if (primary) return primary;
+  return config.get<string>('PUSHY_ME_API_KEY')?.trim() ?? '';
 }

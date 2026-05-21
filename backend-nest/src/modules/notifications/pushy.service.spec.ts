@@ -53,6 +53,36 @@ describe('PushyService', () => {
     expect(results[1].error).toBe('network error');
   });
 
+  it('accepts PUSHY_ME_API_KEY when PUSHY_API_KEY is unset', async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        PushyService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              key === 'PUSHY_ME_API_KEY' ? 'legacy-key' : undefined,
+          },
+        },
+      ],
+    }).compile();
+    const legacyService = module.get(PushyService);
+    mockedPost.mockResolvedValue({ data: { success: true } });
+
+    const results = await legacyService.send(['tok1'], {
+      title: 'Hi',
+      body: '',
+      data: {},
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      expect.stringContaining('api_key=legacy-key'),
+      expect.any(Object),
+      expect.any(Object),
+    );
+    expect(results[0].success).toBe(true);
+  });
+
   it('flags invalid tokens so caller can purge them', async () => {
     mockedPost.mockRejectedValue({
       response: { data: { error: 'DeviceNotRegistered' } },
