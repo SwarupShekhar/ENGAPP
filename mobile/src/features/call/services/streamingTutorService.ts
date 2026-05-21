@@ -1,14 +1,27 @@
 import Constants from "expo-constants";
 import { API_URL as NEST_API_URL } from "../../../api/client";
 import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
+import { readExpoExtra } from "../../../api/expoExtra";
+
+/** Vultr backend-ai WebSocket port (not exposed on api.englivo.com — only Nest is behind Caddy). */
+const VULTR_AI_WS_ORIGIN = "wss://139.84.163.249:4002";
 
 export interface StreamChunk {
-  type: "sentence" | "audio" | "error" | "timeout" | "transcription" | "transcript" | "done";
+  type:
+    | "sentence"
+    | "audio"
+    | "error"
+    | "timeout"
+    | "transcription"
+    | "transcript"
+    | "phonetic_ready"
+    | "done";
   text?: string;
   audio?: string; // base64
   message?: string;
   is_final?: boolean;
   assessmentResult?: any;
+  timings?: { trace_id?: string; ms?: Record<string, number> };
 }
 
 type StreamCallback = (chunk: StreamChunk) => void;
@@ -29,26 +42,43 @@ class StreamingTutorService {
     }
   }
 
+  isConnected(): boolean {
+    return (
+      this.ws != null &&
+      (this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING)
+    );
+  }
+
+  /** Open WS only when needed (e.g. SSE fallback). Preserves registered onMessage handlers. */
+  ensureConnected(sessionId: string, userId: string) {
+    if (this.isConnected()) return;
+    this.connect(sessionId, userId);
+  }
+
   connect(sessionId: string, userId: string) {
     if (this.ws) {
       this.ws.close();
     }
     this.pendingSends = [];
-    this.callbacks = [];
     const IS_PROD = !__DEV__;
     let wsUrl: string;
 
-    // Explicit override wins (set via ENGLIVO_WS_URL_OVERRIDE in .env.local for internal builds)
-    const wsOverride = ((Constants.expoConfig as any)?.extra?.englivoWsUrlOverride as string | undefined)?.trim();
+    // Explicit override wins (ENGLIVO_WS_URL_OVERRIDE in .env → app.config extra)
+    const wsOverride = (readExpoExtra("englivoWsUrlOverride") ?? "").trim();
     if (wsOverride) {
       wsUrl = wsOverride;
     } else if (IS_PROD) {
-      // REST may hit Nest (:4001); tutor WebSocket is on backend-ai (:4002 on Vultr).
       const nestBase = NEST_API_URL.replace(/\/$/, "");
       try {
         const u = new URL(nestBase.startsWith("http") ? nestBase : `http://${nestBase}`);
         const wsScheme = u.protocol === "https:" ? "wss" : "ws";
-        wsUrl = `${wsScheme}://${u.hostname}:4002`;
+        // api.englivo.com only reverse-proxies Nest; backend-ai WS stays on Vultr :4002.
+        if (u.hostname === "api.englivo.com") {
+          wsUrl = VULTR_AI_WS_ORIGIN;
+        } else {
+          wsUrl = `${wsScheme}://${u.hostname}:4002`;
+        }
       } catch {
         const base = ENGLIVO_API_URL.replace(/\/$/, "");
         wsUrl = base.startsWith("https://")
@@ -68,9 +98,13 @@ class StreamingTutorService {
       }
     }
 
-    this.ws = new WebSocket(
-      `${wsUrl}/api/tutor/ws/${sessionId}?user_id=${userId}`,
-    );
+    const fullWs = `${wsUrl}/api/tutor/ws/${sessionId}?user_id=${userId}`;
+    if (__DEV__) {
+      console.log("[StreamingTutor] Connecting", fullWs);
+    } else {
+      console.log(`[EngR] Tutor WS fallback: ${wsUrl}`);
+    }
+    this.ws = new WebSocket(fullWs);
 
     this.ws.onopen = () => {
       if (__DEV__) console.log("[StreamingTutor] Connected");
@@ -96,11 +130,17 @@ class StreamingTutorService {
     };
   }
 
-  sendText(text: string | null, phoneticContext?: any, audioBase64?: string) {
+  sendText(
+    text: string | null,
+    phoneticContext?: any,
+    audioBase64?: string,
+    traceId?: string,
+  ) {
     const payload: Record<string, unknown> = {};
     if (text) payload.text = text;
     if (phoneticContext) payload.phonetic_context = phoneticContext;
     if (audioBase64) payload.audio_base64 = audioBase64;
+    if (traceId) payload.trace_id = traceId;
     const raw = JSON.stringify(payload);
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {

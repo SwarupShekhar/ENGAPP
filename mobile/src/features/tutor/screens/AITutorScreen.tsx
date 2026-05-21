@@ -9,8 +9,14 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+
+let Haptics: { impactAsync: (s: any) => Promise<void>; ImpactFeedbackStyle: { Light: any; Medium: any } } = {
+  impactAsync: async () => {},
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
+};
+try { Haptics = require('expo-haptics'); } catch { /* optional */ }
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +39,15 @@ import { streamingTutor, StreamChunk } from "../../call/services/streamingTutorS
 import { PronunciationBreakdown } from "../../../components/PronunciationBreakdown";
 import { bridgeApi } from "../../../api/bridgeApi";
 import { getCachedToken } from "../../../api/authToken";
+import {
+  activeLatencyTimeline,
+  type LatencyTrace,
+} from "../../../utils/latencyTimeline";
+import { LatencyTimelinePanel } from "../../../components/debug/LatencyTimelinePanel";
+import {
+  createRecordingMeteringCallback,
+  resolveVadProvider,
+} from "../voice/voiceActivityDetector";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -226,6 +241,7 @@ export default function AITutorScreen({ navigation }: any) {
   const [firstChunkLatencyMs, setFirstChunkLatencyMs] = useState<number | null>(
     null,
   );
+  const [latencyTrace, setLatencyTrace] = useState<LatencyTrace | null>(null);
   const [referenceTextForNextTurn, setReferenceTextForNextTurn] = useState<
     string | null
   >(null);
@@ -262,12 +278,7 @@ export default function AITutorScreen({ navigation }: any) {
     }
   };
 
-  // VAD Refs
-  const silenceStartRef = useRef<number | null>(null);
-  const isSpeakingRef = useRef(false);
-  const silenceThresholdDb = -50; // Silence threshold
-  const speechThresholdDb = -45; // Speech threshold
-  const silenceDurationMs = 800; // 800ms silence to trigger end
+  const turnTraceIdRef = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -351,14 +362,10 @@ export default function AITutorScreen({ navigation }: any) {
           ? prewarmRef.current.then(([, r]) => r)
           : tutorApi.startSession(user?.id || "test");
 
-        // Fire WS connect the moment session resolves — don't wait for perm
-        const wsAndSessionPromise = sessionPromise.then((res) => {
-          streamingTutor.connect(res.sessionId, user?.id || "test");
-          streamingTutor.onMessage((c) => streamHandlerRef.current(c));
-          return res;
-        });
+        const [perm, res] = await Promise.all([permPromise, sessionPromise]);
 
-        const [perm, res] = await Promise.all([permPromise, wsAndSessionPromise]);
+        // SSE is primary — register WS handler now; connect lazily on SSE failure only.
+        streamingTutor.onMessage((c) => streamHandlerRef.current(c));
 
         if (perm.status !== "granted") {
           Alert.alert("Permission Required", "Microphone access is needed.");
@@ -390,8 +397,10 @@ export default function AITutorScreen({ navigation }: any) {
       sseAbortRef.current?.abort();
       streamingTutor.disconnect();
       if (soundRef.current) soundRef.current.unloadAsync();
-      for (const s of soundPoolRef.current) {
+      for (let i = 0; i < soundPoolRef.current.length; i++) {
+        const s = soundPoolRef.current[i];
         if (s) s.unloadAsync().catch(() => {});
+        soundPoolRef.current[i] = null;
       }
       if (recordingRef.current) stopRecording(); // Ensure recording stops
 
@@ -413,6 +422,17 @@ export default function AITutorScreen({ navigation }: any) {
 
   // ─── Stream Handling ────────────────────────────────────
   const handleStreamMessage = (chunk: StreamChunk) => {
+    if (chunk.type === "phonetic_ready") {
+      activeLatencyTimeline.markInstant("phonetic_ready");
+    }
+    if (chunk.type === "done") {
+      if (chunk.timings?.ms) {
+        activeLatencyTimeline.mergeServerTimings(chunk.timings.ms);
+      }
+      activeLatencyTimeline.finish();
+      setLatencyTrace(activeLatencyTimeline.getSnapshot());
+    }
+
     // First meaningful chunk latency marker for this turn.
     if (!firstChunkSeenRef.current) {
       const isMeaningfulChunk =
@@ -423,6 +443,16 @@ export default function AITutorScreen({ navigation }: any) {
       if (isMeaningfulChunk && turnStartMsRef.current) {
         firstChunkSeenRef.current = true;
         setFirstChunkLatencyMs(Date.now() - turnStartMsRef.current);
+        activeLatencyTimeline.endSpan("sse_request");
+        if (chunk.type === "transcript" || chunk.type === "transcription") {
+          activeLatencyTimeline.markInstant("sse_transcript");
+        }
+        if (chunk.type === "sentence") {
+          activeLatencyTimeline.markInstant("first_sentence");
+        }
+        if (chunk.type === "audio") {
+          activeLatencyTimeline.markInstant("first_audio");
+        }
       }
     }
 
@@ -589,6 +619,7 @@ export default function AITutorScreen({ navigation }: any) {
   // ─── Recording ──────────────────────────────────────────
   const startRecording = async () => {
     if (isProcessing || isStreaming || isRecording) return; // Block while streaming/recording
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       const perm = await Audio.requestPermissionsAsync();
       if (perm.status !== "granted") return;
@@ -600,35 +631,23 @@ export default function AITutorScreen({ navigation }: any) {
         } catch (e) {}
         recordingRef.current = null;
       }
+      activeLatencyTimeline.markInstant("vad_listen_start", {
+        provider: resolveVadProvider(),
+      });
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        (status) => {
-          if (status.metering !== undefined) {
-            const level = status.metering;
-
-            // Check for speech
-            if (level > speechThresholdDb) {
-              isSpeakingRef.current = true;
-              silenceStartRef.current = null; // Reset silence timer
+        createRecordingMeteringCallback(
+          () => stopRecording(),
+          (vadStatus, meta) => {
+            if (vadStatus === "speech_start") {
+              activeLatencyTimeline.markInstant("vad_speech_start", meta);
             }
-
-            // Check for silence
-            if (level < silenceThresholdDb && isSpeakingRef.current) {
-              if (silenceStartRef.current === null) {
-                silenceStartRef.current = Date.now();
-              } else {
-                const silenceDuration = Date.now() - silenceStartRef.current;
-                if (silenceDuration > silenceDurationMs) {
-                  // User finished speaking
-                  stopRecording();
-                  isSpeakingRef.current = false;
-                  silenceStartRef.current = null;
-                }
-              }
+            if (vadStatus === "speech_end") {
+              activeLatencyTimeline.markInstant("vad_speech_end", meta);
             }
-          }
-        },
-        100, // Metering interval ms
+          },
+        ),
+        100,
       );
       recordingRef.current = recording;
       setIsRecording(true);
@@ -646,8 +665,11 @@ export default function AITutorScreen({ navigation }: any) {
     setIsProcessing(true);
 
     try {
+      let recordedDurationMs = 0;
       try {
         const status = await recording.getStatusAsync();
+        recordedDurationMs =
+          typeof status.durationMillis === "number" ? status.durationMillis : 0;
         if (status.isRecording) {
           await recording.stopAndUnloadAsync();
         } else if (status.isDoneRecording) {
@@ -670,25 +692,39 @@ export default function AITutorScreen({ navigation }: any) {
         return;
       }
 
+      if (recordedDurationMs > 0 && recordedDurationMs < 350) {
+        if (__DEV__) {
+          console.log("[AITutor] Ignoring short recording tap", recordedDurationMs, "ms");
+        }
+        setIsProcessing(false);
+        return;
+      }
+
       if (uri) {
-        // Mark turn start timing for debug visibility.
+        const traceId = activeLatencyTimeline.start("maya_turn");
+        turnTraceIdRef.current = traceId;
+        activeLatencyTimeline.markInstant("recording_stop");
+
         turnStartMsRef.current = Date.now();
         firstChunkSeenRef.current = false;
         setFirstChunkLatencyMs(null);
         setTurnStartAtLabel(new Date(turnStartMsRef.current).toLocaleTimeString());
 
-        // 1. Prepare Audio Base64 (always needed now)
-        let audioBase64: string | undefined;
-        try {
-          audioBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        } catch (e) {
-          console.warn("[AITutor] Could not read audio file:", e);
-        }
-
         const refText = referenceTextForNextTurn;
         const activeSessionId = sessionIdRef.current;
+
+        // Parallelize: base64 encode (needed only for WS fallback) + token fetch simultaneously
+        activeLatencyTimeline.startSpan("audio_read");
+        const [audioBase64, token] = await Promise.all([
+          FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
+            .catch((e) => { console.warn("[AITutor] Could not read audio file:", e); return undefined; }),
+          getToken ? getCachedToken(getToken) : Promise.resolve<string | null>(null),
+        ]);
+        activeLatencyTimeline.endSpan("audio_read");
+
         if (refText && activeSessionId) {
           setReferenceTextForNextTurn(null);
+          activeLatencyTimeline.startSpan("assess_pronunciation");
           const assessForm = new FormData();
           assessForm.append("audio", {
             uri,
@@ -701,6 +737,7 @@ export default function AITutorScreen({ navigation }: any) {
           void tutorApi
             .assessPronunciation(assessForm)
             .then((res) => {
+              activeLatencyTimeline.endSpan("assess_pronunciation");
               setTranscript((prev) =>
                 prev.map((m) =>
                   m.tempId && m.speaker === "user"
@@ -715,6 +752,7 @@ export default function AITutorScreen({ navigation }: any) {
               );
             })
             .catch((e) => {
+              activeLatencyTimeline.endSpan("assess_pronunciation");
               if (__DEV__) console.warn("[AITutor] parallel assess failed:", e);
             });
         }
@@ -737,15 +775,18 @@ export default function AITutorScreen({ navigation }: any) {
           name: "audio.m4a",
         } as any);
         formData.append("sessionId", activeSessionId || "");
+        if (turnTraceIdRef.current) {
+          formData.append("traceId", turnTraceIdRef.current);
+        }
 
         let usedSSE = false;
         let sseSkipped = false;
-        const token = getToken ? await getCachedToken(getToken) : null;
         if (token && activeSessionId) {
             try {
               sseAbortRef.current?.abort();
               const abortController = new AbortController();
               sseAbortRef.current = abortController;
+              activeLatencyTimeline.startSpan("sse_request");
               const response = await tutorApi.streamSpeech(formData, {
                 Authorization: `Bearer ${token}`,
               }, abortController.signal);
@@ -783,6 +824,9 @@ export default function AITutorScreen({ navigation }: any) {
                       const chunk = JSON.parse(line.slice(6).trim());
                       if (chunk.type === "transcript" && chunk.text) userTranscript = chunk.text;
                       if (chunk.type === "sentence" && chunk.text) aiText += (aiText ? " " : "") + chunk.text;
+                      if (chunk.type === "done" && chunk.timings?.ms) {
+                        activeLatencyTimeline.mergeServerTimings(chunk.timings.ms);
+                      }
                       handleStreamMessage(chunk);
                     } catch (_) {
                       /* incomplete or invalid chunk */
@@ -845,7 +889,18 @@ export default function AITutorScreen({ navigation }: any) {
             if (!sseSkipped) {
               setStreamPath("ws-fallback");
             }
-            streamingTutor.sendText(null, null, audioBase64);
+            if (activeSessionId) {
+              streamingTutor.ensureConnected(
+                activeSessionId,
+                user?.id || "test",
+              );
+            }
+            streamingTutor.sendText(
+              null,
+              null,
+              audioBase64,
+              turnTraceIdRef.current ?? undefined,
+            );
           } else if (!usedSSE && !audioBase64) {
             setStreamPath("ws-fallback");
             setStreamDebugReason("no_audio_base64");
@@ -997,12 +1052,16 @@ export default function AITutorScreen({ navigation }: any) {
           {__DEV__ && (
             <View style={styles.debugBadge}>
               <Text style={styles.debugBadgeText}>
-                stream: {streamPath} ({streamDebugReason})
+                stream: {streamPath} ({streamDebugReason}) • vad: {resolveVadProvider()}
               </Text>
               <Text style={styles.debugBadgeText}>
                 turnStart: {turnStartAtLabel} • firstChunk:{" "}
                 {firstChunkLatencyMs === null ? "pending" : `${firstChunkLatencyMs}ms`}
               </Text>
+              <LatencyTimelinePanel
+                trace={latencyTrace}
+                extra={turnTraceIdRef.current ?? undefined}
+              />
             </View>
           )}
         </View>

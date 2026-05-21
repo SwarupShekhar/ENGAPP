@@ -101,6 +101,12 @@ class Settings(BaseSettings):
     # Rate Limiting
     rate_limit_per_minute: int = 60
     rate_limit_per_hour: int = 1000
+
+    # Tutor streaming: pronunciation enrichment (Phase 2.1)
+    # Max ms to wait for PA before starting Gemini (0 = never wait, stream immediately).
+    pa_stream_wait_ms: int = 600
+    # Max concurrent Azure PA enrichments process-wide (protects single-node Vultr).
+    pa_enrich_max_concurrent: int = 8
     
     # Monitoring
     sentry_dsn: Optional[str] = None

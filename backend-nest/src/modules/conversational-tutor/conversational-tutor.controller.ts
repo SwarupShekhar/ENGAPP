@@ -53,6 +53,7 @@ export class ConversationalTutorController {
     @Res({ passthrough: false }) res: Response,
     @UploadedFile() audio: Express.Multer.File,
     @Body('sessionId') sessionId: string,
+    @Body('traceId') traceId: string | undefined,
     @Request() req,
   ) {
     if (!audio) throw new BadRequestException('Audio file is required');
@@ -63,6 +64,7 @@ export class ConversationalTutorController {
       req.user.id,
       sessionId,
       res,
+      traceId,
     );
   }
 
