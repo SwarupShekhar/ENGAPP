@@ -35,9 +35,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
 import PulseHomeCarousel from '../../../components/home/PulseHomeCarousel';
+import { FeedbackReadyCard } from '../../../components/home/FeedbackReadyCard';
 import { getHomeData, HomeData } from '../services/homeApi';
+import { sessionsApi, ConversationSession } from '../../../api/sessions';
 
 const HOME_DATA_CACHE_KEY = '@home_data_cache';
+const feedbackSeenKey = (sessionId: string) => `@feedback_seen_${sessionId}`;
 
 let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
   impactAsync: async () => {},
@@ -564,6 +567,51 @@ function timeGreeting(): string {
   return 'Good evening';
 }
 
+function PracticeCallCard({
+  title,
+  description,
+  buttonText,
+  onPress,
+  theme,
+}: {
+  title: string;
+  description: string;
+  buttonText: string;
+  onPress: () => void;
+  theme: any;
+}) {
+  const c = theme.colors;
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88}>
+      <LinearGradient
+        colors={[`${c.primary}22`, `${c.surface}FF`] as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[st.practiceCtaCard, { borderColor: `${c.primary}40` }]}
+      >
+        <View style={st.practiceCtaIcon}>
+          <Ionicons name="call" size={22} color={c.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[st.practiceCtaTitle, { color: c.text.primary }]}>{title}</Text>
+          <Text style={[st.practiceCtaDesc, { color: c.text.secondary }]}>{description}</Text>
+        </View>
+        <View style={[st.practiceCtaBtn, { backgroundColor: c.primary }]}>
+          <Text style={st.practiceCtaBtnTxt}>{buttonText}</Text>
+          <Ionicons name="arrow-forward" size={16} color="#fff" />
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
+function sessionHasFeedbackReady(session: ConversationSession): boolean {
+  if (session.status !== 'COMPLETED') return false;
+  const summaryScore = session.summaryJson?.overall_score;
+  if (typeof summaryScore === 'number' && summaryScore > 0) return true;
+  return (session.analyses?.length ?? 0) > 0;
+}
+
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { user, isLoaded } = useUser();
@@ -578,6 +626,7 @@ export default function HomeScreen() {
   const [phraseIdx, setPhraseIdx]     = useState(0); // kept for type compat, unused
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
+  const [feedbackReadySession, setFeedbackReadySession] = useState<ConversationSession | null>(null);
 
   const c = theme.colors;
 
@@ -608,6 +657,29 @@ export default function HomeScreen() {
           console.warn('[HomeV1] home data:', e);
         } finally {
           if (alive) setLoadingHome(false);
+        }
+
+        try {
+          const sessions = await sessionsApi.listSessions();
+          if (!alive) return;
+          const sorted = [...sessions]
+            .filter(sessionHasFeedbackReady)
+            .sort((a, b) => {
+              const ta = new Date(a.endedAt ?? a.startedAt).getTime();
+              const tb = new Date(b.endedAt ?? b.startedAt).getTime();
+              return tb - ta;
+            });
+          for (const session of sorted) {
+            const seen = await AsyncStorage.getItem(feedbackSeenKey(session.id));
+            if (!seen) {
+              setFeedbackReadySession(session);
+              return;
+            }
+          }
+          setFeedbackReadySession(null);
+        } catch (e) {
+          console.warn('[HomeV1] feedback-ready scan:', e);
+          if (alive) setFeedbackReadySession(null);
         }
       };
 
@@ -696,6 +768,25 @@ export default function HomeScreen() {
   const goAssess   = () => navigation.navigate('AssessmentIntro');
   const goChat     = () => navigation.navigate('Conversations');
   const goNotifs   = () => navigation.navigate('Notifications');
+  const goPracticeCall = () => navigation.navigate('CallPreference');
+  const goFeedbackReady = async () => {
+    if (!feedbackReadySession) return;
+    await AsyncStorage.setItem(feedbackSeenKey(feedbackReadySession.id), '1');
+    setFeedbackReadySession(null);
+    navigation.navigate('CallFeedback', { sessionId: feedbackReadySession.id });
+  };
+
+  const primaryCta = homeData?.primaryCTA;
+  const practiceTitle =
+    primaryCta?.title?.trim() || 'Start a practice call';
+  const practiceDescription =
+    primaryCta?.description?.trim() || 'Match with a partner or warm up with Maya first.';
+  const practiceButton =
+    primaryCta?.buttonText?.trim() || 'Start a Call';
+
+  const feedbackOverall =
+    feedbackReadySession?.summaryJson?.overall_score ??
+    (feedbackReadySession?.analyses?.[0]?.scores as { overall?: number } | undefined)?.overall;
 
   return (
     <View style={[st.root, { backgroundColor: c.background }]}>
@@ -770,7 +861,31 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {/* ── Practice + phrase carousel ──────────────────────────────────── */}
+        {!loadingHome && (
+          <Animated.View entering={FadeInDown.delay(180).duration(380).springify()}>
+            <PracticeCallCard
+              title={practiceTitle}
+              description={practiceDescription}
+              buttonText={practiceButton}
+              onPress={goPracticeCall}
+              theme={theme}
+            />
+          </Animated.View>
+        )}
+
+        {!loadingHome && feedbackReadySession && (
+          <Animated.View entering={FadeInDown.delay(200).duration(380).springify()}>
+            <FeedbackReadyCard
+              onPress={() => void goFeedbackReady()}
+              timeAgo="Just now"
+              overallScore={
+                typeof feedbackOverall === 'number' ? Math.round(feedbackOverall) : undefined
+              }
+            />
+          </Animated.View>
+        )}
+
+        {/* ── Phrase carousel ─────────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(210).duration(380).springify()} style={{ gap: 10 }}>
           <PulseHomeCarousel phrase={phrases[0] ?? null} loadingPhrase={loadingPhrase} />
         </Animated.View>
@@ -839,6 +954,34 @@ const st = StyleSheet.create({
   nudgeSub: { fontSize:13, lineHeight:20, textAlign:'center', paddingHorizontal:8 },
   nudgeBtn: { flexDirection:'row', alignItems:'center', justifyContent:'center', paddingVertical:14, borderRadius:10, gap:8 },
   nudgeBtnTxt: { color:'#fff', fontSize:15, fontWeight:'700', letterSpacing:0.2 },
+
+  practiceCtaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  practiceCtaIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(139,92,246,0.14)',
+  },
+  practiceCtaTitle: { fontSize: 15, fontWeight: '800', marginBottom: 3 },
+  practiceCtaDesc: { fontSize: 12, lineHeight: 17 },
+  practiceCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  practiceCtaBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   // Score card
   scoreCard: { borderWidth:1, padding:CPAD, gap:16 },
