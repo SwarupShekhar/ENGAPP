@@ -414,6 +414,40 @@ export class TasksService {
         });
     }
 
+    /**
+     * Home carousel: merge SR-due, pending, and daily queues (deduped).
+     * One endpoint so the app does not fail when /tasks/due is empty or unavailable.
+     */
+    async getCarouselTasksForUser(userId: string, limit = 8) {
+        const byId = new Map<string, Awaited<ReturnType<typeof this.getDueTasksForUser>>[number]>();
+
+        const add = (rows: Awaited<ReturnType<typeof this.getDueTasksForUser>>) => {
+            for (const row of rows) {
+                if (row?.id) byId.set(row.id, row);
+            }
+        };
+
+        add(await this.getDueTasksForUser(userId, limit));
+
+        const pending = await this.getPendingTasksForUser(userId, limit);
+        add(pending);
+
+        const daily = await this.getDailyTasks(userId);
+        add(daily.slice(0, limit));
+
+        const list = [...byId.values()];
+        list.sort((a, b) => {
+            const tr = this.dueTaskTypeRank(a.type) - this.dueTaskTypeRank(b.type);
+            if (tr !== 0) return tr;
+            const sa = Number((a.content as { severityScore?: number })?.severityScore ?? 0);
+            const sb = Number((b.content as { severityScore?: number })?.severityScore ?? 0);
+            if (sb !== sa) return sb - sa;
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        });
+
+        return list.slice(0, limit);
+    }
+
     async completeTaskForUser(taskId: string, userId: string) {
         const task = await this.prisma.learningTask.findFirst({
             where: { id: taskId, userId },

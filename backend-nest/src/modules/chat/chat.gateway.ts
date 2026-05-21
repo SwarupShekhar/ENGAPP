@@ -37,6 +37,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // userId → Set of socketIds (supports multi-device)
   private onlineUsers = new Map<string, Set<string>>();
+  private pendingMissedCallTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private clerkService: ClerkService,
@@ -169,23 +170,31 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       if (conversation) {
-        const offlineUserIds: string[] = [];
-        conversation.participants.forEach((p) => {
+        const pushRecipientIds: string[] = [];
+        for (const p of conversation.participants) {
           this.server.to(`user:${p.userId}`).emit('new_message', {
             conversationId: data.conversationId,
             message,
           });
-          if (p.userId !== client.userId && !this.onlineUsers.has(p.userId)) {
-            offlineUserIds.push(p.userId);
+          if (p.userId === client.userId) continue;
+          const viewing = await this.isUserViewingConversation(
+            p.userId,
+            data.conversationId,
+          );
+          if (!viewing) {
+            pushRecipientIds.push(p.userId);
           }
-        });
+        }
 
-        if (offlineUserIds.length) {
-          const preview = data.content.length > 80 ? data.content.slice(0, 80) + '…' : data.content;
-          await this.notificationService.notifyMany(offlineUserIds, 'message', {
-            senderName: client.userName ?? 'New message',
+        if (pushRecipientIds.length) {
+          const preview =
+            data.content.length > 80 ? data.content.slice(0, 80) + '…' : data.content;
+          await this.notificationService.notifyMany(pushRecipientIds, 'message', {
+            senderName: client.userName ?? 'Someone',
             preview,
             conversationId: data.conversationId,
+            messageId: message.id,
+            timestamp: new Date().toISOString(),
           });
         }
       }
@@ -301,37 +310,65 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     if (conversation) {
-      conversation.participants.forEach((p) => {
-        if (p.userId !== client.userId) {
-          this.logger.log(
-            `[DirectCall] Found participant ${p.userId}. Checking if they are in room user:${p.userId}`,
-          );
+      for (const p of conversation.participants) {
+        if (p.userId === client.userId) continue;
+        this.logger.log(
+          `[DirectCall] Found participant ${p.userId}. Checking if they are in room user:${p.userId}`,
+        );
 
-          if (!this.isUserOnline(p.userId)) {
-            this.logger.log(
-              `[DirectCall] User ${p.userId} is offline. Auto-declining call from ${client.userId}.`,
-            );
-            // Auto-decline if offline
-            this.notifyUser(client.userId, 'call_status_update', {
-              conversationId: data.conversationId,
-              status: 'declined',
-              responderId: p.userId,
-              reason: 'User is offline',
-            });
-          } else {
-            this.logger.log(
-              `[DirectCall] Notifying user ${p.userId} of incoming call from ${client.userId}`,
-            );
-            this.notifyUser(p.userId, 'incoming_call', {
-              conversationId: data.conversationId,
-              initiatorId: client.userId,
-              initiatorName: client.userName,
-              callType: data.callType,
-              sessionId: data.conversationId,
-            });
-          }
+        const callKey = this.missedCallTimerKey(
+          p.userId,
+          data.conversationId,
+          client.userId!,
+        );
+
+        if (!this.isUserOnline(p.userId)) {
+          this.logger.log(
+            `[DirectCall] User ${p.userId} is offline. Auto-declining call from ${client.userId}.`,
+          );
+          await this.notificationService.notify(p.userId, 'incoming_call', {
+            callerId: client.userId,
+            callerName: client.userName ?? 'Friend',
+            callType: data.callType,
+            conversationId: data.conversationId,
+            callId: data.callId,
+            timestamp: new Date().toISOString(),
+          });
+          this.scheduleMissedCallPush(callKey, {
+            userId: p.userId,
+            callerId: client.userId!,
+            callerName: client.userName ?? 'Friend',
+            conversationId: data.conversationId,
+            onTimeout: () => {
+              this.notifyUser(client.userId!, 'call_status_update', {
+                conversationId: data.conversationId,
+                status: 'declined',
+                responderId: p.userId,
+                reason: 'User is offline',
+              });
+            },
+          });
+          continue;
         }
-      });
+
+        this.logger.log(
+          `[DirectCall] Notifying user ${p.userId} of incoming call from ${client.userId}`,
+        );
+        this.notifyUser(p.userId, 'incoming_call', {
+          conversationId: data.conversationId,
+          initiatorId: client.userId,
+          initiatorName: client.userName,
+          callType: data.callType,
+          sessionId: data.conversationId,
+          callId: data.callId,
+        });
+        this.scheduleMissedCallPush(callKey, {
+          userId: p.userId,
+          callerId: client.userId!,
+          callerName: client.userName ?? 'Friend',
+          conversationId: data.conversationId,
+        });
+      }
     }
 
     return { success: true, messageId: message.id };
@@ -345,6 +382,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(
       `[DirectCall] User ${client.userId} accepted call in ${data.conversationId}`,
     );
+    this.clearMissedCallTimersForConversation(data.conversationId);
 
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: data.conversationId },
@@ -389,6 +427,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(
       `[DirectCall] User ${client.userId} declined call in ${data.conversationId}`,
     );
+    this.clearMissedCallTimersForConversation(data.conversationId);
     // Notify other participants in the conversation that the call was declined
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: data.conversationId },
@@ -434,6 +473,68 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return (
       this.onlineUsers.has(userId) && this.onlineUsers.get(userId)!.size > 0
     );
+  }
+
+  private async isUserViewingConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
+    if (!this.isUserOnline(userId)) return false;
+    const sockets = await this.server
+      .in(`conversation:${conversationId}`)
+      .fetchSockets();
+    return sockets.some((s) => {
+      const auth = s as unknown as AuthenticatedSocket;
+      return auth.userId === userId;
+    });
+  }
+
+  private missedCallTimerKey(
+    calleeUserId: string,
+    conversationId: string,
+    callerId: string,
+  ): string {
+    return `${calleeUserId}:${conversationId}:${callerId}`;
+  }
+
+  private scheduleMissedCallPush(
+    key: string,
+    params: {
+      userId: string;
+      callerId: string;
+      callerName: string;
+      conversationId: string;
+      onTimeout?: () => void;
+    },
+  ): void {
+    this.clearMissedCallTimer(key);
+    const timer = setTimeout(() => {
+      this.pendingMissedCallTimers.delete(key);
+      void this.notificationService.notify(params.userId, 'missed_call', {
+        callerId: params.callerId,
+        callerName: params.callerName,
+        conversationId: params.conversationId,
+        timestamp: new Date().toISOString(),
+      });
+      params.onTimeout?.();
+    }, 30000);
+    this.pendingMissedCallTimers.set(key, timer);
+  }
+
+  private clearMissedCallTimer(key: string): void {
+    const timer = this.pendingMissedCallTimers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingMissedCallTimers.delete(key);
+    }
+  }
+
+  private clearMissedCallTimersForConversation(conversationId: string): void {
+    for (const key of [...this.pendingMissedCallTimers.keys()]) {
+      if (key.includes(`:${conversationId}:`)) {
+        this.clearMissedCallTimer(key);
+      }
+    }
   }
 
   notifyUser(userId: string, event: string, data: any) {

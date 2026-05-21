@@ -929,7 +929,13 @@ export default function AITutorScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={["#0F0C29", "#302B63", "#0F0C29"]}
+        colors={
+          [
+            `${theme.colors.background}`,
+            `${theme.colors.surface}`,
+            `${theme.colors.background}`,
+          ] as [string, string, string]
+        }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.background}
@@ -1049,6 +1055,17 @@ export default function AITutorScreen({ navigation }: any) {
                   ? "Listening..."
                   : "Hold to Speak"}
           </Text>
+          <View style={styles.statePillsRow}>
+            <View style={[styles.statePill, isRecording && styles.statePillActive]}>
+              <Text style={styles.statePillText}>Listening</Text>
+            </View>
+            <View style={[styles.statePill, isProcessing && styles.statePillActive]}>
+              <Text style={styles.statePillText}>Thinking</Text>
+            </View>
+            <View style={[styles.statePill, isStreaming && styles.statePillActive]}>
+              <Text style={styles.statePillText}>Speaking</Text>
+            </View>
+          </View>
           {__DEV__ && (
             <View style={styles.debugBadge}>
               <Text style={styles.debugBadgeText}>
@@ -1094,20 +1111,20 @@ const getStyles = (theme: any) =>
       shadowOffset: { width: 0, height: 0 },
     },
     headerTitle: {
-      color: "white",
+      color: theme.colors.text.primary,
       fontWeight: "bold",
       fontSize: 18,
       letterSpacing: 0.5,
     },
     endSessionBtn: {
-      backgroundColor: "rgba(239, 68, 68, 0.15)",
+      backgroundColor: `${theme.colors.error}20`,
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: "rgba(239, 68, 68, 0.4)",
+      borderColor: `${theme.colors.error}60`,
     },
-    endSessionText: { color: "#ef4444", fontWeight: "600", fontSize: 13 },
+    endSessionText: { color: theme.colors.error, fontWeight: "600", fontSize: 13 },
     transcriptScroll: { flex: 1 },
     transcriptContent: { padding: 16, gap: 16, paddingBottom: 100 },
 
@@ -1154,7 +1171,7 @@ const getStyles = (theme: any) =>
     },
     bubble: { paddingHorizontal: 16, paddingVertical: 12 },
     bubbleUser: { backgroundColor: theme.colors.primary },
-    bubblePartner: { backgroundColor: "transparent" },
+    bubblePartner: { backgroundColor: `${theme.colors.surface}DD` },
     bubbleText: {
       color: "white",
       fontSize: 16,
@@ -1162,7 +1179,7 @@ const getStyles = (theme: any) =>
       letterSpacing: 0.2,
     },
     bubbleTextUser: { color: "white" },
-    bubbleTextPartner: { color: "#f8fafc" },
+    bubbleTextPartner: { color: theme.colors.text.primary },
 
     // Footer
     footer: { alignItems: "center", paddingBottom: 40 },
@@ -1197,11 +1214,33 @@ const getStyles = (theme: any) =>
       backgroundColor: "rgba(239, 68, 68, 0.4)",
     },
     hintText: {
-      color: "rgba(255,255,255,0.7)",
+      color: theme.colors.text.secondary,
       marginTop: 16,
       fontSize: 14,
       fontWeight: "500",
       letterSpacing: 0.5,
+    },
+    statePillsRow: {
+      marginTop: 8,
+      flexDirection: "row",
+      gap: 8,
+    },
+    statePill: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: `${theme.colors.border}`,
+      backgroundColor: `${theme.colors.surface}CC`,
+    },
+    statePillActive: {
+      backgroundColor: `${theme.colors.primary}22`,
+      borderColor: `${theme.colors.primary}80`,
+    },
+    statePillText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.colors.text.secondary,
     },
     debugBadge: {
       marginTop: 8,

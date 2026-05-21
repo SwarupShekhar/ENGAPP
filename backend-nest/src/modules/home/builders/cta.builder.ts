@@ -45,25 +45,15 @@ export class CTABuilder {
     let cta: any = {};
 
     if (stage === UserStage.INACTIVE_USER) {
-      if (daysSinceLastSession >= 7) {
-        cta = {
-          type: 'restart_journey',
-          title: `Pick up where you left off, ${user.fname}`,
-          description: 'We saved your progress',
-          buttonText: 'Restart My Journey',
-          action: 'navigate_to_practice',
-          accentColor: '#10B981',
-        };
-      } else if (daysSinceLastSession >= 3) {
-        cta = {
-          type: 'quick_practice',
-          title: 'Quick 5-Min Session',
-          description: 'Just to keep the habit',
-          buttonText: '5-Min Practice',
-          action: 'start_maya_session',
-          accentColor: '#3B82F6',
-        };
-      }
+      // Random-match product: no "saved progress" / resume narrative
+      cta = {
+        type: 'match_practice',
+        title: `Welcome back, ${user.fname}`,
+        description: 'Match with someone new for a fresh live conversation',
+        buttonText: 'Find a Partner',
+        action: 'navigate_to_practice',
+        accentColor: '#10B981',
+      };
     } else if (daysSinceAssessment >= 7 && stage >= UserStage.ACTIVE_BEGINNER) {
       cta = {
         type: 'reassessment',
@@ -111,10 +101,10 @@ export class CTABuilder {
       };
     } else if (p2pSessions >= 1 && p2pSessions < 5) {
       cta = {
-        type: 'continue_practice',
-        title: 'Practice Again?',
-        description: 'Keep building your confidence',
-        buttonText: 'Continue Practice',
+        type: 'match_practice',
+        title: 'Ready for another call?',
+        description: 'Get matched with a new partner and practice live',
+        buttonText: 'Find a Partner',
         action: 'navigate_to_practice',
         accentColor: '#10B981',
       };

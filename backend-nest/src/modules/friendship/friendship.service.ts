@@ -5,12 +5,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { ChatGateway } from '../chat/chat.gateway';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class FriendshipService {
   constructor(
     private prisma: PrismaService,
     private chatGateway: ChatGateway,
+    private notificationService: NotificationService,
   ) {}
 
   async sendRequest(requesterId: string, addresseeClerkIdOrEmail: string) {
@@ -79,11 +81,20 @@ export class FriendshipService {
     });
 
     if (sender) {
+      const senderName = `${sender.fname} ${sender.lname}`.trim();
       this.chatGateway.notifyUser(addresseeId, 'friend_request', {
         requestId: request.id,
         senderId: requesterId,
-        senderName: `${sender.fname} ${sender.lname}`.trim(),
+        senderName,
       });
+      if (!this.chatGateway.isUserOnline(addresseeId)) {
+        void this.notificationService.notify(addresseeId, 'friend_request', {
+          requestId: request.id,
+          senderId: requesterId,
+          senderName,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     return request;
