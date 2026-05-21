@@ -419,21 +419,22 @@ export class TasksService {
      * One endpoint so the app does not fail when /tasks/due is empty or unavailable.
      */
     async getCarouselTasksForUser(userId: string, limit = 8) {
-        const byId = new Map<string, Awaited<ReturnType<typeof this.getDueTasksForUser>>[number]>();
+        type CarouselTaskRow =
+            | Awaited<ReturnType<typeof this.getDueTasksForUser>>[number]
+            | Awaited<ReturnType<typeof this.getPendingTasksForUser>>[number]
+            | Awaited<ReturnType<typeof this.getDailyTasks>>[number];
 
-        const add = (rows: Awaited<ReturnType<typeof this.getDueTasksForUser>>) => {
+        const byId = new Map<string, CarouselTaskRow>();
+
+        const add = (rows: CarouselTaskRow[]) => {
             for (const row of rows) {
                 if (row?.id) byId.set(row.id, row);
             }
         };
 
         add(await this.getDueTasksForUser(userId, limit));
-
-        const pending = await this.getPendingTasksForUser(userId, limit);
-        add(pending);
-
-        const daily = await this.getDailyTasks(userId);
-        add(daily.slice(0, limit));
+        add(await this.getPendingTasksForUser(userId, limit));
+        add((await this.getDailyTasks(userId)).slice(0, limit));
 
         const list = [...byId.values()];
         list.sort((a, b) => {
