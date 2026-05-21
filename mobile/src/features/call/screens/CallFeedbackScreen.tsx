@@ -3638,12 +3638,6 @@ const getStyles = (theme: any) => {
       color: theme.colors.text.primary,
       letterSpacing: -0.3,
     },
-    detailSectionSubtitle: {
-      fontSize: theme.typography.sizes.s,
-      color: theme.colors.text.secondary,
-      marginTop: 6,
-      lineHeight: 20,
-    },
     detailSectionBody: {
       gap: theme.spacing.m,
     },
