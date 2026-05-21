@@ -105,12 +105,16 @@ export class LiveKitWebhookController {
       return { ok: true };
     }
 
-    if (this.processedEgress.has(info.egressId)) {
+    // Redis-backed dedup (survives restarts) + in-memory fallback
+    const dedupKey = `egress:dedup:${info.egressId}`;
+    const alreadyProcessed = await this.redis.get(dedupKey).catch(() => null);
+    if (alreadyProcessed || this.processedEgress.has(info.egressId)) {
       this.logger.log(
         `Skipping duplicate egress_ended for egressId=${info.egressId}`,
       );
       return { ok: true, duplicate: true };
     }
+    await this.redis.set(dedupKey, '1', 300).catch(() => {}); // 5 min TTL
     this.processedEgress.add(info.egressId);
     setTimeout(() => this.processedEgress.delete(info.egressId), 5 * 60 * 1000);
 

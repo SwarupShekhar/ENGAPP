@@ -9,6 +9,12 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+
+let Haptics: { impactAsync: (s: any) => Promise<void>; ImpactFeedbackStyle: { Light: any; Medium: any } } = {
+  impactAsync: async () => {},
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
+};
+try { Haptics = require('expo-haptics'); } catch { /* optional */ }
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
@@ -615,6 +621,7 @@ export default function AITutorScreen({ navigation }: any) {
   // ─── Recording ──────────────────────────────────────────
   const startRecording = async () => {
     if (isProcessing || isStreaming || isRecording) return; // Block while streaming/recording
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       const perm = await Audio.requestPermissionsAsync();
       if (perm.status !== "granted") return;
@@ -694,19 +701,18 @@ export default function AITutorScreen({ navigation }: any) {
         setFirstChunkLatencyMs(null);
         setTurnStartAtLabel(new Date(turnStartMsRef.current).toLocaleTimeString());
 
-        let audioBase64: string | undefined;
-        activeLatencyTimeline.startSpan("audio_read");
-        try {
-          audioBase64 = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-        } catch (e) {
-          console.warn("[AITutor] Could not read audio file:", e);
-        }
-        activeLatencyTimeline.endSpan("audio_read");
-
         const refText = referenceTextForNextTurn;
         const activeSessionId = sessionIdRef.current;
+
+        // Parallelize: base64 encode (needed only for WS fallback) + token fetch simultaneously
+        activeLatencyTimeline.startSpan("audio_read");
+        const [audioBase64, token] = await Promise.all([
+          FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
+            .catch((e) => { console.warn("[AITutor] Could not read audio file:", e); return undefined; }),
+          getToken ? getCachedToken(getToken) : Promise.resolve<string | null>(null),
+        ]);
+        activeLatencyTimeline.endSpan("audio_read");
+
         if (refText && activeSessionId) {
           setReferenceTextForNextTurn(null);
           activeLatencyTimeline.startSpan("assess_pronunciation");
@@ -766,7 +772,6 @@ export default function AITutorScreen({ navigation }: any) {
 
         let usedSSE = false;
         let sseSkipped = false;
-        const token = getToken ? await getCachedToken(getToken) : null;
         if (token && activeSessionId) {
             try {
               sseAbortRef.current?.abort();
