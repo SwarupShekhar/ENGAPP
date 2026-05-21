@@ -34,7 +34,17 @@ import {
 } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
+import Animated, {
+  FadeInDown,
+  FadeInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
+import type { SharedValue } from "react-native-reanimated";
+import Svg, { Circle } from "react-native-svg";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { getLevelColor } from "../../../theme/colorUtils";
 import {
@@ -51,7 +61,7 @@ import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
 import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
 import { getCQSScore, CQSResults } from "../../../api/scoring";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // ─── Step-by-step feedback types ─────────────────────────
 type FeedbackPhase = 'intro' | 'step' | 'summary' | 'detail';
@@ -90,6 +100,58 @@ const STEP_CATEGORY_BG = {
   grammar: '#F0FDF4',
   vocabulary: '#EFF6FF',
 } as const;
+
+// ─── Segment playback progress ring ──────────────────────────
+const SEG_RING_SIZE = 84;
+const SEG_RING_STROKE = 5;
+const SEG_RING_RADIUS = (SEG_RING_SIZE - SEG_RING_STROKE * 2) / 2;
+const SEG_RING_CIRC = 2 * Math.PI * SEG_RING_RADIUS;
+const AnimatedSegCircle = Animated.createAnimatedComponent(Circle);
+
+/**
+ * Animated circular progress ring drawn behind the step play/pause button.
+ * `progress` is a reanimated shared value in [0,1] driven by audio position.
+ */
+function SegmentProgressRing({
+  progress,
+  color,
+  track,
+}: {
+  progress: SharedValue<number>;
+  color: string;
+  track: string;
+}) {
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: SEG_RING_CIRC * (1 - Math.min(1, Math.max(0, progress.value))),
+  }));
+  return (
+    <Svg
+      width={SEG_RING_SIZE}
+      height={SEG_RING_SIZE}
+      style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}
+    >
+      <Circle
+        cx={SEG_RING_SIZE / 2}
+        cy={SEG_RING_SIZE / 2}
+        r={SEG_RING_RADIUS}
+        stroke={track}
+        strokeWidth={SEG_RING_STROKE}
+        fill="none"
+      />
+      <AnimatedSegCircle
+        cx={SEG_RING_SIZE / 2}
+        cy={SEG_RING_SIZE / 2}
+        r={SEG_RING_RADIUS}
+        stroke={color}
+        strokeWidth={SEG_RING_STROKE}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={SEG_RING_CIRC}
+        animatedProps={animatedProps}
+      />
+    </Svg>
+  );
+}
 
 // ─── Skill Bar Component ──────────────────────────────────
 function SkillBar({
@@ -815,6 +877,14 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [feedbackLatencyTrace, setFeedbackLatencyTrace] = useState<LatencyTrace | null>(
     null,
   );
+
+  // Reanimated: progress of the current segment's audio (0→1) for the ring,
+  // and the translateY of the bottom-sheet card that rises on play.
+  const segmentProgress = useSharedValue(0);
+  const sheetTranslateY = useSharedValue(SCREEN_HEIGHT);
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslateY.value }],
+  }));
 
   // Clean up audio on unmount
   useEffect(() => {
@@ -1702,6 +1772,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       const position = status.positionMillis ?? 0;
       if (duration > 0) {
         const ratio = position / duration;
+        // Drive the circular progress ring (0→1) with the playback position.
+        segmentProgress.value = Math.min(1, Math.max(0, ratio));
         if (hasCards) {
           if (ratio >= 0.22) setCardReveal((prev) => (prev === 'none' ? 'youSaid' : prev));
           if (ratio >= 0.52) setCardReveal('both');
@@ -1715,6 +1787,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       }
       if (status.didJustFinish) {
         if (hasCards) setCardReveal('both');
+        // Snap the ring to full when the clip ends.
+        segmentProgress.value = withTiming(1, { duration: 180 });
         setSegmentListened(true);
         sound.unloadAsync().catch(() => {});
         stepSoundRef.current = null;
@@ -1740,6 +1814,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     setStepAudioLoading(true);
     setCardReveal('none');
     setSegmentListened(false);
+    segmentProgress.value = 0;
     if (options?.transitionFromIntro) introAudioStartedRef.current = false;
     try {
       const payload = buildSegmentNarrationPayload(segment);
@@ -1847,6 +1922,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       return;
     }
     setCurrentStepIdx(0);
+    // Rise the bottom-sheet card up into place as playback begins.
+    sheetTranslateY.value = SCREEN_HEIGHT;
+    sheetTranslateY.value = withTiming(0, {
+      duration: 460,
+      easing: Easing.out(Easing.cubic),
+    });
     await startSegmentAudio(feedbackSegments[0], { transitionFromIntro: true });
   };
 
@@ -1860,58 +1941,144 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     cat.charAt(0).toUpperCase() + cat.slice(1);
 
   // ── Intro phase ───────────────────────────────────────────
-  if (feedbackPhase === 'intro') return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" />
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16 }}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
-          Feedback
-        </Text>
-        <View style={{ width: 22 }} />
-      </View>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => {
-            if (stepAudioPlaying && feedbackSegments[0]) {
-              handleStepPlay(feedbackSegments[0]);
-              return;
-            }
-            if (!stepAudioLoading) handleIntroPlay();
-          }}
-          disabled={stepAudioLoading && !stepAudioPlaying}
-          style={{ width: '100%', borderRadius: 20, overflow: 'hidden' }}
+  if (feedbackPhase === 'intro') {
+    const introSkills = [
+      { key: 'pronunciation' as const, label: 'Pronunciation', icon: 'mic', score: data.scores.pronunciation },
+      { key: 'grammar' as const, label: 'Grammar', icon: 'document-text', score: data.scores.grammar },
+      { key: 'fluency' as const, label: 'Fluency', icon: 'flash', score: data.scores.fluency },
+      { key: 'vocabulary' as const, label: 'Vocabulary', icon: 'book', score: data.scores.vocabulary },
+    ];
+    const skillColor = (key: 'pronunciation' | 'grammar' | 'fluency' | 'vocabulary') =>
+      key === 'fluency'
+        ? theme.colors.primary
+        : STEP_CATEGORY_COLORS[key];
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top', 'bottom']}>
+        <StatusBar barStyle="dark-content" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16 }}>
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
+            <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+            Feedback
+          </Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 160 }}
+          showsVerticalScrollIndicator={false}
         >
-          <LinearGradient
-            colors={theme.colors.gradients.primary as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={{ paddingVertical: 52, paddingHorizontal: 24, alignItems: 'center' }}
+          {/* Compact score preview card */}
+          <Animated.View
+            entering={FadeInDown.duration(320)}
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: 20,
+              padding: 20,
+              shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12,
+              shadowOffset: { width: 0, height: 4 }, elevation: 3,
+            }}
           >
-            <View style={{
-              width: 76, height: 76, borderRadius: 38,
-              backgroundColor: 'rgba(255,255,255,0.25)',
-              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
-            }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: overallColor + '18',
+                alignItems: 'center', justifyContent: 'center', marginRight: 16,
+              }}>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: overallColor }}>
+                  {data.overallScore}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, marginBottom: 2 }}>
+                  Overall Score
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+                  {scoreLabel}
+                </Text>
+              </View>
+            </View>
+            <View style={{ gap: 12 }}>
+              {introSkills.map((s) => {
+                const c = skillColor(s.key);
+                const pct = Math.min(100, Math.max(0, s.score));
+                return (
+                  <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      backgroundColor: c + '15',
+                      alignItems: 'center', justifyContent: 'center', marginRight: 10,
+                    }}>
+                      <Ionicons name={s.icon as any} size={15} color={c} />
+                    </View>
+                    <Text style={{ width: 96, fontSize: 13, color: theme.colors.text.primary, fontWeight: '500' }}>
+                      {s.label}
+                    </Text>
+                    <View style={{
+                      flex: 1, height: 6, borderRadius: 3,
+                      backgroundColor: theme.colors.text.secondary + '20', overflow: 'hidden',
+                    }}>
+                      <View style={{ width: `${pct}%`, height: '100%', backgroundColor: c, borderRadius: 3 }} />
+                    </View>
+                    <Text style={{ width: 40, textAlign: 'right', fontSize: 13, fontWeight: '700', color: c }}>
+                      {pct}%
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </Animated.View>
+
+          <Text style={{
+            marginTop: 24, textAlign: 'center', fontSize: 14,
+            color: theme.colors.text.secondary, lineHeight: 21,
+          }}>
+            Tap play to hear a quick, segment-by-segment walkthrough of your feedback.
+          </Text>
+
+          <TouchableOpacity onPress={() => setFeedbackPhase('detail')} style={{ marginTop: 16, alignSelf: 'center' }} activeOpacity={0.7}>
+            <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: '600' }}>
+              Skip to full analysis
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Floating play button */}
+        <View
+          style={{
+            position: 'absolute', left: 0, right: 0,
+            bottom: Math.max(insets.bottom, 16) + 12,
+            alignItems: 'center',
+          }}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              if (!stepAudioLoading) handleIntroPlay();
+            }}
+            disabled={stepAudioLoading}
+            style={{
+              width: 76, height: 76, borderRadius: 38, overflow: 'hidden',
+              shadowColor: theme.colors.primary, shadowOpacity: 0.4,
+              shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+            }}
+          >
+            <LinearGradient
+              colors={theme.colors.gradients.primary as any}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+            >
               {stepAudioLoading
                 ? <ActivityIndicator size="small" color="white" />
-                : <Ionicons name={stepAudioPlaying ? 'pause' : 'play'} size={32} color="white" />
+                : <Ionicons name="play" size={34} color="white" style={{ marginLeft: 3 }} />
               }
-            </View>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: 'white', marginBottom: 10 }}>Your Feedback</Text>
-            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 }}>
-              Tap the play button to listen to your personalized feedback
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFeedbackPhase('detail')} style={{ marginTop: 28 }} activeOpacity={0.7}>
-          <Text style={{ color: theme.colors.text.secondary, fontSize: 14 }}>Skip to full analysis</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // ── Step phase (4 segments: pronunciation, grammar, vocabulary, fluency) ─
   if (feedbackPhase === 'step' && currentSegment) {
@@ -1929,135 +2096,160 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     const showCorrect =
       currentSegment.hasCorrectionCards && cardReveal === 'both';
 
+    // Replay/Next gate: appears as soon as the segment's content is fully
+    // revealed (cardReveal === 'both') — both for correction-card segments
+    // and for the single-insight fluency segment.
+    const controlsUnlocked = cardReveal === 'both';
+
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: screenBg }} edges={['top', 'bottom']}>
+      <View style={{ flex: 1, backgroundColor: screenBg }}>
         <StatusBar barStyle="dark-content" />
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
-          <TouchableOpacity
-            onPress={async () => {
-              await stopStepAudio();
-              if (currentStepIdx > 0) {
-                const prev = feedbackSegments[currentStepIdx - 1];
-                setCurrentStepIdx((i) => i - 1);
-                setCardReveal('none');
-                setSegmentListened(false);
-                if (prev) await startSegmentAudio(prev);
-              } else {
-                introAudioStartedRef.current = false;
-                setFeedbackPhase('intro');
-              }
-            }}
-            hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
-          >
-            <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
-            Feedback
-          </Text>
-          <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
-            {currentStepIdx + 1} / {feedbackSegments.length}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 }}>
-          {feedbackSegments.map((_, i) => (
-            <View key={i} style={{
-              width: i === currentStepIdx ? 20 : 7, height: 7, borderRadius: 4,
-              backgroundColor: i === currentStepIdx ? theme.colors.primary : theme.colors.text.secondary + '40',
-            }} />
-          ))}
-        </View>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16 }}>
-          <View style={{
-            backgroundColor: theme.colors.surface, borderRadius: 16, padding: 28, alignItems: 'center', marginBottom: 20,
-            shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3,
-          }}>
-            <TouchableOpacity
-              onPress={() => handleStepPlay(currentSegment)}
-              activeOpacity={0.85}
-              style={{
-                width: 72, height: 72, borderRadius: 36,
-                borderWidth: 3,
-                borderColor: stepAudioPlaying || stepAudioLoading ? theme.colors.primary : theme.colors.text.secondary + '30',
-                alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-              }}
-            >
-              {stepAudioLoading
-                ? <ActivityIndicator size="small" color={theme.colors.primary} />
-                : <Ionicons name={stepAudioPlaying ? 'pause' : 'play'} size={28} color={theme.colors.primary} />
-              }
-            </TouchableOpacity>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 6 }}>Your Feedback</Text>
-            <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 20 }}>
-              {stepAudioPlaying
-                ? 'Listen to your personalized feedback…'
-                : 'Tap the play button to listen to your personalized feedback'}
-            </Text>
-          </View>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: catColor, marginBottom: 12 }}>
-            {segmentCategoryLabel(currentSegment.category)}
-          </Text>
-          {currentSegment.hasCorrectionCards ? (
-            <>
-              {showYouSaid && (
-                <Animated.View
-                  entering={FadeInDown.duration(280)}
-                  style={{ borderLeftWidth: 4, borderLeftColor: theme.colors.error, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 16, marginBottom: 10 }}
-                >
-                  <Text style={{ fontSize: 12, color: theme.colors.error, fontWeight: '700', marginBottom: 6 }}>You Said:</Text>
-                  <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.youSaid}</Text>
-                </Animated.View>
-              )}
-              {showCorrect && (
-                <Animated.View
-                  entering={FadeInDown.duration(280)}
-                  style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
-                >
-                  <Text style={{ fontSize: 12, color: catColor, fontWeight: '700', marginBottom: 6 }}>{currentSegment.correctionLabel}</Text>
-                  <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.correct}</Text>
-                </Animated.View>
-              )}
-            </>
-          ) : (
-            (cardReveal === 'both' || segmentListened) && (
-              <Animated.View
-                entering={FadeInDown.duration(280)}
-                style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+        {/* Bottom-sheet card that rises up into place on play */}
+        <Animated.View style={[{ flex: 1, backgroundColor: screenBg }, sheetAnimatedStyle]}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  await stopStepAudio();
+                  if (currentStepIdx > 0) {
+                    const prev = feedbackSegments[currentStepIdx - 1];
+                    setCurrentStepIdx((i) => i - 1);
+                    setCardReveal('none');
+                    setSegmentListened(false);
+                    if (prev) await startSegmentAudio(prev);
+                  } else {
+                    introAudioStartedRef.current = false;
+                    sheetTranslateY.value = SCREEN_HEIGHT;
+                    setFeedbackPhase('intro');
+                  }
+                }}
+                hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
               >
-                <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.fluencyNote}</Text>
-              </Animated.View>
-            )
-          )}
-        </ScrollView>
-        {segmentListened ? (
-          <View style={{
-            flexDirection: 'row', gap: 12, paddingHorizontal: 20,
-            paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12, backgroundColor: screenBg,
-          }}>
-            <TouchableOpacity
-              onPress={() => handleStepReplay(currentSegment)}
-              activeOpacity={0.8}
-              style={{ flex: 1, paddingVertical: 16, borderRadius: 50, borderWidth: 1.5, borderColor: theme.colors.text.secondary + '40', alignItems: 'center', backgroundColor: theme.colors.surface }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Replay</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleNextStep}
-              activeOpacity={0.85}
-              style={{ flex: 1, paddingVertical: 16, borderRadius: 50, backgroundColor: theme.colors.primary, alignItems: 'center' }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '600', color: 'white' }}>
-                {currentStepIdx < feedbackSegments.length - 1 ? 'Next' : 'Done'}
+                <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+              </TouchableOpacity>
+              <Text style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: theme.colors.text.primary }}>
+                Feedback
               </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 8, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
-              Replay and Next unlock after you finish listening
-            </Text>
-          </View>
-        )}
-      </SafeAreaView>
+              <Text style={{ fontSize: 13, color: theme.colors.text.secondary, fontWeight: '500' }}>
+                {currentStepIdx + 1} / {feedbackSegments.length}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10 }}>
+              {feedbackSegments.map((_, i) => (
+                <View key={i} style={{
+                  width: i === currentStepIdx ? 20 : 7, height: 7, borderRadius: 4,
+                  backgroundColor: i === currentStepIdx ? theme.colors.primary : theme.colors.text.secondary + '40',
+                }} />
+              ))}
+            </View>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16 }}>
+              <View style={{
+                backgroundColor: theme.colors.surface, borderRadius: 16, padding: 28, alignItems: 'center', marginBottom: 20,
+                shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 3,
+              }}>
+                {/* Play/pause button with animated circular progress ring */}
+                <View style={{
+                  width: SEG_RING_SIZE, height: SEG_RING_SIZE,
+                  alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+                }}>
+                  <SegmentProgressRing
+                    progress={segmentProgress}
+                    color={catColor}
+                    track={theme.colors.text.secondary + '25'}
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleStepPlay(currentSegment)}
+                    activeOpacity={0.85}
+                    style={{
+                      width: 60, height: 60, borderRadius: 30,
+                      backgroundColor: catColor + '15',
+                      alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    {stepAudioLoading
+                      ? <ActivityIndicator size="small" color={catColor} />
+                      : <Ionicons name={stepAudioPlaying ? 'pause' : 'play'} size={26} color={catColor} style={stepAudioPlaying ? undefined : { marginLeft: 2 }} />
+                    }
+                  </TouchableOpacity>
+                </View>
+                {/* Segment X of N label */}
+                <Text style={{ fontSize: 13, fontWeight: '700', color: catColor, marginBottom: 4 }}>
+                  Segment {currentStepIdx + 1} of {feedbackSegments.length}
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 6 }}>Your Feedback</Text>
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary, textAlign: 'center', lineHeight: 20 }}>
+                  {stepAudioPlaying
+                    ? 'Listen to your personalized feedback…'
+                    : 'Tap the play button to listen to your personalized feedback'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: catColor, marginBottom: 12 }}>
+                {segmentCategoryLabel(currentSegment.category)}
+              </Text>
+              {currentSegment.hasCorrectionCards ? (
+                <>
+                  {showYouSaid && (
+                    <Animated.View
+                      entering={FadeInDown.duration(280)}
+                      style={{ borderLeftWidth: 4, borderLeftColor: theme.colors.error, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 16, marginBottom: 10 }}
+                    >
+                      <Text style={{ fontSize: 12, color: theme.colors.error, fontWeight: '700', marginBottom: 6 }}>You Said:</Text>
+                      <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.youSaid}</Text>
+                    </Animated.View>
+                  )}
+                  {showCorrect && (
+                    <Animated.View
+                      entering={FadeInDown.duration(280)}
+                      style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+                    >
+                      <Text style={{ fontSize: 12, color: catColor, fontWeight: '700', marginBottom: 6 }}>{currentSegment.correctionLabel}</Text>
+                      <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.correct}</Text>
+                    </Animated.View>
+                  )}
+                </>
+              ) : (
+                (cardReveal === 'both' || segmentListened) && (
+                  <Animated.View
+                    entering={FadeInDown.duration(280)}
+                    style={{ borderLeftWidth: 4, borderLeftColor: catColor, backgroundColor: catBg, borderRadius: 10, padding: 16 }}
+                  >
+                    <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.fluencyNote}</Text>
+                  </Animated.View>
+                )
+              )}
+            </ScrollView>
+            {controlsUnlocked ? (
+              <View style={{
+                flexDirection: 'row', gap: 12, paddingHorizontal: 20,
+                paddingBottom: Math.max(insets.bottom, 16), paddingTop: 12, backgroundColor: screenBg,
+              }}>
+                <TouchableOpacity
+                  onPress={() => handleStepReplay(currentSegment)}
+                  activeOpacity={0.8}
+                  style={{ flex: 1, paddingVertical: 16, borderRadius: 50, borderWidth: 1.5, borderColor: theme.colors.text.secondary + '40', alignItems: 'center', backgroundColor: theme.colors.surface }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text.primary }}>Replay</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleNextStep}
+                  activeOpacity={0.85}
+                  style={{ flex: 1, paddingVertical: 16, borderRadius: 50, backgroundColor: theme.colors.primary, alignItems: 'center' }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: 'white' }}>
+                    {currentStepIdx < feedbackSegments.length - 1 ? 'Next' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ paddingBottom: Math.max(insets.bottom, 16), paddingTop: 8, alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+                  Replay and Next unlock as your feedback is revealed
+                </Text>
+              </View>
+            )}
+          </SafeAreaView>
+        </Animated.View>
+      </View>
     );
   }
 
