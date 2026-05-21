@@ -63,8 +63,15 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
 
   useEffect(() => {
     let alive = true;
-    tasksApi
-      .getDueTasks()
+    const loadTasks = async () => {
+      try {
+        return await tasksApi.getDueTasks();
+      } catch {
+        // Fallback when /tasks/due fails (auth blip, empty SR queue, prod deploy mismatch)
+        return await tasksApi.getPendingTasks();
+      }
+    };
+    loadTasks()
       .then((t) => {
         if (!alive) return;
         setTasks(t);
@@ -93,20 +100,23 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
 
   const slides = useMemo<PulseSlide[]>(() => {
     if (!phrase) return [];
-    const practice: PulseSlide[] = (tasks ?? []).map((task) => ({
-      key: `practice-${task.id}`,
-      kind: 'practice',
-      task,
-    }));
+    // Phrase first (local, instant) — tasks append so index 0 never shifts on load
     return [
-      ...practice,
-      {
-        key: `phrase-${phrase.id ?? 'pod'}`,
-        kind: 'phrase',
-        phrase,
-      },
+      { key: `phrase-${phrase.id ?? 'pod'}`, kind: 'phrase', phrase },
+      ...(tasks ?? []).map((task): PulseSlide => ({
+        key: `practice-${task.id}`,
+        kind: 'practice',
+        task,
+      })),
     ];
   }, [tasks, phrase]);
+
+  // Clamp active index if slides shrink (safety guard)
+  useEffect(() => {
+    if (slides.length > 0 && active >= slides.length) {
+      setActive(slides.length - 1);
+    }
+  }, [slides.length]);
 
   if (!phraseReady) {
     return <CarouselSkeleton theme={theme} styles={styles} />;
@@ -210,23 +220,29 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
       ) : loadError && (tasks?.length ?? 0) === 0 ? (
         <Text style={styles.hint}>Couldn&apos;t load practice cards — showing phrase only.</Text>
       ) : null}
-      <FlatList
-        ref={listRef}
-        data={slides}
-        renderItem={renderSlide}
-        keyExtractor={(s) => s.key}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={CARD_W}
-        decelerationRate="fast"
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        getItemLayout={(_, index) => ({
-          length: CARD_W,
-          offset: CARD_W * index,
-          index,
-        })}
-      />
+      {slides.length === 0 ? (
+        <View style={[styles.card, { justifyContent: 'center', alignItems: 'center', minHeight: CAROUSEL_MIN_H }]}>
+          <Text style={styles.hint}>No cards right now. Complete a call to unlock practice cards.</Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={slides}
+          renderItem={renderSlide}
+          keyExtractor={(s) => s.key}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={CARD_W}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          getItemLayout={(_, index) => ({
+            length: CARD_W,
+            offset: CARD_W * index,
+            index,
+          })}
+        />
+      )}
       {slides.length > 1 ? (
         <View style={styles.dots}>
           {slides.map((s, i) => (
