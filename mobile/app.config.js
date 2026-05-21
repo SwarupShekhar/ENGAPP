@@ -56,8 +56,8 @@ if (process.env.ENGLIVO_WS_URL_OVERRIDE?.trim()) {
 
 module.exports = {
   expo: {
-    name: "mobile",
-    slug: "mobile",
+    name: "Englivo",
+    slug: "englivo",
     scheme: "engr",
     version: "1.0.0",
     orientation: "portrait",
@@ -67,7 +67,7 @@ module.exports = {
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#0d1b3d",
     },
     ios: {
       supportsTablet: true,
@@ -86,9 +86,10 @@ module.exports = {
       },
     },
     android: {
+      label: "Englivo",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#1a1035",
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,

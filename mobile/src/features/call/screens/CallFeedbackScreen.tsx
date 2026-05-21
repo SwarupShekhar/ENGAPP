@@ -2422,6 +2422,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           <View style={styles.backChipSpacer} />
         </LinearGradient>
 
+        <View style={styles.detailSectionBlock}>
+        <Text style={styles.detailSectionLabel}>Session</Text>
+        <Text style={styles.detailSectionSubtitle}>
+          Listen to your full feedback, then review scores and corrections below
+        </Text>
+
         {/* ── Listen to Feedback button ── */}
         <Animated.View entering={FadeInDown.delay(20).springify()} style={styles.listenBtnWrapper}>
           <TouchableOpacity
@@ -2485,101 +2491,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             )}
           </Animated.View>
         )}
+        </View>
 
-        {/* Cap notification banner: pronunciation is holding score back */}
-        {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
-          (data?.scores?.pronunciation != null &&
-            data?.scores?.grammar != null &&
-            data.scores.pronunciation < data.scores.grammar - 15)) && (
-          <Animated.View
-            entering={FadeInDown.delay(80).springify()}
-            style={styles.capBanner}
-          >
-            <View style={styles.capBannerContent}>
-              <Text style={styles.capBannerTitle}>
-                Pronunciation is holding back your score
-              </Text>
-              <Text style={styles.capBannerSubtitle}>
-                {sessionData?.summaryJson?.dominant_pronunciation_errors?.length
-                  ? `Focus on ${sessionData.summaryJson.dominant_pronunciation_errors
-                      .slice(0, 2)
-                      .join(" and ")
-                      .replace(/_/g, " ")} to level up.`
-                  : "Your pronunciation score is significantly lower than your grammar score. Practice the highlighted words to improve."}
-              </Text>
-              <TouchableOpacity
-                style={styles.capBannerCta}
-                onPress={() => navigation.getParent()?.navigate("MainTabs", { screen: "eBites" })}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.capBannerCtaText}>Watch Reels</Text>
-                <Ionicons name="play-circle" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Full conversation transcript (grammar + pronunciation highlighted) */}
-        {(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
-          <Animated.View
-            entering={FadeInDown.delay(80).springify()}
-            style={styles.transcriptSection}
-          >
-            <TouchableOpacity
-              style={styles.transcriptToggleRow}
-              activeOpacity={0.8}
-              onPress={() => setTranscriptExpanded((v) => !v)}
-            >
-              <Text style={styles.sectionTitle}>Conversation</Text>
-              <Ionicons
-                name={transcriptExpanded ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={theme.colors.text.secondary}
-              />
-            </TouchableOpacity>
-            {transcriptExpanded && (
-              <>
-                {(data.mistakes.length > 0 || data.pronunciationIssues.length > 0) && (
-                  <View style={styles.transcriptLegend}>
-                    {data.mistakes.length > 0 && (
-                      <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: theme.colors.error + "40" }]} />
-                        <Text style={styles.legendText}>Grammar</Text>
-                      </View>
-                    )}
-                    {data.pronunciationIssues.length > 0 && (
-                      <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: theme.colors.warning + "50" }]} />
-                        <Text style={styles.legendText}>Pronunciation</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-                <View style={styles.transcriptCard}>
-                  <ScrollView
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                    style={styles.transcriptScroll}
-                  >
-                    <TranscriptWithHighlights
-                      transcript={
-                        sessionData?.feedback?.transcript ??
-                        sessionData?.summaryJson?.transcript ??
-                        ""
-                      }
-                      mistakes={data.mistakes}
-                      pronunciationIssues={data.pronunciationIssues}
-                      participants={sessionData?.participants}
-                    />
-                  </ScrollView>
-                </View>
-              </>
-            )}
-          </Animated.View>
-        )}
-
-        <View style={styles.detailContentWrap}>
+        <View style={[styles.detailSectionBlock, { marginTop: theme.spacing.m }]}>
         <Text style={styles.detailSectionLabel}>Overview</Text>
+        <Text style={styles.detailSectionSubtitle}>
+          Partner, topic, and your overall result for this call
+        </Text>
 
         {/* Meta Info */}
         <Animated.View
@@ -2716,9 +2634,47 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             </View>
           </LinearGradient>
         </Animated.View>
+        </View>
 
         <View style={styles.detailSectionBlock}>
         <Text style={styles.detailSectionLabel}>Skill scores</Text>
+        <Text style={styles.detailSectionSubtitle}>
+          How pronunciation, grammar, vocabulary, and fluency contributed
+        </Text>
+
+        {/* Cap notification banner: pronunciation is holding score back */}
+        {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
+          (data?.scores?.pronunciation != null &&
+            data?.scores?.grammar != null &&
+            data.scores.pronunciation < data.scores.grammar - 15)) && (
+          <Animated.View
+            entering={FadeInDown.delay(80).springify()}
+            style={styles.capBanner}
+          >
+            <View style={styles.capBannerContent}>
+              <Text style={styles.capBannerTitle}>
+                Pronunciation is holding back your score
+              </Text>
+              <Text style={styles.capBannerSubtitle}>
+                {sessionData?.summaryJson?.dominant_pronunciation_errors?.length
+                  ? `Focus on ${sessionData.summaryJson.dominant_pronunciation_errors
+                      .slice(0, 2)
+                      .join(" and ")
+                      .replace(/_/g, " ")} to level up.`
+                  : "Your pronunciation score is significantly lower than your grammar score. Practice the highlighted words to improve."}
+              </Text>
+              <TouchableOpacity
+                style={styles.capBannerCta}
+                onPress={() => navigation.getParent()?.navigate("MainTabs", { screen: "eBites" })}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.capBannerCtaText}>Watch Reels</Text>
+                <Ionicons name="play-circle" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+
         {cqsData && (
           <CallQualityScoreCard 
             cqs={cqsData.cqs} 
@@ -2748,6 +2704,67 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             onPlay={handlePlay}
           />
         </Animated.View>
+
+        {/* Full conversation transcript (grammar + pronunciation highlighted) */}
+        {(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
+          <Animated.View
+            entering={FadeInDown.delay(120).springify()}
+            style={styles.transcriptSection}
+          >
+            <TouchableOpacity
+              style={styles.transcriptToggleRow}
+              activeOpacity={0.8}
+              onPress={() => setTranscriptExpanded((v) => !v)}
+            >
+              <Text style={styles.transcriptToggleLabel}>
+                {transcriptExpanded ? "Hide conversation" : "Show conversation"}
+              </Text>
+              <Ionicons
+                name={transcriptExpanded ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={theme.colors.text.secondary}
+              />
+            </TouchableOpacity>
+            {transcriptExpanded && (
+              <>
+                {(data.mistakes.length > 0 || data.pronunciationIssues.length > 0) && (
+                  <View style={styles.transcriptLegend}>
+                    {data.mistakes.length > 0 && (
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: theme.colors.error + "40" }]} />
+                        <Text style={styles.legendText}>Grammar</Text>
+                      </View>
+                    )}
+                    {data.pronunciationIssues.length > 0 && (
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: theme.colors.warning + "50" }]} />
+                        <Text style={styles.legendText}>Pronunciation</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+                <View style={[styles.transcriptCard, { marginHorizontal: 0 }]}>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={styles.transcriptScroll}
+                  >
+                    <TranscriptWithHighlights
+                      transcript={
+                        sessionData?.feedback?.transcript ??
+                        sessionData?.summaryJson?.transcript ??
+                        ""
+                      }
+                      mistakes={data.mistakes}
+                      pronunciationIssues={data.pronunciationIssues}
+                      participants={sessionData?.participants}
+                    />
+                  </ScrollView>
+                </View>
+              </>
+            )}
+          </Animated.View>
+        )}
         </View>
 
         {/* Detail Toggle */}
@@ -2776,7 +2793,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         {/* Dev-only: re-run pronunciation for past sessions */}
         {__DEV__ && !!sessionId && sessionId !== "session-id" && (
           <TouchableOpacity
-            style={[styles.detailToggle, { marginTop: 10 }]}
+            style={[styles.detailToggleDev, { marginTop: 10 }]}
             onPress={async () => {
               try {
                 setCheckingAgain(true);
@@ -2913,54 +2930,40 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             : null;
 
           return (
-            <Animated.View
-              entering={FadeInDown.delay(350).springify()}
-              style={{ marginHorizontal: 16, marginBottom: 12 }}
-            >
-              <View
-                style={{
-                  backgroundColor: "#1e1b4b",
-                  borderRadius: 16,
-                  padding: 16,
-                  borderLeftWidth: 4,
-                  borderLeftColor: "#7C3AED",
-                }}
-              >
+            <Animated.View entering={FadeInDown.delay(350).springify()}>
+              <View style={styles.dominantPatternCard}>
                 <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                  <Ionicons name="mic" size={16} color="#a78bfa" style={{ marginRight: 6 }} />
-                  <Text
-                    style={{
-                      color: "#a78bfa",
-                      fontSize: 11,
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    Dominant Pattern · {catIssues.length}×
+                  <Ionicons
+                    name="mic"
+                    size={16}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.dominantPatternKicker}>
+                    Dominant pattern · {catIssues.length}×
                   </Text>
                 </View>
-                <Text
-                  style={{ color: "#fff", fontSize: 15, fontWeight: "700", marginBottom: 4 }}
-                >
-                  {label}
-                </Text>
+                <Text style={styles.dominantPatternLabel}>{label}</Text>
                 {spokenWord && correctWord && (
-                  <Text style={{ color: "#d1d5db", fontSize: 13, marginBottom: 8 }}>
+                  <Text style={styles.dominantPatternExample}>
                     {"You said "}
-                    <Text style={{ color: "#f87171", fontWeight: "600" }}>"{spokenWord}"</Text>
+                    <Text style={{ color: theme.colors.error, fontWeight: "600" }}>
+                      "{spokenWord}"
+                    </Text>
                     {" — correct: "}
-                    <Text style={{ color: "#6ee7b7", fontWeight: "600" }}>"{correctWord}"</Text>
+                    <Text style={{ color: theme.colors.success, fontWeight: "600" }}>
+                      "{correctWord}"
+                    </Text>
                   </Text>
                 )}
                 <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                   <Ionicons
                     name="information-circle-outline"
                     size={14}
-                    color="#7C3AED"
+                    color={theme.colors.primary}
                     style={{ marginRight: 4, marginTop: 1 }}
                   />
-                  <Text style={{ color: "#a78bfa", fontSize: 12, flex: 1 }}>{tip}</Text>
+                  <Text style={styles.dominantPatternTip}>{tip}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -3006,6 +3009,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               }
               firstName={user?.firstName ?? undefined}
               enteringDelay={400}
+              embedded
             />
           );
         })()}
@@ -3014,7 +3018,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         {/* Strengths & Areas to Improve */}
         {(data.strengths.length > 0 || data.improvementAreas.length > 0) && (
           <Animated.View entering={FadeInDown.delay(800).springify()} style={styles.detailSectionBlock}>
-            <Text style={styles.detailSectionLabel}>Performance breakdown</Text>
+            <Text style={styles.detailSectionLabel}>Performance</Text>
+            <Text style={styles.detailSectionSubtitle}>
+              What went well and what to focus on next
+            </Text>
             <View style={styles.strengthsRow}>
               {data.strengths.length > 0 && (
                 <View
@@ -3080,13 +3087,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         <View style={styles.detailSectionBlock}>
         <Text style={styles.detailSectionLabel}>
-          Key mistakes{data.mistakes.length > 0 ? ` (${data.mistakes.length})` : ""}
+          Grammar corrections{data.mistakes.length > 0 ? ` (${data.mistakes.length})` : ""}
         </Text>
-        {data.mistakes.length > 0 && (sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
-          <Text style={styles.keyMistakesHint}>
-            See where each mistake appears in your conversation above, then use the cards below to learn the correction.
-          </Text>
-        )}
+        <Text style={styles.detailSectionSubtitle}>
+          {data.mistakes.length > 0
+            ? "Tap a card to expand — highlights in the conversation match these fixes"
+            : "No major grammar issues detected this session"}
+        </Text>
         {data.mistakes.length > 0 ? (
           data.mistakes.map((item, index) => (
             <MistakeCard key={item.id || index} item={item} index={index} />
@@ -3116,7 +3123,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         {/* MAYA AI Summary – engaging, human copy + real data */}
         {mayaHasContent && (
           <Animated.View entering={FadeInDown.delay(1000).springify()} style={styles.detailSectionBlock}>
-            <Text style={styles.detailSectionLabel}>What MAYA noticed</Text>
+            <Text style={styles.detailSectionLabel}>Coach insight</Text>
+            <Text style={styles.detailSectionSubtitle}>
+              Personalized takeaways from MAYA for this call
+            </Text>
             <LinearGradient
               colors={[
                 theme.colors.primary + "12",
@@ -3238,8 +3248,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             </LinearGradient>
           </Animated.View>
         )}
-
-        </View>
 
         {/* Action Buttons */}
         <Animated.View
@@ -3367,7 +3375,7 @@ const getStyles = (theme: any) => {
       lineHeight: 15,
     },
     listenBtnWrapper: {
-      paddingHorizontal: theme.spacing.l,
+      paddingHorizontal: 0,
       paddingTop: 0,
       paddingBottom: 0,
     },
@@ -3389,7 +3397,7 @@ const getStyles = (theme: any) => {
       fontWeight: "700",
     },
     subtitleBox: {
-      marginHorizontal: 16,
+      marginHorizontal: 0,
       marginTop: 8,
       backgroundColor: 'rgba(0,0,0,0.55)',
       borderRadius: 12,
@@ -3435,7 +3443,7 @@ const getStyles = (theme: any) => {
     },
     metaRow: {
       flexDirection: "row",
-      paddingHorizontal: theme.spacing.l,
+      paddingHorizontal: 0,
       gap: theme.spacing.s,
       marginBottom: theme.spacing.m,
       flexWrap: "wrap",
@@ -3457,7 +3465,7 @@ const getStyles = (theme: any) => {
       fontWeight: "500",
     },
     capBanner: {
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       marginBottom: theme.spacing.m,
       borderRadius: theme.borderRadius.lg,
       backgroundColor: theme.colors.primary + "18",
@@ -3496,7 +3504,7 @@ const getStyles = (theme: any) => {
       color: "#fff",
     },
     scoreCard: {
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       marginBottom: theme.spacing.l,
       borderRadius: theme.borderRadius.xl,
       ...theme.shadows.medium,
@@ -3539,7 +3547,7 @@ const getStyles = (theme: any) => {
       fontWeight: "700",
     },
     whatItMeansWrap: {
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       marginBottom: theme.spacing.m,
       borderRadius: theme.borderRadius.xl,
       overflow: "hidden",
@@ -3621,26 +3629,6 @@ const getStyles = (theme: any) => {
       marginBottom: theme.spacing.m,
       marginTop: theme.spacing.m,
     },
-    detailSection: {
-      marginTop: theme.spacing.xl,
-      paddingTop: theme.spacing.xs,
-    },
-    detailSectionFirst: {
-      marginTop: theme.spacing.m,
-    },
-    detailSectionHeader: {
-      paddingHorizontal: theme.spacing.l,
-      marginBottom: theme.spacing.m,
-    },
-    detailSectionTitle: {
-      fontSize: theme.typography.sizes.l,
-      fontWeight: "800",
-      color: theme.colors.text.primary,
-      letterSpacing: -0.3,
-    },
-    detailSectionBody: {
-      gap: theme.spacing.m,
-    },
     transcriptToggleLabel: {
       fontSize: theme.typography.sizes.s,
       fontWeight: "600",
@@ -3650,7 +3638,7 @@ const getStyles = (theme: any) => {
       backgroundColor: theme.colors.surface,
       borderRadius: 16,
       padding: theme.spacing.m,
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       borderLeftWidth: 4,
       borderLeftColor: theme.colors.primary,
       borderWidth: 1,
@@ -3682,13 +3670,11 @@ const getStyles = (theme: any) => {
       flex: 1,
       lineHeight: 18,
     },
-    detailContentWrap: {
-      paddingHorizontal: theme.spacing.l,
-      gap: theme.spacing.xs,
-    },
     detailSectionBlock: {
-      marginTop: theme.spacing.l,
+      marginTop: theme.spacing.xl,
       marginBottom: theme.spacing.s,
+      gap: theme.spacing.m,
+      paddingHorizontal: theme.spacing.l,
     },
     detailSectionLabel: {
       fontSize: theme.typography.sizes.l,
@@ -3780,7 +3766,7 @@ const getStyles = (theme: any) => {
     // Glassmorphism card used for all sections
     glassCard: {
       backgroundColor: glassBg,
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       borderRadius: 16,
       padding: theme.spacing.m,
       gap: theme.spacing.m,
@@ -3790,11 +3776,11 @@ const getStyles = (theme: any) => {
     },
     transcriptSection: {
       marginBottom: 0,
-      paddingHorizontal: theme.spacing.l,
+      paddingHorizontal: 0,
     },
     transcriptCard: {
       backgroundColor: glassBg,
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       borderRadius: 16,
       padding: theme.spacing.m,
       borderWidth: 1,
@@ -3823,7 +3809,7 @@ const getStyles = (theme: any) => {
     },
     transcriptLegend: {
       flexDirection: "row" as const,
-      paddingHorizontal: theme.spacing.l,
+      paddingHorizontal: 0,
       marginBottom: theme.spacing.s,
       gap: 16,
     },
@@ -4173,8 +4159,8 @@ const getStyles = (theme: any) => {
     },
     // Strengths & Improvements
     strengthsRow: {
-      paddingHorizontal: theme.spacing.l,
-      gap: theme.spacing.s,
+      paddingHorizontal: 0,
+      gap: theme.spacing.m,
     },
     strengthCard: {
       backgroundColor: glassBg,
@@ -4204,7 +4190,7 @@ const getStyles = (theme: any) => {
     // Mistake cards
     mistakeCard: {
       backgroundColor: glassBg,
-      marginHorizontal: theme.spacing.l,
+      marginHorizontal: 0,
       marginBottom: theme.spacing.s,
       borderRadius: 16,
       padding: theme.spacing.m,
@@ -4558,19 +4544,10 @@ const getStyles = (theme: any) => {
       fontSize: theme.typography.sizes.m,
       fontWeight: "600",
     },
-    detailToggle: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      alignSelf: "stretch",
-      marginHorizontal: theme.spacing.l,
-      paddingVertical: 14,
-      paddingHorizontal: theme.spacing.m,
-      borderRadius: theme.borderRadius.l,
-      backgroundColor: theme.colors.primary + "10",
-      borderWidth: 1,
-      borderColor: theme.colors.primary + "28",
+    detailToggleDev: {
+      alignSelf: "center",
+      paddingVertical: 12,
+      paddingHorizontal: 20,
       marginBottom: 8,
     },
     detailToggleCard: {
