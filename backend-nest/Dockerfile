@@ -3,9 +3,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency manifests
+# Copy dependency manifests + Prisma schema (see prisma.config.ts — not ./prisma/)
 COPY package*.json ./
-COPY prisma ./prisma/
+COPY prisma.config.ts ./
+COPY src/database/prisma ./src/database/prisma/
 
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
@@ -31,7 +32,8 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./
+COPY --from=builder /app/src/database/prisma ./src/database/prisma
 # Copy generated Prisma client runtime artifacts from builder.
 # Production install does not always generate these files automatically.
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
