@@ -49,5 +49,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => { if (r.statusCode !== 200) throw new Error('Unhealthy') })"
 
-# Start command
-CMD ["node", "dist/main.js"]
+# Start command (apply pending migrations before boot — matches npm run start:prod)
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
