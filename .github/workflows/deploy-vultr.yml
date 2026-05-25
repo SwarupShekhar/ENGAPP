@@ -63,12 +63,37 @@ jobs:
             cd "$APP_DIR"
             git fetch origin main
             git checkout main
-            git pull --ff-only origin main
+            # Match force-pushed main (pull --ff-only fails after history rewrite).
+            git reset --hard origin/main
 
             if [ ! -f "backend-nest/.env" ] || [ ! -f "backend-ai/.env" ]; then
               echo "Missing backend-nest/.env or backend-ai/.env on server."
               exit 1
             fi
 
-            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml build backend-nest backend-ai
+
+            # Apply DB migrations before boot (image CMD also runs migrate on start).
+            docker compose -f docker-compose.prod.yml run --rm --no-deps backend-nest \
+              npx prisma migrate deploy
+
+            # Start core services first; prometheus depends on healthy backends.
+            docker compose -f docker-compose.prod.yml up -d backend-nest backend-ai caddy
+
+            echo "Waiting for backend-nest health (up to 120s)..."
+            healthy=0
+            for _ in $(seq 1 24); do
+              if docker compose -f docker-compose.prod.yml exec -T backend-nest \
+                node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+                healthy=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "$healthy" -ne 1 ]; then
+              docker compose -f docker-compose.prod.yml logs backend-nest --tail 80
+              exit 1
+            fi
+
+            docker compose -f docker-compose.prod.yml up -d prometheus
             docker compose -f docker-compose.prod.yml ps
