@@ -12,10 +12,11 @@ export function PostHogUserSync() {
     if (!isPostHogEnabled) return;
 
     if (isSignedIn && user?.id) {
-      analytics.identify(user.id, {
-        email: user.primaryEmailAddress?.emailAddress,
-        name: user.fullName ?? undefined,
-      });
+      const traits: Record<string, string> = {};
+      const email = user.primaryEmailAddress?.emailAddress;
+      if (email) traits.email = email;
+      if (user.fullName) traits.name = user.fullName;
+      analytics.identify(user.id, traits);
     } else {
       analytics.reset();
     }

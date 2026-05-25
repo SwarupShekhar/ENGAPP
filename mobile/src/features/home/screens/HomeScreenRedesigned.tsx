@@ -124,10 +124,10 @@ export default function HomeScreenRedesigned() {
   if (fetchError && !homeData) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background, justifyContent: "center", alignItems: "center", padding: 32 }]}>
-        <Text style={{ fontSize: 18, fontWeight: "600", color: theme.colors.text, marginBottom: 8, textAlign: "center" }}>
+        <Text style={{ fontSize: 18, fontWeight: "600", color: theme.colors.text.primary, marginBottom: 8, textAlign: "center" }}>
           Couldn't load your dashboard
         </Text>
-        <Text style={{ fontSize: 14, color: theme.colors.secondaryText, marginBottom: 20, textAlign: "center" }}>
+        <Text style={{ fontSize: 14, color: theme.colors.text.secondary, marginBottom: 20, textAlign: "center" }}>
           Please check your connection and try again.
         </Text>
         <TouchableOpacity
