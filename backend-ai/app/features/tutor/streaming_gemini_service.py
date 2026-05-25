@@ -17,7 +17,7 @@ class StreamingGeminiService:
             return
 
         genai.configure(api_key=settings.google_api_key)
-        self.model_name = 'gemini-2.5-flash'
+        self.model_name = 'gemini-2.0-flash-lite'
         self.model = genai.GenerativeModel(self.model_name)
 
     def _sanitize_sentence(self, text: str) -> str:
@@ -34,23 +34,32 @@ class StreamingGeminiService:
         prompt: str,
         conversation_history: list,
         phonetic_context: dict | None = None,
-        audio_base64: str | None = None
+        audio_base64: str | None = None,
+        cefr_level: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream tokens from Gemini and yield complete sentences as they form.
         If audio_base64 is provided, Gemini receives the raw audio to analyze pronunciation.
+        cefr_level (A1..C2) tunes vocabulary + sentence complexity to the learner.
         """
         if not self.enabled or self.model is None:
             yield "I'm not fully configured yet. Please set GOOGLE_API_KEY and restart the AI service."
             return
 
-        full_prompt = self._build_conversation_prompt(prompt, conversation_history, phonetic_context)
+        full_prompt = self._build_conversation_prompt(
+            prompt, conversation_history, phonetic_context, cefr_level
+        )
         logger.info(f"GEMINI PROMPT: {prompt[:50]}... context={bool(phonetic_context)}, audio={bool(audio_base64)}")
         
         # Build content: text-only or multimodal (text + audio)
         if audio_base64:
             import base64 as b64
             audio_bytes = b64.b64decode(audio_base64)
+            # Auto-detect mime: Silero path uploads WAV (RIFF header); expo-av path uploads M4A.
+            if len(audio_bytes) >= 12 and audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE":
+                audio_mime = "audio/wav"
+            else:
+                audio_mime = "audio/mp4"
             # Add pronunciation instruction when audio is present
             audio_instruction = (
                 "\n\n[AUDIO ATTACHED: Listen to the user's audio carefully. "
@@ -61,9 +70,13 @@ class StreamingGeminiService:
             )
             content = [
                 full_prompt + audio_instruction,
-                {"mime_type": "audio/mp4", "data": audio_bytes}
+                {"mime_type": audio_mime, "data": audio_bytes}
             ]
-            logger.info(f"Sending multimodal prompt to Gemini with {len(audio_bytes)} bytes of audio")
+            logger.info(
+                "Sending multimodal prompt to Gemini with %d bytes (%s)",
+                len(audio_bytes),
+                audio_mime,
+            )
         else:
             content = full_prompt
         
@@ -148,23 +161,72 @@ class StreamingGeminiService:
             if tail:
                 yield tail
 
+    @staticmethod
+    def _cefr_style_block(cefr_level: str | None) -> str:
+        """Return CEFR-adapted style + vocabulary directives. Defaults to A2 when unknown."""
+        level = (cefr_level or "").strip().upper()
+        if level not in {"A1", "A2", "B1", "B2", "C1", "C2"}:
+            level = "A2"
+        guides = {
+            "A1": (
+                "- Learner level: A1 (beginner). Use only the most common 500 English words.\n"
+                "- Sentences: 4-8 words. Present simple tense. No idioms, no phrasal verbs.\n"
+                "- Speak slowly, one idea per sentence. Repeat key words when helpful."
+            ),
+            "A2": (
+                "- Learner level: A2 (elementary). Use common everyday vocabulary.\n"
+                "- Sentences: 6-12 words. Simple past and present. Light use of common phrasal verbs.\n"
+                "- Keep ideas concrete and familiar (food, work, family, daily life)."
+            ),
+            "B1": (
+                "- Learner level: B1 (intermediate). Use a broader everyday vocabulary.\n"
+                "- Sentences: up to 15 words. Past, present, future, conditionals OK.\n"
+                "- You may use common phrasal verbs and a few simple idioms with light explanation."
+            ),
+            "B2": (
+                "- Learner level: B2 (upper-intermediate). Use natural conversational English.\n"
+                "- Sentences: natural length. Most tenses, phrasal verbs, common idioms allowed.\n"
+                "- Lightly challenge the learner with more nuanced vocabulary."
+            ),
+            "C1": (
+                "- Learner level: C1 (advanced). Use rich, varied English.\n"
+                "- Idioms, nuance, register shifts encouraged when natural.\n"
+                "- Push the learner with precise word choice and complex structures."
+            ),
+            "C2": (
+                "- Learner level: C2 (proficient). Speak at near-native fluency.\n"
+                "- Full range of idiom, register, and abstract vocabulary is welcome.\n"
+                "- Treat the learner as a peer; refine subtle errors of nuance and style."
+            ),
+        }
+        return f"CEFR ADAPTATION (mandatory):\n{guides[level]}\n"
+
     def _build_conversation_prompt(
-        self, 
-        current_utterance: str, 
+        self,
+        current_utterance: str,
         history: list,
-        phonetic_context: dict | None = None
+        phonetic_context: dict | None = None,
+        cefr_level: str | None = None,
     ) -> str:
         """Build full context from conversation history"""
 
-        system_prompt = """
-You are Maya, an expert spoken-English coach for Indian learners.
+        cefr_block = self._cefr_style_block(cefr_level)
+
+        system_prompt = f"""
+You are Maya, an expert spoken-English coach for adult learners.
 Your tone is calm, sharp, warm, and premium. You sound like a highly skilled real tutor, not a hype friend.
+
+LANGUAGE RULE (absolute):
+- Speak in clear, natural ENGLISH ONLY. Do NOT use Hindi, Hinglish, Urdu, or any other language.
+- No Hindi words at all (no "namaste", "arre", "shabash", "bhai", "koi baat nahi", "acha", etc.).
+- If the learner uses Hindi, respond in English and gently model the English version.
+
+{cefr_block}
 
 Voice and personality:
 - Confident and clear, never dramatic or over-excited.
 - Encouraging but grounded (no fake praise).
 - Gentle humor is fine; avoid slangy catchphrases and repetitive fillers.
-- Use Hinglish lightly and intentionally. Default to clear English with occasional Hindi for warmth.
 
 Teaching behavior:
 - Correct only ONE high-impact issue per turn.
@@ -183,7 +245,7 @@ Hard constraints:
 - Never use bullet points, headers, or list formatting in your reply.
 - Never say robotic phrases like "Great question", "Certainly", "As an AI", etc.
 - Never over-praise basic output.
-- Never use familial terms like "bhai", "didi", "bro", "brother", "sister".
+- Never use any non-English words (no Hindi, no Hinglish, no familial terms like "bhai", "didi", "bro").
 - Never use emojis or emoticons.
 - Never break character.
 
@@ -198,10 +260,9 @@ Common patterns to watch for:
 - "tree" when they mean "three"
 - "dey/dat/dis" -> "they/that/this"
 
-IMPORTANT: The user's speech is STT-transcribed and normalized. 
+IMPORTANT: The user's speech is STT-transcribed and normalized.
 1. If the sentence sounds grammatically odd (e.g., "People English" instead of "English people"), the user likely mispronounced words and the STT cleaned them up.
 2. If the user's message is complete gibberish (e.g., "English speaking is people making people"), DO NOT invent context or stories. Just say: "I didn't quite catch that. Could you say it again?"
-3. NEVER use the word "bhai".
 
 STRICT OUTPUT: 1-2 sentences maximum. No emojis.
 

@@ -27,18 +27,23 @@ class InworldTTSService:
             self.auth_header = None
             logger.warning("Inworld AI credentials not configured.")
 
+    def is_configured(self) -> bool:
+        return bool(self.auth_header)
+
     def _clean_text(self, text: str) -> str:
         text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
         text = re.sub(r'[^\w\s,!.?\'"]', '', text)
         return text
 
     def _build_payload(self, text: str) -> dict:
+        # Maya tutor voice: standard (non-max) model is less theatrical / expressive.
+        # speakingRate < 1.0 = slower; 0.78 gives clearer pacing for English learners.
         return {
             "text": self._clean_text(text),
-            "voiceId": settings.inworld_character_id or "Abby",
-            "modelId": "inworld-tts-1.5-max",
+            "voiceId": settings.inworld_character_id or "Olivia",
+            "modelId": "inworld-tts-1",
             "timestampType": "WORD",
-            "speakingRate": 0.85,
+            "speakingRate": 0.78,
         }
 
     def synthesize_hinglish(self, text: str, gender: str = 'female') -> bytes:

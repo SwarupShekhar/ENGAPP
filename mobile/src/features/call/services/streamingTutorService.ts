@@ -135,12 +135,14 @@ class StreamingTutorService {
     phoneticContext?: any,
     audioBase64?: string,
     traceId?: string,
+    cefrLevel?: string | null,
   ) {
     const payload: Record<string, unknown> = {};
     if (text) payload.text = text;
     if (phoneticContext) payload.phonetic_context = phoneticContext;
     if (audioBase64) payload.audio_base64 = audioBase64;
     if (traceId) payload.trace_id = traceId;
+    if (cefrLevel) payload.cefr_level = cefrLevel;
     const raw = JSON.stringify(payload);
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {

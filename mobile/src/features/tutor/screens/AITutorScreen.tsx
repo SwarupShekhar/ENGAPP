@@ -44,10 +44,12 @@ import {
   type LatencyTrace,
 } from "../../../utils/latencyTimeline";
 import { LatencyTimelinePanel } from "../../../components/debug/LatencyTimelinePanel";
+import { resolveVadProvider } from "../voice/voiceActivityDetector";
 import {
-  createRecordingMeteringCallback,
-  resolveVadProvider,
-} from "../voice/voiceActivityDetector";
+  startMayaCapture,
+  type MayaCaptureHandle,
+} from "../voice/mayaAudioCapture";
+import { Buffer } from "buffer";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -222,7 +224,7 @@ let _msgSeq = 0;
 const nextMsgId = () => `msg-${++_msgSeq}`;
 
 // ─── Main Screen ──────────────────────────────────────────
-export default function AITutorScreen({ navigation }: any) {
+export default function AITutorScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const { user } = useUser();
@@ -252,7 +254,8 @@ export default function AITutorScreen({ navigation }: any) {
   const streamHandlerRef = useRef<(chunk: StreamChunk) => void>(() => {});
   transcriptRef.current = transcript;
   const scrollRef = useRef<ScrollView>(null);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const captureHandleRef = useRef<MayaCaptureHandle | null>(null);
+  const meteringRecordingRef = useRef<Audio.Recording | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -279,6 +282,13 @@ export default function AITutorScreen({ navigation }: any) {
   };
 
   const turnTraceIdRef = useRef<string | null>(null);
+  /** Learner CEFR level (A1..C2). Set after startSession; piped into WS fallback so backend-ai
+   *  can adapt vocabulary when the SSE → Nest CEFR injection is skipped. */
+  const cefrLevelRef = useRef<string | null>(null);
+  /** Optional "Phrase of the day" handed from PulseHomeCarousel — kicks off the first prompt. */
+  const seedPhraseRef = useRef<{ phrase?: string; example?: string; definition?: string } | null>(
+    route?.params?.phrase ?? null,
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -344,13 +354,13 @@ export default function AITutorScreen({ navigation }: any) {
     // Start Session
     const init = async () => {
       try {
-        // 1. Show immediate joining bubble to eliminate perceived lag
+        // 1. Show immediate joining bubble to eliminate perceived lag (English-only).
         const initialName = user?.firstName || "Friend";
         setTranscript([
           {
             id: "welcome",
             speaker: "ai",
-            text: `Namaste ${initialName}! Maya is joining...`,
+            text: `Hi ${initialName}, Maya is joining…`,
           },
         ]);
 
@@ -374,14 +384,24 @@ export default function AITutorScreen({ navigation }: any) {
 
         setSessionId(res.sessionId);
         sessionIdRef.current = res.sessionId;
+        cefrLevelRef.current = res.cefrLevel || null;
 
-        setTranscript([
-          {
-            id: "welcome",
-            speaker: "ai",
-            text: res.message,
-          },
-        ]);
+        const greeting = { id: "welcome", speaker: "ai" as const, text: res.message };
+        const seed = seedPhraseRef.current;
+        const initial = seed?.phrase
+          ? [
+              greeting,
+              {
+                id: "seed-prompt",
+                speaker: "ai" as const,
+                text: `Let's practise today's phrase: "${seed.phrase}". Try saying it.`,
+              },
+            ]
+          : [greeting];
+        setTranscript(initial);
+        if (seed?.phrase) {
+          setReferenceTextForNextTurn(seed.phrase);
+        }
 
         if (res.audioBase64) {
           queueAudio(res.audioBase64);
@@ -402,7 +422,10 @@ export default function AITutorScreen({ navigation }: any) {
         if (s) s.unloadAsync().catch(() => {});
         soundPoolRef.current[i] = null;
       }
-      if (recordingRef.current) stopRecording(); // Ensure recording stops
+      if (captureHandleRef.current) {
+        captureHandleRef.current.cancel().catch(() => {});
+        captureHandleRef.current = null;
+      }
 
       // Trigger final analysis and save session
       if (sessionIdRef.current) {
@@ -624,32 +647,29 @@ export default function AITutorScreen({ navigation }: any) {
       const perm = await Audio.requestPermissionsAsync();
       if (perm.status !== "granted") return;
 
-      // Validate previous recording is cleared
-      if (recordingRef.current) {
+      // Validate previous capture is cleared
+      if (captureHandleRef.current) {
         try {
-          await recordingRef.current.stopAndUnloadAsync();
-        } catch (e) {}
-        recordingRef.current = null;
+          await captureHandleRef.current.cancel();
+        } catch (_) {}
+        captureHandleRef.current = null;
       }
+      meteringRecordingRef.current = null;
       activeLatencyTimeline.markInstant("vad_listen_start", {
         provider: resolveVadProvider(),
       });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        createRecordingMeteringCallback(
-          () => stopRecording(),
-          (vadStatus, meta) => {
-            if (vadStatus === "speech_start") {
-              activeLatencyTimeline.markInstant("vad_speech_start", meta);
-            }
-            if (vadStatus === "speech_end") {
-              activeLatencyTimeline.markInstant("vad_speech_end", meta);
-            }
-          },
-        ),
-        100,
-      );
-      recordingRef.current = recording;
+      const handle = await startMayaCapture({
+        onSpeechEnd: () => stopRecording(),
+        onStatus: (vadStatus, meta) => {
+          if (vadStatus === "speech_start") {
+            activeLatencyTimeline.markInstant("vad_speech_start", meta);
+          }
+          if (vadStatus === "speech_end") {
+            activeLatencyTimeline.markInstant("vad_speech_end", meta);
+          }
+        },
+      });
+      captureHandleRef.current = handle;
       setIsRecording(true);
     } catch (e) {
       console.error("Rec error", e);
@@ -657,45 +677,62 @@ export default function AITutorScreen({ navigation }: any) {
   };
 
   const stopRecording = async () => {
-    const recording = recordingRef.current;
-    if (!recording) return;
-
-    recordingRef.current = null; // Clear ref immediately to prevent re-entry
+    const handle = captureHandleRef.current;
+    if (!handle) return;
+    captureHandleRef.current = null;
     setIsRecording(false);
     setIsProcessing(true);
 
     try {
-      let recordedDurationMs = 0;
-      try {
-        const status = await recording.getStatusAsync();
-        recordedDurationMs =
-          typeof status.durationMillis === "number" ? status.durationMillis : 0;
-        if (status.isRecording) {
-          await recording.stopAndUnloadAsync();
-        } else if (status.isDoneRecording) {
-          await recording.stopAndUnloadAsync();
+      const capture = await handle.stop();
+      let uri: string | null = null;
+      let uploadMime = "audio/m4a";
+      let uploadName = "audio.m4a";
+      let prebuiltAudioBase64: string | undefined;
+
+      if (capture.providerUsed === "silero" && capture.wavBytes) {
+        prebuiltAudioBase64 = Buffer.from(capture.wavBytes).toString("base64");
+        uri = `${FileSystem.cacheDirectory}maya-turn-${Date.now()}.wav`;
+        try {
+          await FileSystem.writeAsStringAsync(uri, prebuiltAudioBase64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } catch (e) {
+          console.warn("[AITutor] Could not write WAV to cache:", e);
+          uri = null;
         }
-      } catch (unloadError: any) {
-        // Ignore "already unloaded" error
-        if (
-          !unloadError.message?.includes("already been unloaded") &&
-          !unloadError.message?.includes("Recorder does not exist")
-        ) {
-          if (__DEV__) console.log("Unload error (ignoring):", unloadError);
+        uploadMime = "audio/wav";
+        uploadName = "audio.wav";
+      } else if (capture.recording) {
+        meteringRecordingRef.current = capture.recording;
+        let recordedDurationMs = 0;
+        try {
+          const status = await capture.recording.getStatusAsync();
+          recordedDurationMs =
+            typeof status.durationMillis === "number" ? status.durationMillis : 0;
+          if (status.isRecording || status.isDoneRecording) {
+            await capture.recording.stopAndUnloadAsync();
+          }
+        } catch (unloadError: any) {
+          if (
+            !unloadError.message?.includes("already been unloaded") &&
+            !unloadError.message?.includes("Recorder does not exist")
+          ) {
+            if (__DEV__) console.log("Unload error (ignoring):", unloadError);
+          }
+        }
+        uri = capture.recording.getURI();
+        if (recordedDurationMs > 0 && recordedDurationMs < 350) {
+          if (__DEV__) {
+            console.log("[AITutor] Ignoring short recording tap", recordedDurationMs, "ms");
+          }
+          setIsProcessing(false);
+          return;
         }
       }
 
-      const uri = recording.getURI();
       if (!uri) {
-        console.warn("[AITutor] No URI found after stopping recording");
-        setIsProcessing(false);
-        return;
-      }
-
-      if (recordedDurationMs > 0 && recordedDurationMs < 350) {
-        if (__DEV__) {
-          console.log("[AITutor] Ignoring short recording tap", recordedDurationMs, "ms");
-        }
+        console.warn("[AITutor] No audio URI after stopping capture");
         setIsProcessing(false);
         return;
       }
@@ -713,11 +750,14 @@ export default function AITutorScreen({ navigation }: any) {
         const refText = referenceTextForNextTurn;
         const activeSessionId = sessionIdRef.current;
 
-        // Parallelize: base64 encode (needed only for WS fallback) + token fetch simultaneously
+        // Parallelize: base64 encode (needed only for WS fallback) + token fetch simultaneously.
+        // Silero path already produced base64 in-memory — skip the disk re-read.
         activeLatencyTimeline.startSpan("audio_read");
         const [audioBase64, token] = await Promise.all([
-          FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
-            .catch((e) => { console.warn("[AITutor] Could not read audio file:", e); return undefined; }),
+          prebuiltAudioBase64 !== undefined
+            ? Promise.resolve(prebuiltAudioBase64)
+            : FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
+                .catch((e) => { console.warn("[AITutor] Could not read audio file:", e); return undefined; }),
           getToken ? getCachedToken(getToken) : Promise.resolve<string | null>(null),
         ]);
         activeLatencyTimeline.endSpan("audio_read");
@@ -728,8 +768,8 @@ export default function AITutorScreen({ navigation }: any) {
           const assessForm = new FormData();
           assessForm.append("audio", {
             uri,
-            type: "audio/m4a",
-            name: "audio.m4a",
+            type: uploadMime,
+            name: uploadName,
           } as any);
           assessForm.append("userId", user?.id || "test");
           assessForm.append("referenceText", refText);
@@ -771,8 +811,8 @@ export default function AITutorScreen({ navigation }: any) {
         const formData = new FormData();
         formData.append("audio", {
           uri,
-          type: "audio/m4a",
-          name: "audio.m4a",
+          type: uploadMime,
+          name: uploadName,
         } as any);
         formData.append("sessionId", activeSessionId || "");
         if (turnTraceIdRef.current) {
@@ -900,6 +940,7 @@ export default function AITutorScreen({ navigation }: any) {
               null,
               audioBase64,
               turnTraceIdRef.current ?? undefined,
+              cefrLevelRef.current,
             );
           } else if (!usedSSE && !audioBase64) {
             setStreamPath("ws-fallback");

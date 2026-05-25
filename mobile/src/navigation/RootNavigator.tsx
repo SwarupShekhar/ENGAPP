@@ -116,6 +116,9 @@ function ActiveTabs() {
   return mode === "ENGR" ? <EngrTabs /> : <EnglivoTabs />;
 }
 
+// Pulse (ENGR) Maya tutor and Core (Englivo) AI tutor are separate routes.
+// `MayaTutor` → AITutorScreen (Inworld TTS, English+CEFR adaptive, Silero VAD).
+// `AITutor` remains mode-aware for shared call/practice flows that don't yet know which mode they're in.
 function AITutorByMode(props: any) {
   const { mode } = useSuperApp();
   return mode === "ENGR" ? <AITutorScreen {...props} /> : <EnglivoAiConversationScreen {...props} />;
@@ -169,6 +172,7 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
         component={InCallScreen}
         options={{ gestureEnabled: false }}
       />
+      <Stack.Screen name="MayaTutor" component={AITutorScreen} />
       <Stack.Screen name="AITutor" component={AITutorByMode} />
       <Stack.Screen name="CallFeedback" component={CallFeedbackScreen} />
       <Stack.Screen name="ActiveCall" component={ActiveCallScreen} />

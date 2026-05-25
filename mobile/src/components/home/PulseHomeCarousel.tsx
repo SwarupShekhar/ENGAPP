@@ -176,7 +176,7 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
       </View>
       <TouchableOpacity
         activeOpacity={0.82}
-        onPress={() => navigation.navigate('AITutor', { phrase: p })}
+        onPress={() => navigation.navigate('MayaTutor', { phrase: p })}
         style={{ borderRadius: theme.borderRadius.m, overflow: 'hidden' }}
       >
         <LinearGradient

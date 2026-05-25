@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     google_api_key: Optional[str] = None
     google_tts_api_key: Optional[str] = None
+    # Gemini TTS (generativelanguage.googleapis.com) — Maya fallback when Inworld fails
+    google_tts_model: str = "gemini-2.5-flash-tts"
+    google_tts_voice: str = "Kore"
+    google_tts_prompt: str = (
+        "Say the following in a calm, clear, neutral English voice suitable for a language tutor. "
+        "Speak at a steady, natural pace without being overly expressive."
+    )
     anthropic_api_key: Optional[str] = None
     
     # Azure
@@ -47,6 +54,9 @@ class Settings(BaseSettings):
     # When true and Deepgram is configured, run Nova-3 alongside Azure for a secondary
     # display transcript. Azure stays authoritative for pronunciation / PA alignment.
     deepgram_secondary_transcript: bool = True
+    # When true, use Deepgram Nova-3 as primary STT (bypasses Azure ~2000ms → ~300ms).
+    # Azure is still used for pronunciation assessment (PA) — only plain transcription is rerouted.
+    deepgram_primary_stt: bool = False
     
     # Inworld AI
     inworld_api_key: Optional[str] = None
@@ -104,7 +114,7 @@ class Settings(BaseSettings):
 
     # Tutor streaming: pronunciation enrichment (Phase 2.1)
     # Max ms to wait for PA before starting Gemini (0 = never wait, stream immediately).
-    pa_stream_wait_ms: int = 600
+    pa_stream_wait_ms: int = 0
     # Max concurrent Azure PA enrichments process-wide (protects single-node Vultr).
     pa_enrich_max_concurrent: int = 8
     

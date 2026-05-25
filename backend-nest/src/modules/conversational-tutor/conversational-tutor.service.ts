@@ -259,7 +259,7 @@ export class ConversationalTutorService implements OnModuleInit {
   // ─── Existing: End session ─────────────────────────────────
 
   async startSession(userId: string) {
-    // 1. Create session in DB + get user name in parallel
+    // 1. Create session in DB + get user name + CEFR level in parallel
     const [dbSession, user] = await Promise.all([
       this.prisma.conversationSession.create({
         data: {
@@ -275,13 +275,15 @@ export class ConversationalTutorService implements OnModuleInit {
       }),
       this.prisma.user.findUnique({
         where: { id: userId },
-        select: { fname: true },
+        select: { fname: true, overallLevel: true },
       }),
     ]);
 
     const sessionId = dbSession.id;
     const name = user?.fname || 'Friend';
-    const message = `Namaste ${name}! I'm Maya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!`;
+    const cefrLevel = user?.overallLevel || null;
+    // English-only greeting. Maya adapts vocabulary to the learner's CEFR level on subsequent turns.
+    const message = `Hi ${name}, I'm Maya, your English tutor. Hold the mic and start speaking — I'll listen and help you sound more natural.`;
 
     // 2. Initialize in-memory state immediately (no waiting for TTS)
     const session = {
@@ -296,12 +298,14 @@ export class ConversationalTutorService implements OnModuleInit {
     };
     this.conversations.set(sessionId, session);
 
-    // 3. Return immediately — NO TTS for greeting (saves 1-2s)
-    //    The user reads the text. Audio will come through WebSocket on subsequent turns.
+    // 3. Return immediately — NO TTS for greeting (saves 1-2s).
+    //    Mobile pipes `cefrLevel` into the WS fallback path so backend-ai can adapt
+    //    when the SSE → Nest CEFR injection is skipped.
     return {
       sessionId,
       message,
       audioBase64: '', // Skip TTS for instant loading
+      cefrLevel,
     };
   }
 
@@ -596,6 +600,19 @@ export class ConversationalTutorService implements OnModuleInit {
       .slice(-6)
       .map((t) => ({ role: t.speaker, content: t.text }));
 
+    // Maya tutor adapts vocabulary + sentence length to learner's CEFR level.
+    // overallLevel is the authoritative current CEFR (synced after each session).
+    let cefrLevel: string | null = null;
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { overallLevel: true },
+      });
+      cefrLevel = user?.overallLevel ?? null;
+    } catch (e) {
+      this.logger.warn(`CEFR lookup failed for ${userId}: ${(e as Error).message}`);
+    }
+
     const form = new FormData();
     form.append('audio', audioBuffer, { filename: 'audio.wav' });
     form.append('session_id', sessionId);
@@ -603,6 +620,9 @@ export class ConversationalTutorService implements OnModuleInit {
     form.append('conversation_history', JSON.stringify(history));
     if (traceId) {
       form.append('trace_id', traceId);
+    }
+    if (cefrLevel) {
+      form.append('cefr_level', cefrLevel);
     }
 
     const url = `${this.aiBackendUrl}/api/tutor/stream-response`;

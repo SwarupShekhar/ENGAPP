@@ -57,6 +57,26 @@ class HinglishSTTService:
             logger.error(f"Audio conversion failed: {e}")
             return {"text": "", "language": None, "error": "Invalid audio format"}
 
+        # Fast path: Deepgram Nova-3 primary (~300ms vs Azure ~2000ms).
+        # PA enrichment still uses Azure — only plain transcription is rerouted.
+        if settings.deepgram_primary_stt and deepgram_transcription_service.configured:
+            try:
+                dg = deepgram_transcription_service.transcribe_bytes_sync(
+                    wav_bytes,
+                    language=settings.deepgram_language,
+                    mime_type="audio/wav",
+                )
+                return {
+                    "text": dg.text,
+                    "language": settings.deepgram_language,
+                    "success": True,
+                    "confidence": dg.confidence,
+                    "provider": "deepgram",
+                    "model": settings.deepgram_model,
+                }
+            except Exception as e:
+                logger.warning("Deepgram primary STT failed, falling back to Azure: %s", e)
+
         if not self.speech_config:
             if settings.deepgram_secondary_transcript and deepgram_transcription_service.configured:
                 try:

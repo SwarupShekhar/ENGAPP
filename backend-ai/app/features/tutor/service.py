@@ -18,26 +18,39 @@ try:
 except ImportError:
     InworldTTSService = None  # type: ignore
 
+try:
+    from ..transcription.google_gemini_tts_service import GoogleGeminiTTSService
+except ImportError:
+    GoogleGeminiTTSService = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 class StreamingTutorService:
     def __init__(self):
         self.speech_key = os.getenv('AZURE_SPEECH_KEY')
         self.speech_region = os.getenv('AZURE_SPEECH_REGION')
-        
+
         # Initialize sub-services
         self.gemini_service = StreamingGeminiService()
 
-        # Determine the order of TTS services to try
-        use_inworld_primary = os.getenv('USE_INWORLD_TTS', 'false').lower() == 'true'
-        azure_tts_disabled = settings.disable_azure_tts
+        # Maya tutor (Pulse) MUST use Inworld TTS. Azure is only for prosody / PA / STT.
+        # Order: honor settings.tts_provider first; legacy USE_INWORLD_TTS env kept as override.
+        env_use_inworld = os.getenv('USE_INWORLD_TTS', '').lower() in ('1', 'true', 'yes')
+        prefer_inworld = (
+            settings.tts_provider == "inworld"
+            or settings.disable_azure_tts
+            or env_use_inworld
+        )
+        azure_tts_disabled = settings.disable_azure_tts or prefer_inworld
         if azure_tts_disabled:
-            logger.info("DISABLE_AZURE_TTS=true — Azure TTS fallback is disabled")
+            logger.info("Azure TTS disabled for tutor (Inworld primary)")
 
-        tts_service_candidates = []
-        if use_inworld_primary:
+        tts_service_candidates: list[tuple[str, type]] = []
+        if prefer_inworld:
             if InworldTTSService is not None:
                 tts_service_candidates.append(("InworldTTS", InworldTTSService))
+            if GoogleGeminiTTSService is not None:
+                tts_service_candidates.append(("GoogleGeminiTTS", GoogleGeminiTTSService))
             if not azure_tts_disabled and OptimizedTTSService is not None:
                 tts_service_candidates.append(("OptimizedTTS", OptimizedTTSService))
         else:
@@ -45,16 +58,26 @@ class StreamingTutorService:
                 tts_service_candidates.append(("OptimizedTTS", OptimizedTTSService))
             if InworldTTSService is not None:
                 tts_service_candidates.append(("InworldTTS", InworldTTSService))
+            if GoogleGeminiTTSService is not None:
+                tts_service_candidates.append(("GoogleGeminiTTS", GoogleGeminiTTSService))
 
-        self.tts_service = None
+        self.tts_services: list[tuple[str, object]] = []
         for service_name, service_class in tts_service_candidates:
             try:
-                self.tts_service = service_class()
-                logger.info(f"Initialized {service_name} for TTS")
-                break
+                instance = service_class()
+                if hasattr(instance, "is_configured") and not instance.is_configured():
+                    logger.info("%s skipped (not configured)", service_name)
+                    continue
+                self.tts_services.append((service_name, instance))
+                logger.info("Initialized %s for TTS", service_name)
             except Exception as e:
-                logger.error(f"Failed to initialize {service_name}: {e}")
-                self.tts_service = None
+                logger.error("Failed to initialize %s: %s", service_name, e)
+
+        # Primary for legacy callers
+        self.tts_service = self.tts_services[0][1] if self.tts_services else None
+        if self.tts_services:
+            chain = " -> ".join(name for name, _ in self.tts_services)
+            logger.info("Maya TTS chain: %s", chain)
         
         if not self.speech_key or not self.speech_region:
             logger.warning("Azure Speech credentials not found. Streaming features will be disabled.")
@@ -134,16 +157,30 @@ class StreamingTutorService:
         # Real-time streaming would require continuous recognition; use recognize_audio_bytes for request/response.
         pass
 
+    async def _synthesize_tts_sentence(self, text: str) -> bytes | None:
+        """Try each TTS provider in order until one returns audio."""
+        for service_name, svc in self.tts_services:
+            try:
+                audio_bytes = await svc.synthesize_sentence(text)
+                if audio_bytes:
+                    return audio_bytes
+                logger.warning("%s returned empty audio for sentence", service_name)
+            except Exception as e:
+                logger.error("%s synthesis failed: %s", service_name, e)
+        return None
+
     async def generate_chunked_response(
         self,
         user_utterance: str,
         conversation_history: list,
         session_id: str,
         phonetic_context: dict | None = None,
-        audio_base64: str | None = None
+        audio_base64: str | None = None,
+        cefr_level: str | None = None,
     ) -> AsyncGenerator[dict, None]:
         """
         Generate AI response in chunks. Emits transcript first so mobile can show it immediately.
+        cefr_level (A1..C2) tunes Maya's vocabulary + sentence complexity to the learner.
         """
         # Emit transcript immediately — mobile can show it while audio loads
         yield {
@@ -158,14 +195,10 @@ class StreamingTutorService:
             conversation_history,
             phonetic_context,
             audio_base64,
+            cefr_level=cefr_level,
         ):
-            audio_bytes = None
             tts_input = strip_pron_tags_for_mobile(sentence)
-            if self.tts_service:
-                try:
-                    audio_bytes = await self.tts_service.synthesize_sentence(tts_input)
-                except Exception as e:
-                    logger.error("TTS synthesis failed for sentence: %s", e)
+            audio_bytes = await self._synthesize_tts_sentence(tts_input) if self.tts_services else None
             yield {
                 "type": "sentence",
                 "text": sentence,

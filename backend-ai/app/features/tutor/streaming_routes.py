@@ -38,6 +38,7 @@ async def _generate_stream_response(
     user_id: str,
     conversation_history: list,
     trace_id: str = "",
+    cefr_level: str | None = None,
 ):
     """Yield SSE events: transcript, then sentence chunks (text + audio base64), then done."""
     timings = TraceTimings(trace_id)
@@ -70,6 +71,7 @@ async def _generate_stream_response(
         session_id,
         phonetic_context=phonetic_context,
         audio_base64=None,
+        cefr_level=cefr_level,
     ):
         if chunk.get("type") == "transcript":
             continue
@@ -119,6 +121,7 @@ async def stream_tutor_response(
     user_id: str = Form(...),
     conversation_history: str = Form(default="[]"),
     trace_id: str = Form(default=""),
+    cefr_level: str = Form(default=""),
 ):
     """
     Stream tutor response via SSE. Accepts multipart: audio file + session_id + user_id + conversation_history (JSON array).
@@ -142,7 +145,12 @@ async def stream_tutor_response(
     async def event_generator():
         try:
             async for event in _generate_stream_response(
-                audio_bytes, session_id, user_id, history, trace_id=trace_id
+                audio_bytes,
+                session_id,
+                user_id,
+                history,
+                trace_id=trace_id,
+                cefr_level=cefr_level or None,
             ):
                 yield {"data": json.dumps(event)}
         except Exception as e:
@@ -201,6 +209,7 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                 user_utterance = message.get("text")
                 client_phonetic = message.get("phonetic_context")
                 audio_base64 = message.get("audio_base64")
+                cefr_level = (message.get("cefr_level") or "").strip() or None
                 pa_task = None
                 ws_timings = TraceTimings(str(message.get("trace_id") or ""))
                 ws_timings.mark("ws_message")
@@ -257,6 +266,7 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                     session_id,
                     stream_phonetic,
                     audio_base64,
+                    cefr_level=cefr_level,
                 ):
                     out_chunk = dict(chunk)
                     if out_chunk.get("audio"):
