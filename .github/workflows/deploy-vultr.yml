@@ -77,14 +77,16 @@ jobs:
             docker compose -f docker-compose.prod.yml run --rm --no-deps backend-nest \
               npx prisma migrate deploy
 
-            # Start core services first; prometheus depends on healthy backends.
-            docker compose -f docker-compose.prod.yml up -d backend-nest backend-ai caddy
+            # Start backends only (caddy/prometheus depend on healthy nest — would fail compose up).
+            docker compose -f docker-compose.prod.yml up -d --no-deps backend-nest backend-ai
 
             echo "Waiting for backend-nest health (up to 120s)..."
             healthy=0
-            for _ in $(seq 1 24); do
+            i=0
+            while [ "$i" -lt 24 ]; do
+              i=$((i + 1))
               if docker compose -f docker-compose.prod.yml exec -T backend-nest \
-                node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+                node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
                 healthy=1
                 break
               fi
@@ -95,5 +97,5 @@ jobs:
               exit 1
             fi
 
-            docker compose -f docker-compose.prod.yml up -d prometheus
+            docker compose -f docker-compose.prod.yml up -d caddy prometheus
             docker compose -f docker-compose.prod.yml ps
