@@ -50,6 +50,9 @@ import {
   type MayaCaptureHandle,
 } from "../voice/mayaAudioCapture";
 import { Buffer } from "buffer";
+import { useAnalytics } from "../../../analytics/useAnalytics";
+import { AnalyticsEvents } from "../../../analytics/events";
+import { analyticsMeta } from "../../../analytics/eventMeta";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -228,6 +231,7 @@ export default function AITutorScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const { user } = useUser();
+  const analytics = useAnalytics();
   const { getToken } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -289,6 +293,22 @@ export default function AITutorScreen({ navigation, route }: any) {
   const seedPhraseRef = useRef<{ phrase?: string; example?: string; definition?: string } | null>(
     route?.params?.phrase ?? null,
   );
+  const tutorOpenTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (tutorOpenTrackedRef.current) return;
+    tutorOpenTrackedRef.current = true;
+    const source =
+      (route?.params?.source as string | undefined) ??
+      (route?.params?.phrase ? "phrase_of_day" : "unknown");
+    analytics.capture(
+      AnalyticsEvents.AI_TUTOR_OPENED,
+      analyticsMeta({
+        source,
+        has_seed_phrase: Boolean(route?.params?.phrase),
+      }),
+    );
+  }, [analytics, route?.params?.phrase, route?.params?.source]);
 
   useFocusEffect(
     useCallback(() => {
@@ -765,6 +785,22 @@ export default function AITutorScreen({ navigation, route }: any) {
         if (refText && activeSessionId) {
           setReferenceTextForNextTurn(null);
           activeLatencyTimeline.startSpan("assess_pronunciation");
+          const requestId = `pron_${activeSessionId}_${Date.now()}`;
+          const assessStartedAt = Date.now();
+          analytics.capture(
+            AnalyticsEvents.PRON_FEEDBACK_REQUESTED,
+            analyticsMeta({
+              session_id: activeSessionId,
+              request_id: requestId,
+            }),
+          );
+          analytics.capture(
+            AnalyticsEvents.AZURE_PROSODY_STARTED,
+            analyticsMeta({
+              session_id: activeSessionId,
+              request_id: requestId,
+            }),
+          );
           const assessForm = new FormData();
           assessForm.append("audio", {
             uri,
@@ -774,10 +810,22 @@ export default function AITutorScreen({ navigation, route }: any) {
           assessForm.append("userId", user?.id || "test");
           assessForm.append("referenceText", refText);
           assessForm.append("sessionId", activeSessionId);
+          assessForm.append("requestId", requestId);
           void tutorApi
             .assessPronunciation(assessForm)
             .then((res) => {
               activeLatencyTimeline.endSpan("assess_pronunciation");
+              analytics.capture(
+                AnalyticsEvents.AZURE_PROSODY_COMPLETED,
+                analyticsMeta({
+                  session_id: activeSessionId,
+                  request_id: requestId,
+                  latency_ms: Date.now() - assessStartedAt,
+                  passed: Boolean(res?.passed),
+                  accuracy_score: Number(res?.accuracy_score ?? 0),
+                  error_code: null,
+                }),
+              );
               setTranscript((prev) =>
                 prev.map((m) =>
                   m.tempId && m.speaker === "user"
@@ -793,6 +841,15 @@ export default function AITutorScreen({ navigation, route }: any) {
             })
             .catch((e) => {
               activeLatencyTimeline.endSpan("assess_pronunciation");
+              analytics.capture(
+                AnalyticsEvents.AZURE_PROSODY_FAILED,
+                analyticsMeta({
+                  session_id: activeSessionId,
+                  request_id: requestId,
+                  latency_ms: Date.now() - assessStartedAt,
+                  error_code: e?.response?.status ?? e?.code ?? "unknown",
+                }),
+              );
               if (__DEV__) console.warn("[AITutor] parallel assess failed:", e);
             });
         }

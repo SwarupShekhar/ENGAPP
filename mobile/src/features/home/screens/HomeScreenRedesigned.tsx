@@ -92,13 +92,13 @@ export default function HomeScreenRedesigned() {
         navigation.navigate("CallPreference");
         break;
       case "start_maya_session":
-        navigation.navigate("AITutor");
+        navigation.navigate("AITutor", { source: "home" });
         break;
       case "start_assessment":
         navigation.navigate("AssessmentIntro");
         break;
       case "open_maya_chat":
-        navigation.navigate("AITutor");
+        navigation.navigate("AITutor", { source: "home" });
         break;
       default:
         console.log("Unhandled action:", action, data);

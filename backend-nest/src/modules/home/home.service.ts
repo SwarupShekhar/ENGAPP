@@ -5,6 +5,7 @@ import { HeaderBuilder } from './builders/header.builder';
 import { CTABuilder } from './builders/cta.builder';
 import { SkillsBuilder } from './builders/skills.builder';
 import { CardsBuilder } from './builders/cards.builder';
+import { WordOfDayService } from './services/word-of-day.service';
 
 @Injectable()
 export class HomeService {
@@ -15,18 +16,20 @@ export class HomeService {
     private ctaBuilder: CTABuilder,
     private skillsBuilder: SkillsBuilder,
     private cardsBuilder: CardsBuilder,
+    private wordOfDayService: WordOfDayService,
   ) {}
 
   async getHomeData(userId: string) {
     const stage = await this.stageResolver.getCachedStage(userId);
 
-    const [header, primaryCTA, skills, contextualCards, weeklyActivity] =
+    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay] =
       await Promise.all([
         this.headerBuilder.buildHeaderData(userId, stage),
         this.ctaBuilder.buildPrimaryCTA(userId, stage),
         this.skillsBuilder.buildSkillsData(userId, stage),
         this.cardsBuilder.buildContextualCards(userId, stage),
         this.getWeeklyActivity(userId),
+        this.wordOfDayService.getWordOfTheDay(),
       ]);
 
     return {
@@ -36,6 +39,7 @@ export class HomeService {
       skills,
       contextualCards,
       weeklyActivity,
+      wordOfTheDay,
     };
   }
 

@@ -6,6 +6,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { PushyService, PushPayload } from './pushy.service';
 import { NotificationStatus } from '@prisma/client';
 import { RedisService } from '../../redis/redis.service';
+import { PosthogAnalyticsService } from './posthog-analytics.service';
 
 export type NotificationType =
   | 'reminder'
@@ -16,7 +17,8 @@ export type NotificationType =
   | 'milestone'
   | 'friend_request'
   | 'incoming_call'
-  | 'missed_call';
+  | 'missed_call'
+  | 'word_of_day';
 
 export interface NotificationJobData {
   logId: string;
@@ -101,6 +103,17 @@ const PAYLOADS: Record<NotificationType, (data: Record<string, unknown>) => Push
     body: `You reached ${d.label ?? 'a new level'}!`,
     data: { type: 'milestone' },
   }),
+  word_of_day: (d) => ({
+    title: `Word of the Day: ${String(d.word ?? 'New word')}`,
+    body: String(d.definition ?? 'Tap to practice this word today.'),
+    data: {
+      type: 'word_of_day',
+      word: d.word,
+      definition: d.definition,
+      example: d.example,
+      partOfSpeech: d.partOfSpeech,
+    },
+  }),
 };
 
 @Injectable()
@@ -112,6 +125,7 @@ export class NotificationService {
     private readonly prisma: PrismaService,
     private readonly pushy: PushyService,
     private readonly redis: RedisService,
+    private readonly posthog: PosthogAnalyticsService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
   ) {}
 
@@ -232,6 +246,16 @@ export class NotificationService {
           payload: telemetry as unknown as import('@prisma/client').Prisma.InputJsonValue,
         },
       });
+
+      if (type === 'word_of_day' && successful > 0) {
+        this.posthog.capture('word_of_day_push_sent', userId, {
+          word: data.word,
+          part_of_speech: data.partOfSpeech,
+          word_source: data.source,
+          devices_targeted: tokens.length,
+          devices_delivered: successful,
+        });
+      }
     } catch (err) {
       await this.prisma.notificationLog.update({
         where: { id: logId },

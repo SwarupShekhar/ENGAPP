@@ -4,8 +4,10 @@ import { NotificationService } from './notification.service';
 import { PushyService } from './pushy.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
+import { PosthogAnalyticsService } from './posthog-analytics.service';
 
 const mockPushy = { send: jest.fn() };
+const mockPosthog = { captureWordOfDayPushSent: jest.fn() };
 const mockQueue = { add: jest.fn() };
 const mockRedis = {
   getClient: jest.fn(() => ({
@@ -31,6 +33,7 @@ describe('NotificationService', () => {
         { provide: PushyService, useValue: mockPushy },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RedisService, useValue: mockRedis },
+        { provide: PosthogAnalyticsService, useValue: mockPosthog },
         { provide: getQueueToken('notifications'), useValue: mockQueue },
       ],
     }).compile();

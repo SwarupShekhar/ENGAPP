@@ -70,6 +70,8 @@ describe('TasksService SR', () => {
     expect(arg.where.userId).toBe('u1');
     expect(arg.where.srState).toBe('LEARNING');
     expect(arg.where.dueAt.lte).toBeInstanceOf(Date);
+    expect(arg.take).toBe(50);
+    expect(arg.orderBy).toEqual({ dueAt: 'asc' });
     expect(rows.map((r) => r.id)).toEqual(['p1', 'g1', 'v1']);
   });
 

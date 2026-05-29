@@ -28,6 +28,7 @@ import {
   Modal,
   Pressable,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -60,8 +61,12 @@ import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
 import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
 import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
 import { getCQSScore, CQSResults } from "../../../api/scoring";
+import { useAnalytics } from "../../../analytics/useAnalytics";
+import { AnalyticsEvents } from "../../../analytics/events";
+import { analyticsMeta } from "../../../analytics/eventMeta";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const FIRST_CALL_COMPLETED_KEY = "analytics:first_call_completed";
 
 // ─── Step-by-step feedback types ─────────────────────────
 type FeedbackPhase = 'intro' | 'step' | 'summary' | 'detail';
@@ -836,6 +841,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const { user } = useUser();
+  const analytics = useAnalytics();
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState<ConversationSession | null>(
     null,
@@ -884,6 +890,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [feedbackLatencyTrace, setFeedbackLatencyTrace] = useState<LatencyTrace | null>(
     null,
   );
+  const feedbackRenderedTrackedRef = useRef(false);
 
   // Reanimated: progress of the current segment's audio (0→1) for the ring,
   // and the translateY of the bottom-sheet card that rises on play.
@@ -905,6 +912,38 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       sheetTranslateY.value = SCREEN_HEIGHT;
     }
   }, [feedbackPhase, sheetTranslateY]);
+
+  useEffect(() => {
+    if (!sessionData || feedbackRenderedTrackedRef.current) return;
+    feedbackRenderedTrackedRef.current = true;
+    analytics.capture(
+      AnalyticsEvents.FEEDBACK_RENDERED,
+      analyticsMeta({
+        session_id: sessionData.id,
+        has_transcript: Boolean(sessionData.feedback?.transcript),
+      }),
+    );
+
+    const maybeTrackFirstCallCompleted = async () => {
+      try {
+        const alreadyTracked = await AsyncStorage.getItem(FIRST_CALL_COMPLETED_KEY);
+        if (alreadyTracked === "1") return;
+        analytics.capture(
+          AnalyticsEvents.FIRST_CALL_COMPLETED,
+          analyticsMeta({
+            session_id: sessionData.id,
+            duration_sec: Number((sessionData as any)?.durationSec ?? 0),
+            partner_type: (sessionData as any)?.isAi ? "ai_tutor" : "human",
+          }),
+        );
+        await AsyncStorage.setItem(FIRST_CALL_COMPLETED_KEY, "1");
+      } catch (err) {
+        if (__DEV__) console.warn("[Analytics] first_call_completed track failed:", err);
+      }
+    };
+
+    void maybeTrackFirstCallCompleted();
+  }, [analytics, sessionData]);
 
   // Clean up audio on unmount
   useEffect(() => {
@@ -2470,6 +2509,35 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         <Text style={styles.detailSectionSubtitle}>
           Listen to your full feedback, then review scores and corrections below
         </Text>
+        <View style={styles.helpfulRow}>
+          <Text style={styles.helpfulPrompt}>Was this feedback helpful?</Text>
+          <View style={styles.helpfulButtons}>
+            <TouchableOpacity
+              style={styles.helpfulBtn}
+              onPress={() =>
+                analytics.capture(
+                  AnalyticsEvents.FEEDBACK_HELPFUL_YES,
+                  analyticsMeta({ session_id: sessionData?.id ?? null }),
+                )
+              }
+            >
+              <Ionicons name="thumbs-up-outline" size={14} color={theme.colors.success} />
+              <Text style={styles.helpfulBtnText}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.helpfulBtn}
+              onPress={() =>
+                analytics.capture(
+                  AnalyticsEvents.FEEDBACK_HELPFUL_NO,
+                  analyticsMeta({ session_id: sessionData?.id ?? null }),
+                )
+              }
+            >
+              <Ionicons name="thumbs-down-outline" size={14} color={theme.colors.error} />
+              <Text style={styles.helpfulBtnText}>No</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* ── Listen to Feedback button ── */}
         <Animated.View entering={FadeInDown.delay(20).springify()} style={styles.listenBtnWrapper}>
@@ -3737,6 +3805,36 @@ const getStyles = (theme: any) => {
       lineHeight: 20,
       marginBottom: theme.spacing.s,
       marginTop: 0,
+    },
+    helpfulRow: {
+      marginTop: -4,
+      marginBottom: theme.spacing.s,
+      gap: 8,
+    },
+    helpfulPrompt: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.light,
+      fontWeight: "600",
+    },
+    helpfulButtons: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    helpfulBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: `${String(theme.colors.border)}AA`,
+      backgroundColor: `${String(theme.colors.surface)}CC`,
+    },
+    helpfulBtnText: {
+      fontSize: theme.typography.sizes.xs,
+      color: theme.colors.text.secondary,
+      fontWeight: "700",
     },
     wordsToWorkOnSubtitle: {
       fontSize: theme.typography.sizes.s,

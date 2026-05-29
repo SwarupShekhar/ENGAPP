@@ -34,6 +34,9 @@ import { SplashAnimation } from "./components/SplashAnimation";
 import { assessmentApi } from "./features/assessment/services/assessment";
 import { AnalyticsProvider } from "./analytics/AnalyticsProvider";
 import { PostHogUserSync } from "./analytics/PostHogUserSync";
+import { useAnalytics } from "./analytics/useAnalytics";
+import { AnalyticsEvents } from "./analytics/events";
+import { analyticsMeta } from "./analytics/eventMeta";
 
 class AppErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -263,6 +266,16 @@ function AppPushHandler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppOpenTracker() {
+  const analytics = useAnalytics();
+
+  useEffect(() => {
+    analytics.capture(AnalyticsEvents.APP_OPENED, analyticsMeta());
+  }, [analytics]);
+
+  return null;
+}
+
 /**
  * OnboardingGate checks if the signed-in user has completed:
  * 1. Profile creation (firstName exists)
@@ -473,6 +486,7 @@ export default function App() {
     >
       <AnalyticsProvider>
       <PostHogUserSync />
+      <AppOpenTracker />
       <StartupReachabilityProbe />
       <AuthTokenInjector>
         <AppSocketHandler>

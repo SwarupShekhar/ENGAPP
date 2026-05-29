@@ -89,6 +89,7 @@ model NotificationLog {
 
   @@index([userId])
   @@index([status])
+  @@index([userId, type, sentAt])
 }
 
 model UserAchievement {
@@ -98,6 +99,8 @@ model UserAchievement {
   unlockedAt DateTime @default(now())
   displayed  Boolean  @default(false)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model StreakHistory {
@@ -186,6 +189,7 @@ model FriendRequest {
 
   @@unique([senderId, receiverId])
   @@index([receiverId])
+  @@index([senderId])
 }
 
 model ChatMessage {
@@ -238,6 +242,9 @@ model ConversationSession {
   tasks               LearningTask[]
   reviews             PartnerReview[]
   participants        SessionParticipant[]
+
+  @@index([createdAt])
+  @@index([status, startedAt])
 }
 
 model SessionParticipant {
@@ -256,6 +263,8 @@ model SessionParticipant {
   user                    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, userId])
+  @@index([userId])
+  @@index([userId, sessionId])
 }
 
 model Analysis {
@@ -452,6 +461,8 @@ model AssessmentSession {
   user               User             @relation(fields: [userId], references: [id])
 
   @@index([userId, status])
+  @@index([completedAt])
+  @@index([status, completedAt])
 }
 
 model Conversation {
@@ -489,6 +500,7 @@ model Message {
   sender         User         @relation("ChatMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+  @@index([conversationId, createdAt])
   @@index([senderId])
 }
 

@@ -506,7 +506,18 @@ export class ConversationalTutorService implements OnModuleInit {
     audioBuffer: Buffer,
     referenceText: string,
     sessionId: string,
+    requestId?: string,
   ): Promise<any> {
+    const requestTag = requestId || `pron_${sessionId}_${Date.now()}`;
+    const startedAt = Date.now();
+    this.logger.log(
+      JSON.stringify({
+        event: 'azure_prosody_started',
+        request_id: requestTag,
+        session_id: sessionId,
+        reference_text_len: referenceText?.length ?? 0,
+      }),
+    );
     try {
       const form = new FormData();
       form.append('audio', audioBuffer, {
@@ -541,10 +552,31 @@ export class ConversationalTutorService implements OnModuleInit {
       });
       this.conversations.set(sessionId, session);
 
-      return result;
+      this.logger.log(
+        JSON.stringify({
+          event: 'azure_prosody_completed',
+          request_id: requestTag,
+          session_id: sessionId,
+          latency_ms: Date.now() - startedAt,
+          passed: Boolean(result.passed),
+          accuracy_score: Number(result.accuracy_score ?? 0),
+        }),
+      );
+
+      return { ...result, requestId: requestTag };
     } catch (error) {
       const errorMessage =
         (error as any).response?.data?.detail || (error as any).message;
+      this.logger.error(
+        JSON.stringify({
+          event: 'azure_prosody_failed',
+          request_id: requestTag,
+          session_id: sessionId,
+          latency_ms: Date.now() - startedAt,
+          error_code: (error as any).response?.status ?? 'unknown',
+          error_message: errorMessage,
+        }),
+      );
       this.logger.error(`Pronunciation assessment failed: ${errorMessage}`);
       throw new Error(`Pronunciation assessment failed: ${errorMessage}`, {
         cause: error,

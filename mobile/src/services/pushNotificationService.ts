@@ -1,5 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { captureAnalyticsEvent } from "../analytics/analyticsBridge";
+import { AnalyticsEvents } from "../analytics/events";
+import { analyticsMeta } from "../analytics/eventMeta";
 import { client, getNestAuthToken } from "../api/client";
 import { navigate } from "../navigation/navigationRef";
 
@@ -80,6 +83,13 @@ function normalizeNotification(raw: PushyPayload): { title: string; body: string
         title: "Session analysis ready",
         body: explicitBody || "Tap to see your feedback.",
       };
+    case "word_of_day": {
+      const word = (payload.word as string | undefined)?.trim();
+      return {
+        title: explicitTitle || (word ? `Word of the Day: ${word}` : "Word of the Day"),
+        body: explicitBody || "Tap to practice today's word in EngR.",
+      };
+    }
     default:
       return {
         title: explicitTitle || "New notification",
@@ -124,6 +134,15 @@ class PushNotificationService {
       Pushy.setNotificationListener(async (data) => {
         const flat = flattenPushPayload(data);
         console.log("[Pushy] Received notification:", JSON.stringify(flat));
+        if (flat.type === "word_of_day") {
+          captureAnalyticsEvent(
+            AnalyticsEvents.WORD_OF_DAY_PUSH_RECEIVED,
+            analyticsMeta({
+              word: (flat.word as string | undefined) ?? null,
+              source: (flat.source as string | undefined) ?? null,
+            }),
+          );
+        }
         this.listeners.forEach((cb) => cb(flat));
         const normalized = normalizeNotification(flat);
 
@@ -307,10 +326,21 @@ class PushNotificationService {
   }
 
   private handleNotificationClick(data: PushyPayload): void {
-    const type = data.type as string | undefined;
-    const sessionId = data.sessionId as string | undefined;
-    const conversationId = data.conversationId as string | undefined;
+    const flat = flattenPushPayload(data);
+    const type = flat.type as string | undefined;
+    const sessionId = flat.sessionId as string | undefined;
+    const conversationId = flat.conversationId as string | undefined;
     console.log("[Pushy] Navigating based on notification type:", type);
+
+    if (type === "word_of_day") {
+      captureAnalyticsEvent(
+        AnalyticsEvents.WORD_OF_DAY_PUSH_TAPPED,
+        analyticsMeta({
+          word: (flat.word as string | undefined) ?? null,
+          source: (flat.source as string | undefined) ?? null,
+        }),
+      );
+    }
 
     switch (type) {
       case "message":
@@ -334,6 +364,7 @@ class PushNotificationService {
         break;
       case "reminder":
       case "streak_risk":
+      case "word_of_day":
         navigate("MainTabs", { screen: "Home" });
         break;
       default:

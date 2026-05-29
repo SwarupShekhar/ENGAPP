@@ -89,6 +89,7 @@ export class ConversationalTutorController {
     @UploadedFile() audio: Express.Multer.File,
     @Body('sessionId') sessionId: string,
     @Body('referenceText') referenceText: string,
+    @Body('requestId') requestId?: string,
   ) {
     if (!audio) throw new BadRequestException('Audio file is required');
     if (!referenceText)
@@ -99,6 +100,7 @@ export class ConversationalTutorController {
       audio.buffer,
       referenceText,
       sessionId,
+      requestId,
     );
   }
 

@@ -66,7 +66,10 @@ export default function CallPreferenceScreenV2() {
 
     if (showAiOption) {
       navigation.goBack();
-      setTimeout(() => navigation.navigate("AITutor"), 100);
+      setTimeout(
+        () => navigation.navigate("AITutor", { source: "call_preference" }),
+        100,
+      );
       return;
     }
 
@@ -261,7 +264,10 @@ export default function CallPreferenceScreenV2() {
                 style={styles.aiTutorLink}
                 onPress={() => {
                   navigation.goBack();
-                  setTimeout(() => navigation.navigate("AITutor"), 100);
+                  setTimeout(
+        () => navigation.navigate("AITutor", { source: "call_preference" }),
+        100,
+      );
                 }}
                 activeOpacity={0.7}
               >

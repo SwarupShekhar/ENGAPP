@@ -97,7 +97,31 @@ export default function NotificationScreen() {
 
     return (
       <View style={styles.card}>
+        <View style={styles.badgeRow}>
+          <View style={styles.badgePill}>
+            <Ionicons
+              name="notifications"
+              size={12}
+              color={theme.colors.primary}
+            />
+            <Text style={styles.badgeText}>Friend Request</Text>
+          </View>
+          <Text style={styles.dateText}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+
         <View style={styles.cardHeader}>
+          <View style={styles.notificationLogoWrap}>
+            <LinearGradient
+              colors={theme.colors.gradients.primary as any}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.notificationLogo}
+            >
+              <Ionicons name="sparkles" size={16} color="#fff" />
+            </LinearGradient>
+          </View>
           <View style={styles.avatarContainer}>
             {item.sender.imageUrl ? (
               <Image
@@ -113,9 +137,6 @@ export default function NotificationScreen() {
               {firstName} {lastName}
             </Text>
             <Text style={styles.subtitleText}>Sent you a friend request</Text>
-            <Text style={styles.dateText}>
-              {new Date(item.createdAt).toLocaleDateString()}
-            </Text>
           </View>
         </View>
 
@@ -124,6 +145,11 @@ export default function NotificationScreen() {
             style={[styles.btn, styles.declineBtn]}
             onPress={() => handleDecline(item.id)}
           >
+            <Ionicons
+              name="close-circle-outline"
+              size={16}
+              color={theme.colors.text.secondary}
+            />
             <Text style={[styles.btnText, styles.declineText]}>Decline</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -136,6 +162,7 @@ export default function NotificationScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.acceptGradient}
             >
+              <Ionicons name="checkmark-circle" size={16} color="#fff" />
               <Text style={[styles.btnText, styles.acceptText]}>Accept</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -245,16 +272,50 @@ const getStyles = (theme: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: theme.colors.surface,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadows.small,
+    ...theme.shadows.md,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  badgePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: `${theme.colors.primary}18`,
+    borderWidth: 1,
+    borderColor: `${theme.colors.primary}40`,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    color: theme.colors.primary,
   },
   cardHeader: {
     flexDirection: "row",
-    marginBottom: 16,
+    marginBottom: 14,
+    alignItems: "center",
+  },
+  notificationLogoWrap: {
+    marginRight: 10,
+  },
+  notificationLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarContainer: {
     width: 48,
@@ -290,9 +351,9 @@ const getStyles = (theme: any) => StyleSheet.create({
     color: theme.colors.text.secondary,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.text.light,
-    marginTop: 4,
+    fontWeight: "600",
   },
   actionRow: {
     flexDirection: "row",
@@ -303,14 +364,18 @@ const getStyles = (theme: any) => StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
     overflow: "hidden",
   },
   acceptBtn: {},
   acceptGradient: {
     width: "100%",
-    paddingVertical: 10,
+    paddingVertical: 11,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
   },
   declineBtn: {
     backgroundColor: `${theme.colors.text.light}22`,

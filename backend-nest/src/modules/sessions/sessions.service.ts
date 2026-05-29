@@ -316,15 +316,23 @@ export class SessionsService {
     return session;
   }
 
-  async getUserSessions(userId: string) {
-    return this.prisma.conversationSession.findMany({
+  async getUserSessions(
+    userId: string,
+    options?: { limit?: number; cursor?: string },
+  ) {
+    const limit = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+    const sessions = await this.prisma.conversationSession.findMany({
       where: {
         participants: {
           some: {
             userId: userId,
           },
         },
+        ...(options?.cursor
+          ? { createdAt: { lt: new Date(options.cursor) } }
+          : {}),
       },
+      take: limit + 1,
       include: {
         participants: {
           include: {
@@ -354,6 +362,14 @@ export class SessionsService {
         createdAt: 'desc',
       },
     });
+
+    const hasMore = sessions.length > limit;
+    const page = hasMore ? sessions.slice(0, limit) : sessions;
+    const nextCursor = hasMore
+      ? page[page.length - 1]?.createdAt.toISOString()
+      : null;
+
+    return { items: page, nextCursor, hasMore };
   }
 
   async getUserSessionsCount(userId: string): Promise<{ count: number }> {

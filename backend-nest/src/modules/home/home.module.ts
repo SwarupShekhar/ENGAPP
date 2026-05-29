@@ -11,6 +11,7 @@ import { WeeklySummaryBuilder } from './builders/weekly-summary.builder';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../redis/redis.module';
 import { BrainModule } from '../brain/brain.module';
+import { WordOfDayService } from './services/word-of-day.service';
 
 @Module({
   imports: [PrismaModule, RedisModule, BrainModule],
@@ -24,7 +25,8 @@ import { BrainModule } from '../brain/brain.module';
     SkillsBuilder,
     CardsBuilder,
     WeeklySummaryBuilder,
+    WordOfDayService,
   ],
-  exports: [HomeService, SessionHandlerService],
+  exports: [HomeService, SessionHandlerService, WordOfDayService],
 })
 export class HomeModule {}

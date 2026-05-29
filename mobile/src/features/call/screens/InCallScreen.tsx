@@ -51,6 +51,9 @@ import {
   incrementBridgeStreak,
   syncBridgeCefr,
 } from "../../../api/bridgeClient";
+import { captureAnalyticsEvent } from "../../../analytics/analyticsBridge";
+import { AnalyticsEvents } from "../../../analytics/events";
+import { analyticsMeta } from "../../../analytics/eventMeta";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // In a real app, these would come from environment variables
@@ -412,6 +415,7 @@ export default function InCallScreen({ navigation, route }: any) {
   const transcriptRef = useRef<any[]>(INITIAL_TRANSCRIPT);
   const roomRef = useRef<any>(null);
   const hasEndedRef = useRef(false);
+  const callStartedTrackedRef = useRef(false);
   const joinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sttRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -448,6 +452,27 @@ export default function InCallScreen({ navigation, route }: any) {
     "calling" | "connected" | "declined"
   >("calling");
 
+  const trackCallStartedOnce = useCallback(() => {
+    if (callStartedTrackedRef.current || hasEndedRef.current) return;
+    callStartedTrackedRef.current = true;
+    captureAnalyticsEvent(
+      AnalyticsEvents.CALL_STARTED,
+      analyticsMeta({
+        session_id: sessionId ?? null,
+        mode: (route?.params?.mode as string | undefined) ?? "live_call",
+        is_direct: Boolean(isDirect),
+        is_caller: Boolean(isCaller),
+        topic,
+      }),
+    );
+  }, [sessionId, route?.params?.mode, isDirect, isCaller, topic]);
+
+  useEffect(() => {
+    if (callStatus === "connected") {
+      trackCallStartedOnce();
+    }
+  }, [callStatus, trackCallStartedOnce]);
+
   // Real-time Quality Preview Loop
   useEffect(() => {
     if (callStatus !== 'connected' || hasEndedRef.current) return;
@@ -470,6 +495,13 @@ export default function InCallScreen({ navigation, route }: any) {
     "idle" | "active" | "error" | "unavailable" | "muted"
   >("idle");
   const [roomReady, setRoomReady] = useState(false);
+
+  useEffect(() => {
+    if (roomReady) {
+      trackCallStartedOnce();
+    }
+  }, [roomReady, trackCallStartedOnce]);
+
   const localSttActiveRef = useRef(false);
   const hasLiveKitSttRef = useRef(false);
   const hasScheduledLocalSTTRef = useRef(false);
@@ -1051,6 +1083,18 @@ export default function InCallScreen({ navigation, route }: any) {
     async (remoteTriggered = false) => {
       if (hasEndedRef.current) return;
       hasEndedRef.current = true;
+
+      captureAnalyticsEvent(
+        AnalyticsEvents.CALL_ENDED,
+        analyticsMeta({
+          session_id: sessionId ?? null,
+          duration_sec: durationRef.current,
+          end_reason: remoteTriggered ? "remote_ended" : "user_ended",
+          mode: (route?.params?.mode as string | undefined) ?? "live_call",
+          is_direct: Boolean(isDirect),
+          topic,
+        }),
+      );
 
       // 1. Brief delay so any in-flight speech result commits to state and ref
       await new Promise((r) => setTimeout(r, 80));

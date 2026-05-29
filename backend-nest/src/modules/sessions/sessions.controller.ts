@@ -23,9 +23,20 @@ export class SessionsController {
 
     @Get()
     @UseGuards(ClerkGuard)
-    async getAll(@Request() req) {
-        console.log('GET /sessions hit for user:', req.user.id);
-        return this.sessionsService.getUserSessions(req.user.id);
+    async getAll(
+        @Request() req,
+        @Query('limit') limitStr?: string,
+        @Query('cursor') cursor?: string,
+    ) {
+        const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+        const page = await this.sessionsService.getUserSessions(req.user.id, {
+            limit: Number.isFinite(limit) ? limit : undefined,
+            cursor: cursor || undefined,
+        });
+        if (limitStr || cursor) {
+            return page;
+        }
+        return page.items;
     }
 
     @Get('count')

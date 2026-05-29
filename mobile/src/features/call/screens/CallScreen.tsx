@@ -19,8 +19,13 @@ import { useAppTheme } from "../../../theme/useAppTheme";
 import { matchmakingApi } from "../../../api/matchmaking";
 import { ActivityIndicator } from "react-native";
 import { FeatureLock } from "../../../components/FeatureLock";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAnalytics } from "../../../analytics/useAnalytics";
+import { AnalyticsEvents } from "../../../analytics/events";
+import { analyticsMeta } from "../../../analytics/eventMeta";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const FIRST_CALL_STARTED_KEY = "analytics:first_call_started";
 
 // ─── Constants & Helpers ───────────────────────────────────
 
@@ -227,6 +232,7 @@ export default function CallScreen() {
   const userLevelNum = getLevelScore(userLevel);
 
   const navigation: any = useNavigation();
+  const analytics = useAnalytics();
   const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -249,9 +255,28 @@ export default function CallScreen() {
     }
   };
 
+  const maybeTrackFirstCallStarted = async () => {
+    try {
+      const alreadyTracked = await AsyncStorage.getItem(FIRST_CALL_STARTED_KEY);
+      if (alreadyTracked === "1") return;
+      analytics.capture(
+        AnalyticsEvents.FIRST_CALL_STARTED,
+        analyticsMeta({
+          user_id: user?.id ?? null,
+          flow: showAiOption ? "ai_tutor" : isStructured ? "structured" : "free_talk",
+          topic: selectedTopic || "general",
+        }),
+      );
+      await AsyncStorage.setItem(FIRST_CALL_STARTED_KEY, "1");
+    } catch (err) {
+      if (__DEV__) console.warn("[Analytics] first_call_started track failed:", err);
+    }
+  };
+
   const handleFindPartner = async () => {
     if (!user) return;
 
+    await maybeTrackFirstCallStarted();
     cleanupMatchmaking();
     setIsSearching(true);
     setError(null);
@@ -427,7 +452,12 @@ export default function CallScreen() {
                   activeOpacity={0.85}
                   onPress={
                     showAiOption
-                      ? () => navigation.navigate("AITutor")
+                      ? () => {
+                          void maybeTrackFirstCallStarted();
+                          navigation.navigate("AITutor", {
+                            source: "call_ai_fallback",
+                          });
+                        }
                       : handleFindPartner
                   }
                   disabled={isSearching || (isStructured && userLevelNum < 5)}

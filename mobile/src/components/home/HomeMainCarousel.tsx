@@ -125,7 +125,7 @@ const HomeMainCarousel = () => {
             </View>
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={() => navigation.navigate("AITutor")}
+              onPress={() => navigation.navigate("AITutor", { source: "home_carousel" })}
             >
               <Text style={styles.primaryButtonText}>Practice It</Text>
               <Ionicons
@@ -236,7 +236,7 @@ const HomeMainCarousel = () => {
                   <TouchableOpacity
                     key={chip}
                     style={styles.promptChip}
-                    onPress={() => navigation.navigate("AITutor")}
+                    onPress={() => navigation.navigate("AITutor", { source: "home_carousel" })}
                   >
                     <Text style={styles.promptChipText}>{chip}</Text>
                   </TouchableOpacity>
@@ -245,7 +245,7 @@ const HomeMainCarousel = () => {
             </View>
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: "#9333EA" }]}
-              onPress={() => navigation.navigate("AITutor")}
+              onPress={() => navigation.navigate("AITutor", { source: "home_carousel" })}
             >
               <Text style={styles.primaryButtonText}>Chat with Maya</Text>
               <Ionicons

@@ -188,12 +188,24 @@ export interface ConversationSession {
   summaryJson?: SessionSummaryJson | null;
 }
 
+/** Supports legacy array or paginated `{ items, nextCursor, hasMore }`. */
+export function unwrapSessionsListResponse(
+  data: unknown,
+): ConversationSession[] {
+  if (Array.isArray(data)) return data as ConversationSession[];
+  if (data && typeof data === "object" && "items" in data) {
+    const items = (data as { items?: ConversationSession[] }).items;
+    return Array.isArray(items) ? items : [];
+  }
+  return [];
+}
+
 // ─── API ───────────────────────────────────────────────────
 export const sessionsApi = {
   /** Get all sessions for the current user */
   listSessions: async (): Promise<ConversationSession[]> => {
     const response = await client.get("/sessions");
-    return response.data;
+    return unwrapSessionsListResponse(response.data);
   },
 
   /** Get detailed analysis for a specific session. Pass retry: true to ask the backend to re-queue analysis when status is ANALYSIS_FAILED. */

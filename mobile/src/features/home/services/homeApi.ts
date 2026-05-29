@@ -49,6 +49,13 @@ export interface HomeData {
     data: any;
   }>;
   weeklyActivity: number[];
+  wordOfTheDay?: {
+    word: string;
+    definition: string;
+    example: string;
+    partOfSpeech?: string | null;
+    source?: 'wordnik' | 'fallback';
+  };
 }
 
 export const getHomeData = async (): Promise<HomeData> => {

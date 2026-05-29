@@ -373,7 +373,7 @@ export class TasksService {
         }
     }
 
-    async getDailyTasks(userId: string) {
+    async getDailyTasks(userId: string, take = 100) {
         return this.prisma.learningTask.findMany({
             where: {
                 userId,
@@ -382,6 +382,7 @@ export class TasksService {
             orderBy: {
                 dueDate: 'asc',
             },
+            take: Math.min(Math.max(take, 1), 200),
             include: {
                 mistakes: {
                     include: {
@@ -483,9 +484,12 @@ export class TasksService {
     }
 
     async getDueTasksForUser(userId: string, limit = 10) {
+        const fetchCap = Math.min(Math.max(limit * 5, limit), 100);
         const rows = await this.prisma.learningTask.findMany({
             where: { userId, srState: 'LEARNING', dueAt: { lte: new Date() } },
             include: { session: { select: { id: true, createdAt: true } } },
+            take: fetchCap,
+            orderBy: { dueAt: 'asc' },
         });
         rows.sort((a, b) => {
             const tr = this.dueTaskTypeRank(a.type) - this.dueTaskTypeRank(b.type);

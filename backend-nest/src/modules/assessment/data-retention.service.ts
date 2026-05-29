@@ -96,22 +96,19 @@ export class DataRetentionService {
    * for research purposes. The session record stays but PII is removed.
    */
   private async anonymizeExpiredSessions(sessionIds: string[]) {
-    for (const sessionId of sessionIds) {
-      await this.prisma.assessmentSession.update({
-        where: { id: sessionId },
-        data: {
-          // Keep: overallScore, overallLevel, skillBreakdown, benchmarking
-          // Clear: phase-level raw data containing audio references
-          phase1Data: null,
-          phase2Data: null,
-          phase3Data: null,
-          phase4Data: null,
-          // Mark as anonymized via status metadata
-        } as any,
-      });
+    if (sessionIds.length === 0) return;
 
-      this.logger.debug(`Anonymized session ${sessionId}`);
-    }
+    const { count } = await this.prisma.assessmentSession.updateMany({
+      where: { id: { in: sessionIds } },
+      data: {
+        phase1Data: null,
+        phase2Data: null,
+        phase3Data: null,
+        phase4Data: null,
+      } as any,
+    });
+
+    this.logger.debug(`Anonymized ${count} sessions (batch)`);
   }
 
   /**

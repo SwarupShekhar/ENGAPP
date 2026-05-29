@@ -98,7 +98,7 @@ export default function PracticeScreen() {
                         <TouchableOpacity
                             style={styles.aiTutorCard}
                             activeOpacity={0.85}
-                            onPress={() => navigation.navigate('AITutor')}
+                            onPress={() => navigation.navigate('AITutor', { source: 'practice_screen' })}
                         >
                             <LinearGradient
                                 colors={theme.colors.gradients.premium}

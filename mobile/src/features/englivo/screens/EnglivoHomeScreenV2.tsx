@@ -546,7 +546,7 @@ export default function EnglivoHomeScreenV2() {
           <TouchableOpacity
             style={s.quickCard}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate("AITutor")}
+            onPress={() => navigation.navigate("AITutor", { source: "englivo_home" })}
           >
             <View style={s.quickIconRing}>
               <Ionicons name="mic" size={22} color={C.goldMid} />

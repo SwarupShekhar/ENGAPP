@@ -224,6 +224,17 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Phrase { id?: string; phrase: string; definition: string; example: string; }
+function toPhraseFromHomeWord(
+  word: HomeData['wordOfTheDay'] | null | undefined,
+): Phrase | null {
+  if (!word?.word?.trim() || !word?.definition?.trim()) return null;
+  return {
+    id: `wotd-${word.word.toLowerCase()}`,
+    phrase: word.word.trim(),
+    definition: word.definition.trim(),
+    example: (word.example || `Try using "${word.word}" in a sentence today.`).trim(),
+  };
+}
 
 const LEVEL_ORDER = ['a1','a2','b1','b2','c1','c2'];
 type LevelKey = 'a1'|'a2'|'b1'|'b2'|'c1'|'c2';
@@ -658,7 +669,13 @@ export default function HomeScreen() {
         try {
           const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
           if (cached && alive) {
-            setHomeData(JSON.parse(cached) as HomeData);
+            const parsed = JSON.parse(cached) as HomeData;
+            setHomeData(parsed);
+            const fromCached = toPhraseFromHomeWord(parsed.wordOfTheDay);
+            if (fromCached) {
+              setPhrases([fromCached]);
+              setLoadingPhrase(false);
+            }
             setLoadingHome(false);
           } else if (alive) {
             setLoadingHome(true);
@@ -671,9 +688,37 @@ export default function HomeScreen() {
           const fresh = await getHomeData();
           if (!alive) return;
           setHomeData(fresh);
+          const fromHome = toPhraseFromHomeWord(fresh.wordOfTheDay);
+          if (fromHome) {
+            setPhrases([fromHome]);
+            setLoadingPhrase(false);
+          } else {
+            const p = getPhraseOfTheDay();
+            setPhrases([
+              {
+                id: 'local-pod',
+                phrase: p.phrase,
+                definition: p.meaning,
+                example: p.usage,
+              },
+            ]);
+            setLoadingPhrase(false);
+          }
           await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
         } catch (e) {
           console.warn('[HomeV1] home data:', e);
+          if (alive) {
+            const p = getPhraseOfTheDay();
+            setPhrases([
+              {
+                id: 'local-pod',
+                phrase: p.phrase,
+                definition: p.meaning,
+                example: p.usage,
+              },
+            ]);
+            setLoadingPhrase(false);
+          }
         } finally {
           if (alive) setLoadingHome(false);
         }
@@ -739,21 +784,6 @@ export default function HomeScreen() {
       };
     }, [socketService]),
   );
-
-  // ── Fetch phrase ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    // Use local deterministic phrase source to avoid backend 404 noise.
-    const p = getPhraseOfTheDay();
-    setPhrases([
-      {
-        id: 'local-pod',
-        phrase: p.phrase,
-        definition: p.meaning,
-        example: p.usage,
-      },
-    ]);
-    setLoadingPhrase(false);
-  }, []);
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const scoreRaw  = homeData?.header.score;

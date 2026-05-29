@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Platform } from "react-native";
 import { PostHogProvider, usePostHog } from "posthog-react-native";
+import { registerAnalyticsCapture } from "./analyticsBridge";
 import { buildPostHogOptions } from "./posthogOptions";
 import { isPostHogEnabled, POSTHOG_API_KEY } from "./posthogConfig";
 import {
@@ -19,6 +20,12 @@ function PostHogBridge({ children }: { children: React.ReactNode }) {
     }),
     [posthog],
   );
+
+  useEffect(() => {
+    registerAnalyticsCapture(client.capture);
+    return () => registerAnalyticsCapture(null);
+  }, [client]);
+
   return (
     <AnalyticsContext.Provider value={client}>
       {children}
