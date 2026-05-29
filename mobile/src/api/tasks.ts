@@ -16,6 +16,8 @@ export interface LearningTaskContent {
         actual?: string | null;
         expected?: string | null;
     };
+    focusWords?: string[];
+    referenceText?: string;
 }
 
 export interface LearningTask {

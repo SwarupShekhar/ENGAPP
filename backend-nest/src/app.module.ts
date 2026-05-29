@@ -32,6 +32,7 @@ import { BrainModule } from './modules/brain/brain.module';
 import { InternalModule } from './modules/internal/internal.module';
 import { TtsModule } from './modules/tts/tts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { HomePracticeModule } from './modules/home-practice/home-practice.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { MetricsModule } from './metrics/metrics.module';
 
@@ -80,6 +81,7 @@ import { MetricsModule } from './metrics/metrics.module';
     InternalModule,
     TtsModule,
     NotificationsModule,
+    HomePracticeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

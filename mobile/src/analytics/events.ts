@@ -20,6 +20,12 @@ export const AnalyticsEvents = {
   WORD_OF_DAY_PUSH_TAPPED: "word_of_day_push_tapped",
   /** Emitted from backend-nest when Pushy delivery succeeds */
   WORD_OF_DAY_PUSH_SENT: "word_of_day_push_sent",
+  HOME_PRACTICE_CAROUSEL_VIEWED: "home_practice_carousel_viewed",
+  HOME_PRACTICE_RECORD_STARTED: "home_practice_record_started",
+  HOME_PRACTICE_RECORD_ENDED: "home_practice_record_ended",
+  HOME_PRACTICE_ASSESS_COMPLETED: "home_practice_assess_completed",
+  HOME_PRACTICE_DAILY_COMPLETED: "home_practice_daily_completed",
+  HOME_PRACTICE_MISTAKE_STREAK_UPDATED: "home_practice_mistake_streak_updated",
 } as const;
 
 export type PracticeTaskType = "pronunciation" | "grammar" | "vocabulary" | string;

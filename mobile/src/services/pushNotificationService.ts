@@ -357,7 +357,11 @@ class PushNotificationService {
         navigate("CallPreference");
         break;
       case "session_ready":
-        navigate("AssessmentResult", { sessionId });
+        if (sessionId) {
+          navigate("CallFeedback", { sessionId });
+        } else {
+          navigate("MainTabs", { screen: "Home" });
+        }
         break;
       case "milestone":
         navigate("MainTabs", { screen: "Progress" });

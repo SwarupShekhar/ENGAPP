@@ -1,237 +1,332 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Dimensions,
   FlatList,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme } from '../../theme/useAppTheme';
 import { tasksApi, type LearningTask } from '../../api/tasks';
 import { AnalyticsEvents } from '../../analytics/events';
 import { useAnalytics } from '../../analytics/useAnalytics';
+
+import { HomeSpeakCard, type CardState } from './HomeSpeakCard';
+import { homePracticeApi } from '../../api/homePracticeApi';
+import { useHomePracticeCapture } from '../../features/home/voice/useHomePracticeCapture';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const HPAD = 16;
 const CARD_W = SCREEN_W - HPAD * 2;
 const CAROUSEL_MIN_H = 248;
 
-export type PulsePhrase = {
-  id?: string;
-  phrase: string;
-  definition: string;
-  example: string;
-};
-
-type PulseSlide =
-  | { key: string; kind: 'practice'; task: LearningTask }
-  | { key: string; kind: 'phrase'; phrase: PulsePhrase };
-
-const PRACTICE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
-  pronunciation: 'mic',
-  grammar: 'create',
-  vocabulary: 'book',
-};
-const PRACTICE_LABEL: Record<string, string> = {
-  pronunciation: 'Pronunciation',
-  grammar: 'Grammar',
-  vocabulary: 'Vocabulary',
-};
-
 type Props = {
-  phrase: PulsePhrase | null;
+  phraseOfTheDay?: { phrase: string; definition: string; example: string } | null;
+  wordOfTheDay?: { word: string; definition: string; example: string; partOfSpeech?: string | null } | null;
+  dailyPracticeStatus?: {
+    phrase: { done: boolean };
+    word: { done: boolean };
+  } | null;
   loadingPhrase?: boolean;
 };
 
-export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Props) {
+type PulseSlide =
+  | { key: string; kind: 'phrase_daily'; phrase: { phrase: string; definition: string; example: string } }
+  | { key: string; kind: 'word_daily'; word: { word: string; definition: string; example: string; partOfSpeech?: string | null } }
+  | { key: string; kind: 'mistake_task'; task: LearningTask };
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function buildFormData(slide: PulseSlide, wavBytes: Uint8Array): FormData {
+  const fd = new FormData();
+  const blob = new Blob([wavBytes], { type: 'audio/wav' }) as any;
+  fd.append('audio', blob, 'capture.wav');
+  if (slide.kind === 'phrase_daily') {
+    fd.append('cardType', 'phrase_daily');
+    fd.append('referenceText', slide.phrase.phrase);
+  } else if (slide.kind === 'word_daily') {
+    fd.append('cardType', 'word_daily');
+    fd.append('referenceText', slide.word.word);
+  } else {
+    fd.append('cardType', 'mistake_task');
+    fd.append('taskId', slide.task.id);
+    fd.append('referenceText', slide.task.content?.referenceText ?? slide.task.content?.target ?? '');
+  }
+  return fd;
+}
+
+export default function PulseHomeCarousel({
+  phraseOfTheDay,
+  wordOfTheDay,
+  dailyPracticeStatus,
+  loadingPhrase = false,
+}: Props) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-  const navigation = useNavigation<any>();
   const analytics = useAnalytics();
   const listRef = useRef<FlatList<PulseSlide>>(null);
 
   const [tasks, setTasks] = useState<LearningTask[] | null>(null);
   const [active, setActive] = useState(0);
+  const [cardStates, setCardStates] = useState<Map<string, CardState>>(new Map());
   const trackedCarousel = useRef(false);
+  const assessingLock = useRef(false);
 
+  const capture = useHomePracticeCapture();
+
+  // ── Load practice tasks on mount ────────────────────────────────────────────
   useEffect(() => {
     let alive = true;
     void (async () => {
       const t = await tasksApi.loadPracticeCarouselTasks();
       if (!alive) return;
       setTasks(t);
-      if (!trackedCarousel.current) {
-        trackedCarousel.current = true;
-        analytics.capture(AnalyticsEvents.PRACTICE_CAROUSEL_VIEWED, {
-          due_count: t.length,
-          types: [...new Set(t.map((x) => x.type))],
-          unified_carousel: true,
-        });
-      }
     })();
-    return () => {
-      alive = false;
-    };
-  }, [analytics]);
+    return () => { alive = false; };
+  }, []);
 
-  const phraseReady = !loadingPhrase && phrase != null;
-  const tasksLoading = tasks === null;
+  // ── Refetch status on focus ──────────────────────────────────────────────────
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void (async () => {
+        try {
+          if (!homePracticeApi?.getStatus) return;
+          const status = await homePracticeApi.getStatus();
+          if (!alive || !status) return;
+          setCardStates((prev) => {
+            const next = new Map(prev);
+            if (status.phrase?.done) next.set(`phrase-${todayKey()}`, 'done_today' as CardState);
+            if (status.word?.done) next.set(`word-${todayKey()}`, 'done_today' as CardState);
+            return next;
+          });
+        } catch {
+          // best-effort
+        }
+      })();
+      return () => { alive = false; };
+    }, []),
+  );
 
+  // ── Build slide list ─────────────────────────────────────────────────────────
   const slides = useMemo<PulseSlide[]>(() => {
-    if (!phrase) return [];
-    // Phrase first (local, instant) — tasks append so index 0 never shifts on load
-    return [
-      { key: `phrase-${phrase.id ?? 'pod'}`, kind: 'phrase', phrase },
-      ...(tasks ?? []).map((task): PulseSlide => ({
-        key: `practice-${task.id}`,
-        kind: 'practice',
-        task,
-      })),
-    ];
-  }, [tasks, phrase]);
+    const date = todayKey();
+    const result: PulseSlide[] = [];
 
-  // Clamp active index if slides shrink (safety guard)
+    if (phraseOfTheDay) {
+      result.push({ key: `phrase-${date}`, kind: 'phrase_daily', phrase: phraseOfTheDay });
+    }
+    if (wordOfTheDay) {
+      result.push({ key: `word-${date}`, kind: 'word_daily', word: wordOfTheDay });
+    }
+    for (const task of tasks ?? []) {
+      result.push({ key: `practice-${task.id}`, kind: 'mistake_task', task });
+    }
+    return result;
+  }, [phraseOfTheDay, wordOfTheDay, tasks]);
+
+  // ── Fire carousel viewed once after slides are built ────────────────────────
+  useEffect(() => {
+    if (slides.length === 0 || trackedCarousel.current) return;
+    trackedCarousel.current = true;
+    analytics.capture(AnalyticsEvents.HOME_PRACTICE_CAROUSEL_VIEWED, {
+      slide_count: slides.length,
+      kinds: [...new Set(slides.map((s) => s.kind))],
+    });
+  }, [slides, analytics]);
+
+  // ── Clamp active index ───────────────────────────────────────────────────────
   useEffect(() => {
     if (slides.length > 0 && active >= slides.length) {
       setActive(slides.length - 1);
     }
-  }, [slides.length]);
+  }, [slides.length, active]);
 
-  if (!phraseReady) {
-    return <CarouselSkeleton theme={theme} styles={styles} />;
-  }
+  // ── Card state helpers ───────────────────────────────────────────────────────
+  const setCardState = useCallback((key: string, state: CardState) => {
+    setCardStates((prev) => {
+      const next = new Map(prev);
+      next.set(key, state);
+      return next;
+    });
+  }, []);
+
+  // ── Mic handlers ─────────────────────────────────────────────────────────────
+  const handlePressIn = useCallback(async (slide: PulseSlide) => {
+    if (assessingLock.current) return;
+    analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
+    setCardState(slide.key, 'recording' as CardState);
+    try {
+      await capture.start();
+    } catch {
+      setCardState(slide.key, 'ready' as CardState);
+    }
+  }, [analytics, capture, setCardState]);
+
+  const handlePressOut = useCallback(async (slide: PulseSlide) => {
+    analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_ENDED, { kind: slide.kind });
+    if (assessingLock.current) return;
+
+    let wavBytes: Uint8Array | null = null;
+    try {
+      const stopResult = await capture.stop();
+      if (stopResult.tooShort || !stopResult.wavBytes) {
+        setCardState(slide.key, 'ready' as CardState);
+        return;
+      }
+      wavBytes = stopResult.wavBytes;
+    } catch {
+      setCardState(slide.key, 'ready' as CardState);
+      return;
+    }
+
+    assessingLock.current = true;
+    setCardState(slide.key, 'assessing' as CardState);
+
+    try {
+      const fd = buildFormData(slide, wavBytes);
+      const result = await homePracticeApi.assess(fd);
+
+      analytics.capture(AnalyticsEvents.HOME_PRACTICE_ASSESS_COMPLETED, {
+        kind: slide.kind,
+        pass: result.pass,
+        doneForToday: result.doneForToday,
+      });
+
+      if (result.pass && result.doneForToday) {
+        setCardState(slide.key, 'done_today' as CardState);
+        if (slide.kind === 'phrase_daily' || slide.kind === 'word_daily') {
+          analytics.capture(AnalyticsEvents.HOME_PRACTICE_DAILY_COMPLETED, { kind: slide.kind });
+        }
+      } else if (result.pass && !result.doneForToday) {
+        setCardState(slide.key, 'pass_partial' as CardState);
+        if (slide.kind === 'mistake_task') {
+          analytics.capture(AnalyticsEvents.HOME_PRACTICE_MISTAKE_STREAK_UPDATED, {
+            taskId: slide.task.id,
+            correctStreak: result.correctStreak,
+          });
+        }
+        setTimeout(() => { setCardState(slide.key, 'ready' as CardState); }, 1500);
+      } else {
+        setCardState(slide.key, 'fail' as CardState);
+        setTimeout(() => { setCardState(slide.key, 'ready' as CardState); }, 1500);
+      }
+    } catch {
+      setCardState(slide.key, 'fail' as CardState);
+      setTimeout(() => { setCardState(slide.key, 'ready' as CardState); }, 1500);
+    } finally {
+      assessingLock.current = false;
+    }
+  }, [analytics, capture, setCardState]);
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     setActive(Math.round(e.nativeEvent.contentOffset.x / CARD_W));
   };
 
-  const renderPractice = (item: LearningTask) => {
-    const c: { userSaid?: string; spoken?: string; target?: string; correct?: string } =
-      item.content || {};
-    const userSaid = c.userSaid || c.spoken || '—';
-    const target = c.target || c.correct || item.title || 'Practice this correction';
+  if (loadingPhrase && tasks === null) {
+    const tint = `${theme.colors.primary}22`;
+    return (
+      <View style={[styles.card, styles.skeletonCard]}>
+        {[120, '72%', '100%', '88%', '100%'].map((w, i) => (
+          <View key={i} style={[styles.skelBar, { width: w as any, backgroundColor: tint, height: i === 1 ? 22 : i === 3 ? 48 : i === 4 ? 44 : 12 }]} />
+        ))}
+      </View>
+    );
+  }
+
+  if (slides.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.card, { justifyContent: 'center', alignItems: 'center', minHeight: CAROUSEL_MIN_H }]}>
+          <Text style={styles.hint}>No cards right now. Complete a call to unlock practice cards.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const renderSlide = ({ item }: { item: PulseSlide }) => {
+    const date = todayKey();
+    let effectiveState: CardState = cardStates.get(item.key) ?? ('ready' as CardState);
+    if (item.key === `phrase-${date}` && dailyPracticeStatus?.phrase.done) effectiveState = 'done_today' as CardState;
+    if (item.key === `word-${date}` && dailyPracticeStatus?.word.done) effectiveState = 'done_today' as CardState;
+
+    const streakForTask = item.kind === 'mistake_task' ? `${item.task.correctStreak ?? 0}/2` : undefined;
+    const pillLabel = item.kind === 'phrase_daily' ? 'Phrase of the day' : item.kind === 'word_daily' ? 'Word of the day' : 'Practice mistake';
+    const pillColor = item.kind === 'phrase_daily' ? theme.colors.warning : theme.colors.primary;
+    const doneMessage = item.kind !== 'mistake_task' ? 'Great — see you tomorrow' : undefined;
 
     return (
-      <View style={styles.card}>
-        <View style={styles.pillRow}>
-          <View style={styles.pill}>
-            <Ionicons
-              name={PRACTICE_ICON[item.type] || 'flash'}
-              size={14}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.pillText}>{PRACTICE_LABEL[item.type] || 'Practice'}</Text>
-          </View>
-          <Text style={styles.streak}>{item.correctStreak ?? 0}/2</Text>
-        </View>
-        <Text style={styles.eyebrow}>From your last call</Text>
-        <Text style={styles.said} numberOfLines={1}>
-          You said: {userSaid}
-        </Text>
-        <Text style={styles.target} numberOfLines={2}>
-          {target}
-        </Text>
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => {
-            analytics.capture(AnalyticsEvents.PRACTICE_TASK_OPENED, {
-              task_id: item.id,
-              task_type: item.type,
-              source: 'unified_carousel',
-            });
-            navigation.navigate('PracticeTask', { task: item });
-          }}
+      <View style={{ width: CARD_W }}>
+        <HomeSpeakCard
+          cardState={effectiveState}
+          pillLabel={pillLabel}
+          pillColor={pillColor}
+          doneMessage={doneMessage}
+          badge={streakForTask}
+          onMicPressIn={() => void handlePressIn(item)}
+          onMicPressOut={() => void handlePressOut(item)}
         >
-          <Text style={styles.btnText}>Practice</Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
-        </TouchableOpacity>
+          {item.kind === 'phrase_daily' && (
+            <>
+              <Text style={styles.target}>{item.phrase.phrase}</Text>
+              <Text style={styles.said}>{item.phrase.definition}</Text>
+              <View style={styles.quoteBlock}>
+                <Text style={styles.quoteText}>"{item.phrase.example}"</Text>
+              </View>
+            </>
+          )}
+          {item.kind === 'word_daily' && (
+            <>
+              <Text style={styles.target}>{item.word.word}</Text>
+              {item.word.partOfSpeech ? (
+                <Text style={styles.eyebrow}>{item.word.partOfSpeech}</Text>
+              ) : null}
+              <Text style={styles.said}>{item.word.definition}</Text>
+              <View style={styles.quoteBlock}>
+                <Text style={styles.quoteText}>"{item.word.example}"</Text>
+              </View>
+            </>
+          )}
+          {item.kind === 'mistake_task' && (
+            <>
+              <Text style={styles.eyebrow}>From your last call</Text>
+              <Text style={styles.said} numberOfLines={1}>
+                You said: {item.task.content?.userSaid ?? '—'}
+              </Text>
+              <Text style={styles.target} numberOfLines={3}>
+                {item.task.content?.target ?? item.task.title}
+              </Text>
+            </>
+          )}
+        </HomeSpeakCard>
       </View>
     );
   };
 
-  const renderPhrase = (p: PulsePhrase) => (
-    <View style={styles.card}>
-      <View style={styles.pillRow}>
-        <View style={[styles.pill, styles.phrasePill]}>
-          <Ionicons name="chatbubble-ellipses" size={14} color={theme.colors.warning} />
-          <Text style={[styles.pillText, { color: theme.colors.warning }]}>Phrase of the day</Text>
-        </View>
-      </View>
-      <Text style={styles.target} numberOfLines={2}>
-        {p.phrase}
-      </Text>
-      <Text style={styles.said} numberOfLines={2}>
-        {p.definition}
-      </Text>
-      <View style={[styles.quoteBlock, { borderLeftColor: theme.colors.primary }]}>
-        <Text style={styles.quoteText} numberOfLines={3}>
-          "{p.example}"
-        </Text>
-      </View>
-      <TouchableOpacity
-        activeOpacity={0.82}
-        onPress={() =>
-          navigation.navigate('MayaTutor', { phrase: p, source: 'phrase_of_day' })
-        }
-        style={{ borderRadius: theme.borderRadius.m, overflow: 'hidden' }}
-      >
-        <LinearGradient
-          colors={theme.colors.gradients.primary as [string, string, ...string[]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.phraseBtn}
-        >
-          <Ionicons name="mic" size={14} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.phraseBtnText}>Practice it</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderSlide = ({ item }: { item: PulseSlide }) => (
-    <View style={{ width: CARD_W }}>
-      {item.kind === 'practice' ? renderPractice(item.task) : renderPhrase(item.phrase)}
-    </View>
-  );
-
   return (
     <View style={styles.container}>
-      {tasksLoading ? (
-        <View style={styles.stateCard}>
-          <Ionicons name="hourglass-outline" size={16} color={theme.colors.text.secondary} />
-          <Text style={styles.stateTitle}>Preparing your practice queue</Text>
-          <Text style={styles.stateHint}>Fetching your latest corrections…</Text>
-        </View>
-      ) : null}
-      {slides.length === 0 ? (
-        <View style={[styles.card, { justifyContent: 'center', alignItems: 'center', minHeight: CAROUSEL_MIN_H }]}>
-          <Text style={styles.hint}>No cards right now. Complete a call to unlock practice cards.</Text>
-        </View>
-      ) : (
-        <FlatList
-          ref={listRef}
-          data={slides}
-          renderItem={renderSlide}
-          keyExtractor={(s) => s.key}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={CARD_W}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          onMomentumScrollEnd={onMomentumScrollEnd}
-          getItemLayout={(_, index) => ({
-            length: CARD_W,
-            offset: CARD_W * index,
-            index,
-          })}
-        />
-      )}
+      <FlatList
+        ref={listRef}
+        data={slides}
+        renderItem={renderSlide}
+        keyExtractor={(s) => s.key}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={CARD_W}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        getItemLayout={(_, index) => ({
+          length: CARD_W,
+          offset: CARD_W * index,
+          index,
+        })}
+      />
       {slides.length > 1 ? (
         <View style={styles.dots}>
           {slides.map((s, i) => (
@@ -243,24 +338,6 @@ export default function PulseHomeCarousel({ phrase, loadingPhrase = false }: Pro
   );
 }
 
-function CarouselSkeleton({
-  theme,
-  styles,
-}: {
-  theme: ReturnType<typeof useAppTheme>;
-  styles: ReturnType<typeof getStyles>;
-}) {
-  const tint = `${theme.colors.primary}22`;
-  return (
-    <View style={[styles.card, styles.skeletonCard]}>
-      <View style={[styles.skelBar, { width: 120, backgroundColor: tint }]} />
-      <View style={[styles.skelBar, { width: '72%', height: 22, backgroundColor: tint }]} />
-      <View style={[styles.skelBar, { width: '100%', backgroundColor: tint }]} />
-      <View style={[styles.skelBar, { width: '88%', height: 48, backgroundColor: tint }]} />
-      <View style={[styles.skelBar, { width: '100%', height: 44, backgroundColor: tint }]} />
-    </View>
-  );
-}
 
 const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
   StyleSheet.create({
@@ -270,40 +347,6 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       color: theme.colors.text.secondary,
       textAlign: 'center',
       marginBottom: 4,
-    },
-    stateCard: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 14,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      backgroundColor: `${theme.colors.surface}EE`,
-      alignItems: 'center',
-      gap: 4,
-      marginBottom: 4,
-    },
-    stateTitle: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.text.primary,
-      textAlign: 'center',
-    },
-    stateHint: {
-      fontSize: 11,
-      color: theme.colors.text.secondary,
-      textAlign: 'center',
-    },
-    retryButton: {
-      marginTop: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 999,
-      backgroundColor: `${theme.colors.primary}20`,
-    },
-    retryButtonText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: theme.colors.primary,
     },
     card: {
       width: CARD_W,
@@ -318,19 +361,6 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
     },
     skeletonCard: { justifyContent: 'flex-start' },
     skelBar: { height: 12, borderRadius: 6 },
-    pillRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    pill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: `${theme.colors.primary}14`,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    phrasePill: { backgroundColor: `${theme.colors.warning}18` },
-    pillText: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },
-    streak: { fontSize: 12, fontWeight: '700', color: theme.colors.text.secondary },
     eyebrow: {
       fontSize: 11,
       fontWeight: '600',
@@ -339,19 +369,9 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
     },
     said: { fontSize: 12, color: theme.colors.text.secondary },
     target: { fontSize: 17, fontWeight: '800', color: theme.colors.text.primary },
-    btn: {
-      marginTop: 4,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 10,
-      borderRadius: 12,
-      backgroundColor: theme.colors.primary,
-    },
-    btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
     quoteBlock: {
       borderLeftWidth: 3,
+      borderLeftColor: theme.colors.primary,
       paddingLeft: 12,
       paddingVertical: 8,
       backgroundColor: `${theme.colors.primary}0E`,
@@ -363,14 +383,6 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       color: theme.colors.text.secondary,
       lineHeight: 20,
     },
-    phraseBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 13,
-      borderRadius: 10,
-    },
-    phraseBtnText: { color: '#fff', fontWeight: '700', fontSize: theme.typography.sizes.m },
     dots: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
     dot: { height: 4, borderRadius: 2 },
     dotOn: { width: 16, backgroundColor: theme.colors.primary },

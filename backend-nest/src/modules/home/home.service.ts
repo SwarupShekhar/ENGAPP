@@ -6,6 +6,7 @@ import { CTABuilder } from './builders/cta.builder';
 import { SkillsBuilder } from './builders/skills.builder';
 import { CardsBuilder } from './builders/cards.builder';
 import { WordOfDayService } from './services/word-of-day.service';
+import { PhraseOfDayService } from './services/phrase-of-day.service';
 
 @Injectable()
 export class HomeService {
@@ -17,12 +18,13 @@ export class HomeService {
     private skillsBuilder: SkillsBuilder,
     private cardsBuilder: CardsBuilder,
     private wordOfDayService: WordOfDayService,
+    private phraseOfDayService: PhraseOfDayService,
   ) {}
 
   async getHomeData(userId: string) {
     const stage = await this.stageResolver.getCachedStage(userId);
 
-    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay] =
+    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay, phraseOfTheDay, dailyPracticeStatus] =
       await Promise.all([
         this.headerBuilder.buildHeaderData(userId, stage),
         this.ctaBuilder.buildPrimaryCTA(userId, stage),
@@ -30,6 +32,8 @@ export class HomeService {
         this.cardsBuilder.buildContextualCards(userId, stage),
         this.getWeeklyActivity(userId),
         this.wordOfDayService.getWordOfTheDay(),
+        this.phraseOfDayService.getPhraseOfTheDay(),
+        this.getDailyPracticeStatus(userId),
       ]);
 
     return {
@@ -40,6 +44,30 @@ export class HomeService {
       contextualCards,
       weeklyActivity,
       wordOfTheDay,
+      phraseOfTheDay,
+      dailyPracticeStatus,
+    };
+  }
+
+  private async getDailyPracticeStatus(userId: string) {
+    const today = new Date();
+    const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const rows = await this.prisma.userDailyPracticeCompletion.findMany({
+      where: { userId, practiceDate: date },
+    });
+    const byKind = Object.fromEntries(rows.map((r) => [r.kind, r]));
+    return {
+      date: date.toISOString().slice(0, 10),
+      phrase: {
+        done: !!byKind['phrase'],
+        completedAt: byKind['phrase']?.completedAt?.toISOString(),
+        bestScore: byKind['phrase']?.bestScore ?? undefined,
+      },
+      word: {
+        done: !!byKind['word'],
+        completedAt: byKind['word']?.completedAt?.toISOString(),
+        bestScore: byKind['word']?.bestScore ?? undefined,
+      },
     };
   }
 

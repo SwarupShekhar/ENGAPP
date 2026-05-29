@@ -220,4 +220,63 @@ export class PronunciationService {
       return { accuracy: 0, errored: true };
     }
   }
+
+  async assessFromUploadedFileWithWords(
+    userId: string,
+    file: { buffer: Buffer; originalname: string; mimetype: string },
+    referenceText?: string,
+  ): Promise<{
+    accuracy: number;
+    words: Array<{ word: string; accuracy: number }>;
+    fluencyScore: number | null;
+    prosodyScore: number | null;
+    errored: boolean;
+  }> {
+    const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8001';
+    const url = `${aiEngineUrl}/api/pronunciation/assess`;
+    try {
+      const form = new FormData();
+      const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'audio/m4a' });
+      form.append('audio', blob, file.originalname || 'audio.m4a');
+      if (referenceText) form.append('reference_text', referenceText);
+      const res = await fetch(url, { method: 'POST', body: form });
+      if (!res.ok) {
+        this.logger.warn(`assessFromUploadedFileWithWords backend-ai ${res.status}`);
+        return { accuracy: 0, words: [], fluencyScore: null, prosodyScore: null, errored: true };
+      }
+      const data = (await res.json()) as {
+        pronunciation_score?: { score?: number };
+        azure_result?: {
+          Words?: Array<{
+            Word?: string;
+            AccuracyScore?: number;
+            PronunciationAssessment?: { AccuracyScore?: number };
+          }>;
+          fluency_score?: number;
+          prosody_score?: number;
+          accuracy_score?: number;
+        };
+      };
+      const accuracy = data.azure_result?.accuracy_score ?? data.pronunciation_score?.score ?? 0;
+      const rawWords = data.azure_result?.Words ?? [];
+      const words = rawWords
+        .filter((w) => w.Word?.trim())
+        .map((w) => ({
+          word: (w.Word as string).toLowerCase().trim(),
+          accuracy: Math.max(0, Math.min(100, Number(
+            w.AccuracyScore ?? w.PronunciationAssessment?.AccuracyScore ?? 0,
+          ))),
+        }));
+      return {
+        accuracy: Math.max(0, Math.min(100, Number(accuracy))),
+        words,
+        fluencyScore: data.azure_result?.fluency_score ?? null,
+        prosodyScore: data.azure_result?.prosody_score ?? null,
+        errored: false,
+      };
+    } catch (e) {
+      this.logger.error('assessFromUploadedFileWithWords', e as Error);
+      return { accuracy: 0, words: [], fluencyScore: null, prosodyScore: null, errored: true };
+    }
+  }
 }

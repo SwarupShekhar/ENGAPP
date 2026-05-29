@@ -61,6 +61,7 @@ model User {
   reelHistory            UserReelHistory[]
   reliability            UserReliability?
   topicScores            UserTopicScore[]
+  dailyPracticeCompletions UserDailyPracticeCompletion[]
 
   @@index([clerkId])
 }
@@ -573,6 +574,20 @@ model CallQualityScore {
 
   @@index([sessionId])
   @@index([userId])
+}
+
+model UserDailyPracticeCompletion {
+  id           String   @id @default(uuid())
+  userId       String
+  kind         String   // "phrase" | "word"
+  practiceDate DateTime @db.Date
+  completedAt  DateTime @default(now())
+  bestScore    Float?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, practiceDate])
+  @@index([userId, practiceDate])
 }
 
 enum DevicePlatform {

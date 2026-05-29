@@ -12,6 +12,7 @@ import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../redis/redis.module';
 import { BrainModule } from '../brain/brain.module';
 import { WordOfDayService } from './services/word-of-day.service';
+import { PhraseOfDayService } from './services/phrase-of-day.service';
 
 @Module({
   imports: [PrismaModule, RedisModule, BrainModule],
@@ -26,7 +27,8 @@ import { WordOfDayService } from './services/word-of-day.service';
     CardsBuilder,
     WeeklySummaryBuilder,
     WordOfDayService,
+    PhraseOfDayService,
   ],
-  exports: [HomeService, SessionHandlerService, WordOfDayService],
+  exports: [HomeService, SessionHandlerService, WordOfDayService, PhraseOfDayService],
 })
 export class HomeModule {}

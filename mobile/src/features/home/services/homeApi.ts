@@ -56,6 +56,17 @@ export interface HomeData {
     partOfSpeech?: string | null;
     source?: 'wordnik' | 'fallback';
   };
+  phraseOfTheDay?: {
+    phrase: string;
+    definition: string;
+    example: string;
+    source?: string;
+  };
+  dailyPracticeStatus?: {
+    date: string;
+    phrase: { done: boolean; completedAt?: string; bestScore?: number };
+    word: { done: boolean; completedAt?: string; bestScore?: number };
+  };
 }
 
 export const getHomeData = async (): Promise<HomeData> => {

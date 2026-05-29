@@ -35,9 +35,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
 import PulseHomeCarousel from '../../../components/home/PulseHomeCarousel';
-import { FeedbackReadyCard } from '../../../components/home/FeedbackReadyCard';
 import { getHomeData, HomeData } from '../services/homeApi';
-import { sessionsApi, ConversationSession } from '../../../api/sessions';
 
 const HOME_DATA_CACHE_KEY = '@home_data_cache_v2';
 
@@ -59,8 +57,6 @@ function resolvePracticeCta(cta?: HomeData['primaryCTA']) {
     buttonText: cta.buttonText?.trim() || 'Start a Call',
   };
 }
-const feedbackSeenKey = (sessionId: string) => `@feedback_seen_${sessionId}`;
-
 let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
   impactAsync: async () => {},
   ImpactFeedbackStyle: { Light: 'light' },
@@ -207,7 +203,6 @@ function HomeSkillDetailModalV1({
     </Modal>
   );
 }
-import { getPhraseOfTheDay } from '../../../data/phraseOfTheDay';
 import { chatApi } from '../../../api/connections';
 import SocketService from '../../call/services/socketService';
 
@@ -222,19 +217,7 @@ const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface Phrase { id?: string; phrase: string; definition: string; example: string; }
-function toPhraseFromHomeWord(
-  word: HomeData['wordOfTheDay'] | null | undefined,
-): Phrase | null {
-  if (!word?.word?.trim() || !word?.definition?.trim()) return null;
-  return {
-    id: `wotd-${word.word.toLowerCase()}`,
-    phrase: word.word.trim(),
-    definition: word.definition.trim(),
-    example: (word.example || `Try using "${word.word}" in a sentence today.`).trim(),
-  };
-}
 
 const LEVEL_ORDER = ['a1','a2','b1','b2','c1','c2'];
 type LevelKey = 'a1'|'a2'|'b1'|'b2'|'c1'|'c2';
@@ -635,13 +618,6 @@ function PracticeCallCard({
   );
 }
 
-function sessionHasFeedbackReady(session: ConversationSession): boolean {
-  if (session.status !== 'COMPLETED') return false;
-  const summaryScore = session.summaryJson?.overall_score;
-  if (typeof summaryScore === 'number' && summaryScore > 0) return true;
-  return (session.analyses?.length ?? 0) > 0;
-}
-
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { user, isLoaded } = useUser();
@@ -650,13 +626,9 @@ export default function HomeScreen() {
   const socketService = useRef(SocketService.getInstance()).current;
 
   const [homeData, setHomeData]       = useState<HomeData | null>(null);
-  const [phrases, setPhrases]         = useState<Phrase[]>([]);
   const [loadingHome, setLoadingHome] = useState(true);
-  const [loadingPhrase, setLoadingPhrase] = useState(true);
-  const [phraseIdx, setPhraseIdx]     = useState(0); // kept for type compat, unused
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
-  const [feedbackReadySession, setFeedbackReadySession] = useState<ConversationSession | null>(null);
 
   const c = theme.colors;
 
@@ -671,11 +643,6 @@ export default function HomeScreen() {
           if (cached && alive) {
             const parsed = JSON.parse(cached) as HomeData;
             setHomeData(parsed);
-            const fromCached = toPhraseFromHomeWord(parsed.wordOfTheDay);
-            if (fromCached) {
-              setPhrases([fromCached]);
-              setLoadingPhrase(false);
-            }
             setLoadingHome(false);
           } else if (alive) {
             setLoadingHome(true);
@@ -688,62 +655,11 @@ export default function HomeScreen() {
           const fresh = await getHomeData();
           if (!alive) return;
           setHomeData(fresh);
-          const fromHome = toPhraseFromHomeWord(fresh.wordOfTheDay);
-          if (fromHome) {
-            setPhrases([fromHome]);
-            setLoadingPhrase(false);
-          } else {
-            const p = getPhraseOfTheDay();
-            setPhrases([
-              {
-                id: 'local-pod',
-                phrase: p.phrase,
-                definition: p.meaning,
-                example: p.usage,
-              },
-            ]);
-            setLoadingPhrase(false);
-          }
           await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
         } catch (e) {
           console.warn('[HomeV1] home data:', e);
-          if (alive) {
-            const p = getPhraseOfTheDay();
-            setPhrases([
-              {
-                id: 'local-pod',
-                phrase: p.phrase,
-                definition: p.meaning,
-                example: p.usage,
-              },
-            ]);
-            setLoadingPhrase(false);
-          }
         } finally {
           if (alive) setLoadingHome(false);
-        }
-
-        try {
-          const sessions = await sessionsApi.listSessions();
-          if (!alive) return;
-          const sorted = [...sessions]
-            .filter(sessionHasFeedbackReady)
-            .sort((a, b) => {
-              const ta = new Date(a.endedAt ?? a.startedAt).getTime();
-              const tb = new Date(b.endedAt ?? b.startedAt).getTime();
-              return tb - ta;
-            });
-          for (const session of sorted) {
-            const seen = await AsyncStorage.getItem(feedbackSeenKey(session.id));
-            if (!seen) {
-              setFeedbackReadySession(session);
-              return;
-            }
-          }
-          setFeedbackReadySession(null);
-        } catch (e) {
-          console.warn('[HomeV1] feedback-ready scan:', e);
-          if (alive) setFeedbackReadySession(null);
         }
       };
 
@@ -818,21 +734,11 @@ export default function HomeScreen() {
   const goChat     = () => navigation.navigate('Conversations');
   const goNotifs   = () => navigation.navigate('Notifications');
   const goPracticeCall = () => navigation.navigate('CallPreference');
-  const goFeedbackReady = async () => {
-    if (!feedbackReadySession) return;
-    await AsyncStorage.setItem(feedbackSeenKey(feedbackReadySession.id), '1');
-    setFeedbackReadySession(null);
-    navigation.navigate('CallFeedback', { sessionId: feedbackReadySession.id });
-  };
 
   const practiceCta = resolvePracticeCta(homeData?.primaryCTA);
   const practiceTitle = practiceCta.title;
   const practiceDescription = practiceCta.description;
   const practiceButton = practiceCta.buttonText;
-
-  const feedbackOverall =
-    feedbackReadySession?.summaryJson?.overall_score ??
-    (feedbackReadySession?.analyses?.[0]?.scores as { overall?: number } | undefined)?.overall;
 
   return (
     <View style={[st.root, { backgroundColor: c.background }]}>
@@ -919,21 +825,14 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {!loadingHome && feedbackReadySession && (
-          <Animated.View entering={FadeInDown.delay(200).duration(380).springify()}>
-            <FeedbackReadyCard
-              onPress={() => void goFeedbackReady()}
-              timeAgo="Just now"
-              overallScore={
-                typeof feedbackOverall === 'number' ? Math.round(feedbackOverall) : undefined
-              }
-            />
-          </Animated.View>
-        )}
-
         {/* ── Phrase carousel ─────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(210).duration(380).springify()} style={{ gap: 10 }}>
-          <PulseHomeCarousel phrase={phrases[0] ?? null} loadingPhrase={loadingPhrase} />
+        <Animated.View entering={FadeInDown.delay(200).duration(380).springify()} style={{ gap: 10 }}>
+          <PulseHomeCarousel
+            phraseOfTheDay={homeData?.phraseOfTheDay ?? null}
+            wordOfTheDay={homeData?.wordOfTheDay ?? null}
+            dailyPracticeStatus={homeData?.dailyPracticeStatus ?? null}
+            loadingPhrase={loadingHome}
+          />
         </Animated.View>
       </ScrollView>
 

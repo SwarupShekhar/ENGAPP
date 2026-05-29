@@ -31,6 +31,16 @@ export class TasksService {
         return 'other';
     }
 
+    private computeFocusWords(type: string, userSaid: string, correct: string, target: string, cap = 5): string[] {
+        if (type === 'pronunciation') {
+            return [target.toLowerCase().trim()].filter(Boolean);
+        }
+        const userTokens = new Set(userSaid.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean));
+        const correctTokens = correct.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
+        const diff = correctTokens.filter((t) => !userTokens.has(t));
+        return (diff.length ? diff : correctTokens).slice(0, cap);
+    }
+
     /**
      * Explicit task generation for a session.
      *
@@ -223,6 +233,8 @@ export class TasksService {
                             actual: c.phoneticActual ?? null,
                             expected: c.phoneticExpected ?? null,
                         },
+                        focusWords: this.computeFocusWords('pronunciation', c.userSaid, c.correct, c.word),
+                        referenceText: c.word,
                     };
                     const mistakeKey = this.computeMistakeKey({ type, content });
                     if (await this.reactivateOnRecurrence(userId, mistakeKey)) continue;
@@ -268,6 +280,8 @@ export class TasksService {
                         severity: c.severity,
                         severityScore: c.severityScore,
                         repetition: c.repetition,
+                        focusWords: this.computeFocusWords(c.kind, c.userSaid, c.correct, c.phrase),
+                        referenceText: c.phrase,
                     };
                     const mistakeKey = this.computeMistakeKey({ type, content });
                     if (await this.reactivateOnRecurrence(userId, mistakeKey)) continue;
