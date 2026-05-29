@@ -16,6 +16,10 @@ interface HomeSpeakCardProps {
   failMessage?: string;
   doneMessage?: string;
   disabled?: boolean;
+  /** Phrase/word cards: play target pronunciation before mic practice. */
+  listenEnabled?: boolean;
+  listenPlaying?: boolean;
+  onListenPress?: () => void;
 }
 
 export function HomeSpeakCard({
@@ -29,6 +33,9 @@ export function HomeSpeakCard({
   failMessage,
   doneMessage,
   disabled = false,
+  listenEnabled = false,
+  listenPlaying = false,
+  onListenPress,
 }: HomeSpeakCardProps) {
   const theme = useAppTheme();
   const c = theme.colors;
@@ -43,9 +50,17 @@ export function HomeSpeakCard({
       case 'done_today': return doneMessage ?? 'Done for today';
       case 'fail': return failMessage ?? 'Try again';
       case 'pass_partial': return failMessage ?? 'Once more';
-      default: return 'Hold and speak';
+      default:
+        return listenEnabled ? 'Listen, then hold and speak' : 'Hold and speak';
     }
   })();
+
+  const showListen =
+    listenEnabled &&
+    onListenPress &&
+    cardState !== 'done_today' &&
+    cardState !== 'assessing' &&
+    cardState !== 'recording';
 
   return (
     <View style={[styles.card, { borderColor: c.border }]}>
@@ -59,6 +74,30 @@ export function HomeSpeakCard({
 
       <View style={{ flex: 1 }}>{children}</View>
 
+      {showListen ? (
+        <Pressable
+          onPress={onListenPress}
+          disabled={disabled}
+          style={({ pressed }) => [
+            styles.listenBtn,
+            {
+              backgroundColor: listenPlaying ? `${c.primary}22` : `${c.primary}12`,
+              borderColor: listenPlaying ? c.primary : c.border,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Ionicons
+            name={listenPlaying ? 'stop-circle' : 'volume-high'}
+            size={18}
+            color={c.primary}
+          />
+          <Text style={[styles.listenText, { color: c.primary }]}>
+            {listenPlaying ? 'Playing… tap to stop' : 'Listen'}
+          </Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.micArea}>
         {cardState === 'done_today' ? (
           <View style={[styles.doneRow, { backgroundColor: `${(c as any).success ?? '#4ade80'}18` }]}>
@@ -71,6 +110,7 @@ export function HomeSpeakCard({
           <Pressable
             onPressIn={micDisabled ? undefined : onMicPressIn}
             onPressOut={micDisabled ? undefined : onMicPressOut}
+            delayPressIn={0}
             disabled={micDisabled}
             style={({ pressed }) => [
               styles.micBtn,
@@ -120,6 +160,17 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
     },
     pillText: { fontSize: 11, fontWeight: '700' },
     badge: { fontSize: 12, fontWeight: '700' },
+    listenBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    listenText: { fontSize: 13, fontWeight: '700' },
     micArea: { alignItems: 'center', gap: 6 },
     micBtn: {
       width: 52,
