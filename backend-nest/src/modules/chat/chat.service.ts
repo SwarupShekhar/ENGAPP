@@ -180,8 +180,8 @@ export class ChatService {
             FROM "ConversationParticipant" cp
             INNER JOIN "Message" m
                 ON m."conversationId" = cp."conversationId"
-            WHERE cp."userId" = ${userId}::uuid
-                AND m."senderId" <> ${userId}::uuid
+            WHERE cp."userId" = ${userId}
+                AND m."senderId" <> ${userId}
                 AND m."createdAt" > cp."lastReadAt"
             GROUP BY cp."conversationId"
         `;
