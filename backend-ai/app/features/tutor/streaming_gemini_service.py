@@ -17,7 +17,7 @@ class StreamingGeminiService:
             return
 
         genai.configure(api_key=settings.google_api_key)
-        self.model_name = 'gemini-2.0-flash-lite'
+        self.model_name = (settings.google_gemini_chat_model or "gemini-2.0-flash").strip()
         self.model = genai.GenerativeModel(self.model_name)
 
     def _sanitize_sentence(self, text: str) -> str:

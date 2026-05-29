@@ -111,6 +111,9 @@ const TTS_CACHE_PHRASES = [
   "You're welcome!",
 ];
 
+/** Default chat model (flash-lite retired for new Google AI API projects). */
+const DEFAULT_GEMINI_CHAT_MODEL = 'gemini-2.0-flash';
+
 @Injectable()
 export class ConversationalTutorService implements OnModuleInit {
   private readonly logger = new Logger(ConversationalTutorService.name);
@@ -118,6 +121,7 @@ export class ConversationalTutorService implements OnModuleInit {
   private conversations: Map<string, ConversationSession> = new Map();
   private aiBackendUrl: string;
   private readonly ttsCache = new Map<string, string>();
+  private readonly geminiChatModel: string;
 
   constructor(
     private configService: ConfigService,
@@ -128,9 +132,16 @@ export class ConversationalTutorService implements OnModuleInit {
     this.genAI = new GoogleGenerativeAI(
       this.configService.get<string>('GEMINI_API_KEY'),
     );
+    this.geminiChatModel =
+      this.configService.get<string>('GEMINI_CHAT_MODEL')?.trim() ||
+      DEFAULT_GEMINI_CHAT_MODEL;
     this.aiBackendUrl =
       this.configService.get<string>('AI_ENGINE_URL') ||
       'http://localhost:8001';
+  }
+
+  private getChatModel() {
+    return this.genAI.getGenerativeModel({ model: this.geminiChatModel });
   }
 
   async onModuleInit() {
@@ -170,7 +181,7 @@ export class ConversationalTutorService implements OnModuleInit {
       .map((t) => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
       .join('\n');
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = this.getChatModel();
     const prompt = CONVERSATIONAL_TUTOR_PROMPT.replace(
       '{user_utterance}',
       userUtterance,
@@ -487,7 +498,7 @@ export class ConversationalTutorService implements OnModuleInit {
     Respond STRICTLY in JSON.
     `;
 
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = this.getChatModel();
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
