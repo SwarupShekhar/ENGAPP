@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from app.features.tts.narration_service import build_narration_script, build_full_feedback_script
 from app.features.transcription.inworld_tts_service import inworld_tts_service
+from app.features.transcription.google_gemini_tts_service import google_gemini_tts_service
 from app.api.deps import get_logger
 
 router = APIRouter(prefix="/tts", tags=["TTS"])
@@ -120,10 +121,16 @@ async def full_feedback_narration(request: Request, body: FullFeedbackNarrationR
 
 class SpeakRequest(BaseModel):
     text: str
-    speaking_rate: float = 0.65  # Home practice cards: slower for learner-paced full scripts
+    speaking_rate: float = 0.65  # Only used by Inworld fallback path
 
 @router.post("/speak", response_model=FeedbackNarrationResponse)
 async def speak(request: Request, body: SpeakRequest):
-    audio_bytes = await inworld_tts_service.synthesize_async(body.text, speaking_rate=body.speaking_rate)
+    # Prefer Gemini TTS — significantly more natural for vocabulary/phrase teaching cards.
+    # Falls back to Inworld if Gemini is not configured or returns empty audio.
+    audio_bytes = b""
+    if google_gemini_tts_service.is_configured():
+        audio_bytes = await google_gemini_tts_service.synthesize_async(body.text)
+    if not audio_bytes:
+        audio_bytes = await inworld_tts_service.synthesize_async(body.text, speaking_rate=body.speaking_rate)
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     return FeedbackNarrationResponse(audio_base64=audio_b64, text=body.text)
