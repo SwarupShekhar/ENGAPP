@@ -28,6 +28,16 @@ from app.features.transcription.hinglish_stt_service import hinglish_stt_service
 
 logger = logging.getLogger(__name__)
 
+try:
+    from app.features.coaching.coaching_context import get_context as coaching_get_context
+    from app.features.coaching.coaching_context import update_context as coaching_update_context
+    from app.features.coaching.hint_engine import get_hint as coaching_get_hint
+    from datetime import datetime, timezone as _tz
+    _COACHING_ENABLED = True
+except Exception as _coaching_import_err:
+    logger.warning("Coaching imports failed — hints disabled: %s", _coaching_import_err)
+    _COACHING_ENABLED = False
+
 router = APIRouter()
 streaming_tutor_service = StreamingTutorService()
 
@@ -52,6 +62,90 @@ async def _generate_stream_response(
 
     yield {"type": "transcript", "text": user_utterance}
 
+    # Feedback loop: check if user used the previously hinted phrase
+    try:
+        if _COACHING_ENABLED and user_id and session_id:
+            from app.features.coaching.coaching_context import check_and_clear_pending_hint
+            _confirmed_hint = check_and_clear_pending_hint(user_id, session_id, user_utterance)
+            if _confirmed_hint:
+                import os as _os
+                nest_url = _os.getenv("BACKEND_NEST_URL", "http://backend-nest:3000")
+                async def _notify_hint_confirmed(_uid=user_id, _sid=session_id, _ch=_confirmed_hint, _url=nest_url):
+                    try:
+                        import httpx as _httpx
+                        async with _httpx.AsyncClient() as _client:
+                            await _client.post(
+                                f"{_url}/internal/coaching-context/{_uid}/{_sid}/hint-confirmed",
+                                json={"taskId": _ch.get("taskId"), "phrase": _ch.get("phrase", "")},
+                                timeout=3.0,
+                            )
+                    except Exception as _ne:
+                        logger.warning("[coaching] hint-confirmed notify failed: %s", _ne)
+                asyncio.create_task(_notify_hint_confirmed())
+                # Mark phrase usage in Redis on confirmed speech
+                try:
+                    from app.features.coaching.coaching_context import update_context as _upd_ctx
+                    _mark = _confirmed_hint.get("markField")
+                    _gap_updates: dict = {
+                        "adaptiveGapSeconds": max(45, (coaching_get_context(user_id, session_id) or {}).get("adaptiveGapSeconds", 90) - 15),
+                        "consecutiveMisses": 0,
+                    }
+                    if _mark:
+                        _gap_updates[_mark] = True
+                    _upd_ctx(user_id, session_id, _gap_updates)
+                except Exception as _ge:
+                    logger.warning("[coaching] adaptive gap reward failed (SSE): %s", _ge)
+    except Exception as _e:
+        logger.warning("[coaching] feedback loop check failed (SSE): %s", _e)
+
+    # Coaching hint injection (fire-and-forget — never blocks the call)
+    _coaching_hint_text: str | None = None
+    _coaching_hint_payload: dict | None = None
+    _coaching_ctx: dict | None = None
+    if _COACHING_ENABLED:
+        try:
+            _coaching_ctx = coaching_get_context(user_id, session_id)
+            if _coaching_ctx:
+                _coaching_hint_payload = await coaching_get_hint(user_utterance, _coaching_ctx)
+                if _coaching_hint_payload:
+                    _coaching_hint_text = _coaching_hint_payload.get("text")
+        except Exception as _ce:
+            logger.warning("coaching hint fetch failed (SSE): %s", _ce)
+
+    # Opportunity prompt: append once per call so Maya creates a natural usage moment
+    try:
+        if _COACHING_ENABLED and _coaching_ctx and not _coaching_ctx.get("opportunityPromptAdded"):
+            _phrase_obj = _coaching_ctx.get("phraseOfDay")
+            if _phrase_obj:
+                _opp_phrase = _phrase_obj.get("phrase", "")
+                _opp_directive = (
+                    f'\n\n[LEARNING OPPORTUNITY — apply subtly throughout the call]: '
+                    f'The learner is practicing the phrase "{_opp_phrase}". '
+                    f'Naturally steer the conversation toward a moment where they could use it. '
+                    f'Do NOT tell them to say it — create the situation organically.'
+                )
+                _coaching_ctx["opportunityDirective"] = _opp_directive
+                from app.features.coaching.coaching_context import update_context as _upd_ctx2
+                _upd_ctx2(user_id, session_id, {
+                    "opportunityPromptAdded": True,
+                    "opportunityDirective": _opp_directive,
+                })
+    except Exception as _oe:
+        logger.warning("[coaching] opportunity prompt failed (SSE): %s", _oe)
+
+    # set_pending_hint_check after hint fires
+    try:
+        if _coaching_hint_payload and _COACHING_ENABLED:
+            from app.features.coaching.coaching_context import set_pending_hint_check
+            set_pending_hint_check(
+                user_id, session_id,
+                _coaching_hint_payload.get("watchPhrase", ""),
+                _coaching_hint_payload.get("taskId"),
+                _coaching_hint_payload.get("markField"),
+            )
+    except Exception as _e:
+        logger.warning("[coaching] set_pending_hint_check failed (SSE): %s", _e)
+
     pa_task = start_phonetic_enrichment_task(audio_bytes, user_utterance)
     timings.mark("pa_task_started")
     phonetic_context, pa_in_prompt = await phonetic_context_for_stream(
@@ -60,6 +154,24 @@ async def _generate_stream_response(
 
     if pa_in_prompt:
         yield {"type": "phonetic_ready"}
+
+    # Attach coaching hint and opportunity directive to phonetic_context
+    if _coaching_hint_text or (_coaching_ctx and _coaching_ctx.get("opportunityDirective")):
+        if phonetic_context is None:
+            phonetic_context = {}
+        if _coaching_hint_text:
+            phonetic_context["coaching_hint"] = _coaching_hint_text
+        _opp_dir = (_coaching_ctx or {}).get("opportunityDirective")
+        if _opp_dir:
+            phonetic_context["opportunityDirective"] = _opp_dir
+
+    # Push coaching hint to the mobile client over SSE before LLM streaming starts
+    if _coaching_hint_text and _coaching_hint_payload:
+        yield {
+            "type": "coaching_hint",
+            "text": _coaching_hint_text,
+            "trigger": _coaching_hint_payload.get("trigger", "unknown"),
+        }
 
     timings.mark("llm_stream_start")
     full_response_text = ""
@@ -108,6 +220,32 @@ async def _generate_stream_response(
                 session_id,
                 len(turn_issues),
             )
+
+    # Persist coaching hint state to Redis (hintCount + lastHintAt only — markField is
+    # set only on confirmed phrase usage in the feedback loop above, not on hint fire)
+    if _COACHING_ENABLED and _coaching_hint_payload:
+        try:
+            _ctx_now = coaching_get_context(user_id, session_id)
+            redis_updates: dict = {
+                "hintCount": (_ctx_now.get("hintCount", 0) + 1) if _ctx_now else 1,
+                "lastHintAt": datetime.now(_tz.utc).isoformat(),
+            }
+            coaching_update_context(user_id, session_id, redis_updates)
+        except Exception as _ce:
+            logger.warning("coaching context update failed (SSE): %s", _ce)
+    elif _COACHING_ENABLED and not _coaching_hint_payload:
+        # No hint fired — track consecutive misses to widen adaptive gap
+        try:
+            _miss_ctx = coaching_get_context(user_id, session_id)
+            if _miss_ctx and _miss_ctx.get("hintCount", 0) > 0 and not _miss_ctx.get("pendingHintCheck"):
+                _misses = _miss_ctx.get("consecutiveMisses", 0) + 1
+                _miss_updates: dict = {"consecutiveMisses": _misses}
+                if _misses >= 2:
+                    _cur_gap = _miss_ctx.get("adaptiveGapSeconds", 90)
+                    _miss_updates["adaptiveGapSeconds"] = min(180, _cur_gap + 30)
+                coaching_update_context(user_id, session_id, _miss_updates)
+        except Exception as _me:
+            logger.warning("[coaching] consecutive misses update failed (SSE): %s", _me)
 
     timings.mark("done")
     timings.log_summary("maya_sse")
@@ -194,6 +332,7 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
 
         idle_task = asyncio.create_task(check_idle())
         conversation_history = []
+        ws_session_start = time.time()
 
         while True:
             data = await websocket.receive_text()
@@ -251,6 +390,94 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
 
                 conversation_history.append({"role": "user", "content": user_utterance})
 
+                # Feedback loop: check if user used the previously hinted phrase
+                try:
+                    if _COACHING_ENABLED and user_id and session_id:
+                        from app.features.coaching.coaching_context import check_and_clear_pending_hint
+                        _ws_confirmed = check_and_clear_pending_hint(user_id, session_id, user_utterance)
+                        if _ws_confirmed:
+                            import os as _os2
+                            _ws_nest_url = _os2.getenv("BACKEND_NEST_URL", "http://backend-nest:3000")
+                            async def _ws_notify(_uid=user_id, _sid=session_id, _ch=_ws_confirmed, _url=_ws_nest_url):
+                                try:
+                                    import httpx as _httpx2
+                                    async with _httpx2.AsyncClient() as _cl2:
+                                        await _cl2.post(
+                                            f"{_url}/internal/coaching-context/{_uid}/{_sid}/hint-confirmed",
+                                            json={"taskId": _ch.get("taskId"), "phrase": _ch.get("phrase", "")},
+                                            timeout=3.0,
+                                        )
+                                except Exception as _ne2:
+                                    logger.warning("[coaching] hint-confirmed notify failed (WS): %s", _ne2)
+                            asyncio.create_task(_ws_notify())
+                            # Mark phrase usage in Redis on confirmed speech
+                            try:
+                                from app.features.coaching.coaching_context import update_context as _ws_upd
+                                _ws_mark = _ws_confirmed.get("markField")
+                                _ws_gap_ctx = coaching_get_context(user_id, session_id)
+                                _ws_gap_upd: dict = {
+                                    "adaptiveGapSeconds": max(45, (_ws_gap_ctx or {}).get("adaptiveGapSeconds", 90) - 15),
+                                    "consecutiveMisses": 0,
+                                }
+                                if _ws_mark:
+                                    _ws_gap_upd[_ws_mark] = True
+                                _ws_upd(user_id, session_id, _ws_gap_upd)
+                            except Exception as _wge:
+                                logger.warning("[coaching] adaptive gap reward failed (WS): %s", _wge)
+                except Exception as _wfe:
+                    logger.warning("[coaching] feedback loop check failed (WS): %s", _wfe)
+
+                # Coaching hint injection (fire-and-forget — never blocks the call)
+                _ws_hint_text: str | None = None
+                _ws_hint_payload: dict | None = None
+                _ws_coaching_ctx: dict | None = None
+                if _COACHING_ENABLED:
+                    try:
+                        _ws_coaching_ctx = coaching_get_context(user_id, session_id)
+                        if _ws_coaching_ctx:
+                            _ws_elapsed = time.time() - ws_session_start
+                            _ws_hint_payload = await coaching_get_hint(
+                                user_utterance, _ws_coaching_ctx, _ws_elapsed
+                            )
+                            if _ws_hint_payload:
+                                _ws_hint_text = _ws_hint_payload.get("text")
+                    except Exception as _wce:
+                        logger.warning("coaching hint fetch failed (WS): %s", _wce)
+
+                # Opportunity prompt: append once per call
+                try:
+                    if _COACHING_ENABLED and _ws_coaching_ctx and not _ws_coaching_ctx.get("opportunityPromptAdded"):
+                        _ws_phrase_obj = _ws_coaching_ctx.get("phraseOfDay")
+                        if _ws_phrase_obj:
+                            _ws_opp_phrase = _ws_phrase_obj.get("phrase", "")
+                            _ws_opp_dir = (
+                                f'\n\n[LEARNING OPPORTUNITY — apply subtly throughout the call]: '
+                                f'The learner is practicing the phrase "{_ws_opp_phrase}". '
+                                f'Naturally steer the conversation toward a moment where they could use it. '
+                                f'Do NOT tell them to say it — create the situation organically.'
+                            )
+                            _ws_coaching_ctx["opportunityDirective"] = _ws_opp_dir
+                            from app.features.coaching.coaching_context import update_context as _ws_upd2
+                            _ws_upd2(user_id, session_id, {
+                                "opportunityPromptAdded": True,
+                                "opportunityDirective": _ws_opp_dir,
+                            })
+                except Exception as _woe:
+                    logger.warning("[coaching] opportunity prompt failed (WS): %s", _woe)
+
+                # set_pending_hint_check after hint fires
+                try:
+                    if _ws_hint_payload and _COACHING_ENABLED:
+                        from app.features.coaching.coaching_context import set_pending_hint_check
+                        set_pending_hint_check(
+                            user_id, session_id,
+                            _ws_hint_payload.get("watchPhrase", ""),
+                            _ws_hint_payload.get("taskId"),
+                            _ws_hint_payload.get("markField"),
+                        )
+                except Exception as _wpe:
+                    logger.warning("[coaching] set_pending_hint_check failed (WS): %s", _wpe)
+
                 stream_phonetic, pa_in_prompt = await phonetic_context_for_stream(
                     pa_task,
                     client_phonetic=client_phonetic,
@@ -258,6 +485,24 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                 )
                 if pa_in_prompt:
                     await websocket.send_json({"type": "phonetic_ready"})
+
+                # Push coaching hint to the mobile client before streaming starts
+                if _ws_hint_text and _ws_hint_payload:
+                    await websocket.send_json({
+                        "type": "coaching_hint",
+                        "text": _ws_hint_text,
+                        "trigger": _ws_hint_payload.get("trigger", "unknown"),
+                    })
+
+                # Attach coaching hint and opportunity directive to stream_phonetic
+                if _ws_hint_text or (_ws_coaching_ctx and _ws_coaching_ctx.get("opportunityDirective")):
+                    if stream_phonetic is None:
+                        stream_phonetic = {}
+                    if _ws_hint_text:
+                        stream_phonetic["coaching_hint"] = _ws_hint_text
+                    _ws_opp_d = (_ws_coaching_ctx or {}).get("opportunityDirective")
+                    if _ws_opp_d:
+                        stream_phonetic["opportunityDirective"] = _ws_opp_d
 
                 full_response_text = ""
                 async for chunk in streaming_tutor_service.generate_chunked_response(
@@ -285,6 +530,32 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                     "type": "done",
                     "timings": ws_timings.to_dict(),
                 })
+
+                # Persist coaching hint state to Redis (hintCount + lastHintAt only —
+                # markField is set only on confirmed phrase usage in the feedback loop above)
+                if _COACHING_ENABLED and _ws_hint_payload:
+                    try:
+                        _ws_ctx_now = coaching_get_context(user_id, session_id)
+                        _ws_redis_updates: dict = {
+                            "hintCount": (_ws_ctx_now.get("hintCount", 0) + 1) if _ws_ctx_now else 1,
+                            "lastHintAt": datetime.now(_tz.utc).isoformat(),
+                        }
+                        coaching_update_context(user_id, session_id, _ws_redis_updates)
+                    except Exception as _wce2:
+                        logger.warning("coaching context update failed (WS): %s", _wce2)
+                elif _COACHING_ENABLED and not _ws_hint_payload:
+                    # No hint fired — track consecutive misses to widen adaptive gap
+                    try:
+                        _ws_miss_ctx = coaching_get_context(user_id, session_id)
+                        if _ws_miss_ctx and _ws_miss_ctx.get("hintCount", 0) > 0 and not _ws_miss_ctx.get("pendingHintCheck"):
+                            _ws_misses = _ws_miss_ctx.get("consecutiveMisses", 0) + 1
+                            _ws_miss_upd: dict = {"consecutiveMisses": _ws_misses}
+                            if _ws_misses >= 2:
+                                _ws_cgap = _ws_miss_ctx.get("adaptiveGapSeconds", 90)
+                                _ws_miss_upd["adaptiveGapSeconds"] = min(180, _ws_cgap + 30)
+                            coaching_update_context(user_id, session_id, _ws_miss_upd)
+                    except Exception as _wme:
+                        logger.warning("[coaching] consecutive misses update failed (WS): %s", _wme)
 
                 capture_phonetic = await phonetic_context_for_capture(
                     pa_task, stream_phonetic, timings=ws_timings

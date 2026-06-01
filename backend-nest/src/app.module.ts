@@ -33,6 +33,7 @@ import { InternalModule } from './modules/internal/internal.module';
 import { TtsModule } from './modules/tts/tts.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { HomePracticeModule } from './modules/home-practice/home-practice.module';
+import { InCallCoachingModule } from './modules/in-call-coaching/in-call-coaching.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { MetricsModule } from './metrics/metrics.module';
 
@@ -82,6 +83,7 @@ import { MetricsModule } from './metrics/metrics.module';
     TtsModule,
     NotificationsModule,
     HomePracticeModule,
+    InCallCoachingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -12,6 +12,7 @@ import { HomeModule } from '../home/home.module';
 import { BrainModule } from '../brain/brain.module';
 import { PronunciationModule } from '../pronunciation/pronunciation.module';
 import { LivekitModule } from '../livekit/livekit.module';
+import { InCallCoachingModule } from '../in-call-coaching/in-call-coaching.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { LivekitModule } from '../livekit/livekit.module';
     BrainModule,
     PronunciationModule,
     forwardRef(() => LivekitModule),
+    InCallCoachingModule,
   ],
   controllers: [SessionsController],
   providers: [SessionsService, SessionsProcessor],

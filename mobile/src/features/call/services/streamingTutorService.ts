@@ -15,6 +15,7 @@ export interface StreamChunk {
     | "transcription"
     | "transcript"
     | "phonetic_ready"
+    | "coaching_hint"
     | "done";
   text?: string;
   audio?: string; // base64
@@ -22,6 +23,8 @@ export interface StreamChunk {
   is_final?: boolean;
   assessmentResult?: any;
   timings?: { trace_id?: string; ms?: Record<string, number> };
+  /** Populated when type === "coaching_hint" */
+  trigger?: string;
 }
 
 type StreamCallback = (chunk: StreamChunk) => void;

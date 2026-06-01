@@ -36,6 +36,8 @@ type Props = {
     word: { done: boolean };
   } | null;
   loadingPhrase?: boolean;
+  /** Disable parent ScrollView while recording so taps are not stolen. */
+  onParentScrollEnabledChange?: (enabled: boolean) => void;
 };
 
 type PulseSlide =
@@ -73,6 +75,7 @@ export default function PulseHomeCarousel({
   wordOfTheDay,
   dailyPracticeStatus,
   loadingPhrase = false,
+  onParentScrollEnabledChange,
 }: Props) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -88,6 +91,10 @@ export default function PulseHomeCarousel({
 
   const capture = useHomePracticeCapture();
   const tts = useHomePracticeTts();
+
+  useEffect(() => {
+    onParentScrollEnabledChange?.(capture.captureState !== 'recording');
+  }, [capture.captureState, onParentScrollEnabledChange]);
 
   // ── Load practice tasks on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -181,106 +188,96 @@ export default function PulseHomeCarousel({
 
   const handleListen = useCallback(
     (slide: PulseSlide) => {
-      if (slide.kind === 'phrase_daily') {
-        analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-        tts.speak(slide.key, slide.phrase.phrase);
-      } else if (slide.kind === 'word_daily') {
-        analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-        tts.speak(slide.key, slide.word.word);
-      }
+      void (async () => {
+        if (capture.isRecording) return;
+        if (slide.kind === 'phrase_daily') {
+          analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
+          await tts.speak(slide.key, slide.phrase.phrase);
+        } else if (slide.kind === 'word_daily') {
+          analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
+          await tts.speak(slide.key, slide.word.word);
+        }
+      })();
     },
-    [analytics, tts],
+    [analytics, capture.isRecording, tts],
   );
 
-  const handlePressIn = useCallback(async (slide: PulseSlide) => {
-    if (assessingLock.current) return;
-    tts.stop();
-    analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
-    setCardHint(slide.key, undefined);
-    setCardState(slide.key, 'recording' as CardState);
-    const started = await capture.start();
-    if (!started) {
-      setCardState(slide.key, 'ready' as CardState);
-      Alert.alert(
-        'Microphone',
-        'Allow microphone access in Settings to practice on this card.',
-      );
-      return;
-    }
-  }, [analytics, capture, setCardHint, setCardState, tts]);
+  const submitRecording = useCallback(
+    async (slide: PulseSlide) => {
+      analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_ENDED, { kind: slide.kind });
 
-  const handlePressOut = useCallback(async (slide: PulseSlide) => {
-    analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_ENDED, { kind: slide.kind });
-    if (assessingLock.current) return;
-
-    if (capture.captureState === 'idle') {
-      setCardState(slide.key, 'ready' as CardState);
-      return;
-    }
-
-    const finished = await capture.finish();
-    if (!finished.ok) {
-      const hint =
-        finished.reason === 'too_short'
-          ? 'Hold a bit longer, then release'
-          : finished.reason === 'permission_denied'
-            ? 'Microphone permission required'
+      const finished = await capture.finish();
+      if (!finished.ok) {
+        const hint =
+          finished.reason === 'too_short'
+            ? 'Speak for at least 1 second, then tap stop'
             : 'Could not capture audio — try again';
-      if (finished.reason === 'too_short' || finished.reason === 'no_audio' || finished.reason === 'failed') {
         setCardState(slide.key, 'fail' as CardState);
         setCardHint(slide.key, hint);
         setTimeout(() => {
           setCardState(slide.key, 'ready' as CardState);
           setCardHint(slide.key, undefined);
-        }, 2000);
-      } else {
-        setCardState(slide.key, 'ready' as CardState);
+        }, 2500);
+        return;
       }
-      return;
-    }
 
-    assessingLock.current = true;
-    setCardState(slide.key, 'assessing' as CardState);
+      assessingLock.current = true;
+      setCardState(slide.key, 'assessing' as CardState);
 
-    try {
-      const fd = buildFormData(slide, finished.audio);
-      const result = await homePracticeApi.assess(fd);
+      try {
+        const fd = buildFormData(slide, finished.audio);
+        const result = await homePracticeApi.assess(fd);
 
-      analytics.capture(AnalyticsEvents.HOME_PRACTICE_ASSESS_COMPLETED, {
-        kind: slide.kind,
-        pass: result.pass,
-        doneForToday: result.doneForToday,
-      });
+        analytics.capture(AnalyticsEvents.HOME_PRACTICE_ASSESS_COMPLETED, {
+          kind: slide.kind,
+          pass: result.pass,
+          doneForToday: result.doneForToday,
+          errored: result.errored,
+        });
 
-      if (result.pass && result.doneForToday) {
-        setCardState(slide.key, 'done_today' as CardState);
-        setCardHint(slide.key, result.message || undefined);
-        if (slide.kind === 'phrase_daily' || slide.kind === 'word_daily') {
-          analytics.capture(AnalyticsEvents.HOME_PRACTICE_DAILY_COMPLETED, { kind: slide.kind });
+        if (result.errored) {
+          setCardState(slide.key, 'fail' as CardState);
+          setCardHint(
+            slide.key,
+            result.message ||
+              "We couldn't hear you. Tap Listen, speak clearly, then tap the mic again.",
+          );
+          setTimeout(() => {
+            setCardState(slide.key, 'ready' as CardState);
+            setCardHint(slide.key, undefined);
+          }, 3000);
+          return;
         }
-      } else if (result.pass && !result.doneForToday) {
-        setCardState(slide.key, 'pass_partial' as CardState);
-        setCardHint(slide.key, result.message || `${result.correctStreak}/${result.streakTarget} — once more`);
-        if (slide.kind === 'mistake_task') {
-          analytics.capture(AnalyticsEvents.HOME_PRACTICE_MISTAKE_STREAK_UPDATED, {
-            taskId: slide.task.id,
-            correctStreak: result.correctStreak,
-          });
+
+        if (result.pass && result.doneForToday) {
+          setCardState(slide.key, 'done_today' as CardState);
+          setCardHint(slide.key, result.message || undefined);
+          if (slide.kind === 'phrase_daily' || slide.kind === 'word_daily') {
+            analytics.capture(AnalyticsEvents.HOME_PRACTICE_DAILY_COMPLETED, { kind: slide.kind });
+          }
+        } else if (result.pass && !result.doneForToday) {
+          setCardState(slide.key, 'pass_partial' as CardState);
+          setCardHint(slide.key, result.message || `${result.correctStreak}/${result.streakTarget} — once more`);
+          if (slide.kind === 'mistake_task') {
+            analytics.capture(AnalyticsEvents.HOME_PRACTICE_MISTAKE_STREAK_UPDATED, {
+              taskId: slide.task.id,
+              correctStreak: result.correctStreak,
+            });
+          }
+          setTimeout(() => {
+            setCardState(slide.key, 'ready' as CardState);
+            setCardHint(slide.key, undefined);
+          }, 2000);
+        } else {
+          setCardState(slide.key, 'fail' as CardState);
+          const scoreHint =
+            result.overallAccuracy > 0 ? `${result.overallAccuracy}% — try again` : result.message;
+          setCardHint(slide.key, scoreHint || 'Try again');
+          setTimeout(() => {
+            setCardState(slide.key, 'ready' as CardState);
+            setCardHint(slide.key, undefined);
+          }, 2000);
         }
-        setTimeout(() => {
-          setCardState(slide.key, 'ready' as CardState);
-          setCardHint(slide.key, undefined);
-        }, 2000);
-      } else {
-        setCardState(slide.key, 'fail' as CardState);
-        const scoreHint =
-          result.overallAccuracy > 0 ? `${result.overallAccuracy}% — try again` : result.message;
-        setCardHint(slide.key, scoreHint || 'Try again');
-        setTimeout(() => {
-          setCardState(slide.key, 'ready' as CardState);
-          setCardHint(slide.key, undefined);
-        }, 2000);
-      }
     } catch {
       setCardState(slide.key, 'fail' as CardState);
       setCardHint(slide.key, 'Network error — try again');
@@ -291,7 +288,41 @@ export default function PulseHomeCarousel({
     } finally {
       assessingLock.current = false;
     }
-  }, [analytics, capture, setCardHint, setCardState]);
+    },
+    [analytics, capture, setCardHint, setCardState],
+  );
+
+  const handleMicPress = useCallback(
+    async (slide: PulseSlide) => {
+      if (assessingLock.current) return;
+
+      const state = cardStates.get(slide.key) ?? ('ready' as CardState);
+
+      if (state === 'recording' || capture.isRecording) {
+        await submitRecording(slide);
+        return;
+      }
+
+      if (state !== 'ready' && state !== 'fail' && state !== 'pass_partial') {
+        return;
+      }
+
+      await tts.stop();
+      analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
+      setCardHint(slide.key, undefined);
+      setCardState(slide.key, 'recording' as CardState);
+
+      const started = await capture.start();
+      if (!started) {
+        setCardState(slide.key, 'ready' as CardState);
+        Alert.alert(
+          'Microphone',
+          'Allow microphone access in Settings to practice on this card.',
+        );
+      }
+    },
+    [analytics, capture, cardStates, setCardHint, setCardState, submitRecording, tts],
+  );
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     setActive(Math.round(e.nativeEvent.contentOffset.x / CARD_W));
@@ -347,8 +378,7 @@ export default function PulseHomeCarousel({
           listenEnabled={listenEnabled}
           listenPlaying={tts.playingKey === item.key}
           onListenPress={listenEnabled ? () => handleListen(item) : undefined}
-          onMicPressIn={() => void handlePressIn(item)}
-          onMicPressOut={() => void handlePressOut(item)}
+          onMicPress={() => void handleMicPress(item)}
         >
           {item.kind === 'phrase_daily' && (
             <>
@@ -395,6 +425,7 @@ export default function PulseHomeCarousel({
         renderItem={renderSlide}
         keyExtractor={(s) => s.key}
         horizontal
+        nestedScrollEnabled
         scrollEnabled={capture.captureState !== 'recording'}
         showsHorizontalScrollIndicator={false}
         snapToInterval={CARD_W}

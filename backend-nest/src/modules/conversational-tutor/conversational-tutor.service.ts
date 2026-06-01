@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { WeaknessService } from '../reels/weakness.service';
+import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
 import * as FormData from 'form-data';
 import { Response } from 'express';
 
@@ -128,6 +129,7 @@ export class ConversationalTutorService implements OnModuleInit {
     private httpService: HttpService,
     private prisma: PrismaService,
     private weaknessService: WeaknessService,
+    private inCallCoaching: InCallCoachingService,
   ) {
     this.genAI = new GoogleGenerativeAI(
       this.configService.get<string>('GEMINI_API_KEY'),
@@ -309,7 +311,12 @@ export class ConversationalTutorService implements OnModuleInit {
     };
     this.conversations.set(sessionId, session);
 
-    // 3. Return immediately — NO TTS for greeting (saves 1-2s).
+    // 3. Pre-build coaching context so backend-ai can read hints mid-session. Fire-and-forget.
+    this.inCallCoaching.buildContext(userId, sessionId).catch((err) => {
+      this.logger.warn(`[Coaching] failed to pre-build context for tutor session=${sessionId}: ${err?.message ?? err}`);
+    });
+
+    // 4. Return immediately — NO TTS for greeting (saves 1-2s).
     //    Mobile pipes `cefrLevel` into the WS fallback path so backend-ai can adapt
     //    when the SSE → Nest CEFR injection is skipped.
     return {

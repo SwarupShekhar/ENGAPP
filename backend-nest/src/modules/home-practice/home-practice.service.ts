@@ -74,7 +74,17 @@ export class HomePracticeService {
 
     const result = await this.pronunciation.assessFromUploadedFileWithWords(userId, file, referenceText);
     if (result.errored) {
-      return { pass: false, errored: true, overallAccuracy: 0, focusWords: [], message: 'Assessment failed — try again' };
+      return {
+        pass: false,
+        errored: true,
+        overallAccuracy: 0,
+        focusWords: [],
+        correctStreak: taskRow?.correctStreak ?? 0,
+        streakTarget: MISTAKE_STREAK_TARGET,
+        doneForToday: false,
+        message:
+          "We couldn't hear you clearly. Tap Listen, speak the phrase aloud, then tap the mic again.",
+      };
     }
 
     const threshold = cardType === 'mistake_task' ? THRESHOLD_MISTAKE : THRESHOLD_DAILY;

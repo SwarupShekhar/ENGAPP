@@ -27,6 +27,8 @@ export const AnalyticsEvents = {
   HOME_PRACTICE_DAILY_COMPLETED: "home_practice_daily_completed",
   HOME_PRACTICE_MISTAKE_STREAK_UPDATED: "home_practice_mistake_streak_updated",
   HOME_PRACTICE_LISTEN_TAPPED: "home_practice_listen_tapped",
+  IN_CALL_HINT_SHOWN: "in_call_hint_shown",
+  IN_CALL_HINT_USED: "in_call_hint_used",
 } as const;
 
 export type PracticeTaskType = "pronunciation" | "grammar" | "vocabulary" | string;

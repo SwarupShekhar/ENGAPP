@@ -116,7 +116,8 @@ class HinglishSTTService:
                     azure_result["display_provider"] = "deepgram"
                     azure_result["display_confidence"] = dg.confidence
             except Exception as e:
-                logger.warning("Deepgram display transcript failed (non-fatal): %s", e, exc_info=True)
+                # Optional path — do not spam stack traces on bad/expired API keys.
+                logger.warning("Deepgram display transcript skipped (non-fatal): %s", e)
         else:
             logger.info("Secondary transcription skipped (DEEPGRAM_SECONDARY_TRANSCRIPT=false or Deepgram not configured)")
 

@@ -9,6 +9,7 @@ import {
   PronunciationService,
   FlaggedPronunciationError,
 } from '../pronunciation/pronunciation.service';
+import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
 
 @Injectable()
 export class SessionsService {
@@ -21,6 +22,7 @@ export class SessionsService {
     @InjectQueue('sessions') private sessionsQueue: Queue,
     private readonly transcription: TranscriptionService,
     private readonly pronunciationService: PronunciationService,
+    private readonly inCallCoaching: InCallCoachingService,
   ) {}
 
   async rerunPronunciationForSession(
@@ -412,6 +414,17 @@ export class SessionsService {
           participants: true,
         },
       });
+
+      // Fire-and-forget: build coaching context for each participant so
+      // backend-ai can read it during the call. Never block the join response.
+      for (const userId of data.participants) {
+        this.inCallCoaching.buildContext(userId, session.id).catch((err) => {
+          this.logger.warn(
+            `[Coaching] failed to pre-build context for user=${userId} session=${session.id}: ${err?.message ?? err}`,
+          );
+        });
+      }
+
       return session;
     } catch (error) {
       this.logger.error(`Failed to start session: ${error.message}`);

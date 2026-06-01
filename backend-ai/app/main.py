@@ -18,6 +18,7 @@ from app.core.logger import configure_logging, logger
 from app.core.middleware import RequestIDMiddleware
 from app.cache.manager import cache
 from app.features.transcription.async_azure_speech import shutdown_executor
+from app.features.transcription.deepgram_service import deepgram_transcription_service
 from app.models.response import StandardResponse, ErrorResponse, Meta
 
 # 1. Initialize Sentry
@@ -35,6 +36,19 @@ async def lifespan(app: FastAPI):
     # Startup
     configure_logging()
     logger.info("application_startup", app_name=settings.app_name)
+    stt_primary = (
+        "deepgram"
+        if settings.deepgram_primary_stt and deepgram_transcription_service.configured
+        else "azure"
+    )
+    logger.info(
+        "stt_configuration",
+        stt_primary=stt_primary,
+        deepgram_primary_stt=settings.deepgram_primary_stt,
+        deepgram_secondary_transcript=settings.deepgram_secondary_transcript,
+        azure_speech_configured=bool(settings.azure_speech_key and settings.azure_speech_region),
+        deepgram_configured=deepgram_transcription_service.configured,
+    )
 
     await cache.initialize()
 

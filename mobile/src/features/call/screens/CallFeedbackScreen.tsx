@@ -60,6 +60,7 @@ import { PracticeTips } from "../components/PracticeTips";
 import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
 import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
 import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
+import { CoachingCallSummaryToast } from "../components/CoachingCallSummaryToast";
 import { getCQSScore, CQSResults } from "../../../api/scoring";
 import { useAnalytics } from "../../../analytics/useAnalytics";
 import { AnalyticsEvents } from "../../../analytics/events";
@@ -960,6 +961,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const partnerName = params.partnerName || "Co-learner";
   const topic = params.topic || "General Practice";
   const callDuration = params.duration || 0;
+  const [coachingSummaryMessage, setCoachingSummaryMessage] = useState<string | null>(
+    params.coachingSummaryMessage ?? null,
+  );
+  const coachingSummaryPhrases: string[] = params.coachingSummaryPhrases ?? [];
 
   useEffect(() => {
     let isMounted = true;
@@ -3397,6 +3402,11 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         <View style={{ height: 120 }} />
       </ScrollView>
+      <CoachingCallSummaryToast
+        message={coachingSummaryMessage}
+        phrases={coachingSummaryPhrases}
+        onDismiss={() => setCoachingSummaryMessage(null)}
+      />
     </SafeAreaView>
   );
 }

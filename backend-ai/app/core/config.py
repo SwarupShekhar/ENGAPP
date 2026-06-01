@@ -53,9 +53,8 @@ class Settings(BaseSettings):
     deepgram_api_key: Optional[str] = None
     deepgram_model: str = "nova-3"
     deepgram_language: str = "en-IN"
-    # When true and Deepgram is configured, run Nova-3 alongside Azure for a secondary
-    # display transcript. Azure stays authoritative for pronunciation / PA alignment.
-    deepgram_secondary_transcript: bool = True
+    # Optional second transcript for display only; Azure stays authoritative for STT/PA.
+    deepgram_secondary_transcript: bool = False
     # When true, use Deepgram Nova-3 as primary STT (bypasses Azure ~2000ms → ~300ms).
     # Azure is still used for pronunciation assessment (PA) — only plain transcription is rerouted.
     deepgram_primary_stt: bool = False

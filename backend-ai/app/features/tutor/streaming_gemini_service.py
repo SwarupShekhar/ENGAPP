@@ -287,9 +287,21 @@ Rules for tagging:
 The conversation so far:
 """
 
-        if phonetic_context:
+        coaching_hint = (phonetic_context or {}).get("coaching_hint")
+        if coaching_hint:
+            system_prompt += (
+                f"\n\n[COACHING HINT — weave into your next response naturally, max 1 sentence]: "
+                f"{coaching_hint}\n"
+            )
+
+        opportunity_directive = (phonetic_context or {}).get("opportunityDirective")
+        if opportunity_directive:
+            system_prompt += opportunity_directive
+
+        _pa_keys = set(phonetic_context or {}) - {"coaching_hint", "opportunityDirective"}
+        if phonetic_context and _pa_keys:
             context_str = "\n---\nCURRENT PRONUNCIATION CONTEXT:\n"
-            
+
             is_wrapped = "phonetic_insights" in phonetic_context
             insights = phonetic_context.get('phonetic_insights') if is_wrapped else phonetic_context
             insights = insights or {}

@@ -54,6 +54,9 @@ import {
 import { captureAnalyticsEvent } from "../../../analytics/analyticsBridge";
 import { AnalyticsEvents } from "../../../analytics/events";
 import { analyticsMeta } from "../../../analytics/eventMeta";
+import { useCoachingHints } from "../hooks/useCoachingHints";
+import { CoachingHintToast } from "../components/CoachingHintToast";
+import { inCallCoachingApi, PreloadedHint } from "../../../api/homePracticeApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // In a real app, these would come from environment variables
@@ -75,10 +78,12 @@ function DataListener({
   onTranscription,
   onEndSession,
   setRoomRef,
+  onCoachingHint,
 }: {
   onTranscription: (data: any) => void;
   onEndSession: () => void;
   setRoomRef?: (room: any) => void;
+  onCoachingHint?: (data: Uint8Array) => void;
 }) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -114,6 +119,9 @@ function DataListener({
             text: (data.text || "").trim(),
             fromRemote: true,
           });
+        } else if (data.type === "coaching_hint") {
+          // Forward the raw bytes to the coaching hints hook for decoding
+          onCoachingHint?.(payload);
         } else {
           console.log("[LiveKit] Received data packet:", data);
         }
@@ -421,6 +429,13 @@ export default function InCallScreen({ navigation, route }: any) {
 
   const socketRef = useRef<Socket | null>(null);
 
+  const { current: coachingHint, dismiss: dismissHint, pushHint } = useCoachingHints();
+  const preloadedHintsRef = useRef<PreloadedHint[]>([]);
+  const hintIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hintsShownCountRef = useRef(0);
+  const pushHintRef = useRef(pushHint);
+  useEffect(() => { pushHintRef.current = pushHint; }, [pushHint]);
+
   const insets = useSafeAreaInsets();
   const [sessionId, setSessionId] = useState(route?.params?.sessionId);
   const partnerName = route?.params?.partnerName || "Co-learner";
@@ -490,6 +505,50 @@ export default function InCallScreen({ navigation, route }: any) {
 
     return () => clearInterval(interval);
   }, [callStatus]);
+
+  // Pre-fetch past-mistake hints and show on interval during P2P calls
+  useEffect(() => {
+    if (!user?.id || !sessionId || callStatus !== 'connected' || hasEndedRef.current) return;
+
+    // Reset per-call state
+    hintsShownCountRef.current = 0;
+    preloadedHintsRef.current = [];
+
+    inCallCoachingApi.getHintsPreload(user.id, sessionId).then((hints) => {
+      preloadedHintsRef.current = hints;
+    });
+
+    // 60s warmup → first hint, then every 90s, max 3 per call
+    const HINT_INTERVAL_MS = 90000;
+    const WARMUP_MS = 60000;
+    const MAX_HINTS = 3;
+
+    const startInterval = () => {
+      hintIntervalRef.current = setInterval(() => {
+        if (hasEndedRef.current || hintsShownCountRef.current >= MAX_HINTS) {
+          if (hintIntervalRef.current) clearInterval(hintIntervalRef.current);
+          return;
+        }
+        const next = preloadedHintsRef.current[hintsShownCountRef.current];
+        if (!next) {
+          if (hintIntervalRef.current) clearInterval(hintIntervalRef.current);
+          return;
+        }
+        hintsShownCountRef.current += 1;
+        pushHintRef.current({ id: next.id, text: next.text, trigger: next.trigger });
+      }, HINT_INTERVAL_MS);
+    };
+
+    const warmupTimer = setTimeout(startInterval, WARMUP_MS);
+
+    return () => {
+      clearTimeout(warmupTimer);
+      if (hintIntervalRef.current) {
+        clearInterval(hintIntervalRef.current);
+        hintIntervalRef.current = null;
+      }
+    };
+  }, [callStatus, user?.id, sessionId]);
 
   const [transcriptionStatus, setTranscriptionStatus] = useState<
     "idle" | "active" | "error" | "unavailable" | "muted"
@@ -1245,11 +1304,38 @@ export default function InCallScreen({ navigation, route }: any) {
         console.error("[InCall] Failed to end session:", error);
       }
 
+      // Scan transcript for past-mistake corrections — must complete before getSummary reads context
+      if (user?.id && sessionId && sessionId !== "session-id") {
+        const userSegments = transcriptRef.current
+          .filter((t) => t.speaker === "user" && t.id !== "pending-local" && t.text?.trim())
+          .map((t) => t.text.trim());
+        if (userSegments.length > 0) {
+          await inCallCoachingApi.scanTranscript(user.id, sessionId, userSegments).catch(() => {});
+        }
+      }
+
+      // Fetch coaching summary — non-blocking on failure
+      let coachingSummaryMessage: string | null = null;
+      let coachingSummaryPhrases: string[] = [];
+      if (user?.id && sessionId && sessionId !== "session-id") {
+        try {
+          const summary = await inCallCoachingApi.getSummary(user.id, sessionId);
+          if (summary?.message) {
+            coachingSummaryMessage = summary.message;
+            coachingSummaryPhrases = summary.phrasesAttempted ?? [];
+          }
+        } catch {
+          // Non-critical — proceed to navigation regardless
+        }
+      }
+
       navigation.replace("CallFeedback", {
         sessionId: sessionId || "session-id",
         partnerName,
         topic,
         duration: durationRef.current,
+        coachingSummaryMessage,
+        coachingSummaryPhrases,
       });
     },
     [sessionId, navigation, partnerName, topic, user?.id],
@@ -1317,6 +1403,24 @@ export default function InCallScreen({ navigation, route }: any) {
     }
     handleEndCall(true);
   }, [handleEndCall]);
+
+  const handleCoachingData = useCallback(
+    (rawBytes: Uint8Array) => {
+      try {
+        const parsed = JSON.parse(new TextDecoder().decode(rawBytes));
+        if (parsed?.text) {
+          pushHint({
+            id: `hint-${Date.now()}`,
+            text: parsed.text,
+            trigger: parsed.trigger ?? "unknown",
+          });
+        }
+      } catch {
+        // Ignore malformed data
+      }
+    },
+    [pushHint],
+  );
 
   if (!token) {
     return (
@@ -1395,6 +1499,7 @@ export default function InCallScreen({ navigation, route }: any) {
           setRoomRef={(r) => {
             roomRef.current = r;
           }}
+          onCoachingHint={handleCoachingData}
         />
         <View
           style={[
@@ -1552,6 +1657,9 @@ export default function InCallScreen({ navigation, route }: any) {
               />
             </Animated.View>
           </View>
+
+          {/* Coaching hint overlay — positioned above the controls dock, never blocks call buttons */}
+          <CoachingHintToast hint={coachingHint} onDismiss={dismissHint} />
         </SafeAreaView>
       </LiveKitRoom>
     </View>

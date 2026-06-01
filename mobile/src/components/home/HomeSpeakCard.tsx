@@ -11,12 +11,10 @@ interface HomeSpeakCardProps {
   children: React.ReactNode;
   badge?: string;
   cardState: CardState;
-  onMicPressIn: () => void;
-  onMicPressOut: () => void;
+  onMicPress: () => void;
   failMessage?: string;
   doneMessage?: string;
   disabled?: boolean;
-  /** Phrase/word cards: play target pronunciation before mic practice. */
   listenEnabled?: boolean;
   listenPlaying?: boolean;
   onListenPress?: () => void;
@@ -28,8 +26,7 @@ export function HomeSpeakCard({
   children,
   badge,
   cardState,
-  onMicPressIn,
-  onMicPressOut,
+  onMicPress,
   failMessage,
   doneMessage,
   disabled = false,
@@ -45,13 +42,18 @@ export function HomeSpeakCard({
 
   const micLabel = (() => {
     switch (cardState) {
-      case 'recording': return 'Listening…';
-      case 'assessing': return 'Checking pronunciation…';
-      case 'done_today': return doneMessage ?? 'Done for today';
-      case 'fail': return failMessage ?? 'Try again';
-      case 'pass_partial': return failMessage ?? 'Once more';
+      case 'recording':
+        return 'Tap when you are done speaking';
+      case 'assessing':
+        return 'Checking pronunciation…';
+      case 'done_today':
+        return doneMessage ?? 'Done for today';
+      case 'fail':
+        return failMessage ?? 'Try again';
+      case 'pass_partial':
+        return failMessage ?? 'Once more';
       default:
-        return listenEnabled ? 'Listen, then hold and speak' : 'Hold and speak';
+        return listenEnabled ? 'Listen, then tap the mic' : 'Tap mic and speak';
     }
   })();
 
@@ -78,6 +80,9 @@ export function HomeSpeakCard({
         <Pressable
           onPress={onListenPress}
           disabled={disabled}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Listen to pronunciation"
           style={({ pressed }) => [
             styles.listenBtn,
             {
@@ -108,19 +113,20 @@ export function HomeSpeakCard({
           </View>
         ) : (
           <Pressable
-            onPressIn={micDisabled ? undefined : onMicPressIn}
-            onPressOut={micDisabled ? undefined : onMicPressOut}
-            delayPressIn={0}
+            onPress={micDisabled ? undefined : onMicPress}
             disabled={micDisabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={cardState === 'recording' ? 'Stop recording' : 'Start recording'}
             style={({ pressed }) => [
               styles.micBtn,
               {
                 backgroundColor: micDisabled
                   ? `${c.primary}40`
                   : cardState === 'recording'
-                  ? ((c as any).error ?? '#ef4444')
-                  : c.primary,
-                opacity: pressed && !micDisabled ? 0.85 : 1,
+                    ? ((c as any).error ?? '#ef4444')
+                    : c.primary,
+                opacity: pressed && !micDisabled ? 0.9 : 1,
               },
             ]}
           >
@@ -179,7 +185,7 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    micLabel: { fontSize: 11, textAlign: 'center' },
+    micLabel: { fontSize: 11, textAlign: 'center', paddingHorizontal: 8 },
     doneRow: {
       flexDirection: 'row',
       alignItems: 'center',

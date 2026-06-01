@@ -53,6 +53,9 @@ import { Buffer } from "buffer";
 import { useAnalytics } from "../../../analytics/useAnalytics";
 import { AnalyticsEvents } from "../../../analytics/events";
 import { analyticsMeta } from "../../../analytics/eventMeta";
+import { useCoachingHints } from "../../call/hooks/useCoachingHints";
+import { CoachingHintToast } from "../../call/components/CoachingHintToast";
+import { inCallCoachingApi } from "../../../api/homePracticeApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -253,6 +256,8 @@ export default function AITutorScreen({ navigation, route }: any) {
   >(null);
   const [transcript, setTranscript] = useState<any[]>([]);
 
+  const { current: coachingHint, dismiss: dismissHint, pushHint } = useCoachingHints();
+
   const sessionIdRef = useRef<string | null>(null);
   const transcriptRef = useRef<any[]>([]);
   const streamHandlerRef = useRef<(chunk: StreamChunk) => void>(() => {});
@@ -450,6 +455,9 @@ export default function AITutorScreen({ navigation, route }: any) {
       // Trigger final analysis and save session
       if (sessionIdRef.current) {
         if (__DEV__) console.log("[AITutor] Ending session for analysis:", sessionIdRef.current);
+        // TODO: show CoachingCallSummaryToast — unmount path has no navigation context,
+        //   so coaching summary cannot be shown here. It is fetched in the "End Session"
+        //   button handler above and passed as CallFeedback nav params instead.
         void tutorApi
           .endSession(sessionIdRef.current)
           .then(() => void syncCefrLevelOnce())
@@ -567,6 +575,15 @@ export default function AITutorScreen({ navigation, route }: any) {
         return prev;
       });
       setTimeout(() => evaluateLastMessageForPronunciation(), 0);
+    }
+
+    // Coaching hint from backend-ai SSE/WS stream
+    if (chunk.type === "coaching_hint" && chunk.text) {
+      pushHint({
+        id: `hint-${Date.now()}`,
+        text: chunk.text,
+        trigger: chunk.trigger ?? "unknown",
+      });
     }
 
     // Always check for audio in any chunk
@@ -1061,6 +1078,22 @@ export default function AITutorScreen({ navigation, route }: any) {
                 try {
                   await tutorApi.endSession(sessionIdRef.current);
                   await syncCefrLevelOnce();
+
+                  // Fire-and-forget coaching summary — non-blocking on failure
+                  let coachingSummaryMessage: string | null = null;
+                  let coachingSummaryPhrases: string[] = [];
+                  if (user?.id && sessionIdRef.current) {
+                    try {
+                      const summary = await inCallCoachingApi.getSummary(user.id, sessionIdRef.current);
+                      if (summary?.message) {
+                        coachingSummaryMessage = summary.message;
+                        coachingSummaryPhrases = summary.phrasesAttempted ?? [];
+                      }
+                    } catch {
+                      // Non-critical — proceed to navigation regardless
+                    }
+                  }
+
                   // Make sure we go to the feedback screen instead of just back
                   navigation.replace("CallFeedback", {
                     sessionId: sessionIdRef.current,
@@ -1071,6 +1104,8 @@ export default function AITutorScreen({ navigation, route }: any) {
                       lname: "(AI Tutor)",
                     },
                     isAI: true,
+                    coachingSummaryMessage,
+                    coachingSummaryPhrases,
                   });
                 } catch (e) {
                   setIsProcessing(false);
@@ -1180,6 +1215,9 @@ export default function AITutorScreen({ navigation, route }: any) {
             </View>
           )}
         </View>
+
+        {/* Coaching hint overlay — positioned above the mic button, never blocks recording controls */}
+        <CoachingHintToast hint={coachingHint} onDismiss={dismissHint} />
       </SafeAreaView>
     </View>
   );

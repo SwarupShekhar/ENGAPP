@@ -735,6 +735,8 @@ export default function HomeScreen() {
   const goNotifs   = () => navigation.navigate('Notifications');
   const goPracticeCall = () => navigation.navigate('CallPreference');
 
+  const [homeScrollEnabled, setHomeScrollEnabled] = useState(true);
+
   const practiceCta = resolvePracticeCta(homeData?.primaryCTA);
   const practiceTitle = practiceCta.title;
   const practiceDescription = practiceCta.description;
@@ -748,6 +750,9 @@ export default function HomeScreen() {
         style={[st.scroll, { backgroundColor: c.background }]}
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 104, paddingHorizontal: HPAD, gap: 14 }}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={homeScrollEnabled}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(0).duration(340).springify()} style={st.header}>
@@ -832,6 +837,7 @@ export default function HomeScreen() {
             wordOfTheDay={homeData?.wordOfTheDay ?? null}
             dailyPracticeStatus={homeData?.dailyPracticeStatus ?? null}
             loadingPhrase={loadingHome}
+            onParentScrollEnabledChange={setHomeScrollEnabled}
           />
         </Animated.View>
       </ScrollView>
