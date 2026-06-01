@@ -3,6 +3,10 @@ import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
 import { fetchErrorSpeak } from '../../../api/tts';
+import { getOrFetchTtsFileUri } from '../../../utils/ttsAudioCache';
+
+// Module-level: confirmed-present URIs this session — skips getInfoAsync on repeat taps (Bug 6)
+const cachedUris = new Map<string, string>();
 
 async function setPlaybackAudioMode(): Promise<void> {
   try {
@@ -20,25 +24,25 @@ async function setPlaybackAudioMode(): Promise<void> {
   }
 }
 
-/** Server TTS (Inworld via Nest) with device-speech fallback for phrase/word cards. */
 export function useHomePracticeTts() {
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const activeKeyRef = useRef<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
 
+  // Bug 3 fix: sync state clears happen before any await, so fire-and-forget callers
+  // (useFocusEffect cleanup) see cancelled state immediately without needing to await.
   const stop = useCallback(async () => {
     Speech.stop();
-    if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-      } catch (_) {
-        /* already stopped */
-      }
-      soundRef.current = null;
-    }
     activeKeyRef.current = null;
     setPlayingKey(null);
+    const s = soundRef.current;
+    soundRef.current = null;
+    if (s) {
+      try {
+        await s.stopAsync();
+        await s.unloadAsync();
+      } catch (_) {}
+    }
   }, []);
 
   const speak = useCallback(
@@ -56,28 +60,70 @@ export function useHomePracticeTts() {
       setPlayingKey(key);
       await setPlaybackAudioMode();
 
-      try {
-        const result = await fetchErrorSpeak(trimmed);
-        if (result.audio_base64 && activeKeyRef.current === key) {
-          const tmpUri = `${FileSystem.cacheDirectory}home_practice_${key.replace(/[^a-z0-9]/gi, '_')}.mp3`;
-          await FileSystem.writeAsStringAsync(tmpUri, result.audio_base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: tmpUri },
+      // playUri: loads and plays uri. Guards cancellation before AND after createAsync (Bug 1).
+      // Throws if createAsync fails so caller can evict corrupt cache and re-fetch (Bug 2).
+      const playUri = async (uri: string): Promise<void> => {
+        if (activeKeyRef.current !== key) return;
+
+        let sound: Audio.Sound;
+        try {
+          ({ sound } = await Audio.Sound.createAsync(
+            { uri },
             { shouldPlay: true, volume: 1.0 },
-          );
-          soundRef.current = sound;
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (!status.isLoaded) return;
-            if (status.didJustFinish && activeKeyRef.current === key) {
-              activeKeyRef.current = null;
-              setPlayingKey(null);
-              sound.unloadAsync().catch(() => {});
-              soundRef.current = null;
-            }
-          });
+          ));
+        } catch (err) {
+          // Corrupt/invalid file — evict from both caches so caller can re-fetch (Bug 2)
+          cachedUris.delete(key);
+          await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+          throw err;
+        }
+
+        // Re-check after await — stop() may have fired during createAsync (Bug 1)
+        if (activeKeyRef.current !== key) {
+          sound.unloadAsync().catch(() => {});
           return;
+        }
+
+        soundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) return;
+          if (status.didJustFinish && activeKeyRef.current === key) {
+            activeKeyRef.current = null;
+            setPlayingKey(null);
+            sound.unloadAsync().catch(() => {});
+            soundRef.current = null;
+          }
+        });
+      };
+
+      const fetchB64 = () => fetchErrorSpeak(trimmed).then((r) => r.audio_base64 ?? '');
+
+      try {
+        // Bug 6: use in-memory map to skip getInfoAsync on repeat taps
+        let uri = cachedUris.get(key) ?? null;
+
+        if (!uri) {
+          // Bug 4: use shared utility instead of bespoke getInfoAsync→fetch→write
+          uri = await getOrFetchTtsFileUri(key, fetchB64);
+          if (uri) cachedUris.set(key, uri);
+        }
+
+        if (uri && activeKeyRef.current === key) {
+          try {
+            await playUri(uri);
+            return;
+          } catch {
+            // playUri already evicted from cachedUris + deleted corrupt file (Bug 2).
+            // One re-fetch attempt with a fresh file.
+            if (activeKeyRef.current === key) {
+              const freshUri = await getOrFetchTtsFileUri(key, fetchB64);
+              if (freshUri && activeKeyRef.current === key) {
+                cachedUris.set(key, freshUri);
+                await playUri(freshUri);
+                return;
+              }
+            }
+          }
         }
       } catch (e) {
         if (__DEV__) console.warn('[HomePractice] server TTS failed, fallback to device:', e);
@@ -89,22 +135,13 @@ export function useHomePracticeTts() {
         language: 'en-US',
         rate: 0.9,
         onDone: () => {
-          if (activeKeyRef.current === key) {
-            activeKeyRef.current = null;
-            setPlayingKey(null);
-          }
+          if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
         },
         onStopped: () => {
-          if (activeKeyRef.current === key) {
-            activeKeyRef.current = null;
-            setPlayingKey(null);
-          }
+          if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
         },
         onError: () => {
-          if (activeKeyRef.current === key) {
-            activeKeyRef.current = null;
-            setPlayingKey(null);
-          }
+          if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
         },
       });
     },

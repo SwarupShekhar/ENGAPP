@@ -91,6 +91,9 @@ export default function PulseHomeCarousel({
 
   const capture = useHomePracticeCapture();
   const tts = useHomePracticeTts();
+  // Destructure stable refs so useFocusEffect deps don't re-fire on every
+  // playingKey state change (tts object is new each render, but speak/stop are not).
+  const { speak: ttsSpeak, stop: ttsStop } = tts;
 
   useEffect(() => {
     onParentScrollEnabledChange?.(capture.captureState !== 'recording');
@@ -128,9 +131,9 @@ export default function PulseHomeCarousel({
       })();
       return () => {
         alive = false;
-        tts.stop();
+        ttsStop();
       };
-    }, [tts]),
+    }, [ttsStop]),
   );
 
   // ── Build slide list ─────────────────────────────────────────────────────────
@@ -192,14 +195,14 @@ export default function PulseHomeCarousel({
         if (capture.isRecording) return;
         if (slide.kind === 'phrase_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-          await tts.speak(slide.key, slide.phrase.phrase);
+          await ttsSpeak(slide.key, slide.phrase.phrase);
         } else if (slide.kind === 'word_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-          await tts.speak(slide.key, slide.word.word);
+          await ttsSpeak(slide.key, slide.word.word);
         }
       })();
     },
-    [analytics, capture.isRecording, tts],
+    [analytics, capture.isRecording, ttsSpeak],
   );
 
   const submitRecording = useCallback(
@@ -307,7 +310,7 @@ export default function PulseHomeCarousel({
         return;
       }
 
-      await tts.stop();
+      await ttsStop();
       analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
       setCardHint(slide.key, undefined);
       setCardState(slide.key, 'recording' as CardState);
@@ -321,7 +324,7 @@ export default function PulseHomeCarousel({
         );
       }
     },
-    [analytics, capture, cardStates, setCardHint, setCardState, submitRecording, tts],
+    [analytics, capture, cardStates, setCardHint, setCardState, submitRecording, ttsStop],
   );
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
