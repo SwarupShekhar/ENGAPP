@@ -133,7 +133,7 @@ export function useHomePracticeTts() {
 
       Speech.speak(trimmed, {
         language: 'en-US',
-        rate: 0.9,
+        rate: 0.78,
         onDone: () => {
           if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
         },

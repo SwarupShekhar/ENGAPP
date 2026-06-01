@@ -120,9 +120,10 @@ async def full_feedback_narration(request: Request, body: FullFeedbackNarrationR
 
 class SpeakRequest(BaseModel):
     text: str
+    speaking_rate: float = 0.65  # Home practice cards: slower for learner-paced full scripts
 
 @router.post("/speak", response_model=FeedbackNarrationResponse)
 async def speak(request: Request, body: SpeakRequest):
-    audio_bytes = await inworld_tts_service.synthesize_async(body.text)
+    audio_bytes = await inworld_tts_service.synthesize_async(body.text, speaking_rate=body.speaking_rate)
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     return FeedbackNarrationResponse(audio_base64=audio_b64, text=body.text)

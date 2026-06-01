@@ -32,18 +32,17 @@ class InworldTTSService:
 
     def _clean_text(self, text: str) -> str:
         text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
-        text = re.sub(r'[^\w\s,!.?\'"]', '', text)
+        # Allow - and : so "Meaning - ..." and part-of-speech labels survive intact
+        text = re.sub(r'[^\w\s,!.?\'":\-]', '', text)
         return text
 
-    def _build_payload(self, text: str) -> dict:
-        # Maya tutor voice: standard (non-max) model is less theatrical / expressive.
-        # speakingRate < 1.0 = slower; 0.78 gives clearer pacing for English learners.
+    def _build_payload(self, text: str, speaking_rate: float = 0.78) -> dict:
         return {
             "text": self._clean_text(text),
             "voiceId": settings.inworld_character_id or "Olivia",
             "modelId": "inworld-tts-1",
             "timestampType": "WORD",
-            "speakingRate": 0.78,
+            "speakingRate": speaking_rate,
         }
 
     def synthesize_hinglish(self, text: str, gender: str = 'female') -> bytes:
@@ -73,7 +72,7 @@ class InworldTTSService:
             logger.error(f"Inworld TTS error: {e}")
             return b""
 
-    async def synthesize_async(self, text: str, gender: str = 'female') -> bytes:
+    async def synthesize_async(self, text: str, gender: str = 'female', speaking_rate: float = 0.78) -> bytes:
         """Async synthesis using httpx.AsyncClient — non-blocking, lower latency."""
         if not self.auth_header:
             logger.error("Inworld TTS service is not configured.")
@@ -83,7 +82,7 @@ class InworldTTSService:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.endpoint,
-                    json=self._build_payload(text),
+                    json=self._build_payload(text, speaking_rate),
                     headers=headers,
                     timeout=30.0,
                 )

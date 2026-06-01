@@ -195,10 +195,23 @@ export default function PulseHomeCarousel({
         if (capture.isRecording) return;
         if (slide.kind === 'phrase_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-          await ttsSpeak(slide.key, slide.phrase.phrase);
+          const { phrase, definition, example } = slide.phrase;
+          const def = definition || '';
+          const ex = example || '';
+          const script = [phrase, def && `Meaning - ${def}`, ex && `For example - ${ex}`].filter(Boolean).join('. ');
+          await ttsSpeak(`${slide.key}:full`, script);
         } else if (slide.kind === 'word_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-          await ttsSpeak(slide.key, slide.word.word);
+          const { word, definition, example, partOfSpeech } = slide.word;
+          const pos = partOfSpeech ? `${partOfSpeech}. ` : '';
+          const def = definition || '';
+          const ex = example || '';
+          const script = [
+            `${word}. ${pos}`.trim(),
+            def && `Meaning - ${def}`,
+            ex && `For example - ${ex}`,
+          ].filter(Boolean).join('. ');
+          await ttsSpeak(`${slide.key}:full`, script);
         }
       })();
     },
@@ -379,7 +392,7 @@ export default function PulseHomeCarousel({
           badge={streakForTask}
           disabled={assessingLock.current}
           listenEnabled={listenEnabled}
-          listenPlaying={tts.playingKey === item.key}
+          listenPlaying={tts.playingKey === (listenEnabled ? `${item.key}:full` : item.key)}
           onListenPress={listenEnabled ? () => handleListen(item) : undefined}
           onMicPress={() => void handleMicPress(item)}
         >
