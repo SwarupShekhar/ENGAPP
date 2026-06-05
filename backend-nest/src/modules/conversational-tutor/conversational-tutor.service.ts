@@ -644,6 +644,8 @@ export class ConversationalTutorService implements OnModuleInit {
     sessionId: string,
     res: Response,
     traceId?: string,
+    uploadFilename = 'audio.m4a',
+    uploadMime = 'audio/m4a',
   ): Promise<void> {
     const session = this.getOrCreateSession(sessionId);
     const history = session.history
@@ -664,7 +666,10 @@ export class ConversationalTutorService implements OnModuleInit {
     }
 
     const form = new FormData();
-    form.append('audio', audioBuffer, { filename: 'audio.wav' });
+    form.append('audio', audioBuffer, {
+      filename: uploadFilename,
+      contentType: uploadMime,
+    });
     form.append('session_id', sessionId);
     form.append('user_id', userId);
     form.append('conversation_history', JSON.stringify(history));

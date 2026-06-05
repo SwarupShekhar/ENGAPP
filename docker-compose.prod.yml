@@ -46,6 +46,8 @@ services:
       # Tutor + calls use Azure Speech STT; Deepgram is opt-in only.
       DEEPGRAM_PRIMARY_STT: "false"
       DEEPGRAM_SECONDARY_TRANSCRIPT: "false"
+      # Coaching context (Maya tutor) reads REDIS_URL — must point at the same Redis as backend-nest.
+      # Set REDIS_URL in backend-ai/.env on the server (not localhost inside Docker).
     ports:
       - "0.0.0.0:4002:8001"
     restart: unless-stopped

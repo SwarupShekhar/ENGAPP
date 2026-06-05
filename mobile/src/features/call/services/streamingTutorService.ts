@@ -3,8 +3,23 @@ import { API_URL as NEST_API_URL } from "../../../api/client";
 import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
 import { readExpoExtra } from "../../../api/expoExtra";
 
-/** Vultr backend-ai WebSocket port (not exposed on api.englivo.com — only Nest is behind Caddy). */
-const VULTR_AI_WS_ORIGIN = "wss://139.84.163.249:4002";
+/** Vultr backend-ai WebSocket (docker maps host :4002 → uvicorn :8001, plain WS — no TLS). */
+const VULTR_AI_WS_ORIGIN = "ws://139.84.163.249:4002";
+
+/** Port 4002 is HTTP/ws only; wss:// to the raw IP never completes the TLS handshake. */
+function normalizeTutorWsUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname);
+    if (isIpv4 && u.port === "4002" && u.protocol === "wss:") {
+      u.protocol = "ws:";
+      return u.toString().replace(/\/$/, "");
+    }
+  } catch {
+    /* keep original */
+  }
+  return url.replace(/\/$/, "");
+}
 
 export interface StreamChunk {
   type:
@@ -70,7 +85,7 @@ class StreamingTutorService {
     // Explicit override wins (ENGLIVO_WS_URL_OVERRIDE in .env → app.config extra)
     const wsOverride = (readExpoExtra("englivoWsUrlOverride") ?? "").trim();
     if (wsOverride) {
-      wsUrl = wsOverride;
+      wsUrl = normalizeTutorWsUrl(wsOverride);
     } else if (IS_PROD) {
       const nestBase = NEST_API_URL.replace(/\/$/, "");
       try {
@@ -78,9 +93,9 @@ class StreamingTutorService {
         const wsScheme = u.protocol === "https:" ? "wss" : "ws";
         // api.englivo.com only reverse-proxies Nest; backend-ai WS stays on Vultr :4002.
         if (u.hostname === "api.englivo.com") {
-          wsUrl = VULTR_AI_WS_ORIGIN;
+          wsUrl = normalizeTutorWsUrl(VULTR_AI_WS_ORIGIN);
         } else {
-          wsUrl = `${wsScheme}://${u.hostname}:4002`;
+          wsUrl = normalizeTutorWsUrl(`${wsScheme}://${u.hostname}:4002`);
         }
       } catch {
         const base = ENGLIVO_API_URL.replace(/\/$/, "");
@@ -184,6 +199,40 @@ class StreamingTutorService {
       this.ws = null;
     }
     this.callbacks = [];
+  }
+
+  /**
+   * Wait until the socket delivers a meaningful chunk or times out.
+   * Used before falling back to blocking process-speech over HTTPS.
+   */
+  waitForMeaningfulChunk(
+    timeoutMs: number,
+    isDone: () => boolean,
+  ): Promise<boolean> {
+    if (isDone()) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+      const handler: StreamCallback = (chunk) => {
+        const meaningful =
+          ((chunk.type === "transcript" || chunk.type === "transcription") &&
+            Boolean(chunk.text)) ||
+          (chunk.type === "sentence" && Boolean(chunk.text)) ||
+          (chunk.type === "audio" && Boolean(chunk.audio)) ||
+          chunk.type === "error";
+        if (meaningful) {
+          clearTimeout(timer);
+          this.offMessage(handler);
+          resolve(true);
+        }
+      };
+
+      const timer = setTimeout(() => {
+        this.offMessage(handler);
+        resolve(isDone());
+      }, timeoutMs);
+
+      this.onMessage(handler);
+    });
   }
 }
 

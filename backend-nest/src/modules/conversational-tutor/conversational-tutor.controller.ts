@@ -65,6 +65,8 @@ export class ConversationalTutorController {
       sessionId,
       res,
       traceId,
+      audio.originalname || 'audio.m4a',
+      audio.mimetype || 'audio/m4a',
     );
   }
 

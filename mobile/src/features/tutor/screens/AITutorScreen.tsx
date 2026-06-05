@@ -291,6 +291,8 @@ export default function AITutorScreen({ navigation, route }: any) {
   };
 
   const turnTraceIdRef = useRef<string | null>(null);
+  /** Set when SSE/WS delivers transcript, sentence, audio, or blocking fallback completes. */
+  const turnHadResponseRef = useRef(false);
   /** Learner CEFR level (A1..C2). Set after startSession; piped into WS fallback so backend-ai
    *  can adapt vocabulary when the SSE → Nest CEFR injection is skipped. */
   const cefrLevelRef = useRef<string | null>(null);
@@ -471,6 +473,78 @@ export default function AITutorScreen({ navigation, route }: any) {
     };
   }, []);
 
+  const applyBlockingTutorTurn = (
+    userText: string,
+    aiText: string,
+    audioBase64?: string | null,
+  ) => {
+    const cleanUser = userText?.trim() || "(no speech detected)";
+    const cleanAi = aiText?.trim() || "";
+    setTranscript((prev) => {
+      const tempIndex = prev.findIndex(
+        (p) => p.speaker === "user" && p.tempId,
+      );
+      let next = [...prev];
+      if (tempIndex >= 0) {
+        next[tempIndex] = {
+          ...next[tempIndex],
+          text: cleanUser,
+          tempId: false,
+        };
+      } else if (cleanUser) {
+        next = [
+          ...next,
+          { id: nextMsgId(), speaker: "user", text: cleanUser },
+        ];
+      }
+      if (cleanAi) {
+        next = [
+          ...next,
+          { id: nextMsgId(), speaker: "ai", text: cleanAi },
+        ];
+      }
+      return next;
+    });
+    turnHadResponseRef.current = true;
+    if (audioBase64) {
+      queueAudio(audioBase64);
+    }
+    const sid = sessionIdRef.current;
+    if (sid && cleanUser && cleanAi) {
+      tutorApi.appendTurn(sid, cleanUser, cleanAi).catch(() => {});
+    }
+  };
+
+  const runProcessSpeechFallback = async (
+    formData: FormData,
+    activeSessionId: string | null,
+  ): Promise<boolean> => {
+    if (!activeSessionId) return false;
+    try {
+      activeLatencyTimeline.startSpan("process_speech_fallback");
+      const res = await tutorApi.processSpeech(formData);
+      activeLatencyTimeline.endSpan("process_speech_fallback");
+      const transcription =
+        (res as { transcription?: string })?.transcription?.trim() || "";
+      const aiResponse =
+        (res as { aiResponse?: string })?.aiResponse?.trim() || "";
+      const audioB64 =
+        (res as { audioBase64?: string })?.audioBase64 || null;
+      if (!transcription && !aiResponse) return false;
+      applyBlockingTutorTurn(transcription, aiResponse, audioB64);
+      setStreamPath("ws-fallback");
+      setStreamDebugReason("process_speech_https");
+      return true;
+    } catch (e: any) {
+      activeLatencyTimeline.endSpan("process_speech_fallback");
+      console.warn(
+        "[AITutor] process-speech fallback failed:",
+        e?.message || e,
+      );
+      return false;
+    }
+  };
+
   // ─── Stream Handling ────────────────────────────────────
   const handleStreamMessage = (chunk: StreamChunk) => {
     if (chunk.type === "phonetic_ready") {
@@ -491,6 +565,9 @@ export default function AITutorScreen({ navigation, route }: any) {
           Boolean(chunk.text) ||
         (chunk.type === "sentence" && Boolean(chunk.text)) ||
         (chunk.type === "audio" && Boolean(chunk.audio));
+      if (isMeaningfulChunk) {
+        turnHadResponseRef.current = true;
+      }
       if (isMeaningfulChunk && turnStartMsRef.current) {
         firstChunkSeenRef.current = true;
         setFirstChunkLatencyMs(Date.now() - turnStartMsRef.current);
@@ -781,6 +858,7 @@ export default function AITutorScreen({ navigation, route }: any) {
 
         turnStartMsRef.current = Date.now();
         firstChunkSeenRef.current = false;
+        turnHadResponseRef.current = false;
         setFirstChunkLatencyMs(null);
         setTurnStartAtLabel(new Date(turnStartMsRef.current).toLocaleTimeString());
 
@@ -999,16 +1077,15 @@ export default function AITutorScreen({ navigation, route }: any) {
             setStreamPath("sse-skipped");
             setStreamDebugReason("missing_token_or_session");
           }
-          if (!usedSSE && audioBase64) {
+          if (!usedSSE && audioBase64 && activeSessionId) {
             if (!sseSkipped) {
               setStreamPath("ws-fallback");
+              setStreamDebugReason("sse_failed_trying_ws");
             }
-            if (activeSessionId) {
-              streamingTutor.ensureConnected(
-                activeSessionId,
-                user?.id || "test",
-              );
-            }
+            streamingTutor.ensureConnected(
+              activeSessionId,
+              user?.id || "test",
+            );
             streamingTutor.sendText(
               null,
               null,
@@ -1016,9 +1093,34 @@ export default function AITutorScreen({ navigation, route }: any) {
               turnTraceIdRef.current ?? undefined,
               cefrLevelRef.current,
             );
+            await streamingTutor.waitForMeaningfulChunk(
+              12_000,
+              () => turnHadResponseRef.current,
+            );
           } else if (!usedSSE && !audioBase64) {
             setStreamPath("ws-fallback");
             setStreamDebugReason("no_audio_base64");
+          }
+
+          if (!turnHadResponseRef.current) {
+            const ok = await runProcessSpeechFallback(
+              formData,
+              activeSessionId,
+            );
+            if (!ok) {
+              setTranscript((prev) =>
+                prev.map((m) =>
+                  m.tempId
+                    ? {
+                        ...m,
+                        text: "Couldn't reach Maya. Hold the mic and try again.",
+                        tempId: false,
+                      }
+                    : m,
+                ),
+              );
+              setError("Maya didn't respond. Check your connection and try again.");
+            }
           }
         setTurnCount((c) => c + 1);
       }

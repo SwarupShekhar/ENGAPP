@@ -17,18 +17,14 @@
         "buildType": "apk"
       },
       "env": {
-        "APP_API_URL_OVERRIDE": "http://139.84.163.249:4001",
-        "EXPO_PUBLIC_NEST_API_URL": "http://139.84.163.249:4001",
-        "APP_ENGLIVO_API_URL": "http://139.84.163.249:4001",
+        "EXPO_PUBLIC_NEST_API_URL": "https://api.englivo.com",
         "ENGLIVO_WS_URL_OVERRIDE": "ws://139.84.163.249:4002"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "APP_API_URL_OVERRIDE": "http://139.84.163.249:4001",
-        "EXPO_PUBLIC_NEST_API_URL": "http://139.84.163.249:4001",
-        "APP_ENGLIVO_API_URL": "http://139.84.163.249:4001",
+        "EXPO_PUBLIC_NEST_API_URL": "https://api.englivo.com",
         "ENGLIVO_WS_URL_OVERRIDE": "ws://139.84.163.249:4002"
       }
     }

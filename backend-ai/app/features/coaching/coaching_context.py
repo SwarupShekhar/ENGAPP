@@ -1,13 +1,13 @@
 """Reads and updates CoachingContext from Redis."""
 from __future__ import annotations
 import json
-import os
 import logging
 import re
-from datetime import datetime, timezone
 from typing import Any
 
 import redis
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +17,10 @@ _redis_client: redis.Redis | None = None
 def _get_redis() -> redis.Redis:
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", "6379")),
-            password=os.getenv("REDIS_PASSWORD") or None,
-            username=os.getenv("REDIS_USERNAME", "default"),
+        _redis_client = redis.from_url(
+            settings.redis_url,
             decode_responses=True,
+            socket_connect_timeout=5,
         )
     return _redis_client
 
