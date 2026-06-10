@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { engagementApi } from "../../api/engagement";
 import {
   getCachedEngagement,
@@ -47,6 +48,7 @@ export default function EBiteVideoCard({
   const [shareVisible, setShareVisible] = useState(false);
   const hasReportedUnlock = useRef(false);
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const reelId = Number(item.id);
 
   useEffect(() => {
@@ -189,6 +191,9 @@ export default function EBiteVideoCard({
           visible={shareVisible}
           strapiReelId={reelId}
           onClose={() => setShareVisible(false)}
+          onSharedToChat={(target) => {
+            navigation.navigate("Chat", target);
+          }}
         />
       )}
     </View>

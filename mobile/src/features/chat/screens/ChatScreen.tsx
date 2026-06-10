@@ -157,6 +157,10 @@ export default function ChatScreen() {
         return [...prev, data.message];
       });
 
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      });
+
       socketService.markRead(conversationId);
 
       // Infer internal userId
@@ -435,6 +439,12 @@ export default function ChatScreen() {
       flatListRef.current?.scrollToEnd({ animated: true });
     });
   }, []);
+
+  useEffect(() => {
+    if (!loading && messages.length > 0) {
+      scrollToLatest();
+    }
+  }, [loading, messages.length, scrollToLatest]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -740,7 +750,7 @@ const getStyles = (theme: any) =>
     color: "rgba(255,255,255,0.6)",
   },
   theirTimeText: {
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(17,17,17,0.45)",
   },
   messageFooter: {
     flexDirection: "row",

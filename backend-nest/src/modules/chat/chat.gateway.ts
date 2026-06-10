@@ -554,7 +554,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /** Broadcast a persisted message (e.g. reel_share from REST engagement API). */
-  async broadcastNewMessage(conversationId: string, message: unknown) {
+  async broadcastNewMessage(
+    conversationId: string,
+    message: {
+      id: string;
+      content: string;
+      senderId: string;
+      type?: string;
+      sender?: { name?: string };
+    },
+  ) {
     this.server.to(`conversation:${conversationId}`).emit('new_message', {
       conversationId,
       message,
@@ -566,10 +575,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     if (conversation) {
+      const pushRecipientIds: string[] = [];
       for (const p of conversation.participants) {
         this.server.to(`user:${p.userId}`).emit('new_message', {
           conversationId,
           message,
+        });
+        if (p.userId === message.senderId) continue;
+        const viewing = await this.isUserViewingConversation(
+          p.userId,
+          conversationId,
+        );
+        if (!viewing) {
+          pushRecipientIds.push(p.userId);
+        }
+      }
+
+      if (pushRecipientIds.length) {
+        const preview =
+          message.type === 'reel_share'
+            ? '🎬 Shared a reel'
+            : message.content.length > 80
+              ? message.content.slice(0, 80) + '…'
+              : message.content;
+        await this.notificationService.notifyMany(pushRecipientIds, 'message', {
+          senderName: message.sender?.name ?? 'Someone',
+          preview,
+          conversationId,
+          messageId: message.id,
+          timestamp: new Date().toISOString(),
         });
       }
     }

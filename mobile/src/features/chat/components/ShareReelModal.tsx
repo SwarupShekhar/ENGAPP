@@ -20,11 +20,20 @@ interface ConversationRow {
   partner: { id: string; name: string; profileImage: string | null } | null;
 }
 
+export interface SharedChatTarget {
+  conversationId: string;
+  partnerId: string;
+  partnerName: string;
+  partnerAvatar?: string;
+}
+
 interface Props {
   visible: boolean;
   strapiReelId: number;
   onClose: () => void;
   onShared?: () => void;
+  /** Opens the DM thread after a successful share (Instagram-style). */
+  onSharedToChat?: (target: SharedChatTarget) => void;
 }
 
 export default function ShareReelModal({
@@ -32,6 +41,7 @@ export default function ShareReelModal({
   strapiReelId,
   onClose,
   onShared,
+  onSharedToChat,
 }: Props) {
   const theme = useAppTheme();
   const [loading, setLoading] = useState(true);
@@ -49,11 +59,20 @@ export default function ShareReelModal({
   }, [visible]);
 
   const handleShare = async (conversationId: string) => {
+    const row = conversations.find((c) => c.conversationId === conversationId);
     setSharing(conversationId);
     try {
       await engagementApi.shareReel(strapiReelId, conversationId);
       onShared?.();
       onClose();
+      if (row?.partner && onSharedToChat) {
+        onSharedToChat({
+          conversationId,
+          partnerId: row.partner.id,
+          partnerName: row.partner.name,
+          partnerAvatar: row.partner.profileImage ?? undefined,
+        });
+      }
     } catch (err) {
       console.error("[ShareReelModal]", err);
     } finally {
