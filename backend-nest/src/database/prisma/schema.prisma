@@ -59,6 +59,8 @@ model User {
   achievements           UserAchievement[]
   points                 UserPoints?
   reelHistory            UserReelHistory[]
+  reelLikes              ReelLike[]
+  messageReactions       MessageReaction[]
   reliability            UserReliability?
   topicScores            UserTopicScore[]
   dailyPracticeCompletions UserDailyPracticeCompletion[]
@@ -468,6 +470,10 @@ model AssessmentSession {
 
 model Conversation {
   id           String                    @id @default(uuid())
+  type         String                    @default("dm")
+  title        String?
+  imageUrl     String?
+  createdById  String?
   createdAt    DateTime                  @default(now())
   updatedAt    DateTime                  @updatedAt
   participants ConversationParticipant[]
@@ -497,8 +503,9 @@ model Message {
   readBy         String[]     @default([])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation("ChatMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User              @relation("ChatMessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  reactions      MessageReaction[]
 
   @@index([conversationId])
   @@index([conversationId, createdAt])
@@ -532,6 +539,29 @@ model UserReelHistory {
 
   @@unique([userId, strapiReelId])
   @@index([userId])
+}
+
+model ReelLike {
+  id           String   @id @default(uuid())
+  userId       String
+  strapiReelId Int
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, strapiReelId])
+  @@index([strapiReelId])
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
 }
 
 model RecurringErrorPattern {

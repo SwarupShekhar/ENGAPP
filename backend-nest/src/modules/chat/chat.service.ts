@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { aggregateReactions } from '../../common/aggregate-reactions';
 
 @Injectable()
 export class ChatService {
@@ -60,6 +61,9 @@ export class ChatService {
                 ...(before && { createdAt: { lt: new Date(before) } }),
             },
             include: {
+                reactions: {
+                    select: { emoji: true, userId: true },
+                },
                 sender: {
                     select: {
                         id: true,
@@ -79,15 +83,19 @@ export class ChatService {
             data: { lastReadAt: new Date() },
         });
 
-        // Return in chronological order
-        return messages.reverse().map(m => ({
-            ...m,
-            sender: {
-                id: m.sender.id,
-                name: `${m.sender.fname} ${m.sender.lname}`.trim(),
-                profileImage: m.sender.profile?.avatarUrl || null,
-            },
-        }));
+        // Return in chronological order with aggregated reactions
+        return messages.reverse().map((m) => {
+            const { reactions: reactionRows, sender, ...rest } = m;
+            return {
+                ...rest,
+                reactions: aggregateReactions(reactionRows),
+                sender: {
+                    id: sender.id,
+                    name: `${sender.fname} ${sender.lname}`.trim(),
+                    profileImage: sender.profile?.avatarUrl || null,
+                },
+            };
+        });
     }
 
     /**
@@ -257,7 +265,10 @@ export class ChatService {
                     : null,
                 lastMessage: lastMessage
                     ? {
-                          content: lastMessage.content,
+                          content:
+                              lastMessage.type === 'reel_share'
+                                  ? `Shared a reel · ${(lastMessage.metadata as { title?: string } | null)?.title ?? 'Reel'}`
+                                  : lastMessage.content,
                           type: lastMessage.type,
                           senderName: `${lastMessage.sender.fname} ${lastMessage.sender.lname}`.trim(),
                           senderId: lastMessage.senderId,

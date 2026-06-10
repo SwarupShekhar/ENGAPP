@@ -3,7 +3,8 @@ import { Cron } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { PushyService, PushPayload } from './pushy.service';
+import { FcmService } from './fcm.service';
+import type { PushPayload } from './push-payload';
 import { NotificationStatus } from '@prisma/client';
 import { RedisService } from '../../redis/redis.service';
 import { PosthogAnalyticsService } from './posthog-analytics.service';
@@ -123,7 +124,7 @@ export class NotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly pushy: PushyService,
+    private readonly fcm: FcmService,
     private readonly redis: RedisService,
     private readonly posthog: PosthogAnalyticsService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
@@ -193,7 +194,7 @@ export class NotificationService {
   }
 
   hasPushConfiguration(): boolean {
-    return this.pushy.hasValidConfig();
+    return this.fcm.hasValidConfig();
   }
 
   async notifyMany(userIds: string[], type: NotificationType, data: Record<string, unknown>): Promise<void> {
@@ -217,7 +218,7 @@ export class NotificationService {
 
     try {
       const payload = PAYLOADS[type](data);
-      const results = await this.pushy.send(
+      const results = await this.fcm.send(
         tokens.map((t) => t.token),
         payload,
       );

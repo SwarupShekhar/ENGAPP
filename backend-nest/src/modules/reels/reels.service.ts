@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
@@ -455,6 +455,43 @@ export class ReelsService {
     this.invalidateFeedCache(userId);
 
     return { success: true, newScore: updatedScore?.score || 50 };
+  }
+
+  /**
+   * Fetch a single reel from Strapi by ID.
+   */
+  async getReelById(strapiReelId: number) {
+    const url = `${this.strapiBaseUrl}/api/reels/${strapiReelId}?populate=*`;
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get(url, {
+          headers: { Authorization: `Bearer ${this.strapiToken}` },
+          timeout: 60000,
+        }),
+      );
+
+      const reel = response.data?.data;
+      if (!reel) {
+        throw new NotFoundException('Reel not found');
+      }
+
+      const attributes = reel.attributes || reel;
+      return {
+        id: reel.id as number,
+        title: attributes.title as string,
+        muxPlaybackId: attributes.mux_playback_id as string | undefined,
+        difficulty_level: attributes.difficulty_level as string | undefined,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to fetch reel ${strapiReelId}: ${error.message}`,
+      );
+      throw new NotFoundException('Reel not found');
+    }
   }
 
   /**

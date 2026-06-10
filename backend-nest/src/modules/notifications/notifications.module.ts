@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { PushyService } from './pushy.service';
+import { FcmService } from './fcm.service';
 import { NotificationService } from './notification.service';
 import { SmartReminderScheduler } from './smart-reminder.scheduler';
 import { PrismaModule } from '../../database/prisma/prisma.module';
@@ -39,7 +39,7 @@ class NotificationDeliveryProcessor {
   imports: [PrismaModule, RedisModule, HomeModule, BullModule.registerQueue({ name: 'notifications' })],
   providers: [
     PosthogAnalyticsService,
-    PushyService,
+    FcmService,
     NotificationService,
     SmartReminderScheduler,
     WordOfDayScheduler,

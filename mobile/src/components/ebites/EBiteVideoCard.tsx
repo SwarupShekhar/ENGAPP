@@ -1,10 +1,11 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
   TouchableWithoutFeedback,
+  TouchableOpacity,
 } from "react-native";
 import {
   Video,
@@ -15,6 +16,13 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { engagementApi } from "../../api/engagement";
+import {
+  getCachedEngagement,
+  setCachedEngagement,
+  patchCachedLike,
+} from "../../api/engagementCache";
+import ShareReelModal from "../../features/chat/components/ShareReelModal";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -34,8 +42,30 @@ export default function EBiteVideoCard({
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<AVPlaybackStatusSuccess | null>(null);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [shareVisible, setShareVisible] = useState(false);
   const hasReportedUnlock = useRef(false);
   const insets = useSafeAreaInsets();
+  const reelId = Number(item.id);
+
+  useEffect(() => {
+    if (!reelId || Number.isNaN(reelId)) return;
+    const cached = getCachedEngagement(reelId);
+    if (cached) {
+      setLiked(cached.likedByMe);
+      setLikeCount(cached.totalLikes);
+      return;
+    }
+    engagementApi
+      .getReelEngagement(reelId)
+      .then((data) => {
+        setLiked(data.likedByMe);
+        setLikeCount(data.totalLikes);
+        setCachedEngagement(reelId, data.likedByMe, data.totalLikes);
+      })
+      .catch(() => {});
+  }, [reelId]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -67,53 +97,101 @@ export default function EBiteVideoCard({
     setIsPausedByUser((prev) => !prev);
   };
 
+  const toggleLike = async () => {
+    if (!reelId || Number.isNaN(reelId)) return;
+    const prevLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!prevLiked);
+    setLikeCount(prevLiked ? Math.max(0, prevCount - 1) : prevCount + 1);
+    patchCachedLike(reelId, !prevLiked);
+    try {
+      const result = await engagementApi.toggleReelLike(reelId);
+      setLiked(result.liked);
+      setLikeCount(result.totalLikes);
+      setCachedEngagement(reelId, result.liked, result.totalLikes);
+    } catch {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+      setCachedEngagement(reelId, prevLiked, prevCount);
+    }
+  };
+
   const progress =
     status && status.durationMillis
       ? (status.positionMillis / status.durationMillis) * 100
       : 0;
 
   return (
-    <TouchableWithoutFeedback onPress={togglePlayPause}>
-      <View style={styles.container}>
-        <Video
-          ref={videoRef}
-          source={{ uri: item.videoUrl }}
-          style={styles.video}
-          resizeMode={ResizeMode.COVER}
-          isLooping
-          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-          shouldPlay={isActive && !isPausedByUser}
-        />
+    <View style={styles.container}>
+      <TouchableWithoutFeedback onPress={togglePlayPause}>
+        <View style={styles.tapArea}>
+          <Video
+            ref={videoRef}
+            source={{ uri: item.videoUrl }}
+            style={styles.video}
+            resizeMode={ResizeMode.COVER}
+            isLooping
+            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+            shouldPlay={isActive && !isPausedByUser}
+          />
 
-        {isPausedByUser && (
-          <View style={styles.pauseOverlay}>
-            <Ionicons name="play" size={64} color="rgba(255,255,255,0.7)" />
-          </View>
-        )}
+          {isPausedByUser && (
+            <View style={styles.pauseOverlay}>
+              <Ionicons name="play" size={64} color="rgba(255,255,255,0.7)" />
+            </View>
+          )}
 
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.8)"]}
-          style={[styles.overlay, { paddingBottom: insets.bottom + 80 }]}
-        >
-          <View style={styles.bottomContent}>
-            <Text style={styles.title}>{item.title}</Text>
-            {item.description && (
-              <Text style={styles.description}>{item.description}</Text>
-            )}
-          </View>
-
-          {/* Progress Bar */}
-          <View
-            style={[
-              styles.progressBarContainer,
-              { bottom: insets.bottom + 75 },
-            ]}
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.8)"]}
+            style={[styles.overlay, { paddingBottom: insets.bottom + 80 }]}
           >
-            <View style={[styles.progressBar, { width: `${progress}%` }]} />
-          </View>
-        </LinearGradient>
+            <View style={styles.bottomContent}>
+              <Text style={styles.title}>{item.title}</Text>
+              {item.description && (
+                <Text style={styles.description}>{item.description}</Text>
+              )}
+            </View>
+
+            {/* Progress Bar */}
+            <View
+              style={[
+                styles.progressBarContainer,
+                { bottom: insets.bottom + 75 },
+              ]}
+            >
+              <View style={[styles.progressBar, { width: `${progress}%` }]} />
+            </View>
+          </LinearGradient>
+        </View>
+      </TouchableWithoutFeedback>
+
+      <View style={[styles.actionRail, { bottom: insets.bottom + 100 }]}>
+        <TouchableOpacity style={styles.actionBtn} onPress={toggleLike}>
+          <Ionicons
+            name={liked ? "heart" : "heart-outline"}
+            size={30}
+            color={liked ? "#FF3040" : "#FFF"}
+          />
+          {likeCount > 0 && (
+            <Text style={styles.actionCount}>{likeCount}</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => setShareVisible(true)}
+        >
+          <Ionicons name="paper-plane-outline" size={28} color="#FFF" />
+        </TouchableOpacity>
       </View>
-    </TouchableWithoutFeedback>
+
+      {!Number.isNaN(reelId) && (
+        <ShareReelModal
+          visible={shareVisible}
+          strapiReelId={reelId}
+          onClose={() => setShareVisible(false)}
+        />
+      )}
+    </View>
   );
 }
 
@@ -122,6 +200,11 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT, // Snap size
     backgroundColor: "#000",
+  },
+  tapArea: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
   },
   video: {
     width: "100%",
@@ -132,6 +215,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.2)",
+  },
+  actionRail: {
+    position: "absolute",
+    right: 12,
+    alignItems: "center",
+    gap: 20,
+    zIndex: 5,
+  },
+  actionBtn: {
+    alignItems: "center",
+  },
+  actionCount: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
   },
   overlay: {
     position: "absolute",

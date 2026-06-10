@@ -23,7 +23,19 @@ export interface FeedResponse {
   totalAvailable: number;
 }
 
+export interface SingleReelResponse {
+  id: number;
+  title: string;
+  playback_url: string | null;
+  difficulty_level: string | null;
+}
+
 export const reelsApi = {
+  getById: async (strapiReelId: number): Promise<SingleReelResponse> => {
+    const response = await client.get(`/reels/${strapiReelId}`);
+    return response.data;
+  },
+
   getFeed: async (cursor?: number): Promise<FeedResponse> => {
     const response = await client.get("/reels/feed", {
       params: cursor !== undefined ? { cursor } : undefined,

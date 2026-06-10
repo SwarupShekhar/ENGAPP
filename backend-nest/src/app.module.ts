@@ -25,6 +25,7 @@ import livekitConfig from './config/livekit.config';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { ReliabilityModule } from './modules/reliability/reliability.module';
 import { ReelsModule } from './modules/reels/reels.module';
+import { EngagementModule } from './modules/engagement/engagement.module';
 import { PronunciationModule } from './modules/pronunciation/pronunciation.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { HomeModule } from './modules/home/home.module';
@@ -75,6 +76,7 @@ import { MetricsModule } from './metrics/metrics.module';
     ConversationalTutorModule,
     ReliabilityModule,
     ReelsModule,
+    EngagementModule,
     PronunciationModule,
     ProgressModule,
     HomeModule,

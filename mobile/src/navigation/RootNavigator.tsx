@@ -12,6 +12,7 @@ import NotificationScreen from "../features/notification/screens/NotificationScr
 import ConversationsScreen from "../features/chat/screens/ConversationsScreen";
 import AITutorScreen from "../features/tutor/screens/AITutorScreen";
 import ChatScreen from "../features/chat/screens/ChatScreen";
+import ReelViewerScreen from "../features/reels/screens/ReelViewerScreen";
 import SocketDebugScreen from "../features/debug/screens/SocketDebugScreen";
 import ProfileScreenIndex from "../features/profile/screens/ProfileScreenIndex";
 import PracticeTaskScreen from "../screens/practice/PracticeTaskScreen";
@@ -109,7 +110,20 @@ const expoGoFallback = RNStyleSheet.create({
   back: { color: "#818CF8", fontSize: 16, fontWeight: "600", marginTop: 24 },
 });
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  MainTabs: undefined;
+  Conversations: undefined;
+  Chat: {
+    conversationId: string;
+    partnerId: string;
+    partnerName: string;
+    partnerAvatar?: string;
+  };
+  ReelViewer: { reelId: number };
+  [key: string]: object | undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function ActiveTabs() {
   const { mode } = useSuperApp();
@@ -193,6 +207,11 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
       {/* Chat */}
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen
+        name="ReelViewer"
+        component={ReelViewerScreen}
+        options={{ presentation: "fullScreenModal", headerShown: false }}
+      />
 
       {/* Practice Tasks */}
       <Stack.Screen name="PracticeTask" component={PracticeTaskScreen} />

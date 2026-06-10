@@ -77,6 +77,13 @@ docs/superpowers/
 # Project-specific
 /generated/prisma
 
+# Firebase secrets (service account private keys)
+*-firebase-adminsdk-*.json
+backend-nest/config/firebase-service-account.json
+google-services (1).json
+google-services (2).json
+google-services (3).json
+
 # Claude Code local helpers (runtime files, not for repo)
 .claude/helpers/
 

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1046139938321",
+    "project_id": "mobapp-7a5e6",
+    "storage_bucket": "mobapp-7a5e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1046139938321:android:4a7871d44a07067629f3b0",
+        "android_client_info": {
+          "package_name": "com.swarupshekhar.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzOHY6dHWkrBG8H1W6bu_0rNuJGtP0Qrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1046139938321:android:ed0a0dcdfbae194029f3b0",
+        "android_client_info": {
+          "package_name": "englivo.msg.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzOHY6dHWkrBG8H1W6bu_0rNuJGtP0Qrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

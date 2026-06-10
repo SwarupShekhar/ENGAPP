@@ -322,6 +322,14 @@ class SocketService {
   offCallStatusUpdate(callback: SocketCallback) {
     this.off("call_status_update", callback);
   }
+
+  onReactionUpdated(callback: SocketCallback) {
+    this.on("reaction_updated", callback);
+  }
+
+  offReactionUpdated(callback: SocketCallback) {
+    this.off("reaction_updated", callback);
+  }
 }
 
 export default SocketService;

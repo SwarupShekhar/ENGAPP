@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import SocketService from "./features/call/services/socketService";
@@ -34,6 +35,9 @@ import { SplashAnimation } from "./components/SplashAnimation";
 import { assessmentApi } from "./features/assessment/services/assessment";
 import { AnalyticsProvider } from "./analytics/AnalyticsProvider";
 import { PostHogUserSync } from "./analytics/PostHogUserSync";
+import { CrashlyticsBootstrap } from "./crashlytics/CrashlyticsBootstrap";
+import { CrashlyticsUserSync } from "./crashlytics/CrashlyticsUserSync";
+import { recordCrashlyticsError } from "./crashlytics/crashlytics";
 import { useAnalytics } from "./analytics/useAnalytics";
 import { AnalyticsEvents } from "./analytics/events";
 import { analyticsMeta } from "./analytics/eventMeta";
@@ -50,6 +54,7 @@ class AppErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("[App] ErrorBoundary caught:", error, errorInfo);
+    void recordCrashlyticsError(error, "AppErrorBoundary");
   }
 
   render() {
@@ -485,6 +490,8 @@ export default function App() {
       tokenCache={tokenCache}
     >
       <AnalyticsProvider>
+      <CrashlyticsBootstrap />
+      <CrashlyticsUserSync />
       <PostHogUserSync />
       <AppOpenTracker />
       <StartupReachabilityProbe />
@@ -492,6 +499,7 @@ export default function App() {
         <AppSocketHandler>
           <AppPushHandler>
           <SafeAreaProvider>
+            <KeyboardProvider>
             <SuperAppProvider>
               <ThemeProvider>
                 <AppErrorBoundary>
@@ -548,6 +556,7 @@ export default function App() {
                 </AppErrorBoundary>
               </ThemeProvider>
             </SuperAppProvider>
+            </KeyboardProvider>
           </SafeAreaProvider>
           </AppPushHandler>
         </AppSocketHandler>

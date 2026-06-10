@@ -1,12 +1,12 @@
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
 import { NotificationService } from './notification.service';
-import { PushyService } from './pushy.service';
+import { FcmService } from './fcm.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { PosthogAnalyticsService } from './posthog-analytics.service';
 
-const mockPushy = { send: jest.fn() };
+const mockFcm = { send: jest.fn(), hasValidConfig: jest.fn().mockReturnValue(true) };
 const mockPosthog = { captureWordOfDayPushSent: jest.fn() };
 const mockQueue = { add: jest.fn() };
 const mockRedis = {
@@ -30,7 +30,7 @@ describe('NotificationService', () => {
     const module = await Test.createTestingModule({
       providers: [
         NotificationService,
-        { provide: PushyService, useValue: mockPushy },
+        { provide: FcmService, useValue: mockFcm },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RedisService, useValue: mockRedis },
         { provide: PosthogAnalyticsService, useValue: mockPosthog },
@@ -57,7 +57,7 @@ describe('NotificationService', () => {
         { id: 'dt1', token: 'tok1', platform: 'android' },
       ]);
       mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log1' });
-      mockPushy.send.mockResolvedValue([{ token: 'tok1', success: true }]);
+      mockFcm.send.mockResolvedValue([{ token: 'tok1', success: true }]);
       mockPrisma.notificationLog.update.mockResolvedValue({ id: 'log1' });
 
       await service.notify('user1', 'message', {
@@ -68,7 +68,7 @@ describe('NotificationService', () => {
       });
 
       expect(mockQueue.add).not.toHaveBeenCalled();
-      expect(mockPushy.send).toHaveBeenCalled();
+      expect(mockFcm.send).toHaveBeenCalled();
     });
 
     it('writes log before sending and marks failed on error', async () => {
@@ -94,7 +94,7 @@ describe('NotificationService', () => {
       mockPrisma.deviceToken.findMany.mockResolvedValue([
         { id: 'dt1', token: 'dead-token', platform: 'android' },
       ]);
-      mockPushy.send.mockResolvedValue([
+      mockFcm.send.mockResolvedValue([
         { token: 'dead-token', success: false, invalidToken: true },
       ]);
       mockPrisma.notificationLog.update.mockResolvedValue({ id: 'log1' });
@@ -126,7 +126,7 @@ describe('NotificationService', () => {
       mockPrisma.deviceToken.findMany.mockResolvedValue([
         { id: 'dt1', token: 'tok1', platform: 'android' },
       ]);
-      mockPushy.send.mockResolvedValue([{ token: 'tok1', success: true }]);
+      mockFcm.send.mockResolvedValue([{ token: 'tok1', success: true }]);
       mockPrisma.notificationLog.update.mockResolvedValue({ id: 'log1' });
 
       await service.retryFailed();
@@ -137,7 +137,7 @@ describe('NotificationService', () => {
           data: { status: 'retrying' },
         }),
       );
-      expect(mockPushy.send).toHaveBeenCalled();
+      expect(mockFcm.send).toHaveBeenCalled();
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
   });

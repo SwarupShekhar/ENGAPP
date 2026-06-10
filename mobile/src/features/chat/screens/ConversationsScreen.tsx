@@ -190,7 +190,9 @@ export default function ConversationsScreen() {
             {item.lastMessage
               ? item.lastMessage.type === "call_invite"
                 ? "📞 Voice Call"
-                : item.lastMessage.content
+                : item.lastMessage.type === "reel_share"
+                  ? `🎬 ${item.lastMessage.content}`
+                  : item.lastMessage.content
               : "No messages yet"}
           </Text>
           {item.unreadCount > 0 && (
@@ -203,11 +205,6 @@ export default function ConversationsScreen() {
         </View>
       </View>
 
-      <Ionicons
-        name="chevron-forward"
-        size={16}
-        color={theme.colors.text.light}
-      />
     </TouchableOpacity>
   );
 
@@ -322,22 +319,19 @@ const getStyles = (theme: any) =>
   conversationItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: theme.spacing.m,
-    marginTop: theme.spacing.s,
-    padding: theme.spacing.m,
-    borderRadius: theme.borderRadius.l,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadows.small,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   avatarContainer: {
     marginRight: 12,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   onlineBadge: {
     position: "absolute",
@@ -351,9 +345,9 @@ const getStyles = (theme: any) =>
     borderColor: "#FFF",
   },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: `${theme.colors.primary}1E`,
     justifyContent: "center",
     alignItems: "center",

@@ -540,4 +540,38 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   notifyUser(userId: string, event: string, data: any) {
     this.server.to(`user:${userId}`).emit(event, data);
   }
+
+  emitReactionUpdated(
+    conversationId: string,
+    payload: { messageId: string; reactions: unknown[] },
+  ) {
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit('reaction_updated', {
+        conversationId,
+        ...payload,
+      });
+  }
+
+  /** Broadcast a persisted message (e.g. reel_share from REST engagement API). */
+  async broadcastNewMessage(conversationId: string, message: unknown) {
+    this.server.to(`conversation:${conversationId}`).emit('new_message', {
+      conversationId,
+      message,
+    });
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { participants: true },
+    });
+
+    if (conversation) {
+      for (const p of conversation.participants) {
+        this.server.to(`user:${p.userId}`).emit('new_message', {
+          conversationId,
+          message,
+        });
+      }
+    }
+  }
 }

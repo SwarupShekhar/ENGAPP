@@ -87,11 +87,13 @@ module.exports = {
     },
     android: {
       label: "Englivo",
+      googleServicesFile: "./google-services.json",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#1a1035",
       },
       edgeToEdgeEnabled: true,
+      softwareKeyboardLayoutMode: "resize",
       predictiveBackGestureEnabled: false,
       package: "com.swarupshekhar.mobile",
       usesCleartextTraffic: allowHttpApis,
@@ -101,6 +103,19 @@ module.exports = {
     },
     extra,
     plugins: [
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          ios: {
+            useFrameworks: "static",
+            forceStaticLinking: ["RNFBApp", "RNFBCrashlytics", "RNFBMessaging"],
+          },
+        },
+      ],
+      // react-native-keyboard-controller: autolinks via prebuild — no Expo config plugin
       [
         "@livekit/react-native-expo-plugin",
         {
@@ -109,17 +124,6 @@ module.exports = {
         },
       ],
       "expo-speech-recognition",
-      // Embeds pushy-react-native native code (MainApplication / iOS). Rebuild dev client after changing this.
-      [
-        "pushy-expo-plugin",
-        {
-          "aps-environment":
-            process.env.EAS_BUILD_PROFILE === "production" ||
-            process.env.EAS_BUILD_PROFILE === "store"
-              ? "production"
-              : "development",
-        },
-      ],
     ],
     runtimeVersion: {
       policy: "appVersion",

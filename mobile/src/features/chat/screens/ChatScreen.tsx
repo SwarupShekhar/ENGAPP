@@ -6,22 +6,37 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
+  Pressable,
 } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
+import {
+  useNavigation,
+  useRoute,
+  RouteProp,
+  NavigationProp,
+} from "@react-navigation/native";
+import type { RootStackParamList } from "../../../navigation/RootNavigator";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { chatApi } from "../../../api/connections";
+import { engagementApi, AggregatedReaction } from "../../../api/engagement";
 import SocketService from "../../call/services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
+import EmojiPickerSheet from "../components/EmojiPickerSheet";
+import ReelShareCard, {
+  ReelShareMetadata,
+} from "../components/ReelShareCard";
+
+const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 
 // ── Types ───────────────────────────────────────────────
 
@@ -43,6 +58,7 @@ interface ChatMessage {
   createdAt: string;
   readBy?: string[];
   metadata?: any;
+  reactions?: AggregatedReaction[];
 }
 
 // ── Main Component ──────────────────────────────────────
@@ -50,7 +66,7 @@ interface ChatMessage {
 export default function ChatScreen() {
   const theme = useAppTheme();
   const styles = getStyles(theme);
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<ChatRouteParams, "Chat">>();
   const { conversationId, partnerId, partnerName, partnerAvatar } =
     route.params;
@@ -63,14 +79,19 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [reactionTarget, setReactionTarget] = useState<ChatMessage | null>(
+    null,
+  );
+  const [messageReactions, setMessageReactions] = useState<
+    Record<string, AggregatedReaction[]>
+  >({});
 
   const flatListRef = useRef<FlatList>(null);
   const socketService = useRef(SocketService.getInstance()).current;
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [internalUserId, setInternalUserId] = useState<string>("");
   const soundRef = useRef<Audio.Sound | null>(null);
-
-  // ── Init socket + load messages ─────────────────────
 
   // ── Init socket + load messages ─────────────────────
   useEffect(() => {
@@ -90,6 +111,13 @@ export default function ChatScreen() {
         const msgs = await chatApi.getMessages(conversationId);
         if (mounted) {
           setMessages(msgs);
+          const initialReactions: Record<string, AggregatedReaction[]> = {};
+          for (const msg of msgs as ChatMessage[]) {
+            if (msg.reactions?.length) {
+              initialReactions[msg.id] = msg.reactions;
+            }
+          }
+          setMessageReactions(initialReactions);
           setLoading(false);
 
           // Infer internal userId from messages if possible
@@ -180,6 +208,19 @@ export default function ChatScreen() {
     socketService.onPresenceUpdate(handlePresence);
     socketService.onMessagesRead(handleRead);
 
+    const handleReactionUpdated = (data: {
+      conversationId: string;
+      messageId: string;
+      reactions: AggregatedReaction[];
+    }) => {
+      if (data.conversationId !== conversationId) return;
+      setMessageReactions((prev) => ({
+        ...prev,
+        [data.messageId]: data.reactions,
+      }));
+    };
+    socketService.onReactionUpdated(handleReactionUpdated);
+
     const handleConnect = () => {
       console.log("[ChatScreen] Socket connected, fetching presence");
       socketService.getOnlineUsers((data) => {
@@ -199,6 +240,7 @@ export default function ChatScreen() {
       socketService.offUserTyping(handleTyping);
       socketService.offPresenceUpdate(handlePresence);
       socketService.offMessagesRead(handleRead);
+      socketService.offReactionUpdated(handleReactionUpdated);
       socketService.off("connect", handleConnect);
     };
   }, [conversationId, partnerId, internalUserId]);
@@ -263,6 +305,31 @@ export default function ChatScreen() {
     );
   }, [conversationId, partnerName]);
 
+  const handleReaction = useCallback(
+    async (message: ChatMessage, emoji: string) => {
+      setReactionTarget(null);
+      try {
+        const reactions = await engagementApi.setMessageReaction(
+          message.id,
+          emoji,
+        );
+        setMessageReactions((prev) => ({ ...prev, [message.id]: reactions }));
+      } catch (err) {
+        console.error("[ChatScreen] Reaction error:", err);
+      }
+    },
+    [],
+  );
+
+  const openReelViewer = useCallback(
+    (metadata: ReelShareMetadata) => {
+      navigation.navigate("ReelViewer", {
+        reelId: metadata.strapiReelId,
+      });
+    },
+    [navigation],
+  );
+
   // ── Render Functions ────────────────────────────────
 
   const isMyMessage = (msg: ChatMessage) => msg.senderId !== partnerId;
@@ -289,8 +356,28 @@ export default function ChatScreen() {
       );
     }
 
+    if (item.type === "reel_share" && item.metadata?.strapiReelId) {
+      return (
+        <View
+          style={[
+            styles.messageRow,
+            isMine ? styles.messageRowRight : styles.messageRowLeft,
+          ]}
+        >
+          <ReelShareCard
+            metadata={item.metadata as ReelShareMetadata}
+            isMine={isMine}
+            onPress={() => openReelViewer(item.metadata as ReelShareMetadata)}
+          />
+        </View>
+      );
+    }
+
+    const reactions = messageReactions[item.id] || [];
+
     return (
-      <View
+      <Pressable
+        onLongPress={() => setReactionTarget(item)}
         style={[
           styles.messageRow,
           isMine ? styles.messageRowRight : styles.messageRowLeft,
@@ -327,14 +414,30 @@ export default function ChatScreen() {
             )}
           </View>
         </View>
-      </View>
+        {reactions.length > 0 && (
+          <View style={styles.reactionsRow}>
+            {reactions.map((r) => (
+              <Text key={r.emoji} style={styles.reactionChip}>
+                {r.emoji}
+                {r.count > 1 ? ` ${r.count}` : ""}
+              </Text>
+            ))}
+          </View>
+        )}
+      </Pressable>
     );
   };
 
   // ── Main Render ─────────────────────────────────────
 
+  const scrollToLatest = useCallback(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
       <View
         style={[
@@ -352,6 +455,16 @@ export default function ChatScreen() {
             color={theme.colors.text.primary}
           />
         </TouchableOpacity>
+
+        {partnerAvatar ? (
+          <Image source={{ uri: partnerAvatar }} style={styles.headerAvatar} />
+        ) : (
+          <View style={styles.headerAvatarPlaceholder}>
+            <Text style={styles.headerAvatarInitial}>
+              {partnerName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.headerInfo}>
           <View style={styles.headerNameRow}>
@@ -373,12 +486,8 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Messages */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
-      >
+      {/* Messages + composer — sticky input tracks keyboard on iOS & Android */}
+      <View style={styles.flex}>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -390,7 +499,10 @@ export default function ChatScreen() {
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
+            style={styles.flex}
             contentContainerStyle={styles.messagesList}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: false })
             }
@@ -410,7 +522,6 @@ export default function ChatScreen() {
           />
         )}
 
-        {/* Typing Indicator */}
         {partnerTyping && (
           <View style={styles.typingBar}>
             <Text style={styles.typingText}>{partnerName} is typing</Text>
@@ -418,40 +529,86 @@ export default function ChatScreen() {
           </View>
         )}
 
-        {/* Input */}
-        <View
-          style={[
-            styles.inputContainer,
-            { paddingBottom: Math.max(insets.bottom, 10) },
-          ]}
+        <KeyboardStickyView
+          offset={{ closed: 0, opened: insets.bottom }}
         >
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={handleTextChange}
-            placeholder="Type a message..."
-            placeholderTextColor={theme.colors.text.light}
-            multiline
-            maxLength={1000}
-          />
-          <TouchableOpacity
+          <View
             style={[
-              styles.sendButton,
-              inputText.trim()
-                ? styles.sendButtonActive
-                : styles.sendButtonInactive,
+              styles.inputContainer,
+              { paddingBottom: Math.max(insets.bottom, 10) },
             ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
           >
-            <Ionicons
-              name="send"
-              size={20}
-              color={inputText.trim() ? "#FFF" : theme.colors.text.light}
+            <TouchableOpacity
+              style={styles.emojiButton}
+              onPress={() => setEmojiPickerVisible(true)}
+            >
+              <Ionicons
+                name="happy-outline"
+                size={24}
+                color={theme.colors.text.light}
+              />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={handleTextChange}
+              onFocus={scrollToLatest}
+              placeholder="Message..."
+              placeholderTextColor={theme.colors.text.light}
+              multiline
+              maxLength={1000}
             />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                inputText.trim()
+                  ? styles.sendButtonActive
+                  : styles.sendButtonInactive,
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || sending}
+            >
+              <Ionicons
+                name="send"
+                size={20}
+                color={inputText.trim() ? "#FFF" : theme.colors.text.light}
+              />
+            </TouchableOpacity>
+          </View>
+        </KeyboardStickyView>
+      </View>
+
+      <EmojiPickerSheet
+        visible={emojiPickerVisible}
+        onClose={() => setEmojiPickerVisible(false)}
+        onSelect={(emoji) => setInputText((prev) => prev + emoji)}
+      />
+
+      <Modal
+        visible={reactionTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactionTarget(null)}
+      >
+        <Pressable
+          style={styles.reactionOverlay}
+          onPress={() => setReactionTarget(null)}
+        >
+          <View style={styles.reactionBar}>
+            {QUICK_REACTIONS.map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                style={styles.reactionButton}
+                onPress={() =>
+                  reactionTarget && handleReaction(reactionTarget, emoji)
+                }
+              >
+                <Text style={styles.reactionEmoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -485,6 +642,26 @@ const getStyles = (theme: any) =>
     justifyContent: "center",
     backgroundColor: `${theme.colors.primary}18`,
     marginRight: 8,
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+  },
+  headerAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerAvatarInitial: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#6B7280",
   },
   headerInfo: {
     flex: 1,
@@ -541,10 +718,8 @@ const getStyles = (theme: any) =>
     borderBottomRightRadius: 4,
   },
   theirBubble: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: "#EFEFEF",
     borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   messageText: {
     fontSize: 15,
@@ -554,7 +729,7 @@ const getStyles = (theme: any) =>
     color: "#FFF",
   },
   theirMessageText: {
-    color: theme.colors.text.secondary,
+    color: "#111111",
   },
   messageTime: {
     fontSize: 10,
@@ -633,21 +808,70 @@ const getStyles = (theme: any) =>
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+    gap: 4,
+  },
+  emojiButton: {
+    width: 36,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   textInput: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 22,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
     color: theme.colors.text.primary,
     maxHeight: 100,
+  },
+  reactionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  reactionChip: {
+    fontSize: 13,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#E5E7EB",
+  },
+  reactionOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reactionBar: {
+    flexDirection: "row",
+    backgroundColor: "#FFF",
+    borderRadius: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  reactionButton: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  reactionEmoji: {
+    fontSize: 26,
   },
   sendButton: {
     marginLeft: 8,

@@ -6,6 +6,8 @@ import {
   Query,
   UseGuards,
   Req,
+  Param,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { ReelsService } from './reels.service';
@@ -71,5 +73,22 @@ export class ReelsController {
       data.completed,
     );
     return { success: true };
+  }
+
+  @Get(':strapiReelId')
+  @UseGuards(ClerkGuard)
+  @ApiOperation({ summary: 'Get a single reel by Strapi ID (for ReelViewer)' })
+  async getReel(
+    @Param('strapiReelId', ParseIntPipe) strapiReelId: number,
+  ) {
+    const reel = await this.reelsService.getReelById(strapiReelId);
+    return {
+      id: reel.id,
+      title: reel.title,
+      playback_url: reel.muxPlaybackId
+        ? `https://stream.mux.com/${reel.muxPlaybackId}.m3u8`
+        : null,
+      difficulty_level: reel.difficulty_level ?? null,
+    };
   }
 }

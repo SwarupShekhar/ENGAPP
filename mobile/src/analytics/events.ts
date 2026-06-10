@@ -18,7 +18,7 @@ export const AnalyticsEvents = {
   AI_TUTOR_OPENED: "ai_tutor_opened",
   WORD_OF_DAY_PUSH_RECEIVED: "word_of_day_push_received",
   WORD_OF_DAY_PUSH_TAPPED: "word_of_day_push_tapped",
-  /** Emitted from backend-nest when Pushy delivery succeeds */
+  /** Emitted when word-of-day push is received on device */
   WORD_OF_DAY_PUSH_SENT: "word_of_day_push_sent",
   HOME_PRACTICE_CAROUSEL_VIEWED: "home_practice_carousel_viewed",
   HOME_PRACTICE_RECORD_STARTED: "home_practice_record_started",
