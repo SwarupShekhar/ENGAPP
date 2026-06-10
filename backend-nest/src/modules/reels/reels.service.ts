@@ -457,10 +457,56 @@ export class ReelsService {
     return { success: true, newScore: updatedScore?.score || 50 };
   }
 
+  private parseStrapiReelRecord(reel: {
+    id: number;
+    attributes?: Record<string, unknown>;
+    title?: string;
+    mux_playback_id?: string;
+    difficulty_level?: string;
+  }) {
+    const attributes = reel.attributes ?? reel;
+    return {
+      id: reel.id as number,
+      title: String(attributes.title ?? 'Reel'),
+      muxPlaybackId: attributes.mux_playback_id as string | undefined,
+      difficulty_level: attributes.difficulty_level as string | undefined,
+    };
+  }
+
+  /** Search in-memory Strapi list caches when direct /reels/:id is stale or 404. */
+  private findReelInStrapiCache(strapiReelId: number) {
+    const now = Date.now();
+    for (const entry of this.strapiCache.values()) {
+      if (now - entry.savedAt > this.STRAPI_CACHE_TTL_MS) continue;
+      const match = entry.data.find((r) => Number(r.id) === strapiReelId);
+      if (match) return this.parseStrapiReelRecord(match);
+    }
+    return null;
+  }
+
+  private async fetchReelFromStrapiList(strapiReelId: number) {
+    const url = `${this.strapiBaseUrl}/api/reels?filters[id][$eq]=${strapiReelId}&populate=*&pagination[limit]=1`;
+    const response = await firstValueFrom(
+      this.httpService.get(url, {
+        headers: { Authorization: `Bearer ${this.strapiToken}` },
+        timeout: 60000,
+      }),
+    );
+    const reel = response.data?.data?.[0];
+    if (!reel) return null;
+    return this.parseStrapiReelRecord(reel);
+  }
+
   /**
    * Fetch a single reel from Strapi by ID.
    */
   async getReelById(strapiReelId: number) {
+    const cached = this.findReelInStrapiCache(strapiReelId);
+    if (cached) {
+      this.logger.debug(`Reel ${strapiReelId} resolved from Strapi list cache`);
+      return cached;
+    }
+
     const url = `${this.strapiBaseUrl}/api/reels/${strapiReelId}?populate=*`;
 
     try {
@@ -476,20 +522,24 @@ export class ReelsService {
         throw new NotFoundException('Reel not found');
       }
 
-      const attributes = reel.attributes || reel;
-      return {
-        id: reel.id as number,
-        title: attributes.title as string,
-        muxPlaybackId: attributes.mux_playback_id as string | undefined,
-        difficulty_level: attributes.difficulty_level as string | undefined,
-      };
+      return this.parseStrapiReelRecord(reel);
     } catch (error) {
       if (error instanceof NotFoundException) {
+        const fromList = await this.fetchReelFromStrapiList(strapiReelId).catch(
+          () => null,
+        );
+        if (fromList) return fromList;
         throw error;
       }
       this.logger.error(
         `Failed to fetch reel ${strapiReelId}: ${error.message}`,
       );
+      const fromCache = this.findReelInStrapiCache(strapiReelId);
+      if (fromCache) return fromCache;
+      const fromList = await this.fetchReelFromStrapiList(strapiReelId).catch(
+        () => null,
+      );
+      if (fromList) return fromList;
       throw new NotFoundException('Reel not found');
     }
   }

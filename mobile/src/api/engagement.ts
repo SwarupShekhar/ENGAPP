@@ -28,8 +28,19 @@ export const engagementApi = {
       })
       .then((r) => r.data),
 
-  shareReel: (strapiReelId: number, conversationId: string) =>
+  shareReel: (
+    strapiReelId: number,
+    conversationId: string,
+    snapshot?: {
+      title?: string;
+      thumbnailUrl?: string | null;
+      muxPlaybackId?: string;
+    },
+  ) =>
     client
-      .post(`/engagement/reels/${strapiReelId}/share`, { conversationId })
+      .post(`/engagement/reels/${strapiReelId}/share`, {
+        conversationId,
+        snapshot,
+      })
       .then((r) => r.data),
 };

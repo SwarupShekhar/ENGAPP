@@ -128,6 +128,11 @@ export class EngagementService {
     userId: string,
     strapiReelId: number,
     conversationId: string,
+    snapshot?: {
+      title?: string;
+      thumbnailUrl?: string | null;
+      muxPlaybackId?: string;
+    },
   ) {
     let normalizedConversationId: string;
     try {
@@ -141,14 +146,35 @@ export class EngagementService {
       userId,
     );
 
-    const reel = await this.reelsService.getReelById(strapiReelId);
+    let reel: {
+      id: number;
+      title: string;
+      muxPlaybackId?: string;
+      difficulty_level?: string;
+    };
+    try {
+      reel = await this.reelsService.getReelById(strapiReelId);
+    } catch (err) {
+      if (!snapshot?.title?.trim()) {
+        throw err;
+      }
+      reel = {
+        id: strapiReelId,
+        title: snapshot.title.trim(),
+        muxPlaybackId: snapshot.muxPlaybackId,
+      };
+    }
+
+    const thumbnailUrl =
+      snapshot?.thumbnailUrl ??
+      (reel.muxPlaybackId
+        ? `https://image.mux.com/${reel.muxPlaybackId}/thumbnail.jpg`
+        : null);
 
     const metadata = {
       strapiReelId,
       title: reel.title,
-      thumbnailUrl: reel.muxPlaybackId
-        ? `https://image.mux.com/${reel.muxPlaybackId}/thumbnail.jpg`
-        : null,
+      thumbnailUrl,
       ...(reel.difficulty_level && { difficulty: reel.difficulty_level }),
       snapshotAt: new Date().toISOString(),
     };

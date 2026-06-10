@@ -50,6 +50,20 @@ export default function EBiteVideoCard({
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const reelId = Number(item.id);
+  const muxPlaybackId =
+    typeof item.videoUrl === "string"
+      ? item.videoUrl.match(/stream\.mux\.com\/([^/.]+)/)?.[1]
+      : undefined;
+  const reelSnapshot =
+    reelId && !Number.isNaN(reelId) && item.title
+      ? {
+          title: String(item.title),
+          muxPlaybackId,
+          thumbnailUrl: muxPlaybackId
+            ? `https://image.mux.com/${muxPlaybackId}/thumbnail.jpg`
+            : null,
+        }
+      : undefined;
 
   useEffect(() => {
     if (!reelId || Number.isNaN(reelId)) return;
@@ -190,6 +204,7 @@ export default function EBiteVideoCard({
         <ShareReelModal
           visible={shareVisible}
           strapiReelId={reelId}
+          reelSnapshot={reelSnapshot}
           onClose={() => setShareVisible(false)}
           onSharedToChat={(target) => {
             navigation.navigate("Chat", target);

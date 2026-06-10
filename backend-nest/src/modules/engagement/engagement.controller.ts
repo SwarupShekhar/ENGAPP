@@ -50,12 +50,21 @@ export class EngagementController {
   shareReel(
     @Request() req,
     @Param('strapiReelId', ParseIntPipe) strapiReelId: number,
-    @Body('conversationId') conversationId: string,
+    @Body()
+    body: {
+      conversationId: string;
+      snapshot?: {
+        title?: string;
+        thumbnailUrl?: string | null;
+        muxPlaybackId?: string;
+      };
+    },
   ) {
     return this.engagementService.shareReel(
       req.user.id,
       strapiReelId,
-      conversationId,
+      body.conversationId,
+      body.snapshot,
     );
   }
 }

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
 import { fetchErrorSpeak } from '../../../api/tts';
@@ -7,6 +8,10 @@ import { getOrFetchTtsFileUri } from '../../../utils/ttsAudioCache';
 
 // Module-level: confirmed-present URIs this session — skips getInfoAsync on repeat taps (Bug 6)
 const cachedUris = new Map<string, string>();
+
+async function hashInput(input: string): Promise<string> {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, input);
+}
 
 async function setPlaybackAudioMode(): Promise<void> {
   try {
@@ -72,8 +77,8 @@ export function useHomePracticeTts() {
             { shouldPlay: true, volume: 1.0 },
           ));
         } catch (err) {
-          // Corrupt/invalid file — evict from both caches so caller can re-fetch (Bug 2)
-          cachedUris.delete(key);
+            // Corrupt/invalid file — evict from both caches so caller can re-fetch (Bug 2)
+          cachedUris.delete(storageKey);
           await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
           throw err;
         }
@@ -97,15 +102,18 @@ export function useHomePracticeTts() {
       };
 
       const fetchB64 = () => fetchErrorSpeak(trimmed).then((r) => r.audio_base64 ?? '');
+      // Key disk + memory cache by spoken text so stale phrase-of-day audio cannot replay after home refresh.
+      const textDigest = (await hashInput(trimmed)).slice(0, 16);
+      const storageKey = `${key}:${textDigest}`;
 
       try {
         // Bug 6: use in-memory map to skip getInfoAsync on repeat taps
-        let uri = cachedUris.get(key) ?? null;
+        let uri = cachedUris.get(storageKey) ?? null;
 
         if (!uri) {
           // Bug 4: use shared utility instead of bespoke getInfoAsync→fetch→write
-          uri = await getOrFetchTtsFileUri(key, fetchB64);
-          if (uri) cachedUris.set(key, uri);
+          uri = await getOrFetchTtsFileUri(storageKey, fetchB64);
+          if (uri) cachedUris.set(storageKey, uri);
         }
 
         if (uri && activeKeyRef.current === key) {
@@ -116,9 +124,9 @@ export function useHomePracticeTts() {
             // playUri already evicted from cachedUris + deleted corrupt file (Bug 2).
             // One re-fetch attempt with a fresh file.
             if (activeKeyRef.current === key) {
-              const freshUri = await getOrFetchTtsFileUri(key, fetchB64);
+              const freshUri = await getOrFetchTtsFileUri(storageKey, fetchB64);
               if (freshUri && activeKeyRef.current === key) {
-                cachedUris.set(key, freshUri);
+                cachedUris.set(storageKey, freshUri);
                 await playUri(freshUri);
                 return;
               }

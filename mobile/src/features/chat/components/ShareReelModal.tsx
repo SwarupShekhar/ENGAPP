@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Pressable,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { chatApi } from "../../../api/connections";
@@ -27,9 +28,16 @@ export interface SharedChatTarget {
   partnerAvatar?: string;
 }
 
+export interface ReelShareSnapshot {
+  title: string;
+  thumbnailUrl?: string | null;
+  muxPlaybackId?: string;
+}
+
 interface Props {
   visible: boolean;
   strapiReelId: number;
+  reelSnapshot?: ReelShareSnapshot;
   onClose: () => void;
   onShared?: () => void;
   /** Opens the DM thread after a successful share (Instagram-style). */
@@ -39,6 +47,7 @@ interface Props {
 export default function ShareReelModal({
   visible,
   strapiReelId,
+  reelSnapshot,
   onClose,
   onShared,
   onSharedToChat,
@@ -62,7 +71,11 @@ export default function ShareReelModal({
     const row = conversations.find((c) => c.conversationId === conversationId);
     setSharing(conversationId);
     try {
-      await engagementApi.shareReel(strapiReelId, conversationId);
+      await engagementApi.shareReel(
+        strapiReelId,
+        conversationId,
+        reelSnapshot,
+      );
       onShared?.();
       onClose();
       if (row?.partner && onSharedToChat) {
@@ -75,6 +88,10 @@ export default function ShareReelModal({
       }
     } catch (err) {
       console.error("[ShareReelModal]", err);
+      Alert.alert(
+        "Could not share reel",
+        "This reel may no longer be available. Try another reel or refresh eBites.",
+      );
     } finally {
       setSharing(null);
     }

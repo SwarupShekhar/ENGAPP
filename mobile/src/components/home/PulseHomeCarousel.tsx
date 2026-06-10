@@ -140,6 +140,17 @@ export default function PulseHomeCarousel({
     }, [ttsStop]),
   );
 
+  // Stop stale TTS when API phrase/word updates (e.g. after home cache refresh).
+  useEffect(() => {
+    ttsStop();
+  }, [
+    phraseOfTheDay?.phrase,
+    phraseOfTheDay?.definition,
+    wordOfTheDay?.word,
+    wordOfTheDay?.definition,
+    ttsStop,
+  ]);
+
   // ── Build slide list ─────────────────────────────────────────────────────────
   const slides = useMemo<PulseSlide[]>(() => {
     const date = todayKey();

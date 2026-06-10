@@ -158,6 +158,29 @@ describe('EngagementService', () => {
       );
     });
 
+    it('uses client snapshot when Strapi reel lookup fails', async () => {
+      prisma.conversationParticipant.findUnique.mockResolvedValue({ id: 'p-1' });
+      reelsService.getReelById.mockRejectedValue(new NotFoundException());
+      const savedMessage = { id: 'msg-share', type: 'reel_share' };
+      chatService.saveMessage.mockResolvedValue(savedMessage);
+
+      await service.shareReel('user-1', 14, 'conv-1', {
+        title: 'Cached reel title',
+        muxPlaybackId: 'mux-fallback',
+      });
+
+      expect(chatService.saveMessage).toHaveBeenCalledWith(
+        'conv-1',
+        'user-1',
+        'Shared a reel · Cached reel title',
+        'reel_share',
+        expect.objectContaining({
+          strapiReelId: 14,
+          title: 'Cached reel title',
+        }),
+      );
+    });
+
     it('creates reel_share message and broadcasts', async () => {
       prisma.conversationParticipant.findUnique.mockResolvedValue({ id: 'p-1' });
       reelsService.getReelById.mockResolvedValue({
