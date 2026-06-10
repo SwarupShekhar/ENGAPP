@@ -20,6 +20,10 @@ import { API_URL } from "../../../api/client";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
+// Graceful no-op when expo-haptics is unavailable (web / stripped builds)
+let Haptics: any = { impactAsync: async () => {}, ImpactFeedbackStyle: {} };
+try { Haptics = require("expo-haptics"); } catch { /* optional */ }
+
 export default function AssessmentSpeakingScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -122,6 +126,7 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
       );
       setRecording(recording);
       setIsRecording(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     } catch (err) {
       Alert.alert(
         "Error",
@@ -133,6 +138,7 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
   const stopRecording = async () => {
     if (!recording) return;
     setIsRecording(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
@@ -284,6 +290,8 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
             <Text style={styles.initDetailText}>{initError}</Text>
             <TouchableOpacity
               style={styles.retryInitButton}
+              accessibilityRole="button"
+              accessibilityLabel="Retry assessment initialization"
               onPress={() => {
                 void startAssessment();
               }}
@@ -303,6 +311,9 @@ export default function AssessmentSpeakingScreen({ navigation, route }: any) {
           <TouchableOpacity
             onPress={isRecording ? stopRecording : startRecording}
             disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel={isRecording ? "Stop recording" : "Start recording"}
+            accessibilityState={{ disabled: isSubmitting || isInitializingAssessment || !assessmentId }}
             style={[
               styles.recordButton,
               isRecording && styles.recordingActive,

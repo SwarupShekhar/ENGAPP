@@ -3,6 +3,10 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../../theme/useAppTheme';
 
+// Graceful no-op when expo-haptics is unavailable (web / stripped builds)
+let Haptics: any = { impactAsync: async () => {}, ImpactFeedbackStyle: {} };
+try { Haptics = require('expo-haptics'); } catch { /* optional */ }
+
 export type CardState = 'ready' | 'recording' | 'assessing' | 'fail' | 'pass_partial' | 'done_today';
 
 interface HomeSpeakCardProps {
@@ -18,6 +22,8 @@ interface HomeSpeakCardProps {
   listenEnabled?: boolean;
   listenPlaying?: boolean;
   onListenPress?: () => void;
+  /** Screen-reader summary for the card content (card type + content). */
+  contentAccessibilityLabel?: string;
 }
 
 export function HomeSpeakCard({
@@ -33,6 +39,7 @@ export function HomeSpeakCard({
   listenEnabled = false,
   listenPlaying = false,
   onListenPress,
+  contentAccessibilityLabel,
 }: HomeSpeakCardProps) {
   const theme = useAppTheme();
   const c = theme.colors;
@@ -74,7 +81,13 @@ export function HomeSpeakCard({
         {badge ? <Text style={[styles.badge, { color: c.text.secondary }]}>{badge}</Text> : null}
       </View>
 
-      <View style={{ flex: 1 }}>{children}</View>
+      <View
+        style={{ flex: 1 }}
+        accessible={!!contentAccessibilityLabel}
+        accessibilityLabel={contentAccessibilityLabel}
+      >
+        {children}
+      </View>
 
       {showListen ? (
         <Pressable
@@ -113,11 +126,12 @@ export function HomeSpeakCard({
           </View>
         ) : (
           <Pressable
-            onPress={micDisabled ? undefined : onMicPress}
+            onPress={micDisabled ? undefined : () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); onMicPress(); }}
             disabled={micDisabled}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={cardState === 'recording' ? 'Stop recording' : 'Start recording'}
+            accessibilityState={{ disabled: micDisabled }}
             style={({ pressed }) => [
               styles.micBtn,
               {

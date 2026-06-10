@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { connectionsApi } from "../../../api/connections";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { EmptyState } from "../../../components/common/EmptyState";
 
 interface FriendRequest {
   id: string;
@@ -209,14 +210,16 @@ export default function NotificationScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons
-                name="notifications-off-outline"
-                size={48}
-                color="#cbd5e1"
-              />
-              <Text style={styles.emptyText}>No new notifications</Text>
-            </View>
+            <EmptyState
+              icon="🔔"
+              title="No notifications yet"
+              subtitle="Friend requests from practice partners show up here. Meet someone on a call and add them as a friend."
+              ctaLabel="Find a partner"
+              onCtaPress={() =>
+                (navigation as any).navigate("CallPreference")
+              }
+              style={styles.emptyState}
+            />
           }
         />
       )}

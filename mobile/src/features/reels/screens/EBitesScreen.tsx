@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { reelsApi, Reel } from "../../../api/reels";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FeedPrefetchService from "../../../services/feedPrefetchService";
+import { EmptyState } from "../../../components/common/EmptyState";
+import { Skeleton } from "../../../components/common/Skeleton";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -260,10 +262,20 @@ export default function EBitesScreen() {
   };
 
   if (loading && feedItems.length === 0) {
+    // Dark feed skeleton: caption lines bottom-left + action rail right
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#6366f1" />
-        <Text style={styles.loadingText}>Loading eBites...</Text>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.skeletonCaption}>
+          <Skeleton dark width={120} height={14} />
+          <Skeleton dark width={"80%"} height={12} style={{ marginTop: 10 }} />
+          <Skeleton dark width={"60%"} height={12} style={{ marginTop: 8 }} />
+        </View>
+        <View style={styles.skeletonRail}>
+          <Skeleton dark circle width={44} />
+          <Skeleton dark circle width={44} style={{ marginTop: 20 }} />
+          <Skeleton dark circle width={44} style={{ marginTop: 20 }} />
+        </View>
       </View>
     );
   }
@@ -271,10 +283,14 @@ export default function EBitesScreen() {
   if (error && feedItems.length === 0) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Text style={styles.retryText} onPress={fetchFeed}>
-          Tap to Retry
-        </Text>
+        <EmptyState
+          dark
+          icon="📡"
+          title="Couldn't load eBites"
+          subtitle="Check your connection and try again."
+          ctaLabel="Tap to Retry"
+          onCtaPress={fetchFeed}
+        />
       </View>
     );
   }
@@ -282,18 +298,14 @@ export default function EBitesScreen() {
   if (!loading && feedItems.length === 0) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Ionicons
-          name="film-outline"
-          size={64}
-          color="#475569"
-          style={{ marginBottom: 16 }}
+        <EmptyState
+          dark
+          icon="🎬"
+          title="No eBites yet"
+          subtitle="Short learning videos picked for your weak areas will appear here. Check back after your next practice."
+          ctaLabel="Refresh Feed"
+          onCtaPress={fetchFeed}
         />
-        <Text style={[styles.loadingText, { color: "#94a3b8" }]}>
-          No eBites available yet
-        </Text>
-        <Text style={[styles.retryText, { marginTop: 8 }]} onPress={fetchFeed}>
-          Refresh Feed
-        </Text>
       </View>
     );
   }
@@ -352,5 +364,17 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 14,
     fontWeight: "bold",
+  },
+  skeletonCaption: {
+    position: "absolute",
+    left: 16,
+    right: 90,
+    bottom: 110,
+  },
+  skeletonRail: {
+    position: "absolute",
+    right: 16,
+    bottom: 130,
+    alignItems: "center",
   },
 });

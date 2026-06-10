@@ -127,6 +127,8 @@ export default function AssessmentIntroScreen({ navigation }: any) {
             style={styles.buttonContainer}
             onPress={() => navigation.navigate("AssessmentSpeaking")}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Start assessment"
           >
             <LinearGradient
               colors={theme.colors.gradients.primary}
@@ -146,6 +148,8 @@ export default function AssessmentIntroScreen({ navigation }: any) {
           <TouchableOpacity
             style={styles.skipButton}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Skip assessment for now"
           >
             <Text style={styles.skipText}>Skip for now — you can take it later</Text>
           </TouchableOpacity>

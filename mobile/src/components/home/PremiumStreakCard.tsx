@@ -17,6 +17,8 @@ return (
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.card}
+            accessible
+            accessibilityLabel={`${streak} day streak. Keep the momentum going`}
         >
             <View style={styles.content}>
                 <View>

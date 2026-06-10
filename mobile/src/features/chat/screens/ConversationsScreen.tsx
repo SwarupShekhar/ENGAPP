@@ -16,6 +16,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { chatApi } from "../../../api/connections";
 import SocketService from "../../call/services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
+import { EmptyState } from "../../../components/common/EmptyState";
+import { Skeleton } from "../../../components/common/Skeleton";
 
 interface Conversation {
   conversationId: string;
@@ -234,8 +236,16 @@ export default function ConversationsScreen() {
       </LinearGradient>
 
       {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+        <View style={styles.skeletonList}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <View key={i} style={styles.skeletonRow}>
+              <Skeleton circle width={56} />
+              <View style={styles.skeletonTextCol}>
+                <Skeleton width={"45%"} height={14} />
+                <Skeleton width={"75%"} height={12} style={{ marginTop: 8 }} />
+              </View>
+            </View>
+          ))}
         </View>
       ) : (
         <FlatList
@@ -251,17 +261,16 @@ export default function ConversationsScreen() {
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons
-                name="chatbubbles-outline"
-                size={64}
-                color={theme.colors.text.light}
-              />
-              <Text style={styles.emptyTitle}>No messages yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Connect with friends to start a conversation!
-              </Text>
-            </View>
+            <EmptyState
+              icon="💬"
+              title="No messages yet"
+              subtitle="Chats appear here after you connect with a practice partner. Finish a call and send a friend request to start one."
+              ctaLabel="Start a practice call"
+              onCtaPress={() =>
+                (navigation as any).navigate("CallPreference")
+              }
+              style={styles.emptyContainer}
+            />
           }
         />
       )}
@@ -312,6 +321,19 @@ const getStyles = (theme: any) =>
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  skeletonList: {
+    paddingTop: 8,
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  skeletonTextCol: {
+    flex: 1,
+    marginLeft: 12,
   },
   listContainer: {
     flexGrow: 1,

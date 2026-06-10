@@ -2,6 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Graceful no-op when expo-haptics is unavailable (web / stripped builds)
+let Haptics: any = { notificationAsync: async () => {}, NotificationFeedbackType: {} };
+try { Haptics = require('expo-haptics'); } catch { /* optional */ }
+
 interface Props {
   points: number;
   reason: string;
@@ -13,6 +17,7 @@ export const PointsBanner = ({ points, reason, onDismiss }: Props) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     Animated.sequence([
       Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -23,6 +28,9 @@ export const PointsBanner = ({ points, reason, onDismiss }: Props) => {
 
   return (
     <Animated.View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel={`Earned ${points} points. ${reason}`}
       style={[
         styles.container,
         { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },

@@ -56,6 +56,11 @@ import { AnalyticsEvents } from "../../../analytics/events";
 import { analyticsMeta } from "../../../analytics/eventMeta";
 import { useCoachingHints } from "../hooks/useCoachingHints";
 import { CoachingHintToast } from "../components/CoachingHintToast";
+import { ConversationStartersCard } from "../components/ConversationStartersCard";
+import {
+  cefrToStarterLevel,
+  pickStarters,
+} from "../data/conversationStarters";
 import { inCallCoachingApi, PreloadedHint } from "../../../api/homePracticeApi";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -437,6 +442,19 @@ export default function InCallScreen({ navigation, route }: any) {
   useEffect(() => { pushHintRef.current = pushHint; }, [pushHint]);
 
   const insets = useSafeAreaInsets();
+
+  // Pre-call conversation starters (PRD 4.2, Fear 3) — picked once per call,
+  // level-aware via the learner's assessed CEFR level from Clerk metadata.
+  const [starters] = useState(() =>
+    pickStarters(
+      cefrToStarterLevel(
+        ((user?.unsafeMetadata as any)?.assessmentLevel as string) ?? null,
+      ),
+      3,
+    ),
+  );
+  const [startersDismissed, setStartersDismissed] = useState(false);
+
   const [sessionId, setSessionId] = useState(route?.params?.sessionId);
   const partnerName = route?.params?.partnerName || "Co-learner";
   const topic = route?.params?.topic || "General Practice";
@@ -1454,6 +1472,16 @@ export default function InCallScreen({ navigation, route }: any) {
             Connecting...
           </Text>
         </Animated.View>
+        {!startersDismissed && (
+          <ConversationStartersCard
+            starters={starters}
+            onDismiss={() => setStartersDismissed(true)}
+            style={{
+              marginTop: 32,
+              width: SCREEN_WIDTH - theme.spacing.l * 2,
+            }}
+          />
+        )}
       </View>
     );
   }
@@ -1574,6 +1602,19 @@ export default function InCallScreen({ navigation, route }: any) {
                 Waiting for {partnerName} to join...
               </Text>
             </View>
+          )}
+
+          {/* Conversation starters — expanded while waiting, collapsed once live */}
+          {!startersDismissed && (
+            <ConversationStartersCard
+              starters={starters}
+              onDismiss={() => setStartersDismissed(true)}
+              defaultCollapsed={!isWaiting}
+              style={{
+                marginHorizontal: theme.spacing.m,
+                marginBottom: theme.spacing.s,
+              }}
+            />
           )}
 
           {/* Transcript: Live conversation */}

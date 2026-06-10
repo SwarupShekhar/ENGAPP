@@ -56,6 +56,11 @@ import { analyticsMeta } from "../../../analytics/eventMeta";
 import { useCoachingHints } from "../../call/hooks/useCoachingHints";
 import { CoachingHintToast } from "../../call/components/CoachingHintToast";
 import { inCallCoachingApi } from "../../../api/homePracticeApi";
+import {
+  MAYA_RATE_LIMIT_MESSAGE,
+  isRateLimitError,
+  tutorErrorMessage,
+} from "../utils/tutorErrors";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -435,7 +440,7 @@ export default function AITutorScreen({ navigation, route }: any) {
         }
       } catch (e) {
         console.error("Init error:", e);
-        setError("Failed to connect.");
+        setError(tutorErrorMessage(e, "Failed to connect."));
       }
     };
     init();
@@ -518,8 +523,8 @@ export default function AITutorScreen({ navigation, route }: any) {
   const runProcessSpeechFallback = async (
     formData: FormData,
     activeSessionId: string | null,
-  ): Promise<boolean> => {
-    if (!activeSessionId) return false;
+  ): Promise<"ok" | "rate_limited" | "fail"> => {
+    if (!activeSessionId) return "fail";
     try {
       activeLatencyTimeline.startSpan("process_speech_fallback");
       const res = await tutorApi.processSpeech(formData);
@@ -530,18 +535,22 @@ export default function AITutorScreen({ navigation, route }: any) {
         (res as { aiResponse?: string })?.aiResponse?.trim() || "";
       const audioB64 =
         (res as { audioBase64?: string })?.audioBase64 || null;
-      if (!transcription && !aiResponse) return false;
+      if (!transcription && !aiResponse) return "fail";
       applyBlockingTutorTurn(transcription, aiResponse, audioB64);
       setStreamPath("ws-fallback");
       setStreamDebugReason("process_speech_https");
-      return true;
+      return "ok";
     } catch (e: any) {
       activeLatencyTimeline.endSpan("process_speech_fallback");
       console.warn(
         "[AITutor] process-speech fallback failed:",
         e?.message || e,
       );
-      return false;
+      if (isRateLimitError(e)) {
+        setError(MAYA_RATE_LIMIT_MESSAGE);
+        return "rate_limited";
+      }
+      return "fail";
     }
   };
 
@@ -756,6 +765,7 @@ export default function AITutorScreen({ navigation, route }: any) {
   // ─── Recording ──────────────────────────────────────────
   const startRecording = async () => {
     if (isProcessing || isStreaming || isRecording) return; // Block while streaming/recording
+    setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       const perm = await Audio.requestPermissionsAsync();
@@ -973,6 +983,7 @@ export default function AITutorScreen({ navigation, route }: any) {
 
         let usedSSE = false;
         let sseSkipped = false;
+        let turnRateLimited = false;
         if (token && activeSessionId) {
             try {
               sseAbortRef.current?.abort();
@@ -988,11 +999,19 @@ export default function AITutorScreen({ navigation, route }: any) {
                   `[Tutor SSE] ${response.status} ${response.statusText}`,
                   errText.slice(0, 500),
                 );
-                if (__DEV__) {
+                if (response.status === 429) {
+                  turnRateLimited = true;
+                  setError(MAYA_RATE_LIMIT_MESSAGE);
+                  setStreamPath("idle");
+                  setStreamDebugReason("rate_limited_429");
+                } else if (__DEV__) {
                   console.log("[Tutor SSE] Falling back to WS due to non-2xx response");
+                  setStreamPath("ws-fallback");
+                  setStreamDebugReason(`sse_non_2xx_${response.status}`);
+                } else {
+                  setStreamPath("ws-fallback");
+                  setStreamDebugReason(`sse_non_2xx_${response.status}`);
                 }
-                setStreamPath("ws-fallback");
-                setStreamDebugReason(`sse_non_2xx_${response.status}`);
               }
               if (response.ok && response.body) {
                 usedSSE = true;
@@ -1077,7 +1096,9 @@ export default function AITutorScreen({ navigation, route }: any) {
             setStreamPath("sse-skipped");
             setStreamDebugReason("missing_token_or_session");
           }
-          if (!usedSSE && audioBase64 && activeSessionId) {
+          if (turnRateLimited) {
+            setTranscript((prev) => prev.filter((m) => !m.tempId));
+          } else if (!usedSSE && audioBase64 && activeSessionId) {
             if (!sseSkipped) {
               setStreamPath("ws-fallback");
               setStreamDebugReason("sse_failed_trying_ws");
@@ -1102,31 +1123,36 @@ export default function AITutorScreen({ navigation, route }: any) {
             setStreamDebugReason("no_audio_base64");
           }
 
-          if (!turnHadResponseRef.current) {
-            const ok = await runProcessSpeechFallback(
+          if (!turnRateLimited && !turnHadResponseRef.current) {
+            const fallbackResult = await runProcessSpeechFallback(
               formData,
               activeSessionId,
             );
-            if (!ok) {
+            if (fallbackResult !== "ok") {
               setTranscript((prev) =>
                 prev.map((m) =>
                   m.tempId
                     ? {
                         ...m,
-                        text: "Couldn't reach Maya. Hold the mic and try again.",
+                        text:
+                          fallbackResult === "rate_limited"
+                            ? "Rate limited — wait a moment and try again."
+                            : "Couldn't reach Maya. Hold the mic and try again.",
                         tempId: false,
                       }
                     : m,
                 ),
               );
-              setError("Maya didn't respond. Check your connection and try again.");
+              if (fallbackResult === "fail") {
+                setError("Maya didn't respond. Check your connection and try again.");
+              }
             }
           }
         setTurnCount((c) => c + 1);
       }
     } catch (e) {
       console.error("Process error", e);
-      setError("Could not process speech.");
+      setError(tutorErrorMessage(e, "Could not process speech."));
     } finally {
       setIsProcessing(false);
       // setIsStreaming(true) happens on first chunk
@@ -1246,11 +1272,46 @@ export default function AITutorScreen({ navigation, route }: any) {
 
         {/* Footer Controls */}
         <View style={styles.footer}>
+          {error ? (
+            <View
+              style={styles.errorBanner}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              <Ionicons
+                name="warning-outline"
+                size={18}
+                color={theme.colors.warning}
+                style={styles.errorBannerIcon}
+              />
+              <Text style={styles.errorBannerText}>{error}</Text>
+              <TouchableOpacity
+                onPress={() => setError(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss error message"
+              >
+                <Ionicons
+                  name="close"
+                  size={18}
+                  color={theme.colors.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <TouchableOpacity
             onPressIn={startRecording}
             onPressOut={stopRecording}
             activeOpacity={0.8}
             disabled={isProcessing || isStreaming}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isRecording ? "Stop recording" : "Hold to speak with Maya"
+            }
+            accessibilityState={{
+              disabled: isProcessing || isStreaming,
+              busy: isProcessing || isStreaming,
+            }}
           >
             <View
               style={[
@@ -1420,6 +1481,27 @@ const getStyles = (theme: any) =>
     bubbleTextPartner: { color: theme.colors.text.primary },
 
     // Footer
+    errorBanner: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      marginBottom: 12,
+      marginHorizontal: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: `${theme.colors.warning}18`,
+      borderWidth: 1,
+      borderColor: `${theme.colors.warning}40`,
+      maxWidth: SCREEN_WIDTH - 32,
+    },
+    errorBannerIcon: { marginTop: 1 },
+    errorBannerText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.text.primary,
+    },
     footer: { alignItems: "center", paddingBottom: 40 },
     micContainer: {
       width: 80,

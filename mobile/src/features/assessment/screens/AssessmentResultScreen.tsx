@@ -20,6 +20,10 @@ import { ReadinessCard } from "../components/ReadinessCard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { assessmentApi } from "../services/assessment";
 
+// Graceful no-op when expo-haptics is unavailable (web / stripped builds)
+let Haptics: any = { notificationAsync: async () => {}, NotificationFeedbackType: {} };
+try { Haptics = require("expo-haptics"); } catch { /* optional */ }
+
 export default function AssessmentResultScreen({ navigation, route }: any) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
@@ -53,6 +57,13 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
       setIsLoading(false); // just fallback data
     }
   }, [initialResult, sessionId]);
+
+  // Tactile reward when the (non-review) result is revealed
+  useEffect(() => {
+    if (result && !isLoading && !isReviewMode) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+  }, [result, isLoading, isReviewMode]);
 
   const handleContinueToHome = async () => {
     if (isReviewMode) {
@@ -114,6 +125,8 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
           {isReviewMode && (
             <TouchableOpacity
               onPress={() => navigation.goBack()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
               style={{ position: "absolute", left: 20, top: 0, zIndex: 1 }}
             >
               <Ionicons
@@ -461,7 +474,12 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleContinueToHome}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleContinueToHome}
+          accessibilityRole="button"
+          accessibilityLabel={isReviewMode ? "Back to Progress" : "Continue to Home"}
+        >
           <Text style={styles.buttonText}>
             {isReviewMode ? "Back to Progress" : "Continue to Home"}
           </Text>

@@ -23,6 +23,10 @@ import {
 } from '../../features/home/voice/useHomePracticeCapture';
 import { useHomePracticeTts } from '../../features/home/voice/useHomePracticeTts';
 
+// Graceful no-op when expo-haptics is unavailable (web / stripped builds)
+let Haptics: any = { notificationAsync: async () => {}, NotificationFeedbackType: {} };
+try { Haptics = require('expo-haptics'); } catch { /* optional */ }
+
 const { width: SCREEN_W } = Dimensions.get('window');
 const HPAD = 16;
 const CARD_W = SCREEN_W - HPAD * 2;
@@ -266,12 +270,14 @@ export default function PulseHomeCarousel({
         }
 
         if (result.pass && result.doneForToday) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setCardState(slide.key, 'done_today' as CardState);
           setCardHint(slide.key, result.message || undefined);
           if (slide.kind === 'phrase_daily' || slide.kind === 'word_daily') {
             analytics.capture(AnalyticsEvents.HOME_PRACTICE_DAILY_COMPLETED, { kind: slide.kind });
           }
         } else if (result.pass && !result.doneForToday) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setCardState(slide.key, 'pass_partial' as CardState);
           setCardHint(slide.key, result.message || `${result.correctStreak}/${result.streakTarget} — once more`);
           if (slide.kind === 'mistake_task') {
@@ -285,6 +291,7 @@ export default function PulseHomeCarousel({
             setCardHint(slide.key, undefined);
           }, 2000);
         } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
           setCardState(slide.key, 'fail' as CardState);
           const scoreHint =
             result.overallAccuracy > 0 ? `${result.overallAccuracy}% — try again` : result.message;
@@ -380,6 +387,12 @@ export default function PulseHomeCarousel({
         : cardHints.get(item.key) || 'Nice work! Mistake mastered';
     const failMessage = cardHints.get(item.key);
     const listenEnabled = item.kind === 'phrase_daily' || item.kind === 'word_daily';
+    const contentSummary =
+      item.kind === 'phrase_daily'
+        ? `${item.phrase.phrase}. ${item.phrase.definition}`
+        : item.kind === 'word_daily'
+          ? `${item.word.word}. ${item.word.definition}`
+          : `Practice: ${item.task.content?.target ?? item.task.title}`;
 
     return (
       <View style={{ width: CARD_W }}>
@@ -395,6 +408,7 @@ export default function PulseHomeCarousel({
           listenPlaying={tts.playingKey === (listenEnabled ? `${item.key}:full` : item.key)}
           onListenPress={listenEnabled ? () => handleListen(item) : undefined}
           onMicPress={() => void handleMicPress(item)}
+          contentAccessibilityLabel={`${pillLabel}. ${contentSummary}`}
         >
           {item.kind === 'phrase_daily' && (
             <>
