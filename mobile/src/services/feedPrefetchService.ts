@@ -13,9 +13,10 @@
 import { Audio } from "expo-av";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { reelsApi, Reel, FeedResponse } from "../api/reels";
+import { EBITES_FEED_CACHE_KEY } from "./cacheKeys";
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for in-memory freshness
-const STORAGE_KEY = "@ebites_feed_cache";
+const STORAGE_KEY = EBITES_FEED_CACHE_KEY;
 const PRELOAD_VIDEO_COUNT = 2;
 const RETRY_DELAY_MS = 3000; // Retry after 3 seconds if first attempt fails
 const AUTH_RETRY_DELAY_MS = 5000; // Longer delay for 401s to allow AuthTokenInjector to initialize

@@ -10,6 +10,7 @@ import {
   Image,
   Animated as RNAnimated,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useUser } from '@clerk/clerk-expo';
@@ -36,8 +37,9 @@ import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
 import PulseHomeCarousel from '../../../components/home/PulseHomeCarousel';
 import { getHomeData, HomeData } from '../services/homeApi';
-
-const HOME_DATA_CACHE_KEY = '@home_data_cache_v2';
+import { HOME_DATA_CACHE_KEY } from '../../../services/cacheKeys';
+import FeedPrefetchService from '../../../services/feedPrefetchService';
+import { tasksApi } from '../../../api/tasks';
 
 const STALE_RESUME_CTA = /pick up where you left|saved your progress|restart my journey/i;
 
@@ -627,47 +629,62 @@ export default function HomeScreen() {
 
   const [homeData, setHomeData]       = useState<HomeData | null>(null);
   const [loadingHome, setLoadingHome] = useState(true);
+  const [refreshingHome, setRefreshingHome] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
+  const [homeScrollEnabled, setHomeScrollEnabled] = useState(true);
 
   const c = theme.colors;
+
+  const loadHome = useCallback(async (options?: { forceFresh?: boolean }) => {
+    const forceFresh = options?.forceFresh === true;
+
+    if (!forceFresh) {
+      try {
+        const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached) as HomeData;
+          setHomeData(parsed);
+          setLoadingHome(false);
+        } else {
+          setLoadingHome(true);
+        }
+      } catch {
+        setLoadingHome(true);
+      }
+    } else {
+      setLoadingHome(true);
+    }
+
+    try {
+      const fresh = await getHomeData();
+      setHomeData(fresh);
+      await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
+      if (forceFresh) {
+        void tasksApi.loadPracticeCarouselTasks().catch(() => {});
+        FeedPrefetchService.getInstance().invalidate();
+        void FeedPrefetchService.getInstance().prefetch();
+      }
+    } catch (e) {
+      console.warn('[HomeV1] home data:', e);
+    } finally {
+      setLoadingHome(false);
+      setRefreshingHome(false);
+    }
+  }, []);
+
+  const onRefreshHome = useCallback(() => {
+    setRefreshingHome(true);
+    setHomeScrollEnabled(true);
+    void loadHome({ forceFresh: true });
+  }, [loadHome]);
 
   // ── Fetch home data (stale-while-revalidate) ───────────────────────────────
   useFocusEffect(
     useCallback(() => {
-      let alive = true;
-
-      const loadHome = async () => {
-        try {
-          const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
-          if (cached && alive) {
-            const parsed = JSON.parse(cached) as HomeData;
-            setHomeData(parsed);
-            setLoadingHome(false);
-          } else if (alive) {
-            setLoadingHome(true);
-          }
-        } catch {
-          if (alive) setLoadingHome(true);
-        }
-
-        try {
-          const fresh = await getHomeData();
-          if (!alive) return;
-          setHomeData(fresh);
-          await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
-        } catch (e) {
-          console.warn('[HomeV1] home data:', e);
-        } finally {
-          if (alive) setLoadingHome(false);
-        }
-      };
-
+      setHomeScrollEnabled(true);
       void loadHome();
-      return () => {
-        alive = false;
-      };
-    }, []),
+    }, [loadHome]),
   );
 
   // ── Fetch unread chat count + realtime updates ────────────────────────────
@@ -735,8 +752,6 @@ export default function HomeScreen() {
   const goNotifs   = () => navigation.navigate('Notifications');
   const goPracticeCall = () => navigation.navigate('CallPreference');
 
-  const [homeScrollEnabled, setHomeScrollEnabled] = useState(true);
-
   const practiceCta = resolvePracticeCta(homeData?.primaryCTA);
   const practiceTitle = practiceCta.title;
   const practiceDescription = practiceCta.description;
@@ -753,6 +768,14 @@ export default function HomeScreen() {
         scrollEnabled={homeScrollEnabled}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshingHome}
+            onRefresh={onRefreshHome}
+            tintColor={c.primary}
+            colors={[c.primary]}
+          />
+        }
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(0).duration(340).springify()} style={st.header}>

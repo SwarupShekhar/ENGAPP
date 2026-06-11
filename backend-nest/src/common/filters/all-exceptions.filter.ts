@@ -51,12 +51,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
             exception.stack,
         );
 
-        // Write to a persistent log file in the project root
-        try {
-            const logFilePath = path.join(process.cwd(), 'error.log');
-            fs.appendFileSync(logFilePath, JSON.stringify(errorLog) + '\n');
-        } catch (e) {
-            this.logger.error('Failed to write to error.log file', e.stack);
+        // Dev-only file log (Docker prod often lacks write perms on cwd)
+        if (!isProd) {
+            try {
+                const logFilePath = path.join(process.cwd(), 'error.log');
+                fs.appendFileSync(logFilePath, JSON.stringify(errorLog) + '\n');
+            } catch (e) {
+                this.logger.debug('Skipped error.log write (non-fatal)', e);
+            }
         }
 
         response.status(status).json(message);

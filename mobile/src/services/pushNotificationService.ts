@@ -330,8 +330,15 @@ class PushNotificationService {
         break;
       case "reminder":
       case "streak_risk":
-      case "word_of_day":
         navigate("MainTabs", { screen: "Home" });
+        break;
+      case "word_of_day":
+        navigate("WordOfDay", {
+          word: flat.word as string | undefined,
+          definition: flat.definition as string | undefined,
+          example: flat.example as string | undefined,
+          partOfSpeech: flat.partOfSpeech as string | undefined,
+        });
         break;
       default:
         navigate("MainTabs");

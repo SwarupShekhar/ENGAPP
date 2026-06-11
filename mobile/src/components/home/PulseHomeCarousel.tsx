@@ -136,8 +136,10 @@ export default function PulseHomeCarousel({
       return () => {
         alive = false;
         ttsStop();
+        void capture.cancel();
+        onParentScrollEnabledChange?.(true);
       };
-    }, [ttsStop]),
+    }, [ttsStop, capture, onParentScrollEnabledChange]),
   );
 
   // Stop stale TTS when API phrase/word updates (e.g. after home cache refresh).

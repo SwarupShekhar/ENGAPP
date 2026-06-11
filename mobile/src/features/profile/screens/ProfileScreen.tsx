@@ -17,6 +17,7 @@ import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useUIVariant } from "../../../context/UIVariantContext";
 import { reliabilityApi, UserReliability } from "../../../api/reliability";
+import { userApi } from "../../../api/user";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { Theme } from "../../../theme/types";
 
@@ -194,8 +195,31 @@ export default function ProfileScreen() {
           .then(setReliability)
           .catch((err: any) => console.error("Failed to fetch reliability", err));
       }
+      userApi
+        .getNotificationPreferences()
+        .then((prefs) => setPracticeReminders(prefs.practiceRemindersEnabled))
+        .catch((err: any) =>
+          console.error("Failed to fetch notification preferences", err),
+        );
     }, [user?.id]),
   );
+
+  const handlePracticeRemindersChange = async (enabled: boolean) => {
+    const previous = practiceReminders;
+    setPracticeReminders(enabled);
+    try {
+      await userApi.updateNotificationPreferences({
+        practiceRemindersEnabled: enabled,
+      });
+    } catch (err) {
+      console.error("Failed to update practice reminders", err);
+      setPracticeReminders(previous);
+      Alert.alert(
+        "Could not save",
+        "Practice reminder setting was not updated. Please try again.",
+      );
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -456,7 +480,7 @@ export default function ProfileScreen() {
             rightElement={
               <Switch
                 value={practiceReminders}
-                onValueChange={setPracticeReminders}
+                onValueChange={handlePracticeRemindersChange}
                 trackColor={{
                   true: theme.colors.accent,
                   false: theme.colors.border,

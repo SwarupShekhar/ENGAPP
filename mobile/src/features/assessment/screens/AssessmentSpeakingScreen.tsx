@@ -363,7 +363,7 @@ const getStyles = (theme: any) =>
     },
     loadingText: {
       marginTop: theme.spacing.m,
-      color: theme.colors.surface,
+      color: "#FFFFFF",
       fontSize: theme.typography.sizes.l,
       fontWeight: "bold",
     },
@@ -493,7 +493,7 @@ const getStyles = (theme: any) =>
       borderRadius: theme.borderRadius.s,
     },
     retryInitText: {
-      color: "#fff",
+      color: "#FFFFFF",
       fontWeight: "600",
     },
   });

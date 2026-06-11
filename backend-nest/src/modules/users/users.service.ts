@@ -310,4 +310,29 @@ export class UsersService {
 
     return streak;
   }
+
+  async getNotificationPreferences(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { practiceRemindersEnabled: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return { practiceRemindersEnabled: user.practiceRemindersEnabled };
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    data: { practiceRemindersEnabled?: boolean },
+  ) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.practiceRemindersEnabled !== undefined
+          ? { practiceRemindersEnabled: data.practiceRemindersEnabled }
+          : {}),
+      },
+      select: { practiceRemindersEnabled: true },
+    });
+    return { practiceRemindersEnabled: user.practiceRemindersEnabled };
+  }
 }

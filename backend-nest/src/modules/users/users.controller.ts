@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Delete, UseGuards, Request, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, UseGuards, Request, Body, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { TasksService } from '../tasks/tasks.service';
 import { DeviceTokenDto } from './dto/device-token.dto';
+import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
 
 @Controller('users')
 @UseGuards(ClerkGuard)
@@ -11,6 +12,19 @@ export class UsersController {
         private readonly usersService: UsersService,
         private readonly tasksService: TasksService,
     ) { }
+
+    @Get('me/notification-preferences')
+    async getNotificationPreferences(@Request() req) {
+        return this.usersService.getNotificationPreferences(req.user.id);
+    }
+
+    @Patch('me/notification-preferences')
+    async updateNotificationPreferences(
+        @Request() req,
+        @Body() dto: UpdateNotificationPreferencesDto,
+    ) {
+        return this.usersService.updateNotificationPreferences(req.user.id, dto);
+    }
 
     @Get('me/stats')
     async getStats(@Request() req) {

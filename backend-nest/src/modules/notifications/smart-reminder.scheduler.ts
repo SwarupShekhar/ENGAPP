@@ -27,6 +27,12 @@ export class SmartReminderScheduler {
 
   private async processUser(userId: string, currentHour: number): Promise<void> {
     try {
+      const userPrefs = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { practiceRemindersEnabled: true, currentStreak: true },
+      });
+      if (!userPrefs?.practiceRemindersEnabled) return;
+
       const practiceHour = await this.getPracticeHour(userId);
       const diff = Math.abs(currentHour - practiceHour);
       const withinWindow = diff <= 1 || diff >= 23; // handles midnight wrap (e.g. 23 vs 0)
@@ -53,11 +59,7 @@ export class SmartReminderScheduler {
       });
       if (alreadyNotified) return;
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { currentStreak: true },
-      });
-      const streak = user?.currentStreak ?? 0;
+      const streak = userPrefs.currentStreak ?? 0;
 
       if (streak >= 3 && currentHour >= 22) {
         await this.notificationService.notify(userId, 'streak_risk', { streakDays: streak });

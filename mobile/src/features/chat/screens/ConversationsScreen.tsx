@@ -14,6 +14,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { chatApi } from "../../../api/connections";
+import { userApi } from "../../../api/user";
 import SocketService from "../../call/services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { EmptyState } from "../../../components/common/EmptyState";
@@ -47,6 +48,7 @@ export default function ConversationsScreen() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
   const socketService = SocketService.getInstance();
 
   const fetchConversations = async () => {
@@ -71,6 +73,7 @@ export default function ConversationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      void userApi.getCurrentUserId().then(setMyUserId);
       fetchConversations();
 
       // Presence listener
@@ -131,6 +134,16 @@ export default function ConversationsScreen() {
     }
   };
 
+  const previewLastMessage = (item: Conversation): string => {
+    if (!item.lastMessage) return "No messages yet";
+    const { type, content, senderId } = item.lastMessage;
+    if (type === "call_invite") return "📞 Voice Call";
+    if (type === "reel_share") return `🎬 ${content}`;
+    const prefix =
+      myUserId && senderId === myUserId ? "You: " : "";
+    return `${prefix}${content}`;
+  };
+
   const renderItem = ({ item }: { item: Conversation }) => (
     <TouchableOpacity
       style={styles.conversationItem}
@@ -189,13 +202,7 @@ export default function ConversationsScreen() {
             ]}
             numberOfLines={1}
           >
-            {item.lastMessage
-              ? item.lastMessage.type === "call_invite"
-                ? "📞 Voice Call"
-                : item.lastMessage.type === "reel_share"
-                  ? `🎬 ${item.lastMessage.content}`
-                  : item.lastMessage.content
-              : "No messages yet"}
+            {previewLastMessage(item)}
           </Text>
           {item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>

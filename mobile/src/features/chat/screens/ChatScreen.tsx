@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -59,6 +59,35 @@ interface ChatMessage {
   readBy?: string[];
   metadata?: any;
   reactions?: AggregatedReaction[];
+}
+
+type ChatListItem =
+  | { kind: "date"; id: string; label: string }
+  | { kind: "message"; id: string; message: ChatMessage };
+
+function formatDateSeparator(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+  const startOfMsg = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const diffDays = Math.round(
+    (startOfToday.getTime() - startOfMsg.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 // ── Main Component ──────────────────────────────────────
@@ -338,29 +367,56 @@ export default function ChatScreen() {
 
   const isMyMessage = (msg: ChatMessage) => msg.senderId !== partnerId;
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const isMine = isMyMessage(item);
+  const listItems = useMemo<ChatListItem[]>(() => {
+    const items: ChatListItem[] = [];
+    let lastDay = "";
+    for (const message of messages) {
+      const day = new Date(message.createdAt).toDateString();
+      if (day !== lastDay) {
+        items.push({
+          kind: "date",
+          id: `date-${day}`,
+          label: formatDateSeparator(message.createdAt),
+        });
+        lastDay = day;
+      }
+      items.push({ kind: "message", id: message.id, message });
+    }
+    return items;
+  }, [messages]);
 
-    if (item.type === "call_invite") {
+  const renderListItem = ({ item }: { item: ChatListItem }) => {
+    if (item.kind === "date") {
+      return (
+        <View style={styles.dateSeparator}>
+          <Text style={styles.dateSeparatorText}>{item.label}</Text>
+        </View>
+      );
+    }
+
+    const msg = item.message;
+    const isMine = isMyMessage(msg);
+
+    if (msg.type === "call_invite") {
       return (
         <View style={styles.callInviteContainer}>
           <View style={styles.callInviteBubble}>
             <Ionicons name="call" size={16} color="#A78BFA" />
-            <Text style={styles.callInviteText}>{item.content}</Text>
+            <Text style={styles.callInviteText}>{msg.content}</Text>
           </View>
         </View>
       );
     }
 
-    if (item.type === "system") {
+    if (msg.type === "system") {
       return (
         <View style={styles.systemContainer}>
-          <Text style={styles.systemText}>{item.content}</Text>
+          <Text style={styles.systemText}>{msg.content}</Text>
         </View>
       );
     }
 
-    if (item.type === "reel_share" && item.metadata?.strapiReelId) {
+    if (msg.type === "reel_share" && msg.metadata?.strapiReelId) {
       return (
         <View
           style={[
@@ -369,19 +425,19 @@ export default function ChatScreen() {
           ]}
         >
           <ReelShareCard
-            metadata={item.metadata as ReelShareMetadata}
+            metadata={msg.metadata as ReelShareMetadata}
             isMine={isMine}
-            onPress={() => openReelViewer(item.metadata as ReelShareMetadata)}
+            onPress={() => openReelViewer(msg.metadata as ReelShareMetadata)}
           />
         </View>
       );
     }
 
-    const reactions = messageReactions[item.id] || [];
+    const reactions = messageReactions[msg.id] || [];
 
     return (
       <Pressable
-        onLongPress={() => setReactionTarget(item)}
+        onLongPress={() => setReactionTarget(msg)}
         style={[
           styles.messageRow,
           isMine ? styles.messageRowRight : styles.messageRowLeft,
@@ -399,7 +455,7 @@ export default function ChatScreen() {
               isMine ? styles.myMessageText : styles.theirMessageText,
             ]}
           >
-            {item.content}
+            {msg.content}
           </Text>
           <View style={styles.messageFooter}>
             <Text
@@ -408,13 +464,18 @@ export default function ChatScreen() {
                 isMine ? styles.myTimeText : styles.theirTimeText,
               ]}
             >
-              {new Date(item.createdAt).toLocaleTimeString([], {
+              {new Date(msg.createdAt).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
               })}
             </Text>
-            {isMine && item.readBy?.includes(partnerId) && (
-              <Text style={styles.seenText}>Seen</Text>
+            {isMine && msg.readBy?.includes(partnerId) && (
+              <Ionicons
+                name="checkmark-done"
+                size={14}
+                color={theme.colors.primary}
+                style={styles.readReceiptIcon}
+              />
             )}
           </View>
         </View>
@@ -506,8 +567,8 @@ export default function ChatScreen() {
         ) : (
           <FlatList
             ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
+            data={listItems}
+            renderItem={renderListItem}
             keyExtractor={(item) => item.id}
             style={styles.flex}
             contentContainerStyle={styles.messagesList}
@@ -759,10 +820,22 @@ const getStyles = (theme: any) =>
     gap: 4,
     marginTop: 4,
   },
-  seenText: {
-    fontSize: 10,
-    color: theme.colors.primary,
+  readReceiptIcon: {
+    marginLeft: 4,
+  },
+  dateSeparator: {
+    alignItems: "center",
+    marginVertical: 12,
+  },
+  dateSeparatorText: {
+    fontSize: 12,
     fontWeight: "600",
+    color: theme.colors.text.secondary,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: "hidden",
   },
 
   // Call invite

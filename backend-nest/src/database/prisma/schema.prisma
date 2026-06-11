@@ -33,6 +33,7 @@ model User {
   lastResolvedStage      Int?
   lastSessionAt          DateTime?
   totalSessions          Int                       @default(0)
+  practiceRemindersEnabled Boolean                 @default(true)
   email                  String                    @unique
   assessments            AssessmentSession[]
   blockedBy              BlockedUser[]             @relation("BlockedUser")

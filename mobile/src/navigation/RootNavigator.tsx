@@ -16,6 +16,7 @@ import ReelViewerScreen from "../features/reels/screens/ReelViewerScreen";
 import SocketDebugScreen from "../features/debug/screens/SocketDebugScreen";
 import ProfileScreenIndex from "../features/profile/screens/ProfileScreenIndex";
 import PracticeTaskScreen from "../screens/practice/PracticeTaskScreen";
+import WordOfDayScreen from "../features/home/screens/WordOfDayScreen";
 import ScoreDetailScreen from "../screens/score/ScoreDetailScreen";
 import { useSuperApp } from "../context/SuperAppContext";
 import EngrTabs from "./EngrTabs";
@@ -120,6 +121,12 @@ export type RootStackParamList = {
     partnerAvatar?: string;
   };
   ReelViewer: { reelId: number };
+  WordOfDay: {
+    word?: string;
+    definition?: string;
+    example?: string;
+    partOfSpeech?: string | null;
+  };
   [key: string]: object | undefined;
 };
 
@@ -217,6 +224,7 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
       <Stack.Screen name="PracticeTask" component={PracticeTaskScreen} />
 
       <Stack.Screen name="ScoreDetail" component={ScoreDetailScreen} />
+      <Stack.Screen name="WordOfDay" component={WordOfDayScreen} />
     </Stack.Navigator>
   );
 }

@@ -5,6 +5,7 @@ import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { ReliabilityService } from '../reliability/reliability.service';
 import { TranscriptionService } from '../livekit/transcription.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
+import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
 import { getQueueToken } from '@nestjs/bull';
 
 describe('SessionsService pagination', () => {
@@ -22,6 +23,7 @@ describe('SessionsService pagination', () => {
         { provide: ReliabilityService, useValue: {} },
         { provide: TranscriptionService, useValue: {} },
         { provide: PronunciationService, useValue: {} },
+        { provide: InCallCoachingService, useValue: {} },
         { provide: getQueueToken('sessions'), useValue: { add: jest.fn() } },
       ],
     }).compile();

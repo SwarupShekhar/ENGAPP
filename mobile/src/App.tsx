@@ -28,6 +28,7 @@ import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
+import { migrateAppCaches } from "./services/cacheMigration";
 import PushNotificationService from "./services/pushNotificationService";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { SuperAppProvider } from "./context/SuperAppContext";
@@ -469,6 +470,10 @@ function AuthGate() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(Platform.OS !== "web");
+
+  useEffect(() => {
+    void migrateAppCaches();
+  }, []);
 
   if (!CLERK_PUBLISHABLE_KEY) {
     return (

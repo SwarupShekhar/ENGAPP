@@ -20,6 +20,7 @@ import { useTheme } from "../../../theme/ThemeProvider";
 import { tokensV2_603010 as tokensV2 } from "../../../theme/tokensV2_603010";
 import { useUIVariant } from "../../../context/UIVariantContext";
 import { reliabilityApi, type UserReliability } from "../../../api/reliability";
+import { userApi } from "../../../api/user";
 
 const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any }) => (
   <BlurView intensity={80} tint="dark" style={[styles.glassCard, style]}>
@@ -166,8 +167,31 @@ export default function ProfileScreenV2() {
         .getUserReliability(user.id)
         .then(setReliability)
         .catch((err: any) => console.error("Failed to fetch reliability", err));
+      userApi
+        .getNotificationPreferences()
+        .then((prefs) => setPracticeReminders(prefs.practiceRemindersEnabled))
+        .catch((err: any) =>
+          console.error("Failed to fetch notification preferences", err),
+        );
     }, [user?.id]),
   );
+
+  const handlePracticeRemindersChange = async (enabled: boolean) => {
+    const previous = practiceReminders;
+    setPracticeReminders(enabled);
+    try {
+      await userApi.updateNotificationPreferences({
+        practiceRemindersEnabled: enabled,
+      });
+    } catch (err) {
+      console.error("Failed to update practice reminders", err);
+      setPracticeReminders(previous);
+      Alert.alert(
+        "Could not save",
+        "Practice reminder setting was not updated. Please try again.",
+      );
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -403,7 +427,7 @@ export default function ProfileScreenV2() {
               rightElement={
                 <Switch
                   value={practiceReminders}
-                  onValueChange={setPracticeReminders}
+                  onValueChange={handlePracticeRemindersChange}
                   trackColor={{ true: tokensV2.colors.primaryViolet, false: "rgba(255,255,255,0.18)" }}
                   thumbColor={tokensV2.colors.textPrimary}
                 />

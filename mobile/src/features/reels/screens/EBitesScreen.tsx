@@ -6,20 +6,21 @@ import {
   StyleSheet,
   StatusBar,
   ViewToken,
-  ActivityIndicator,
   Text,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import EBiteVideoCard from "../../../components/ebites/EBiteVideoCard";
 import EBiteActivityCard from "../../../components/ebites/EBiteActivityCard";
-import { Ionicons } from "@expo/vector-icons";
 import { reelsApi, Reel } from "../../../api/reels";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FeedPrefetchService from "../../../services/feedPrefetchService";
+import { EBITES_FEED_CACHE_KEY } from "../../../services/cacheKeys";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { Skeleton } from "../../../components/common/Skeleton";
 
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const UNLOCKED_REELS_KEY = "@ebites_unlocked_reels";
 
@@ -33,111 +34,23 @@ async function loadUnlockedReelIds(): Promise<Set<string>> {
   }
 }
 
-// ─── TYPES ──────────────────────────────────────────────────
 type FeedItem = {
   id: string;
   type: "video" | "activity";
   data: any;
 };
 
-// ─── MAIN COMPONENT ─────────────────────────────────────────
 export default function EBitesScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isScreenFocused, setIsScreenFocused] = useState(true);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unlockedReelIds, setUnlockedReelIds] = useState<Set<string>>(new Set());
 
   const flatListRef = useRef<FlatList>(null);
   const reelsRef = useRef<Reel[]>([]);
-
-  const fetchFeed = useCallback(async () => {
-    try {
-      setActiveIndex(0);
-
-      // ── Layer 1: In-memory cache (instant, ~0ms) ──
-      const prefetchService = FeedPrefetchService.getInstance();
-      let cached = prefetchService.getCachedFeed();
-      let reels: Reel[] | null = null;
-
-      if (cached && cached.items && cached.items.length > 0) {
-        console.log("[eBites] Using in-memory prefetched feed (zero latency)");
-        reels = cached.items;
-      }
-
-      // ── Layer 2: AsyncStorage (fast, ~10ms, survives restart) ──
-      if (!reels) {
-        try {
-          const stored = await AsyncStorage.getItem("@ebites_feed_cache");
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (parsed.response?.items?.length > 0) {
-              console.log("[eBites] Using AsyncStorage cached feed");
-              reels = parsed.response.items;
-            }
-          }
-        } catch (e) {
-          console.warn("[eBites] AsyncStorage read failed:", e);
-        }
-      }
-
-      // If we found cached data, render immediately
-      if (reels && reels.length > 0) {
-        const unlocked = await loadUnlockedReelIds();
-        setUnlockedReelIds(unlocked);
-        buildAndSetFeed(reels, unlocked);
-        setLoading(false);
-
-        // Background refresh: silently fetch latest data
-        reelsApi
-          .getFeed()
-          .then(async (response) => {
-            if (response.items && response.items.length > 0) {
-              console.log("[eBites] Background refresh complete");
-              const unlocked = await loadUnlockedReelIds();
-              setUnlockedReelIds(unlocked);
-              buildAndSetFeed(response.items, unlocked);
-              // Update caches
-              AsyncStorage.setItem(
-                "@ebites_feed_cache",
-                JSON.stringify({
-                  response,
-                  timestamp: Date.now(),
-                }),
-              );
-            }
-          })
-          .catch(() => {
-            /* silent */
-          });
-        return;
-      }
-
-      // ── Layer 3: API call (slow, last resort) ──
-      setLoading(true);
-      console.log("[eBites] Full cache miss, fetching from API...");
-      const response = await reelsApi.getFeed();
-      reels = response.items || [];
-      const unlocked = await loadUnlockedReelIds();
-      setUnlockedReelIds(unlocked);
-      buildAndSetFeed(reels, unlocked);
-
-      // Save to AsyncStorage for next time
-      AsyncStorage.setItem(
-        "@ebites_feed_cache",
-        JSON.stringify({
-          response,
-          timestamp: Date.now(),
-        }),
-      );
-    } catch (err) {
-      console.error("Failed to load reels feed:", err);
-      setError("Failed to load feed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   const buildAndSetFeed = useCallback(
     (reels: Reel[], unlockedIds: Set<string>) => {
@@ -149,11 +62,7 @@ export default function EBitesScreen() {
           type: "video",
           data: reel,
         });
-        // Only show activity after user has watched 80%+ of the reel
-        if (
-          reel.activity &&
-          unlockedIds.has(String(reel.id))
-        ) {
+        if (reel.activity && unlockedIds.has(String(reel.id))) {
           baseFeed.push({
             id: `activity-${reel.id}`,
             type: "activity",
@@ -181,6 +90,117 @@ export default function EBitesScreen() {
     [],
   );
 
+  const persistFeedCache = useCallback(async (response: { items?: Reel[] }) => {
+    try {
+      await AsyncStorage.setItem(
+        EBITES_FEED_CACHE_KEY,
+        JSON.stringify({
+          response,
+          timestamp: Date.now(),
+        }),
+      );
+    } catch (e) {
+      console.warn("[eBites] AsyncStorage write failed:", e);
+    }
+  }, []);
+
+  const fetchFeed = useCallback(
+    async (options?: { forceFresh?: boolean }) => {
+      const forceFresh = options?.forceFresh === true;
+      const prefetchService = FeedPrefetchService.getInstance();
+
+      try {
+        if (forceFresh) {
+          setActiveIndex(0);
+          prefetchService.invalidate();
+        }
+
+        let reels: Reel[] | null = null;
+
+        if (!forceFresh) {
+          const cached = prefetchService.getCachedFeed();
+          if (cached?.items?.length) {
+            console.log("[eBites] Using in-memory prefetched feed");
+            reels = cached.items;
+          }
+
+          if (!reels) {
+            try {
+              const stored = await AsyncStorage.getItem(EBITES_FEED_CACHE_KEY);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed.response?.items?.length > 0) {
+                  console.log("[eBites] Using AsyncStorage cached feed");
+                  reels = parsed.response.items;
+                }
+              }
+            } catch (e) {
+              console.warn("[eBites] AsyncStorage read failed:", e);
+            }
+          }
+
+          if (reels && reels.length > 0) {
+            const unlocked = await loadUnlockedReelIds();
+            setUnlockedReelIds(unlocked);
+            buildAndSetFeed(reels, unlocked);
+            setLoading(false);
+
+            reelsApi
+              .getFeed()
+              .then(async (response) => {
+                if (response.items?.length) {
+                  const unlocked = await loadUnlockedReelIds();
+                  setUnlockedReelIds(unlocked);
+                  buildAndSetFeed(response.items, unlocked);
+                  await persistFeedCache(response);
+                }
+              })
+              .catch(() => {
+                /* silent background refresh */
+              });
+            return;
+          }
+        }
+
+        if (!forceFresh) {
+          setLoading(true);
+        }
+
+        console.log(
+          forceFresh
+            ? "[eBites] Force refresh from API..."
+            : "[eBites] Full cache miss, fetching from API...",
+        );
+        const response = await reelsApi.getFeed();
+        reels = response.items || [];
+        const unlocked = await loadUnlockedReelIds();
+        setUnlockedReelIds(unlocked);
+        buildAndSetFeed(reels, unlocked);
+        await persistFeedCache(response);
+        void prefetchService.prefetch();
+      } catch (err) {
+        console.error("Failed to load reels feed:", err);
+        if (forceFresh && feedItems.length > 0) {
+          Alert.alert(
+            "Refresh failed",
+            "Could not update the feed. Showing your last loaded eBites.",
+          );
+        } else {
+          setError("Failed to load feed. Please try again.");
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [buildAndSetFeed, feedItems.length, persistFeedCache],
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void fetchFeed({ forceFresh: true });
+  }, [fetchFeed]);
+
   const handleWatchProgress = useCallback(
     async (reelId: string, _progressPercent: number) => {
       setUnlockedReelIds((prev) => {
@@ -198,7 +218,7 @@ export default function EBitesScreen() {
   );
 
   useEffect(() => {
-    fetchFeed();
+    void fetchFeed();
   }, [fetchFeed]);
 
   useFocusEffect(
@@ -240,29 +260,31 @@ export default function EBitesScreen() {
         <EBiteVideoCard
           item={{
             ...item.data,
-            videoUrl: item.data.playback_url, // Map backend playback_url to component videoUrl
+            videoUrl: item.data.playback_url,
           }}
           isActive={isActive}
           onWatchProgress={handleWatchProgress}
         />
       );
-    } else if (item.type === "activity") {
+    }
+
+    if (item.type === "activity") {
       return (
         <EBiteActivityCard
           item={{
             ...item.data,
-            correctAnswer: item.data.correct_answer, // Map backend correct_answer to component correctAnswer
+            correctAnswer: item.data.correct_answer,
           }}
           isActive={isActive}
           onComplete={(isCorrect) => handleActivitySubmit(item.data, isCorrect)}
         />
       );
     }
+
     return null;
   };
 
   if (loading && feedItems.length === 0) {
-    // Dark feed skeleton: caption lines bottom-left + action rail right
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
@@ -289,7 +311,7 @@ export default function EBitesScreen() {
           title="Couldn't load eBites"
           subtitle="Check your connection and try again."
           ctaLabel="Tap to Retry"
-          onCtaPress={fetchFeed}
+          onCtaPress={() => void fetchFeed({ forceFresh: true })}
         />
       </View>
     );
@@ -304,7 +326,7 @@ export default function EBitesScreen() {
           title="No eBites yet"
           subtitle="Short learning videos picked for your weak areas will appear here. Check back after your next practice."
           ctaLabel="Refresh Feed"
-          onCtaPress={fetchFeed}
+          onCtaPress={() => void fetchFeed({ forceFresh: true })}
         />
       </View>
     );
@@ -329,6 +351,15 @@ export default function EBitesScreen() {
         maxToRenderPerBatch={3}
         windowSize={5}
         removeClippedSubviews
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#fff"
+            colors={["#6366f1"]}
+            progressBackgroundColor="#1a1a1a"
+          />
+        }
         getItemLayout={(data, index) => ({
           length: SCREEN_HEIGHT,
           offset: SCREEN_HEIGHT * index,
@@ -347,23 +378,6 @@ const styles = StyleSheet.create({
   centered: {
     justifyContent: "center",
     alignItems: "center",
-  },
-  loadingText: {
-    color: "#fff",
-    marginTop: 12,
-    fontSize: 16,
-  },
-  errorText: {
-    color: "#ef4444",
-    fontSize: 16,
-    textAlign: "center",
-    paddingHorizontal: 40,
-  },
-  retryText: {
-    color: "#6366f1",
-    marginTop: 20,
-    fontSize: 14,
-    fontWeight: "bold",
   },
   skeletonCaption: {
     position: "absolute",
