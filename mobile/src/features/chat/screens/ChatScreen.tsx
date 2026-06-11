@@ -28,6 +28,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { chatApi } from "../../../api/connections";
+import { userApi } from "../../../api/user";
 import { engagementApi, AggregatedReaction } from "../../../api/engagement";
 import SocketService from "../../call/services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
@@ -134,6 +135,11 @@ export default function ChatScreen() {
           socketService.connect(token);
           socketService.joinConversation(conversationId);
           socketService.markRead(conversationId);
+        }
+
+        const myId = await userApi.getCurrentUserId();
+        if (mounted && myId) {
+          setInternalUserId(myId);
         }
 
         // Load messages

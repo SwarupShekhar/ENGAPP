@@ -684,6 +684,9 @@ export default function HomeScreen() {
     useCallback(() => {
       setHomeScrollEnabled(true);
       void loadHome();
+      return () => {
+        setHomeScrollEnabled(true);
+      };
     }, [loadHome]),
   );
 

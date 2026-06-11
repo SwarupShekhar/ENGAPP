@@ -51,6 +51,7 @@ export default function EBitesScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const reelsRef = useRef<Reel[]>([]);
+  const hasFeedItemsRef = useRef(false);
 
   const buildAndSetFeed = useCallback(
     (reels: Reel[], unlockedIds: Set<string>) => {
@@ -85,6 +86,7 @@ export default function EBitesScreen() {
       }
 
       setFeedItems(loopedFeed);
+      hasFeedItemsRef.current = loopedFeed.length > 0;
       setError(null);
     },
     [],
@@ -180,7 +182,7 @@ export default function EBitesScreen() {
         void prefetchService.prefetch();
       } catch (err) {
         console.error("Failed to load reels feed:", err);
-        if (forceFresh && feedItems.length > 0) {
+        if (forceFresh && hasFeedItemsRef.current) {
           Alert.alert(
             "Refresh failed",
             "Could not update the feed. Showing your last loaded eBites.",
@@ -193,7 +195,7 @@ export default function EBitesScreen() {
         setRefreshing(false);
       }
     },
-    [buildAndSetFeed, feedItems.length, persistFeedCache],
+    [buildAndSetFeed, persistFeedCache],
   );
 
   const onRefresh = useCallback(() => {
