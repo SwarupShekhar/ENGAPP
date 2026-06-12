@@ -22,6 +22,7 @@ import { useUIVariant } from "../../../context/UIVariantContext";
 import { reliabilityApi, type UserReliability } from "../../../api/reliability";
 import { userApi } from "../../../api/user";
 import { usePushNotificationsSetting } from "../../../hooks/usePushNotificationsSetting";
+import { useTestPushNotification } from "../../../hooks/useTestPushNotification";
 
 const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any }) => (
   <BlurView intensity={80} tint="dark" style={[styles.glassCard, style]}>
@@ -155,6 +156,8 @@ export default function ProfileScreenV2() {
     updating: pushUpdating,
     onToggle: onNotificationsToggle,
   } = usePushNotificationsSetting();
+  const { sendTest: sendTestPush, sending: sendingTestPush } =
+    useTestPushNotification();
   const [practiceReminders, setPracticeReminders] = useState(true);
   const [reliability, setReliability] = useState<UserReliability | null>(null);
 
@@ -437,6 +440,20 @@ export default function ProfileScreenV2() {
                   trackColor={{ true: tokensV2.colors.primaryViolet, false: "rgba(255,255,255,0.18)" }}
                   thumbColor={tokensV2.colors.textPrimary}
                 />
+              }
+            />
+            <View style={styles.separator} />
+            <SettingRowV2
+              icon="paper-plane-outline"
+              label="Send test notification"
+              subtitle={
+                sendingTestPush ? "Sending…" : "Verify push is working on this device"
+              }
+              onPress={sendingTestPush ? undefined : () => void sendTestPush()}
+              rightElement={
+                sendingTestPush ? (
+                  <ActivityIndicator size="small" color={tokensV2.colors.accentMint} />
+                ) : undefined
               }
             />
           </GlassCard>

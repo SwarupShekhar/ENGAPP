@@ -30,6 +30,13 @@ export interface NotificationPreferences {
     practiceRemindersEnabled: boolean;
 }
 
+export interface TestNotificationResult {
+    ok: boolean;
+    pushConfigured: boolean;
+    deviceTokens: number;
+    delivered: number;
+}
+
 export const userApi = {
     getStats: async (): Promise<UserStats> => {
         const response = await client.get('/users/me/stats');
@@ -62,6 +69,11 @@ export const userApi = {
             '/users/me/notification-preferences',
             prefs,
         );
+        return response.data;
+    },
+
+    sendTestNotification: async (): Promise<TestNotificationResult> => {
+        const response = await client.post('/users/me/notifications/test');
         return response.data;
     },
 };

@@ -21,6 +21,7 @@ import { userApi } from "../../../api/user";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { Theme } from "../../../theme/types";
 import { usePushNotificationsSetting } from "../../../hooks/usePushNotificationsSetting";
+import { useTestPushNotification } from "../../../hooks/useTestPushNotification";
 
 // ─── Setting Row ───────────────────────────────────────────
 function SettingRow({
@@ -183,6 +184,8 @@ export default function ProfileScreen() {
     updating: pushUpdating,
     onToggle: onNotificationsToggle,
   } = usePushNotificationsSetting();
+  const { sendTest: sendTestPush, sending: sendingTestPush } =
+    useTestPushNotification();
   const [practiceReminders, setPracticeReminders] = useState(true);
   const { variant, setVariant } = useUIVariant();
   const [reliability, setReliability] = useState<UserReliability | null>(null);
@@ -493,6 +496,21 @@ export default function ProfileScreen() {
                 }}
                 thumbColor={theme.colors.surface}
               />
+            }
+          />
+          <View style={separatorStyle} />
+          <SettingRow
+            icon="paper-plane-outline"
+            label="Send test notification"
+            subtitle={
+              sendingTestPush ? "Sending…" : "Verify push is working on this device"
+            }
+            theme={theme}
+            onPress={sendingTestPush ? undefined : () => void sendTestPush()}
+            rightElement={
+              sendingTestPush ? (
+                <ActivityIndicator size="small" color={theme.colors.accent} />
+              ) : undefined
             }
           />
         </View>

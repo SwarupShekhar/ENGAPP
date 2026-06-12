@@ -357,4 +357,40 @@ export class NotificationService {
       failedByType: failures.map((f) => ({ type: f.type, count: f._count._all })),
     };
   }
+
+  /** Sends an immediate test push to all of the user's registered device tokens. */
+  async sendTestPush(userId: string): Promise<{
+    ok: boolean;
+    pushConfigured: boolean;
+    deviceTokens: number;
+    delivered: number;
+  }> {
+    const pushConfigured = this.fcm.hasValidConfig();
+    if (!pushConfigured) {
+      return { ok: false, pushConfigured: false, deviceTokens: 0, delivered: 0 };
+    }
+
+    const tokens = await this.prisma.deviceToken.findMany({ where: { userId } });
+    const deviceTokens = tokens.length;
+    if (!deviceTokens) {
+      return { ok: false, pushConfigured: true, deviceTokens: 0, delivered: 0 };
+    }
+
+    const results = await this.fcm.send(
+      tokens.map((t) => t.token),
+      {
+        title: 'Englivo test',
+        body: 'Push notifications are working. You are all set.',
+        data: { type: 'reminder', test: 'true' },
+      },
+    );
+    const delivered = results.filter((r) => r.success).length;
+
+    return {
+      ok: delivered > 0,
+      pushConfigured: true,
+      deviceTokens,
+      delivered,
+    };
+  }
 }

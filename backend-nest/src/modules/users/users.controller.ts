@@ -4,6 +4,7 @@ import { ClerkGuard } from '../auth/clerk.guard';
 import { TasksService } from '../tasks/tasks.service';
 import { DeviceTokenDto } from './dto/device-token.dto';
 import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
+import { NotificationService } from '../notifications/notification.service';
 
 @Controller('users')
 @UseGuards(ClerkGuard)
@@ -11,6 +12,7 @@ export class UsersController {
     constructor(
         private readonly usersService: UsersService,
         private readonly tasksService: TasksService,
+        private readonly notificationService: NotificationService,
     ) { }
 
     @Get('me/notification-preferences')
@@ -68,5 +70,10 @@ export class UsersController {
         const userId = req.user.id;
         await this.usersService.removeDeviceToken(userId, token);
         return { ok: true };
+    }
+
+    @Post('me/notifications/test')
+    async sendTestNotification(@Request() req: { user: { id: string } }) {
+        return this.notificationService.sendTestPush(req.user.id);
     }
 }
