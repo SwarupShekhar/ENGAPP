@@ -21,6 +21,7 @@ import { tokensV2_603010 as tokensV2 } from "../../../theme/tokensV2_603010";
 import { useUIVariant } from "../../../context/UIVariantContext";
 import { reliabilityApi, type UserReliability } from "../../../api/reliability";
 import { userApi } from "../../../api/user";
+import { usePushNotificationsSetting } from "../../../hooks/usePushNotificationsSetting";
 
 const GlassCard = ({ children, style }: { children: React.ReactNode; style?: any }) => (
   <BlurView intensity={80} tint="dark" style={[styles.glassCard, style]}>
@@ -149,7 +150,11 @@ export default function ProfileScreenV2() {
   const { variant, setVariant } = useUIVariant();
 
   const [signingOut, setSigningOut] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const {
+    enabled: notificationsEnabled,
+    updating: pushUpdating,
+    onToggle: onNotificationsToggle,
+  } = usePushNotificationsSetting();
   const [practiceReminders, setPracticeReminders] = useState(true);
   const [reliability, setReliability] = useState<UserReliability | null>(null);
 
@@ -413,7 +418,8 @@ export default function ProfileScreenV2() {
               rightElement={
                 <Switch
                   value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
+                  onValueChange={onNotificationsToggle}
+                  disabled={pushUpdating}
                   trackColor={{ true: tokensV2.colors.accentMint, false: "rgba(255,255,255,0.18)" }}
                   thumbColor={tokensV2.colors.textPrimary}
                 />

@@ -10,6 +10,9 @@ services:
       FASTAPI_SERVICE_URL: http://backend-ai:8001
       PORT: 3000
       NODE_ENV: production
+      # FCM push delivery: set FIREBASE_SERVICE_ACCOUNT_JSON in backend-nest/.env
+      # (Firebase Console → Project settings → Service accounts → Generate key).
+      # Without it, backend-nest logs "[FCM] No service account" and push is disabled.
     ports:
       # Port 4001 is firewall-whitelisted on this Vultr server.
       # Mobile preview builds connect here directly (http://139.84.163.249:4001).

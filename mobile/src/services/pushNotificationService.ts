@@ -5,6 +5,12 @@ import { AnalyticsEvents } from "../analytics/events";
 import { analyticsMeta } from "../analytics/eventMeta";
 import { client, getNestAuthToken } from "../api/client";
 import { navigate } from "../navigation/navigationRef";
+import {
+  displayForegroundNotification,
+  ensureNotificationChannel,
+  registerNotifeePressHandler,
+  setupNotifeeForegroundPressHandling,
+} from "./localNotificationDisplay";
 
 export type PushPayload = Record<string, unknown>;
 
@@ -79,17 +85,16 @@ class PushNotificationService {
     }
 
     try {
-      const granted = await this.requestNotificationPermission(messaging);
-      if (!granted) {
-        await this.setPushEnabled(false);
-        return;
-      }
+      await ensureNotificationChannel();
+      registerNotifeePressHandler((data) => this.dispatchClick(data));
+      await setupNotifeeForegroundPressHandling();
 
       this.unsubscribeForeground = messaging().onMessage(async (message) => {
         const flat = payloadFromRemoteMessage(message);
         if (__DEV__) {
           console.log("[FCM] Foreground message:", JSON.stringify(flat));
         }
+        await displayForegroundNotification(flat);
         this.dispatchNotification(flat);
       });
 
@@ -108,7 +113,16 @@ class PushNotificationService {
         await this.sendTokenToBackend(token);
       });
 
-      await this.registerDevice();
+      const pushEnabled = await this.isPushEnabled();
+      if (pushEnabled !== false) {
+        const granted = await this.requestNotificationPermission(messaging);
+        if (!granted) {
+          await AsyncStorage.setItem(PUSH_ENABLED_KEY, "false");
+        } else {
+          await this.registerDevice();
+        }
+      }
+
       this.isInitialized = true;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -242,6 +256,15 @@ class PushNotificationService {
     if (Platform.OS === "web") return;
     await AsyncStorage.setItem(PUSH_ENABLED_KEY, enabled.toString());
     if (enabled) {
+      const messaging = await getMessaging();
+      if (!messaging) return;
+
+      const granted = await this.requestNotificationPermission(messaging);
+      if (!granted) {
+        await AsyncStorage.setItem(PUSH_ENABLED_KEY, "false");
+        throw new Error("Notification permission denied");
+      }
+
       await this.registerDevice();
     } else {
       await this.unregister();

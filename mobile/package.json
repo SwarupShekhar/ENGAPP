@@ -22,6 +22,7 @@
     "@livekit/react-native": "2.9.8",
     "@livekit/react-native-expo-plugin": "^1.0.1",
     "@livekit/react-native-webrtc": "137.0.3",
+    "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-firebase/app": "^24.1.1",
     "@react-native-firebase/crashlytics": "^24.1.1",

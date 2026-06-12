@@ -20,6 +20,7 @@ import { reliabilityApi, UserReliability } from "../../../api/reliability";
 import { userApi } from "../../../api/user";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { Theme } from "../../../theme/types";
+import { usePushNotificationsSetting } from "../../../hooks/usePushNotificationsSetting";
 
 // ─── Setting Row ───────────────────────────────────────────
 function SettingRow({
@@ -177,7 +178,11 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
   const [signingOut, setSigningOut] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const {
+    enabled: notificationsEnabled,
+    updating: pushUpdating,
+    onToggle: onNotificationsToggle,
+  } = usePushNotificationsSetting();
   const [practiceReminders, setPracticeReminders] = useState(true);
   const { variant, setVariant } = useUIVariant();
   const [reliability, setReliability] = useState<UserReliability | null>(null);
@@ -462,7 +467,8 @@ export default function ProfileScreen() {
             rightElement={
               <Switch
                 value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                onValueChange={onNotificationsToggle}
+                disabled={pushUpdating}
                 trackColor={{
                   true: theme.colors.accent,
                   false: theme.colors.border,
