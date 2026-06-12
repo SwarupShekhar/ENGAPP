@@ -305,6 +305,10 @@ export default function AITutorScreen({ navigation, route }: any) {
   const seedPhraseRef = useRef<{ phrase?: string; example?: string; definition?: string } | null>(
     route?.params?.phrase ?? null,
   );
+  /** Optional topic hint passed from a home card action (open_maya_chat). */
+  const seedTopicRef = useRef<string | null>(
+    (route?.params?.topic as string | undefined) ?? null,
+  );
   const tutorOpenTrackedRef = useRef(false);
 
   useEffect(() => {
@@ -312,12 +316,13 @@ export default function AITutorScreen({ navigation, route }: any) {
     tutorOpenTrackedRef.current = true;
     const source =
       (route?.params?.source as string | undefined) ??
-      (route?.params?.phrase ? "phrase_of_day" : "unknown");
+      (route?.params?.phrase ? "phrase_of_day" : route?.params?.topic ? "home_card_topic" : "unknown");
     analytics.capture(
       AnalyticsEvents.AI_TUTOR_OPENED,
       analyticsMeta({
         source,
         has_seed_phrase: Boolean(route?.params?.phrase),
+        has_seed_topic: Boolean(route?.params?.topic),
       }),
     );
   }, [analytics, route?.params?.phrase, route?.params?.source]);
@@ -420,6 +425,7 @@ export default function AITutorScreen({ navigation, route }: any) {
 
         const greeting = { id: "welcome", speaker: "ai" as const, text: res.message };
         const seed = seedPhraseRef.current;
+        const seedTopic = seedTopicRef.current;
         const initial = seed?.phrase
           ? [
               greeting,
@@ -427,6 +433,15 @@ export default function AITutorScreen({ navigation, route }: any) {
                 id: "seed-prompt",
                 speaker: "ai" as const,
                 text: `Let's practise today's phrase: "${seed.phrase}". Try saying it.`,
+              },
+            ]
+          : seedTopic
+          ? [
+              greeting,
+              {
+                id: "seed-topic",
+                speaker: "ai" as const,
+                text: `Let's talk about: ${seedTopic}. What do you think?`,
               },
             ]
           : [greeting];

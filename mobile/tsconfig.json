@@ -14,7 +14,8 @@
       "DOM"
     ],
     "types": [
-      "react"
+      "react",
+      "jest"
     ],
     "noEmit": true
   },

@@ -1617,6 +1617,8 @@ export default function InCallScreen({ navigation, route }: any) {
             />
           )}
 
+          <CallQualityPill data={qualityPreview} />
+
           {/* Transcript: Live conversation */}
           <View style={styles.transcriptContainer}>
             <View style={styles.transcriptHeader}>

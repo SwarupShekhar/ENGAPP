@@ -65,13 +65,18 @@ async def compute_cqs(
     pqs_value = float(pqs["pqs"]) if isinstance(pqs, dict) else float(pqs)
     cqs = call_quality_service.compute_call_quality_score(pqs_value, ds, cs, es)
 
+    grammar_signal = call_quality_service.compute_grammar_score(body.user_turns)
+    fluency_signal = call_quality_service.compute_fluency_signal(pqs, body.user_turns)
+
     return CQSResponse(
         cqs=cqs,
         breakdown={
             "pqs": pqs,
             "ds": ds,
             "cs": cs,
-            "es": es
+            "es": es,
+            "grammar_signal": grammar_signal,
+            "fluency_signal": fluency_signal,
         }
     )
 

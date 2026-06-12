@@ -11,6 +11,7 @@ import {
   Animated as RNAnimated,
   Modal,
   RefreshControl,
+  AccessibilityInfo,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useUser } from '@clerk/clerk-expo';
@@ -25,8 +26,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
-  withRepeat,
-  withSequence,
+  withSpring,
   FadeInDown,
   FadeIn,
   Easing,
@@ -36,32 +36,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
 import PulseHomeCarousel from '../../../components/home/PulseHomeCarousel';
+import { homeTheme } from '../theme/homeTheme';
+import ConnectHeroCard from '../components/ConnectHeroCard';
+import MistakesCard from '../components/MistakesCard';
 import { getHomeData, HomeData } from '../services/homeApi';
 import { HOME_DATA_CACHE_KEY } from '../../../services/cacheKeys';
 import FeedPrefetchService from '../../../services/feedPrefetchService';
 import { tasksApi } from '../../../api/tasks';
 
-const STALE_RESUME_CTA = /pick up where you left|saved your progress|restart my journey/i;
-
-function resolvePracticeCta(cta?: HomeData['primaryCTA']) {
-  const blob = `${cta?.title ?? ''} ${cta?.description ?? ''} ${cta?.buttonText ?? ''}`;
-  if (!cta?.title?.trim() || cta.type === 'restart_journey' || STALE_RESUME_CTA.test(blob)) {
-    return {
-      title: 'Start a practice call',
-      description: 'Get matched with someone new — every call is a live conversation',
-      buttonText: 'Find a Partner',
-    };
-  }
-  return {
-    title: cta.title.trim(),
-    description:
-      cta.description?.trim() || 'Match with a partner or warm up with Maya first.',
-    buttonText: cta.buttonText?.trim() || 'Start a Call',
-  };
-}
-let Haptics: { impactAsync: (s: unknown) => Promise<void>; ImpactFeedbackStyle: { Light: string } } = {
+let Haptics: {
+  impactAsync: (s: unknown) => Promise<void>;
+  ImpactFeedbackStyle: { Light: string; Medium: string };
+} = {
   impactAsync: async () => {},
-  ImpactFeedbackStyle: { Light: 'light' },
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
 };
 try {
   Haptics = require('expo-haptics');
@@ -217,6 +205,10 @@ const RING_STROKE = 11;
 const RING_RADIUS = (RING_SIZE - RING_STROKE * 2) / 2;
 const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 
+// Slim ring variant (~30% smaller) used by the redesigned ScoreCard.
+const RING_SIZE_SLIM = 104;
+const RING_STROKE_SLIM = 9;
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface Phrase { id?: string; phrase: string; definition: string; example: string; }
@@ -233,20 +225,6 @@ function nextCefr(l: string): string {
   return i >= 0 && i < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[i+1].toUpperCase() : 'C2';
 }
 
-// ─── Pulse hook (call card glow) ──────────────────────────────────────────────
-function usePulse(lo = 0.3, hi = 0.75, ms = 1800) {
-  const v = useSharedValue(lo);
-  useEffect(() => {
-    v.value = withRepeat(
-      withSequence(
-        withTiming(hi, { duration: ms, easing: Easing.inOut(Easing.sin) }),
-        withTiming(lo, { duration: ms, easing: Easing.inOut(Easing.sin) }),
-      ), -1, false,
-    );
-  }, [v, lo, hi, ms]);
-  return v;
-}
-
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function Skel({ w, h, r = 8, tint }: { w: number|string; h: number; r?: number; tint: string }) {
   const op = useRef(new RNAnimated.Value(0.15)).current;
@@ -260,22 +238,38 @@ function Skel({ w, h, r = 8, tint }: { w: number|string; h: number; r?: number; 
 }
 
 // ─── Progress Ring ────────────────────────────────────────────────────────────
-function Ring({ score, primary, accent, track }: { score: number; primary: string; accent: string; track: string }) {
+function Ring({
+  score,
+  primary,
+  accent,
+  track,
+  size = RING_SIZE,
+  stroke = RING_STROKE,
+}: {
+  score: number;
+  primary: string;
+  accent: string;
+  track: string;
+  size?: number;
+  stroke?: number;
+}) {
+  const radius = (size - stroke * 2) / 2;
+  const circ = 2 * Math.PI * radius;
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withDelay(350, withTiming(Math.min(score,100)/100, { duration: 1200, easing: Easing.out(Easing.cubic) }));
   }, [score, p]);
-  const ap = useAnimatedProps(() => ({ strokeDashoffset: RING_CIRC * (1 - p.value) }));
+  const ap = useAnimatedProps(() => ({ strokeDashoffset: circ * (1 - p.value) }));
   return (
-    <Svg width={RING_SIZE} height={RING_SIZE} style={{ transform: [{ rotate: '-90deg' }] }}>
+    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
       <Defs>
         <SvgGradient id="rg" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor={primary} stopOpacity="1" />
           <Stop offset="1" stopColor={accent} stopOpacity="1" />
         </SvgGradient>
       </Defs>
-      <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={RING_RADIUS} stroke={track} strokeWidth={RING_STROKE} fill="none" strokeLinecap="round" />
-      <AnimatedCircle cx={RING_SIZE/2} cy={RING_SIZE/2} r={RING_RADIUS} stroke="url(#rg)" strokeWidth={RING_STROKE} fill="none" strokeLinecap="round" strokeDasharray={RING_CIRC} animatedProps={ap} />
+      <Circle cx={size/2} cy={size/2} r={radius} stroke={track} strokeWidth={stroke} fill="none" strokeLinecap="round" />
+      <AnimatedCircle cx={size/2} cy={size/2} r={radius} stroke="url(#rg)" strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={circ} animatedProps={ap} />
     </Svg>
   );
 }
@@ -294,15 +288,97 @@ function Avatar({ url, initials, primary }: { url?: string; initials: string; pr
   );
 }
 
+// ─── Streak flame with ignition + embers ──────────────────────────────────────
+const EMBER_COUNT = 4;
+
+function StreakFlame({
+  streak,
+  igniteOnMount,
+  reduceMotion,
+}: {
+  streak: number;
+  igniteOnMount: boolean;
+  reduceMotion: boolean;
+}) {
+  const lit = streak >= 1;
+  const hot = streak >= 3;
+  const flameColor = !lit ? homeTheme.streakUnlit : hot ? '#FB923C' : homeTheme.streak;
+
+  const scale = useSharedValue(igniteOnMount && lit && !reduceMotion ? 0 : 1);
+  // One shared value per ember (progress 0 → 1).
+  const emberA = useSharedValue(0);
+  const emberB = useSharedValue(0);
+  const emberC = useSharedValue(0);
+  const emberD = useSharedValue(0);
+  const embers = [emberA, emberB, emberC, emberD];
+
+  useEffect(() => {
+    if (!igniteOnMount || !lit || reduceMotion) {
+      scale.value = 1;
+      return;
+    }
+    // Overshoot spring scale 0 → 1.
+    scale.value = withSpring(1, { damping: 7, stiffness: 140, mass: 0.6 });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    embers.forEach((e, i) => {
+      e.value = 0;
+      e.value = withDelay(
+        i * 70,
+        withTiming(1, { duration: 600, easing: Easing.out(Easing.quad) }),
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [igniteOnMount, lit, reduceMotion]);
+
+  const flameStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <View style={st.flameWrap}>
+      <Animated.View style={flameStyle}>
+        <Ionicons name="flame" size={19} color={flameColor} />
+      </Animated.View>
+      {!reduceMotion && lit && igniteOnMount
+        ? embers.map((e, i) => <Ember key={i} progress={e} index={i} color={flameColor} />)
+        : null}
+    </View>
+  );
+}
+
+function Ember({ progress, index, color }: { progress: ReturnType<typeof useSharedValue<number>>; index: number; color: string }) {
+  const driftX = (index - (EMBER_COUNT - 1) / 2) * 6;
+  const style = useAnimatedStyle(() => ({
+    opacity: progress.value < 0.05 ? 0 : 1 - progress.value,
+    transform: [
+      { translateY: -30 * progress.value },
+      { translateX: driftX * progress.value },
+    ],
+  }));
+  return <Animated.View style={[st.ember, { backgroundColor: color }, style]} />;
+}
+
 // ─── Streak + Daily Goal Row ──────────────────────────────────────────────────
-function StreakRow({ streak, done, target, theme }: { streak: number; done: number; target: number; theme: any }) {
+function StreakRow({
+  streak,
+  done,
+  target,
+  theme,
+  igniteOnMount,
+  reduceMotion,
+}: {
+  streak: number;
+  done: number;
+  target: number;
+  theme: any;
+  igniteOnMount: boolean;
+  reduceMotion: boolean;
+}) {
   const c = theme.colors;
   const hot = streak >= 3;
   return (
-    <View style={[st.streakRow, { backgroundColor: c.surface, borderColor: c.border, borderRadius: theme.borderRadius.l }]}>
+    <View style={[st.streakRow, { backgroundColor: homeTheme.cardFill, borderColor: homeTheme.cardBorder, borderRadius: theme.borderRadius.l }]}>
       <View style={st.streakLeft}>
-        <Ionicons name="flame" size={19} color={hot ? '#FB923C' : c.text.light} />
-        <Text style={[st.streakNum, { color: hot ? '#FB923C' : c.text.primary }]}>{streak}</Text>
+        <StreakFlame streak={streak} igniteOnMount={igniteOnMount} reduceMotion={reduceMotion} />
+        <Text style={[st.streakNum, { color: streak >= 1 ? (hot ? '#FB923C' : homeTheme.streak) : c.text.primary }]}>{streak}</Text>
         <Text style={[st.streakUnit, { color: c.text.light }]}>{streak === 1 ? 'day' : 'days'}</Text>
       </View>
       <View style={[st.streakDivider, { backgroundColor: c.border }]} />
@@ -430,10 +506,15 @@ function ScoreCard({
   ];
 
   return (
-    <LinearGradient
-      colors={[`${c.deep}F0`, `${c.surface}FF`] as any}
-      start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-      style={[st.scoreCard, { borderColor: `${c.primary}28`, borderRadius: theme.borderRadius.xl }]}
+    <View
+      style={[
+        st.scoreCard,
+        {
+          backgroundColor: homeTheme.cardFill,
+          borderColor: homeTheme.cardBorder,
+          borderRadius: homeTheme.cardRadius,
+        },
+      ]}
     >
       {/* Top: ring + right-side info */}
       <Pressable
@@ -446,14 +527,24 @@ function ScoreCard({
             : undefined
         }
         disabled={!onPressOverall}
-        style={({ pressed }) => [st.scoreTop, onPressOverall && pressed && { opacity: 0.92 }]}
+        style={({ pressed }) => [
+          st.scoreTop,
+          onPressOverall && pressed && { transform: [{ scale: homeTheme.pressScale }], opacity: 0.95 },
+        ]}
         accessibilityRole={onPressOverall ? 'button' : undefined}
         accessibilityLabel={onPressOverall ? 'Overall score details' : undefined}
       >
-        <View style={st.ringWrap}>
-          <Ring score={ringArcScore} primary={c.primary} accent={c.accent} track={`${c.border}80`} />
+        <View style={st.ringWrapSlim}>
+          <Ring
+            score={ringArcScore}
+            primary={c.primary}
+            accent={c.accent}
+            track={`${c.border}80`}
+            size={RING_SIZE_SLIM}
+            stroke={RING_STROKE_SLIM}
+          />
           <View style={st.ringInner} pointerEvents="none">
-            <Text style={[st.scoreNum, { color: c.text.primary }]}>{Math.round(score)}</Text>
+            <Text style={[st.scoreNumSlim, { color: c.text.primary }]}>{Math.round(score)}</Text>
             <Text style={[st.scoreDenom, { color: c.text.light }]}>{scoreDenom}</Text>
           </View>
         </View>
@@ -474,8 +565,12 @@ function ScoreCard({
         </View>
       </Pressable>
 
-      {/* Skill chips 2×2 */}
-      <View style={st.skillGrid}>
+      {/* Skill chips — single horizontal row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={st.skillRow}
+      >
         {chips.map((ch) => (
           <SkillChip
             key={ch.key}
@@ -489,7 +584,7 @@ function ScoreCard({
             }
           />
         ))}
-      </View>
+      </ScrollView>
 
       {/* Buttons */}
       <View style={st.btnRow}>
@@ -503,7 +598,7 @@ function ScoreCard({
           <Text style={[st.outBtnTxt, { color: c.text.accent }]}>Retake</Text>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -575,49 +670,13 @@ function PhraseSkeleton({ theme }: { theme: any }) {
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-function timeGreeting(): string {
+function timeGreeting(name?: string): string {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function PracticeCallCard({
-  title,
-  description,
-  buttonText,
-  onPress,
-  theme,
-}: {
-  title: string;
-  description: string;
-  buttonText: string;
-  onPress: () => void;
-  theme: any;
-}) {
-  const c = theme.colors;
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.88}>
-      <LinearGradient
-        colors={[`${c.primary}22`, `${c.surface}FF`] as any}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[st.practiceCtaCard, { borderColor: `${c.primary}40` }]}
-      >
-        <View style={st.practiceCtaIcon}>
-          <Ionicons name="call" size={22} color={c.primary} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[st.practiceCtaTitle, { color: c.text.primary }]}>{title}</Text>
-          <Text style={[st.practiceCtaDesc, { color: c.text.secondary }]}>{description}</Text>
-        </View>
-        <View style={[st.practiceCtaBtn, { backgroundColor: c.primary }]}>
-          <Text style={st.practiceCtaBtnTxt}>{buttonText}</Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+  const who = name ? `, ${name}` : '';
+  if (h >= 23 || h < 4) return `Still up${who}? 🌙`;
+  if (h < 12) return `Good morning${who}`;
+  if (h < 18) return `Good afternoon${who}`;
+  return `Good evening${who}`;
 }
 
 export default function HomeScreen() {
@@ -633,8 +692,36 @@ export default function HomeScreen() {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
   const [homeScrollEnabled, setHomeScrollEnabled] = useState(true);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  // Entry choreography fires ONCE per cold land, not on every tab refocus.
+  const hasPlayedEntry = useRef(false);
+  const playEntry = !reduceMotion && !hasPlayedEntry.current;
 
   const c = theme.colors;
+
+  // ── Reduce-motion accessibility preference ─────────────────────────────────
+  useEffect(() => {
+    let alive = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (alive) setReduceMotion(Boolean(enabled));
+      })
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
+      setReduceMotion(Boolean(enabled));
+    });
+    return () => {
+      alive = false;
+      // RN >= 0.65 returns a subscription with remove(); guard for older shapes.
+      (sub as any)?.remove?.();
+    };
+  }, []);
+
+  // Mark entry as played after first render so refocus renders the final state.
+  useEffect(() => {
+    hasPlayedEntry.current = true;
+  }, []);
 
   const loadHome = useCallback(async (options?: { forceFresh?: boolean }) => {
     const forceFresh = options?.forceFresh === true;
@@ -747,6 +834,26 @@ export default function HomeScreen() {
   const levelForUi   = level || '—';
   const initials     = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`.toUpperCase() || '?';
 
+  // ── Community (peer presence) ──────────────────────────────────────────────
+  const onlineCount = homeData?.community?.onlineCount ?? 0;
+  const communityAvatars = homeData?.community?.avatars ?? [];
+
+  // ── Weakest pillar (lowest of the four skill scores; null if all 0 / empty) ─
+  const weakestPillar = (() => {
+    const keys: SkillDetailKeyV1[] = ['grammar', 'pronunciation', 'fluency', 'vocabulary'];
+    const present = keys
+      .map((k) => ({ k, v: Number(skills[k] ?? 0) }))
+      .filter((e) => Number.isFinite(e.v));
+    if (present.length === 0) return null;
+    // New user with no calls: every pillar 0 → hide the card.
+    if (present.every((e) => e.v <= 0)) return null;
+    let lowest = present[0];
+    for (const e of present) {
+      if (e.v < lowest.v) lowest = e;
+    }
+    return lowest.k as string;
+  })();
+
   // ── Handlers ───────────────────────────────────────────────────────────────
   const goResults  = () => latestId ? navigation.navigate('AssessmentResult', { sessionId: latestId }) : navigation.navigate('AssessmentIntro');
   const goRetake   = () => navigation.navigate('AssessmentIntro');
@@ -755,17 +862,46 @@ export default function HomeScreen() {
   const goNotifs   = () => navigation.navigate('Notifications');
   const goPracticeCall = () => navigation.navigate('CallPreference');
 
-  const practiceCta = resolvePracticeCta(homeData?.primaryCTA);
-  const practiceTitle = practiceCta.title;
-  const practiceDescription = practiceCta.description;
-  const practiceButton = practiceCta.buttonText;
+  // Hero secondary CTA — warm up with Maya when no partner is available.
+  const goMayaFallback = useCallback(() => {
+    navigation.navigate('MayaTutor', { source: 'home_fallback' });
+  }, [navigation]);
+
+  // Mistakes card — practice the weakest pillar. PracticeTask needs a real task
+  // payload, so fetch a matching pending task; fall back to the practice flow.
+  const goMistakesPractice = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      const tasks = await tasksApi.loadPracticeCarouselTasks();
+      const focus = (weakestPillar ?? '').toLowerCase();
+      const match =
+        tasks.find((t) => (t.type || '').toLowerCase() === focus) ?? tasks[0] ?? null;
+      if (match) {
+        navigation.navigate('PracticeTask', { task: match, source: 'home_mistakes', focus });
+        return;
+      }
+    } catch {
+      /* fall through to default flow */
+    }
+    // No task available — route to the practice flow rather than an empty screen.
+    navigation.navigate('PracticeTask', { source: 'home_mistakes', focus: weakestPillar });
+  }, [navigation, weakestPillar]);
+
+  // ── Entry choreography (cascade) ───────────────────────────────────────────
+  const { cascadeStart, cascadeStagger, cascadeDuration } = homeTheme.entry;
+  // Greeting 0, then hero / mistakes / score / carousel staggered.
+  const enterAt = (slot: number) =>
+    FadeInDown.delay(cascadeStart + slot * cascadeStagger).duration(cascadeDuration).springify();
+  const enterGreeting = FadeInDown.delay(homeTheme.entry.greeting.delay)
+    .duration(homeTheme.entry.greeting.duration)
+    .springify();
 
   return (
-    <View style={[st.root, { backgroundColor: c.background }]}>
-      <StatusBar style="light" backgroundColor={c.background} />
+    <View style={[st.root, { backgroundColor: homeTheme.canvas }]}>
+      <StatusBar style="light" backgroundColor={homeTheme.canvas} />
 
       <ScrollView
-        style={[st.scroll, { backgroundColor: c.background }]}
+        style={[st.scroll, { backgroundColor: homeTheme.canvas }]}
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 104, paddingHorizontal: HPAD, gap: 14 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={homeScrollEnabled}
@@ -780,8 +916,8 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(0).duration(340).springify()} style={st.header}>
+        {/* ── Header (greeting) ──────────────────────────────────────────── */}
+        <Animated.View entering={playEntry ? enterGreeting : undefined} style={st.header}>
           {isLoaded
             ? <Avatar url={user?.imageUrl} initials={initials} primary={c.primary} />
             : <View style={[st.avatar, { borderColor: `${c.primary}28`, backgroundColor: `${c.primary}15` }]} />
@@ -789,7 +925,7 @@ export default function HomeScreen() {
           <View style={st.switcher}>
             {isLoaded && user?.firstName ? (
               <Text style={{ fontSize: 11, color: c.text.light, fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
-                {timeGreeting()}, {user.firstName}
+                {timeGreeting(user.firstName)}
               </Text>
             ) : null}
             <ModeSwitcher />
@@ -812,19 +948,47 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* ── Streak Row ──────────────────────────────────────────────────── */}
+        {/* ── Streak Row (flame ignites on cold land) ─────────────────────── */}
         {!loadingHome && (
-          <Animated.View entering={FadeInDown.delay(70).duration(340).springify()}>
-            <StreakRow streak={streak} done={done} target={target} theme={theme} />
+          <Animated.View entering={playEntry ? enterGreeting : undefined}>
+            <StreakRow
+              streak={streak}
+              done={done}
+              target={target}
+              theme={theme}
+              igniteOnMount={playEntry}
+              reduceMotion={reduceMotion}
+            />
           </Animated.View>
         )}
 
-        {/* ── Score Card / Nudge ──────────────────────────────────────────── */}
+        {/* ── Connect hero (peer-first CTA) ───────────────────────────────── */}
+        {!loadingHome && (
+          <Animated.View entering={playEntry ? enterAt(0) : undefined}>
+            <ConnectHeroCard
+              onlineCount={onlineCount}
+              avatars={communityAvatars}
+              onFindPartner={goPracticeCall}
+              onMayaFallback={goMayaFallback}
+              reduceMotion={reduceMotion}
+            />
+          </Animated.View>
+        )}
+
+        {/* ── Mistakes card (hides itself when no weakest pillar) ─────────── */}
+        {!loadingHome && (
+          <Animated.View entering={playEntry ? enterAt(1) : undefined}>
+            <MistakesCard weakestPillar={weakestPillar} onPractice={goMistakesPractice} />
+          </Animated.View>
+        )}
+
+        {/* ── Score Card / Nudge (slim) ───────────────────────────────────── */}
         {loadingHome ? (
           <Animated.View entering={FadeIn.delay(60).duration(260)}>
             <ScoreSkeleton theme={theme} />
           </Animated.View>
         ) : hasData ? (
-          <Animated.View entering={FadeInDown.delay(130).duration(400).springify()}>
+          <Animated.View entering={playEntry ? enterAt(2) : undefined}>
             <ScoreCard
               score={score}
               level={levelForUi}
@@ -839,25 +1003,13 @@ export default function HomeScreen() {
             />
           </Animated.View>
         ) : (
-          <Animated.View entering={FadeInDown.delay(130).duration(400).springify()}>
+          <Animated.View entering={playEntry ? enterAt(2) : undefined}>
             <AssessmentNudge theme={theme} onPress={goAssess} />
           </Animated.View>
         )}
 
-        {!loadingHome && (
-          <Animated.View entering={FadeInDown.delay(180).duration(380).springify()}>
-            <PracticeCallCard
-              title={practiceTitle}
-              description={practiceDescription}
-              buttonText={practiceButton}
-              onPress={goPracticeCall}
-              theme={theme}
-            />
-          </Animated.View>
-        )}
-
         {/* ── Phrase carousel ─────────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(200).duration(380).springify()} style={{ gap: 10 }}>
+        <Animated.View entering={playEntry ? enterAt(3) : undefined} style={{ gap: 10 }}>
           <PulseHomeCarousel
             phraseOfTheDay={homeData?.phraseOfTheDay ?? null}
             wordOfTheDay={homeData?.wordOfTheDay ?? null}
@@ -916,6 +1068,8 @@ const st = StyleSheet.create({
   // Streak
   streakRow: { flexDirection:'row', alignItems:'center', paddingHorizontal:16, paddingVertical:13, borderWidth:1 },
   streakLeft: { flexDirection:'row', alignItems:'center', gap:6 },
+  flameWrap: { width:22, height:22, alignItems:'center', justifyContent:'center' },
+  ember: { position:'absolute', bottom:6, left:8, width:6, height:6, borderRadius:3 },
   streakNum: { fontSize:18, fontWeight:'800', letterSpacing:-0.5 },
   streakUnit: { fontSize:12, fontWeight:'500' },
   streakDivider: { width:1, height:22, marginHorizontal:14 },
@@ -932,40 +1086,14 @@ const st = StyleSheet.create({
   nudgeBtn: { flexDirection:'row', alignItems:'center', justifyContent:'center', paddingVertical:14, borderRadius:10, gap:8 },
   nudgeBtnTxt: { color:'#fff', fontSize:15, fontWeight:'700', letterSpacing:0.2 },
 
-  practiceCtaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-  },
-  practiceCtaIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(139,92,246,0.14)',
-  },
-  practiceCtaTitle: { fontSize: 15, fontWeight: '800', marginBottom: 3 },
-  practiceCtaDesc: { fontSize: 12, lineHeight: 17 },
-  practiceCtaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-  },
-  practiceCtaBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '700' },
-
   // Score card
   scoreCard: { borderWidth:1, padding:CPAD, gap:16 },
   scoreTop: { flexDirection:'row', alignItems:'center', gap:16 },
   ringWrap: { width:RING_SIZE, height:RING_SIZE, alignItems:'center', justifyContent:'center' },
+  ringWrapSlim: { width:RING_SIZE_SLIM, height:RING_SIZE_SLIM, alignItems:'center', justifyContent:'center' },
   ringInner: { position:'absolute', top:0, left:0, right:0, bottom:0, alignItems:'center', justifyContent:'center' },
   scoreNum: { fontSize:36, fontWeight:'800', lineHeight:42, letterSpacing:-1 },
+  scoreNumSlim: { fontSize:28, fontWeight:'800', lineHeight:32, letterSpacing:-1 },
   scoreDenom: { fontSize:13, marginTop:-2 },
   scoreInfo: { flex:1, gap:8 },
   overallRow: { flexDirection:'row', alignItems:'center' },
@@ -978,9 +1106,10 @@ const st = StyleSheet.create({
 
   // Skill chips
   skillGrid: { flexDirection:'row', flexWrap:'wrap', gap:8 },
-  skillChip: { flexDirection:'row', alignItems:'center', paddingHorizontal:10, paddingVertical:7, borderRadius:8, borderWidth:1, gap:5, flex:1, minWidth:'45%' },
+  skillRow: { flexDirection:'row', alignItems:'center', gap:8, paddingRight:4 },
+  skillChip: { flexDirection:'row', alignItems:'center', paddingHorizontal:10, paddingVertical:7, borderRadius:8, borderWidth:1, gap:5 },
   skillDot: { width:7, height:7, borderRadius:4 },
-  skillLabel: { fontSize:11, fontWeight:'600', flex:1 },
+  skillLabel: { fontSize:11, fontWeight:'600' },
   skillScore: { fontSize:12, fontWeight:'800' },
 
   // Buttons

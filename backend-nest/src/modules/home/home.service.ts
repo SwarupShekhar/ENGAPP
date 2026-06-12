@@ -5,6 +5,7 @@ import { HeaderBuilder } from './builders/header.builder';
 import { CTABuilder } from './builders/cta.builder';
 import { SkillsBuilder } from './builders/skills.builder';
 import { CardsBuilder } from './builders/cards.builder';
+import { CommunityBuilder } from './builders/community.builder';
 import { WordOfDayService } from './services/word-of-day.service';
 import { PhraseOfDayService } from './services/phrase-of-day.service';
 
@@ -17,6 +18,7 @@ export class HomeService {
     private ctaBuilder: CTABuilder,
     private skillsBuilder: SkillsBuilder,
     private cardsBuilder: CardsBuilder,
+    private communityBuilder: CommunityBuilder,
     private wordOfDayService: WordOfDayService,
     private phraseOfDayService: PhraseOfDayService,
   ) {}
@@ -24,7 +26,7 @@ export class HomeService {
   async getHomeData(userId: string) {
     const stage = await this.stageResolver.getCachedStage(userId);
 
-    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay, phraseOfTheDay, dailyPracticeStatus] =
+    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay, phraseOfTheDay, dailyPracticeStatus, community] =
       await Promise.all([
         this.headerBuilder.buildHeaderData(userId, stage),
         this.ctaBuilder.buildPrimaryCTA(userId, stage),
@@ -34,6 +36,7 @@ export class HomeService {
         this.wordOfDayService.getWordOfTheDay(),
         this.phraseOfDayService.getPhraseOfTheDay(),
         this.getDailyPracticeStatus(userId),
+        this.communityBuilder.buildCommunityData(userId),
       ]);
 
     return {
@@ -46,6 +49,7 @@ export class HomeService {
       wordOfTheDay,
       phraseOfTheDay,
       dailyPracticeStatus,
+      community,
     };
   }
 

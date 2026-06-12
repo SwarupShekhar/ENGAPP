@@ -17,10 +17,44 @@ export class HeaderBuilder {
     if (!user) return null;
 
     const streak = user.currentStreak || user.profile?.streak || 0;
-    let score = user.assessmentScore || 0;
     let level = user.assessmentLevel || user.overallLevel || user.level || 'A2';
 
-    // Fallback for score/level if not in user record (sync with Progress screen)
+    // Read score directly from UserTopicScore (same source as Progress screen)
+    const topicScores = await this.prisma.userTopicScore.findMany({
+      where: {
+        userId,
+        topicTag: { in: ['pillar_pronunciation', 'pillar_fluency', 'pillar_grammar', 'pillar_vocabulary', 'pillar_comprehension'] },
+      },
+    });
+
+    const pillarMap: Record<string, number> = {};
+    for (const ts of topicScores) {
+      const key = ts.topicTag.replace('pillar_', '');
+      pillarMap[key] = Math.round(Number(ts.score) || 0);
+    }
+
+    const hasComprehension = pillarMap.comprehension != null;
+    let score: number;
+    if (topicScores.length === 0) {
+      score = 0;
+    } else if (hasComprehension) {
+      score = Math.round(
+        (pillarMap.pronunciation || 0) * 0.22 +
+        (pillarMap.fluency || 0) * 0.25 +
+        (pillarMap.grammar || 0) * 0.22 +
+        (pillarMap.vocabulary || 0) * 0.18 +
+        (pillarMap.comprehension || 0) * 0.13
+      );
+    } else {
+      score = Math.round(
+        (pillarMap.pronunciation || 0) * 0.255 +
+        (pillarMap.fluency || 0) * 0.291 +
+        (pillarMap.grammar || 0) * 0.255 +
+        (pillarMap.vocabulary || 0) * 0.209
+      );
+    }
+
+    // Fallback for score/level if no UserTopicScore rows exist
     if (score === 0 || !user.assessmentLevel) {
       const latestAssessment = await this.prisma.assessmentSession.findFirst({
         where: { userId, status: 'COMPLETED' },

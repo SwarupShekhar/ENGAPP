@@ -121,6 +121,112 @@ export class CardsBuilder {
       });
     }
 
+    // ── Smart personalised cards (max 2 total) ──────────────────────────────
+    let smartCardCount = 0;
+
+    // SMART CARD 1: Gap card — user hasn't practised in >48 hours
+    const gapSource = user.lastSessionAt || user.reliability?.lastSessionAt;
+    if (gapSource && smartCardCount < 2) {
+      const gapHours =
+        (Date.now() - new Date(gapSource).getTime()) / (1000 * 60 * 60);
+      if (gapHours > 48) {
+        const daysSince = Math.floor(gapHours / 24);
+        cards.push({
+          type: 'tip',
+          priority: 1,
+          data: {
+            title: `Back at it!`,
+            body: `You haven't practiced in ${daysSince} days — a quick 5-min session keeps your streak alive`,
+            action: 'start_maya_session',
+            priority: 'high',
+          },
+        });
+        smartCardCount++;
+      }
+    }
+
+    // SMART CARD 2: Weak skill card — any pillar <50 or lowest is ≥10 below next lowest
+    if (smartCardCount < 2) {
+      const pillarTags = ['pronunciation', 'fluency', 'grammar', 'vocabulary'];
+      const pillarDisplayNames: Record<string, string> = {
+        pronunciation: 'pronunciation clarity',
+        fluency: 'fluency',
+        grammar: 'grammar',
+        vocabulary: 'vocabulary',
+      };
+
+      const topicScores = await this.prisma.userTopicScore.findMany({
+        where: {
+          userId,
+          topicTag: { in: pillarTags },
+        },
+        select: { topicTag: true, score: true },
+      });
+
+      if (topicScores.length > 0) {
+        const sorted = [...topicScores].sort((a, b) => a.score - b.score);
+        const lowest = sorted[0];
+        const secondLowest = sorted[1];
+
+        const triggerByAbsolute = lowest.score < 50;
+        const triggerByGap =
+          secondLowest !== undefined &&
+          secondLowest.score - lowest.score >= 10;
+
+        if (triggerByAbsolute || triggerByGap) {
+          const weakestPillar = lowest.topicTag;
+          const displayName = pillarDisplayNames[weakestPillar] ?? weakestPillar;
+          cards.push({
+            type: 'tip',
+            priority: 2,
+            data: {
+              title: `Improve your ${displayName}`,
+              body: `Your ${displayName} needs work — try a focused Maya session today`,
+              action: 'open_maya_chat',
+              actionParam: { topic: `${weakestPillar}_focus` },
+              priority: 'medium',
+            },
+          });
+          smartCardCount++;
+        }
+      }
+    }
+
+    // SMART CARD 3: CEFR conversation prompt — lowest priority, only if <2 smart cards
+    if (smartCardCount < 2) {
+      const cefrTopics: Record<string, string[]> = {
+        A1: ['your daily routine', 'your favourite food', 'your hometown', 'your weekend plans'],
+        A2: ['your daily routine', 'your favourite food', 'your hometown', 'your weekend plans'],
+        B1: ['a news story you found interesting', 'a travel experience', 'your career goals', 'technology in daily life'],
+        B2: ['a news story you found interesting', 'a travel experience', 'your career goals', 'technology in daily life'],
+        C1: ['the ethics of AI', 'climate policy', 'a book that changed you', 'what makes a great leader'],
+        C2: ['the ethics of AI', 'climate policy', 'a book that changed you', 'what makes a great leader'],
+      };
+
+      const level = (user.assessmentLevel as string) || 'B1';
+      const topics = cefrTopics[level] ?? cefrTopics['B1'];
+      const now = new Date();
+      const dayOfYear = Math.floor(
+        (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      const topic = topics[dayOfYear % topics.length];
+      const topicSlug = topic.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+
+      cards.push({
+        type: 'tip',
+        priority: 3,
+        data: {
+          title: `Today's conversation topic`,
+          body: `At your ${level} level, try discussing: "${topic}"`,
+          action: 'open_maya_chat',
+          actionParam: { topic: topicSlug },
+          priority: 'low',
+        },
+      });
+    }
+    // ── End smart cards ─────────────────────────────────────────────────────
+
     return cards;
   }
 

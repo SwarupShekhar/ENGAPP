@@ -15,16 +15,7 @@ except (ImportError, OSError):
     logger.warning("Spacy model 'en_core_web_sm' not found. Falling back to simple sentence splitting.")
     nlp = None
 
-# CEFR B2/C1 topic word lists (Sample - in production these would be loaded from assets)
-CEFR_B2_WORDS = {
-    "environmental", "sustainable", "management", "corporate", "professional", 
-    "implementation", "significant", "collaborate", "structure", "technical",
-    "architecture", "computation", "assessment", "analysis", "infrastructure"
-}
-CEFR_C1_WORDS = {
-    "paradigm", "juxtaposition", "notwithstanding", "inherent", "empirical",
-    "comprehensive", "eloquent", "pragmatic", "meticulous", "resilient"
-}
+# CEFR sophistication is computed from wordfreq frequency bands (see compute_complexity_score).
 
 class CallQualityService:
     """
@@ -193,7 +184,12 @@ class CallQualityService:
 
         # 1. Topic sophistication (0–40 points)
         content_words = [w for w in words if not nlp.vocab[w].is_stop]
-        advanced_words = [w for w in content_words if w in CEFR_B2_WORDS or w in CEFR_C1_WORDS]
+        # B2-level: frequency between 0.00001 and 0.0001 (mid-frequency, non-basic)
+        # C1-level: frequency < 0.00001 (low-frequency, advanced)
+        advanced_words = [
+            w for w in content_words
+            if (0.00001 <= word_frequency(w, 'en') < 0.0001) or (word_frequency(w, 'en') < 0.00001)
+        ]
         topic_ratio = float(len(advanced_words)) / float(len(content_words)) if content_words else 0.0
         topic_score = min(40.0, topic_ratio * 267.0)
 
@@ -266,6 +262,79 @@ class CallQualityService:
 
         es = question_score + topic_score + completion_score
         return round(float(min(100.0, max(0.0, es))), 2)
+
+    def compute_grammar_score(self, user_turns: List[str]) -> float:
+        """
+        Lightweight grammar signal using spaCy POS tags.
+        Returns 0-100. Higher = fewer grammar errors detected.
+        Does NOT use Gemini — pure spaCy pass.
+        """
+        if not nlp or not user_turns:
+            return 60.0
+
+        full_text = " ".join(user_turns)
+        doc = nlp(full_text)
+
+        total_verbs = 0
+        errors = 0
+
+        for sent in doc.sents:
+            tokens = list(sent)
+            for i, token in enumerate(tokens):
+                # Subject-verb agreement check
+                if token.dep_ == "nsubj" and token.head.pos_ == "VERB":
+                    subj = token
+                    verb = token.head
+                    # Third-person singular subject with bare verb (he go, she run)
+                    if (subj.tag_ in ("NN", "NNP", "PRP") and
+                        subj.text.lower() in ("he", "she", "it") and
+                        verb.tag_ == "VB"):  # bare form instead of VBZ
+                        errors += 1
+                    total_verbs += 1
+
+                # Article before vowel-starting noun (a apple, a engineer)
+                if token.tag_ == "DT" and token.text.lower() == "a":
+                    if i + 1 < len(tokens):
+                        next_tok = tokens[i + 1]
+                        if next_tok.pos_ in ("NOUN", "ADJ") and next_tok.text and next_tok.text[0].lower() in "aeiou":
+                            errors += 1
+
+                # Missing auxiliary in progressive (He working, She going)
+                if token.tag_ == "VBG":  # present participle
+                    # Check if there's an auxiliary before it in the same sentence
+                    has_aux = any(t.pos_ == "AUX" for t in tokens[:i])
+                    if not has_aux and token.dep_ == "ROOT":
+                        errors += 1
+
+        # Score: start at 100, penalise each detected error
+        # Use word count to normalise
+        word_count = len([t for t in doc if t.is_alpha])
+        if word_count == 0:
+            return 60.0
+
+        # Normalised error rate (errors per 100 words)
+        error_rate = (errors / word_count) * 100
+        score = max(0.0, 100.0 - (error_rate * 8.0))
+        return round(float(min(100.0, score)), 2)
+
+    def compute_fluency_signal(self, pqs_result: Dict[str, Any], user_turns: List[str]) -> float:
+        """
+        Fluency signal = mean Azure FluencyScore - filler word penalty.
+        pqs_result: dict returned by compute_pronunciation_quality_score()
+        Returns 0-100.
+        """
+        mean_azure_fluency = float(pqs_result.get("mean_fluency", 0.0))
+
+        filler_words = ["um", "uh", "like", "you know", "basically", "literally"]
+        full_text = " ".join(user_turns).lower()
+        word_count = len(re.findall(r'\b[a-zA-Z]+\b', full_text))
+
+        filler_count = sum(full_text.count(fw) for fw in filler_words)
+        # Penalty: 1.5 points per filler, capped at 20
+        filler_penalty = min(20.0, float(filler_count) * 1.5)
+
+        fluency_signal = max(0.0, mean_azure_fluency - filler_penalty)
+        return round(float(fluency_signal), 2)
 
     def compute_call_quality_score(self, pqs: float, ds: float, cs: float, es: float) -> float:
         """Final CQS combination."""

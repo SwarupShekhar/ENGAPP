@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppTheme } from "../../../theme/useAppTheme";
+import { chatThreadTheme } from "../theme/chatTheme";
 
 export interface ReelShareMetadata {
   strapiReelId: number;
@@ -18,8 +18,6 @@ interface Props {
 }
 
 export default function ReelShareCard({ metadata, isMine, onPress }: Props) {
-  const theme = useAppTheme();
-
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -27,7 +25,6 @@ export default function ReelShareCard({ metadata, isMine, onPress }: Props) {
       style={[
         styles.card,
         isMine ? styles.cardMine : styles.cardTheirs,
-        { borderColor: theme.colors.border },
       ]}
     >
       <View style={styles.thumbWrap}>
@@ -43,13 +40,8 @@ export default function ReelShareCard({ metadata, isMine, onPress }: Props) {
         </View>
       </View>
       <View style={styles.meta}>
-        <Text style={[styles.label, { color: theme.colors.text.light }]}>
-          eBite reel
-        </Text>
-        <Text
-          style={[styles.title, { color: theme.colors.text.primary }]}
-          numberOfLines={2}
-        >
+        <Text style={styles.label}>eBite reel</Text>
+        <Text style={styles.title} numberOfLines={2}>
           {metadata.title}
         </Text>
       </View>
@@ -62,11 +54,13 @@ const styles = StyleSheet.create({
     width: 220,
     borderRadius: 16,
     overflow: "hidden",
-    borderWidth: 1,
-    backgroundColor: "#FFF",
+    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: chatThreadTheme.incomingBubble,
+    borderColor: "rgba(255,255,255,0.12)",
   },
   cardMine: {
     alignSelf: "flex-end",
+    borderColor: "rgba(109,40,217,0.45)",
   },
   cardTheirs: {
     alignSelf: "flex-start",
@@ -105,10 +99,12 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.4,
     marginBottom: 4,
+    color: chatThreadTheme.footerMuted,
   },
   title: {
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 18,
+    color: chatThreadTheme.incomingText,
   },
 });

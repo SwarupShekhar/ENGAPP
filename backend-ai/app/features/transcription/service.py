@@ -32,7 +32,10 @@ class TranscriptionService:
             self.speech_config.request_word_level_timestamps()
             self.speech_config.output_format = speechsdk.OutputFormat.Detailed
             self.speech_config.set_property(
-                speechsdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "5000"
+                speechsdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "8000"
+            )
+            self.speech_config.set_property(
+                speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "2000"
             )
         else:
             logger.warning("Azure Speech credentials not configured.")
@@ -144,9 +147,24 @@ class TranscriptionService:
 
             loop.call_soon_threadsafe(_set_result)
 
+        def on_canceled(evt):
+            def _set_error():
+                if evt.result.reason == speechsdk.ResultReason.Canceled:
+                    cd = evt.result.cancellation_details
+                    if cd.reason == speechsdk.CancellationReason.Error:
+                        if not recognized_future.done():
+                            recognized_future.set_exception(
+                                RuntimeError(f"Azure STT canceled: {cd.error_details}")
+                            )
+                        return
+                # Non-error cancel (end of stream) — treat as success
+                if not recognized_future.done():
+                    recognized_future.set_result(True)
+            loop.call_soon_threadsafe(_set_error)
+
         recognizer.recognized.connect(on_recognized)
         recognizer.session_stopped.connect(on_session_stopped)
-        recognizer.canceled.connect(on_session_stopped)
+        recognizer.canceled.connect(on_canceled)
 
         recognizer.start_continuous_recognition()
 
@@ -160,9 +178,14 @@ class TranscriptionService:
 
         try:
             if secondary_task:
-                await asyncio.gather(recognized_future, secondary_task)
+                await asyncio.wait_for(
+                    asyncio.gather(recognized_future, secondary_task),
+                    timeout=300.0,  # 5 min max for long recordings
+                )
             else:
-                await recognized_future
+                await asyncio.wait_for(recognized_future, timeout=300.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError("Azure STT recognition timed out after 300s")
         finally:
             recognizer.stop_continuous_recognition()
 

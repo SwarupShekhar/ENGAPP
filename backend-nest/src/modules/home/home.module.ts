@@ -7,6 +7,7 @@ import { HeaderBuilder } from './builders/header.builder';
 import { CTABuilder } from './builders/cta.builder';
 import { SkillsBuilder } from './builders/skills.builder';
 import { CardsBuilder } from './builders/cards.builder';
+import { CommunityBuilder } from './builders/community.builder';
 import { WeeklySummaryBuilder } from './builders/weekly-summary.builder';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../redis/redis.module';
@@ -25,6 +26,7 @@ import { PhraseOfDayService } from './services/phrase-of-day.service';
     CTABuilder,
     SkillsBuilder,
     CardsBuilder,
+    CommunityBuilder,
     WeeklySummaryBuilder,
     WordOfDayService,
     PhraseOfDayService,

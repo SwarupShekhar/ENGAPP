@@ -33,9 +33,10 @@ import { engagementApi, AggregatedReaction } from "../../../api/engagement";
 import SocketService from "../../call/services/socketService";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import EmojiPickerSheet from "../components/EmojiPickerSheet";
-import ReelShareCard, {
-  ReelShareMetadata,
-} from "../components/ReelShareCard";
+import type { ReelShareMetadata } from "../components/ReelShareCard";
+import { groupChatListItems, ChatListItem as GroupedChatListItem, RUN_GAP_MS } from "../logic/groupChatListItems";
+import MessageRunRow from "../components/MessageRunRow";
+import { chatThreadTheme } from "../theme/chatTheme";
 
 const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
 
@@ -62,34 +63,6 @@ interface ChatMessage {
   reactions?: AggregatedReaction[];
 }
 
-type ChatListItem =
-  | { kind: "date"; id: string; label: string }
-  | { kind: "message"; id: string; message: ChatMessage };
-
-function formatDateSeparator(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
-  const startOfMsg = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  );
-  const diffDays = Math.round(
-    (startOfToday.getTime() - startOfMsg.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  return date.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 // ── Main Component ──────────────────────────────────────
 
@@ -371,27 +344,14 @@ export default function ChatScreen() {
 
   // ── Render Functions ────────────────────────────────
 
-  const isMyMessage = (msg: ChatMessage) => msg.senderId !== partnerId;
+  const listItems = useMemo<GroupedChatListItem[]>(() => {
+    return groupChatListItems(messages as any[], {
+      partnerId,
+      runGapMs: RUN_GAP_MS,
+    });
+  }, [messages, partnerId]);
 
-  const listItems = useMemo<ChatListItem[]>(() => {
-    const items: ChatListItem[] = [];
-    let lastDay = "";
-    for (const message of messages) {
-      const day = new Date(message.createdAt).toDateString();
-      if (day !== lastDay) {
-        items.push({
-          kind: "date",
-          id: `date-${day}`,
-          label: formatDateSeparator(message.createdAt),
-        });
-        lastDay = day;
-      }
-      items.push({ kind: "message", id: message.id, message });
-    }
-    return items;
-  }, [messages]);
-
-  const renderListItem = ({ item }: { item: ChatListItem }) => {
+  const renderListItem = ({ item }: { item: GroupedChatListItem }) => {
     if (item.kind === "date") {
       return (
         <View style={styles.dateSeparator}>
@@ -400,10 +360,16 @@ export default function ChatScreen() {
       );
     }
 
-    const msg = item.message;
-    const isMine = isMyMessage(msg);
+    if (item.kind === "system") {
+      return (
+        <View style={styles.systemContainer}>
+          <Text style={styles.systemText}>{item.content}</Text>
+        </View>
+      );
+    }
 
-    if (msg.type === "call_invite") {
+    if (item.kind === "call_invite") {
+      const msg = item.message;
       return (
         <View style={styles.callInviteContainer}>
           <View style={styles.callInviteBubble}>
@@ -414,89 +380,19 @@ export default function ChatScreen() {
       );
     }
 
-    if (msg.type === "system") {
+    if (item.kind === "run") {
       return (
-        <View style={styles.systemContainer}>
-          <Text style={styles.systemText}>{msg.content}</Text>
-        </View>
+        <MessageRunRow
+          run={item}
+          messageReactions={messageReactions}
+          onLongPressMessage={(msg) => setReactionTarget(msg as any)}
+          onOpenReel={openReelViewer}
+          primaryColor={theme.colors.primary}
+        />
       );
     }
 
-    if (msg.type === "reel_share" && msg.metadata?.strapiReelId) {
-      return (
-        <View
-          style={[
-            styles.messageRow,
-            isMine ? styles.messageRowRight : styles.messageRowLeft,
-          ]}
-        >
-          <ReelShareCard
-            metadata={msg.metadata as ReelShareMetadata}
-            isMine={isMine}
-            onPress={() => openReelViewer(msg.metadata as ReelShareMetadata)}
-          />
-        </View>
-      );
-    }
-
-    const reactions = messageReactions[msg.id] || [];
-
-    return (
-      <Pressable
-        onLongPress={() => setReactionTarget(msg)}
-        style={[
-          styles.messageRow,
-          isMine ? styles.messageRowRight : styles.messageRowLeft,
-        ]}
-      >
-        <View
-          style={[
-            styles.messageBubble,
-            isMine ? styles.myBubble : styles.theirBubble,
-          ]}
-        >
-          <Text
-            style={[
-              styles.messageText,
-              isMine ? styles.myMessageText : styles.theirMessageText,
-            ]}
-          >
-            {msg.content}
-          </Text>
-          <View style={styles.messageFooter}>
-            <Text
-              style={[
-                styles.messageTime,
-                isMine ? styles.myTimeText : styles.theirTimeText,
-              ]}
-            >
-              {new Date(msg.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
-            {isMine && msg.readBy?.includes(partnerId) && (
-              <Ionicons
-                name="checkmark-done"
-                size={14}
-                color={theme.colors.primary}
-                style={styles.readReceiptIcon}
-              />
-            )}
-          </View>
-        </View>
-        {reactions.length > 0 && (
-          <View style={styles.reactionsRow}>
-            {reactions.map((r) => (
-              <Text key={r.emoji} style={styles.reactionChip}>
-                {r.emoji}
-                {r.count > 1 ? ` ${r.count}` : ""}
-              </Text>
-            ))}
-          </View>
-        )}
-      </Pressable>
-    );
+    return null;
   };
 
   // ── Main Render ─────────────────────────────────────
@@ -696,7 +592,7 @@ const getStyles = (theme: any) =>
   StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: chatThreadTheme.canvas,
   },
   flex: {
     flex: 1,
@@ -775,60 +671,6 @@ const getStyles = (theme: any) =>
     paddingTop: 16,
     paddingBottom: 8,
   },
-  messageRow: {
-    marginBottom: 8,
-    maxWidth: "80%",
-  },
-  messageRowRight: {
-    alignSelf: "flex-end",
-  },
-  messageRowLeft: {
-    alignSelf: "flex-start",
-  },
-  messageBubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-  },
-  myBubble: {
-    backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  theirBubble: {
-    backgroundColor: "#EFEFEF",
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  myMessageText: {
-    color: "#FFF",
-  },
-  theirMessageText: {
-    color: "#111111",
-  },
-  messageTime: {
-    fontSize: 10,
-    marginTop: 4,
-    alignSelf: "flex-end",
-  },
-  myTimeText: {
-    color: "rgba(255,255,255,0.6)",
-  },
-  theirTimeText: {
-    color: "rgba(17,17,17,0.45)",
-  },
-  messageFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 4,
-    marginTop: 4,
-  },
-  readReceiptIcon: {
-    marginLeft: 4,
-  },
   dateSeparator: {
     alignItems: "center",
     marginVertical: 12,
@@ -836,8 +678,8 @@ const getStyles = (theme: any) =>
   dateSeparatorText: {
     fontSize: 12,
     fontWeight: "600",
-    color: theme.colors.text.secondary,
-    backgroundColor: theme.colors.surface,
+    color: chatThreadTheme.dateSeparatorText,
+    backgroundColor: chatThreadTheme.dateSeparatorBg,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -919,23 +761,6 @@ const getStyles = (theme: any) =>
     fontSize: 15,
     color: theme.colors.text.primary,
     maxHeight: 100,
-  },
-  reactionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  reactionChip: {
-    fontSize: 13,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    overflow: "hidden",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#E5E7EB",
   },
   reactionOverlay: {
     flex: 1,

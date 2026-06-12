@@ -199,7 +199,7 @@ export class LiveKitWebhookController {
           {
             userId: participant.userId,
             sessionId: participant.sessionId,
-            language: 'en-IN',
+            language: 'en-US',
           },
         );
 
@@ -209,13 +209,13 @@ export class LiveKitWebhookController {
           );
         } else {
           // 1. Get Azure pronunciation details.
-          // Pass no reference_text so backend-ai runs in free-speech mode —
-          // passing transcript.trim() here creates a self-reference trap where
-          // Azure compares speech against itself and returns 100% accuracy.
+          // Pass transcript as referenceText so Azure runs aligned assessment
+          // instead of free-speech mode — improves phoneme-level accuracy.
           const { flagged_errors, pronunciation_score } =
             await this.pronunciationService.assessFromRecordingUrl(
               participant.userId,
               effectiveFileLocation,
+              transcript.trim(),
             );
           const wordsChecked: number =
             (pronunciation_score as any)?.azure_result?.Words?.length ??

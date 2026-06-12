@@ -6,6 +6,7 @@ import asyncio
 import io
 import json
 import os
+import threading
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 import azure.cognitiveservices.speech as speechsdk
@@ -82,43 +83,88 @@ class AsyncAzureSpeech:
         return result
     
     def _transcribe_sync(self, audio_bytes: bytes, language: str) -> dict:
-        """Synchronous transcription (runs in executor)."""
-        
-        # Create audio config from bytes
-        audio_stream = speechsdk.audio.PushAudioInputStream()
-        audio_stream.write(audio_bytes)
-        audio_stream.close()
-        
-        audio_config = speechsdk.audio.AudioConfig(stream=audio_stream)
-        
-        # Set language
+        """Synchronous continuous transcription (runs in executor)."""
         config = speechsdk.SpeechConfig(
             subscription=settings.azure_speech_key,
-            region=settings.azure_speech_region
+            region=settings.azure_speech_region,
         )
         config.speech_recognition_language = language
         config.request_word_level_timestamps()
         config.output_format = speechsdk.OutputFormat.Detailed
-        
-        # Create recognizer
-        recognizer = speechsdk.SpeechRecognizer(
-            speech_config=config,
-            audio_config=audio_config
+        # Allow up to 8s of leading silence before giving up
+        config.set_property(
+            speechsdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "8000"
         )
-        
-        # Perform recognition (blocking)
-        result = recognizer.recognize_once()
-        
-        # Handle result
-        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            return self._parse_transcription_result(result)
-        elif result.reason == speechsdk.ResultReason.NoMatch:
+        # Stop 2s after last speech (don't wait for full timeout)
+        config.set_property(
+            speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs, "2000"
+        )
+
+        audio_stream = speechsdk.audio.PushAudioInputStream()
+        audio_config = speechsdk.audio.AudioConfig(stream=audio_stream)
+        recognizer = speechsdk.SpeechRecognizer(speech_config=config, audio_config=audio_config)
+
+        parts: list[dict] = []
+        done_event = threading.Event()
+        errors: list[str] = []
+
+        def on_recognized(evt):
+            if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                parts.append(self._parse_transcription_result(evt.result))
+            elif evt.result.reason == speechsdk.ResultReason.Canceled:
+                cd = evt.result.cancellation_details
+                if cd.reason == speechsdk.CancellationReason.Error:
+                    errors.append(cd.error_details)
+
+        def on_stopped(evt):
+            done_event.set()
+
+        recognizer.recognized.connect(on_recognized)
+        recognizer.session_stopped.connect(on_stopped)
+        recognizer.canceled.connect(on_stopped)
+
+        recognizer.start_continuous_recognition()
+        chunk = 4096
+        for i in range(0, len(audio_bytes), chunk):
+            audio_stream.write(audio_bytes[i: i + chunk])
+        audio_stream.close()
+
+        # Wait up to 5 min for long recordings
+        finished = done_event.wait(timeout=300)
+        recognizer.stop_continuous_recognition()
+
+        if errors:
+            raise RuntimeError(f"Transcription canceled: {errors[0]}")
+        if not finished:
+            raise RuntimeError("Transcription timed out after 300s")
+        if not parts:
             raise ValueError("No speech detected in audio")
-        elif result.reason == speechsdk.ResultReason.Canceled:
-            cancellation = result.cancellation_details
-            raise RuntimeError(f"Transcription failed: {cancellation.error_details}")
-        else:
-            raise RuntimeError(f"Unknown result: {result.reason}")
+
+        # Merge parts: concatenate text, accumulate words, sum duration
+        all_words = []
+        total_duration = 0.0
+        texts = []
+        for p in parts:
+            texts.append(p["text"])
+            for w in p.get("words", []):
+                w_copy = dict(w)
+                w_copy["start_time"] = w["start_time"] + total_duration
+                w_copy["end_time"] = w["end_time"] + total_duration
+                all_words.append(w_copy)
+            total_duration += p.get("duration", 0.0)
+
+        confidence = (
+            sum(w.get("confidence", 0.0) for w in all_words) / len(all_words)
+            if all_words else 0.0
+        )
+
+        return {
+            "text": " ".join(texts).strip(),
+            "confidence": confidence,
+            "words": all_words,
+            "duration": total_duration,
+            "language": language,
+        }
     
     def _parse_transcription_result(self, result) -> dict:
         """Parse Azure result into structured format."""
@@ -225,6 +271,9 @@ class AsyncAzureSpeech:
             region=settings.azure_speech_region
         )
         config.speech_recognition_language = "en-US"  # Prosody only supported on en-US
+        config.set_property(
+            speechsdk.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "8000"
+        )
 
         pronunciation_config = speechsdk.PronunciationAssessmentConfig(
             reference_text=reference_text,

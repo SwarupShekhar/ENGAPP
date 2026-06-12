@@ -30,6 +30,7 @@ export interface HomeData {
     mayaChip: {
       label: string;
       action: string;
+      actionParam?: Record<string, string>;
     };
   };
   skills: {
@@ -47,6 +48,8 @@ export interface HomeData {
     type: string;
     priority: number;
     data: any;
+    action?: string;
+    actionParam?: Record<string, string>;
   }>;
   weeklyActivity: number[];
   wordOfTheDay?: {
@@ -66,6 +69,10 @@ export interface HomeData {
     date: string;
     phrase: { done: boolean; completedAt?: string; bestScore?: number };
     word: { done: boolean; completedAt?: string; bestScore?: number };
+  };
+  community: {
+    onlineCount: number;
+    avatars: string[];
   };
 }
 
