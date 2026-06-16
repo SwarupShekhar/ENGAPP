@@ -1,8 +1,12 @@
 import time
 from dotenv import load_dotenv
 
-# Load env vars explicitly before importing settings
+# Load env vars explicitly before importing settings / telemetry
 load_dotenv()
+
+from app.telemetry import configure as configure_otel, instrument_fastapi
+
+configure_otel()
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,6 +73,8 @@ app = FastAPI(
     redoc_url=None,
     debug=False,  # MUST be False so custom exception handlers work correctly
 )
+
+instrument_fastapi(app)
 
 # 2. Middleware Stack (Order matters: Bottom-up execution)
 app.add_middleware(RequestIDMiddleware)
