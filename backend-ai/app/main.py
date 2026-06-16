@@ -11,11 +11,11 @@ configure_otel()
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from contextlib import asynccontextmanager
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
-from prometheus_client import make_asgi_app
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.core.config import settings
 from app.core.logger import configure_logging, logger
@@ -166,8 +166,13 @@ app.include_router(practice_router)
 
 # 5. Monitoring (Prometheus — scraped by config/prometheus/prometheus.yml)
 if settings.enable_prometheus:
-    metrics_app = make_asgi_app()
-    app.mount("/metrics", metrics_app)
+
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics():
+        return Response(
+            content=generate_latest(),
+            media_type=CONTENT_TYPE_LATEST,
+        )
 
 
 @app.get("/")

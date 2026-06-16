@@ -58,16 +58,18 @@ def configure() -> bool:
         return False
 
     if ".vpce.grafana.net" in endpoint:
-        logger.warning(
+        print(
             "[otel] OTEL_EXPORTER_OTLP_ENDPOINT uses AWS PrivateLink; "
-            "use the public OTLP gateway URL on Vultr."
+            "use the public OTLP gateway URL on Vultr.",
+            flush=True,
         )
 
     headers_raw = _otlp_headers()
     if not headers_raw:
-        logger.warning(
+        print(
             "[otel] OTEL_EXPORTER_OTLP_ENDPOINT is set but auth is missing. "
-            "Set GRAFANA_OTLP_TOKEN or GRAFANA_INSTANCE_ID + GRAFANA_CLOUD_API_KEY."
+            "Set GRAFANA_OTLP_TOKEN or GRAFANA_INSTANCE_ID + GRAFANA_CLOUD_API_KEY.",
+            flush=True,
         )
         return False
 
@@ -113,8 +115,9 @@ def configure() -> bool:
     metrics.set_meter_provider(meter_provider)
 
     _configured = True
-    logger.info(
-        "[otel] Exporting traces + metrics for %s (%s)", service_name, environment
+    print(
+        f"[otel] Exporting traces + metrics for {service_name} ({environment})",
+        flush=True,
     )
     return True
 
