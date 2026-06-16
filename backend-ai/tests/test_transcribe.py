@@ -3,7 +3,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.features.transcription.service import transcription_service
 
-client = TestClient(app)
+from app.core.config import settings
+
+client = TestClient(app, headers={"x-api-key": settings.internal_api_key})
 
 def test_transcribe_structure():
     """Test the API response structure for transcription."""

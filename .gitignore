@@ -55,7 +55,6 @@ ruvector.db
 .agents/
 .swarm/
 .claude-flow/
-.planning/
 .graphifyignore
 graphify-out/
 
@@ -68,11 +67,24 @@ graphify-out/
 /uploads/
 public/uploads/
 
+# Internal product & planning docs (never publish to GitHub)
+# Catch-all: all Markdown stays local unless you force-add (don't).
+*.md
+docs/
+.planning/
+PRD.md
+Swarup.md
+ENGR_USER_JOURNEY.md
+SYSTEM_ARCHITECTURE.md
+CALL_FEEDBACK_MECHANISM.md
+CALL_QUALITY_SCORE_SPEC.md
+CLAUDE.md
+AGENTS.md
+CONTEXT.md
+
 # Internal drafts & generated trees
 archive/
 generated/
-*.md
-docs/superpowers/
 
 # Project-specific
 /generated/prisma

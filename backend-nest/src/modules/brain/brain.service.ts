@@ -3,11 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Interval } from '@nestjs/schedule';
 import { lastValueFrom } from 'rxjs';
+import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
 
 @Injectable()
 export class BrainService implements OnModuleInit {
   private readonly logger = new Logger(BrainService.name);
   private aiEngineUrl: string;
+  private readonly aiHeaders: Record<string, string>;
   private aiEngineHealthy = false;
   private lastHealthCheck: Date | null = null;
   private consecutiveFailures = 0;
@@ -19,6 +21,15 @@ export class BrainService implements OnModuleInit {
     this.aiEngineUrl =
       this.configService.get<string>('AI_ENGINE_URL') ||
       'http://localhost:8001';
+    this.aiHeaders = aiEngineAuthHeaders(configService);
+  }
+
+  private withAiAuth(options?: Record<string, unknown>) {
+    const opts = (options ?? {}) as { headers?: Record<string, string> };
+    return {
+      ...opts,
+      headers: { ...this.aiHeaders, ...opts.headers },
+    };
   }
 
   /**
@@ -50,9 +61,10 @@ export class BrainService implements OnModuleInit {
     try {
       const response = await lastValueFrom(
         // backend-ai mounts health at /api/health (see app.main include_router health_router prefix=/api)
-        this.httpService.get(`${this.aiEngineUrl.replace(/\/$/, '')}/api/health`, {
-          timeout: timeoutMs,
-        }),
+        this.httpService.get(
+          `${this.aiEngineUrl.replace(/\/$/, '')}/api/health`,
+          this.withAiAuth({ timeout: timeoutMs }),
+        ),
       );
 
       if (response.status >= 200 && response.status < 300) {
@@ -113,12 +125,16 @@ export class BrainService implements OnModuleInit {
     try {
       // We reuse the generic analyze endpoint but pass specific context
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
-          text: transcript,
-          user_id: 'system', // Should ideally be passed down
-          session_id: 'system',
-          context: `Assessment Phase 3. Image Level: ${imageLevel}. Image Description: ${imageDescription}. Require relevance score and talk style.`,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/analyze`,
+          {
+            text: transcript,
+            user_id: 'system', // Should ideally be passed down
+            session_id: 'system',
+            context: `Assessment Phase 3. Image Level: ${imageLevel}. Image Description: ${imageDescription}. Require relevance score and talk style.`,
+          },
+          this.withAiAuth(),
+        ),
       );
 
       const data = response.data.data;
@@ -149,12 +165,16 @@ export class BrainService implements OnModuleInit {
   ): Promise<any> {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
-          text: transcript,
-          user_id: 'system',
-          session_id: 'system',
-          context: `Assessment Phase 4 Comprehension Check. Question asked: "${question}". Evaluate the response strictly for: 1. Relevance to the question, 2. Coherence, 3. Content depth. Penalize heavily if off-topic or just repeating the question. Return a strictly evaluated overall_score, grammar_score, and vocabulary_score between 0 and 100.`,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/analyze`,
+          {
+            text: transcript,
+            user_id: 'system',
+            session_id: 'system',
+            context: `Assessment Phase 4 Comprehension Check. Question asked: "${question}". Evaluate the response strictly for: 1. Relevance to the question, 2. Coherence, 3. Content depth. Penalize heavily if off-topic or just repeating the question. Return a strictly evaluated overall_score, grammar_score, and vocabulary_score between 0 and 100.`,
+          },
+          this.withAiAuth(),
+        ),
       );
 
       const data = response.data.data;
@@ -188,12 +208,16 @@ export class BrainService implements OnModuleInit {
       const azureContext = this.formatAzureEvidence(evidence);
 
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
-          text: transcript,
-          user_id: 'system',
-          session_id: 'system',
-          context: azureContext,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/analyze`,
+          {
+            text: transcript,
+            user_id: 'system',
+            session_id: 'system',
+            context: azureContext,
+          },
+          this.withAiAuth(),
+        ),
       );
 
       const data = response.data.data;
@@ -308,9 +332,9 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
         this.httpService.post(
           `${this.aiEngineUrl}/api/pronunciation/assess`,
           formData,
-          {
+          this.withAiAuth({
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          },
+          }),
         ),
       );
       return response.data;
@@ -323,12 +347,16 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
   async analyzeSession(sessionId: string, transcript: string, userId: string) {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
-          text: transcript,
-          user_id: userId,
-          session_id: sessionId,
-          context: 'Analyze this conversation transcript.',
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/analyze`,
+          {
+            text: transcript,
+            user_id: userId,
+            session_id: sessionId,
+            context: 'Analyze this conversation transcript.',
+          },
+          this.withAiAuth(),
+        ),
       );
       return response.data;
     } catch (error) {
@@ -349,9 +377,11 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
   }): Promise<any> {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/scoring/cqs`, body, {
-          timeout: 15000,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/scoring/cqs`,
+          body,
+          this.withAiAuth({ timeout: 15000 }),
+        ),
       );
       return response.data;
     } catch (error) {
@@ -370,9 +400,11 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
   }): Promise<any> {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/scoring/pqs`, body, {
-          timeout: 10000,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/scoring/pqs`,
+          body,
+          this.withAiAuth({ timeout: 10000 }),
+        ),
       );
       return response.data;
     } catch (error) {
@@ -387,9 +419,11 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
   async computePreview(userTurnsSoFar: string[]): Promise<any> {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/scoring/preview`, {
-          user_turns_so_far: userTurnsSoFar,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/scoring/preview`,
+          { user_turns_so_far: userTurnsSoFar },
+          this.withAiAuth(),
+        ),
       );
       return response.data;
     } catch (error) {
@@ -401,10 +435,14 @@ Use these scores to calibrate your pronunciation_score and fluency_score.`;
   async analyzeJoint(sessionId: string, segments: any[]) {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/analyze-joint`, {
-          session_id: sessionId,
-          segments: segments,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/analyze-joint`,
+          {
+            session_id: sessionId,
+            segments: segments,
+          },
+          this.withAiAuth(),
+        ),
       );
 
       return response.data.data;
@@ -461,12 +499,16 @@ Rules:
 6. Be specific and actionable`;
 
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/analyze`, {
-          text: `UserID: ${userId}`,
-          user_id: userId,
-          session_id: 'weekly_summary',
-          context: prompt,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/analyze`,
+          {
+            text: `UserID: ${userId}`,
+            user_id: userId,
+            session_id: 'weekly_summary',
+            context: prompt,
+          },
+          this.withAiAuth(),
+        ),
       );
 
       return (
@@ -490,12 +532,16 @@ Rules:
   }): Promise<{ pass: boolean; reason: string; errored: boolean }> {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/practice/judge`, {
-          original_error: input.originalError,
-          target: input.target,
-          spoken: input.spoken,
-          kind: input.kind,
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/practice/judge`,
+          {
+            original_error: input.originalError,
+            target: input.target,
+            spoken: input.spoken,
+            kind: input.kind,
+          },
+          this.withAiAuth(),
+        ),
       );
       const d = response.data as { pass_?: boolean; pass?: boolean; reason?: string };
       const reason = d.reason ?? '';

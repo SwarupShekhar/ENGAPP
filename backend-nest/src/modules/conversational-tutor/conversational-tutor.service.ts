@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { firstValueFrom } from 'rxjs';
+import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { WeaknessService } from '../reels/weakness.service';
 import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
@@ -121,6 +122,7 @@ export class ConversationalTutorService implements OnModuleInit {
   private genAI: GoogleGenerativeAI;
   private conversations: Map<string, ConversationSession> = new Map();
   private aiBackendUrl: string;
+  private readonly aiHeaders: Record<string, string>;
   private readonly ttsCache = new Map<string, string>();
   private readonly geminiChatModel: string;
 
@@ -140,6 +142,15 @@ export class ConversationalTutorService implements OnModuleInit {
     this.aiBackendUrl =
       this.configService.get<string>('AI_ENGINE_URL') ||
       'http://localhost:8001';
+    this.aiHeaders = aiEngineAuthHeaders(this.configService);
+  }
+
+  private withAiAuth(options?: Record<string, unknown>) {
+    const opts = (options ?? {}) as { headers?: Record<string, string> };
+    return {
+      ...opts,
+      headers: { ...this.aiHeaders, ...opts.headers },
+    };
   }
 
   private getChatModel() {
@@ -150,10 +161,14 @@ export class ConversationalTutorService implements OnModuleInit {
     for (const phrase of TTS_CACHE_PHRASES) {
       try {
         const response = await firstValueFrom(
-          this.httpService.post(`${this.aiBackendUrl}/api/tutor/tts`, {
-            text: phrase,
-            gender: 'female',
-          }),
+          this.httpService.post(
+            `${this.aiBackendUrl}/api/tutor/tts`,
+            {
+              text: phrase,
+              gender: 'female',
+            },
+            this.withAiAuth(),
+          ),
         );
         const base64 = response.data?.data?.audio_base64;
         if (base64) {
@@ -230,10 +245,14 @@ export class ConversationalTutorService implements OnModuleInit {
     try {
       const audioBase64 = audioBuffer.toString('base64');
       const response = await firstValueFrom(
-        this.httpService.post(`${this.aiBackendUrl}/api/tutor/stt`, {
-          audio_base64: audioBase64,
-          user_id: userId,
-        }),
+        this.httpService.post(
+          `${this.aiBackendUrl}/api/tutor/stt`,
+          {
+            audio_base64: audioBase64,
+            user_id: userId,
+          },
+          this.withAiAuth(),
+        ),
       );
       return response.data.data;
     } catch (error) {
@@ -257,10 +276,14 @@ export class ConversationalTutorService implements OnModuleInit {
     if (cached) return cached;
     try {
       const response = await firstValueFrom(
-        this.httpService.post(`${this.aiBackendUrl}/api/tutor/tts`, {
-          text: text,
-          gender: 'female',
-        }),
+        this.httpService.post(
+          `${this.aiBackendUrl}/api/tutor/tts`,
+          {
+            text: text,
+            gender: 'female',
+          },
+          this.withAiAuth(),
+        ),
       );
       return response.data.data.audio_base64;
     } catch (error) {
@@ -548,12 +571,12 @@ export class ConversationalTutorService implements OnModuleInit {
         this.httpService.post(
           `${this.aiBackendUrl}/api/tutor/assess-pronunciation`,
           form,
-          {
+          this.withAiAuth({
             headers: { ...form.getHeaders() },
             maxBodyLength: Infinity,
             maxContentLength: Infinity,
             timeout: 30000,
-          },
+          }),
         ),
       );
 
@@ -615,11 +638,11 @@ export class ConversationalTutorService implements OnModuleInit {
         this.httpService.post(
           `${this.aiBackendUrl}/api/tutor/debug-phonemes`,
           form,
-          {
+          this.withAiAuth({
             headers: { ...form.getHeaders() },
             maxBodyLength: Infinity,
             maxContentLength: Infinity,
-          },
+          }),
         ),
       );
 
@@ -683,12 +706,16 @@ export class ConversationalTutorService implements OnModuleInit {
     const url = `${this.aiBackendUrl}/api/tutor/stream-response`;
     try {
       const response = await firstValueFrom(
-        this.httpService.post(url, form, {
-          responseType: 'stream',
-          headers: form.getHeaders(),
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        }),
+        this.httpService.post(
+          url,
+          form,
+          this.withAiAuth({
+            responseType: 'stream',
+            headers: form.getHeaders(),
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+          }),
+        ),
       );
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -713,10 +740,14 @@ export class ConversationalTutorService implements OnModuleInit {
     const audioBase64 = audioBuffer.toString('base64');
     const [sttResponse, session] = await Promise.all([
       firstValueFrom(
-        this.httpService.post(`${this.aiBackendUrl}/api/tutor/stt`, {
-          audio_base64: audioBase64,
-          user_id: userId,
-        }),
+        this.httpService.post(
+          `${this.aiBackendUrl}/api/tutor/stt`,
+          {
+            audio_base64: audioBase64,
+            user_id: userId,
+          },
+          this.withAiAuth(),
+        ),
       ),
       Promise.resolve(this.getOrCreateSession(sessionId)),
     ]);

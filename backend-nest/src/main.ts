@@ -1,3 +1,4 @@
+import './otel';
 import './instrument';
 
 import { NestFactory } from '@nestjs/core';

@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 
 import { client } from "../../../api/englivoClient";
-import { getEnglivoMe } from "../../../api/englivoApi";
+import { getEnglivoMe, getEnglivoUpcomingSessions } from "../../../api/englivoApi";
 import { ENGLIVO_AI_TUTOR_TITLE } from "../constants";
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
@@ -135,8 +135,8 @@ export default function EnglivoSessionsScreen() {
 
   const loadUpcoming = async () => {
     try {
-      const r = await client.get<UpcomingSession[]>("/sessions/upcoming");
-      setUpcoming(Array.isArray(r.data) ? r.data : []);
+      const list = await getEnglivoUpcomingSessions();
+      setUpcoming(list as UpcomingSession[]);
     } catch {
       setUpcoming([]);
     } finally {
@@ -229,7 +229,7 @@ export default function EnglivoSessionsScreen() {
       setLoadingUpcoming(true);
       loadUpcoming();
     } catch {
-      showToast("Booking failed. Please try again.");
+      showToast("Booking failed — check englivo.com is reachable and you have credits.");
     } finally {
       setBooking(false);
     }

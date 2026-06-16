@@ -35,6 +35,9 @@ const extra = {
     process.env.EXPO_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
   posthogSessionReplay:
     process.env.EXPO_PUBLIC_POSTHOG_SESSION_REPLAY === "true",
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || "",
+  sentryEnvironment:
+    process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT || buildProfile,
 };
 
 // Optional overrides — only when explicitly set (local .env or EAS env)
@@ -53,6 +56,20 @@ if (process.env.ENGLIVO_API_URL_OVERRIDE?.trim()) {
 if (process.env.ENGLIVO_WS_URL_OVERRIDE?.trim()) {
   extra.englivoWsUrlOverride = process.env.ENGLIVO_WS_URL_OVERRIDE.trim();
 }
+
+const sentryBuildPlugin =
+  process.env.SENTRY_ORG?.trim() && process.env.SENTRY_PROJECT?.trim()
+    ? [
+        [
+          "@sentry/react-native/expo",
+          {
+            organization: process.env.SENTRY_ORG.trim(),
+            project: process.env.SENTRY_PROJECT.trim(),
+            url: process.env.SENTRY_URL?.trim() || "https://sentry.io/",
+          },
+        ],
+      ]
+    : [];
 
 module.exports = {
   expo: {
@@ -103,6 +120,7 @@ module.exports = {
     },
     extra,
     plugins: [
+      ...sentryBuildPlugin,
       "@react-native-firebase/app",
       "@react-native-firebase/crashlytics",
       "@react-native-firebase/messaging",

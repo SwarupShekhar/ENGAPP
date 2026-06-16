@@ -6,6 +6,15 @@ export const tutorApi = {
         return res.data;
     },
 
+    /** Short-lived HMAC token for direct backend-ai tutor WebSocket. */
+    getStreamingWsToken: async (sessionId: string) => {
+        const res = await client.post<{ token: string; expiresInSeconds: number }>(
+            '/conversational-tutor/streaming-ws-token',
+            { sessionId },
+        );
+        return res.data;
+    },
+
     /** Blocking flow (STT → Gemini → TTS). Use for fallback or when SSE not available. */
     processSpeech: async (formData: FormData) => {
         const res = await client.post('/conversational-tutor/process-speech', formData, {

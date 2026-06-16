@@ -1,15 +1,20 @@
-import { Controller, Get, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { ReliabilityService } from './reliability.service';
-// Assuming AuthGuard is available, or we just pass userId for now for simplicity if not strictly enforced yet 
-// but best practice is to use AuthGuard. I'll check if AuthGuard is used elsewhere.
-// For now, I'll assume standard pattern.
+import { ClerkGuard } from '../auth/clerk.guard';
 
 @Controller('reliability')
+@UseGuards(ClerkGuard)
 export class ReliabilityController {
   constructor(private readonly reliabilityService: ReliabilityService) {}
 
   @Get(':userId')
-  async getUserReliability(@Param('userId') userId: string) {
-    return this.reliabilityService.getUserReliability(userId);
+  async getUserReliability(
+    @Param('userId') userId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    if (userId !== req.user.id) {
+      throw new ForbiddenException('Cannot read another user reliability score');
+    }
+    return this.reliabilityService.getUserReliability(req.user.id);
   }
 }

@@ -2,7 +2,9 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
 
-client = TestClient(app)
+from app.core.config import settings
+
+client = TestClient(app, headers={"x-api-key": settings.internal_api_key})
 
 
 def test_pronunciation_assess_json_azure_result_path():

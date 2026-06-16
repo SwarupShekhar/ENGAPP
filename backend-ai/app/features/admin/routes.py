@@ -1,17 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from app.middleware.rate_limiter import rate_limiter
 from app.core.config import settings
+from app.security.internal_auth import get_current_admin
 import hashlib
 import secrets
 
 router = APIRouter()
-
-
-async def get_current_admin(x_api_key: str = Header(...)):
-    """Admin authentication dependency - validates API key header."""
-    if not secrets.compare_digest(x_api_key, settings.internal_api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return True
 
 
 @router.get("/metrics", dependencies=[Depends(get_current_admin)])

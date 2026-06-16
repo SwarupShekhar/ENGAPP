@@ -3,7 +3,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.features.assessment.service import analysis_service
 
-client = TestClient(app)
+from app.core.config import settings
+
+client = TestClient(app, headers={"x-api-key": settings.internal_api_key})
 
 def test_analyze_structure():
     """Test the API response structure for analysis."""

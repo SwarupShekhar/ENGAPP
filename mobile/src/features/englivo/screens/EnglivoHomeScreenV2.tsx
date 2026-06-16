@@ -47,8 +47,8 @@ import { getMe } from "../../../api/englivo/user";
 import { getMe as getQuotaMe, type MeResponse } from "../../../api/englivo/quota";
 import { getBridgeUser, syncBridgeCefr } from "../../../api/bridgeClient";
 import UpgradeSheet from "../components/UpgradeSheet";
-import { getSessionsCount, getUpcomingSession } from "../../../api/client";
-import { joinSession, getInstantTutorToken } from "../../../api/englivoApi";
+import { getSessionsCount } from "../../../api/client";
+import { joinSession, getInstantTutorToken, getEnglivoUpcomingSession } from "../../../api/englivoApi";
 import { ModeSwitcher } from "../../../components/navigation/ModeSwitcher";
 import { ENGLIVO_AI_TUTOR_TITLE } from "../constants";
 import { useClerk } from "@clerk/clerk-expo";
@@ -335,7 +335,7 @@ export default function EnglivoHomeScreenV2() {
       }
 
       try { setSessionsCount(await getSessionsCount()); } catch { /* silent */ }
-      try { setUpcomingSession(await getUpcomingSession()); } catch { /* silent */ }
+      try { setUpcomingSession(await getEnglivoUpcomingSession()); } catch { /* silent */ }
     } catch (err: any) {
       if (err?.response?.status === 401) {
         setAuthError(true);

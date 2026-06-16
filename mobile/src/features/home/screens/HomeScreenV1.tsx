@@ -40,6 +40,7 @@ import { homeTheme } from '../theme/homeTheme';
 import ConnectHeroCard from '../components/ConnectHeroCard';
 import MistakesCard from '../components/MistakesCard';
 import { getHomeData, HomeData } from '../services/homeApi';
+import { getBridgeUser } from '../../../api/bridgeClient';
 import { HOME_DATA_CACHE_KEY } from '../../../services/cacheKeys';
 import FeedPrefetchService from '../../../services/feedPrefetchService';
 import { tasksApi } from '../../../api/tasks';
@@ -687,6 +688,7 @@ export default function HomeScreen() {
   const socketService = useRef(SocketService.getInstance()).current;
 
   const [homeData, setHomeData]       = useState<HomeData | null>(null);
+  const [bridgeHeader, setBridgeHeader] = useState<{ level?: string; streak?: number }>({});
   const [loadingHome, setLoadingHome] = useState(true);
   const [refreshingHome, setRefreshingHome] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -777,6 +779,25 @@ export default function HomeScreen() {
     }, [loadHome]),
   );
 
+  // ── Bridge overlay (shared CEFR / streak with Englivo mode) ────────────────
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      getBridgeUser(user.id)
+        .then((b) => {
+          if (!b) return;
+          setBridgeHeader({
+            level: b.cefrLevel ?? b.cefr_level,
+            streak:
+              typeof (b.streakDays ?? b.streak_days) === 'number'
+                ? (b.streakDays ?? b.streak_days)
+                : undefined,
+          });
+        })
+        .catch(() => {});
+    }, [user?.id]),
+  );
+
   // ── Fetch unread chat count + realtime updates ────────────────────────────
   useFocusEffect(
     useCallback(() => {
@@ -811,10 +832,12 @@ export default function HomeScreen() {
   // ── Derived values ─────────────────────────────────────────────────────────
   const scoreRaw  = homeData?.header.score;
   const score     = Number(scoreRaw ?? 0);
-  const level     = (homeData?.header.level ?? '').trim();
+  const nestLevel = (homeData?.header.level ?? '').trim();
+  const bridgeLevel = (bridgeHeader.level ?? '').trim();
+  const level     = bridgeLevel || nestLevel;
   const goalTgt   = homeData?.header.goalTarget ?? 100;
   const goalLabel = homeData?.header.goalLabel ?? (level ? nextCefr(level) : 'Next Level');
-  const streak    = homeData?.header.streak ?? 0;
+  const streak    = bridgeHeader.streak ?? homeData?.header.streak ?? 0;
   const done      = homeData?.header.dailyGoalDone ?? 0;
   const target    = homeData?.header.dailyGoalTarget ?? 3;
   const latestId  = homeData?.header.latestAssessmentId ?? null;

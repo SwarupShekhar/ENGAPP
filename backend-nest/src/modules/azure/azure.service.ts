@@ -2,11 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
 
 @Injectable()
 export class AzureService {
   private readonly logger = new Logger(AzureService.name);
   private aiEngineUrl: string;
+  private readonly aiHeaders: Record<string, string>;
 
   constructor(
     private configService: ConfigService,
@@ -15,6 +17,15 @@ export class AzureService {
     this.aiEngineUrl =
       this.configService.get<string>('AI_ENGINE_URL') ||
       'http://localhost:8001';
+    this.aiHeaders = aiEngineAuthHeaders(this.configService);
+  }
+
+  private withAiAuth(options?: Record<string, unknown>) {
+    const opts = (options ?? {}) as { headers?: Record<string, string> };
+    return {
+      ...opts,
+      headers: { ...this.aiHeaders, ...opts.headers },
+    };
   }
 
   async analyzeSpeech(
@@ -67,6 +78,7 @@ export class AzureService {
           this.httpService.post(
             `${this.aiEngineUrl}/api/transcribe`,
             transcribePayload,
+            this.withAiAuth(),
           ),
         );
         transcript = transResponse.data.data.text;
@@ -79,11 +91,15 @@ export class AzureService {
       );
 
       const pronResponse = await lastValueFrom(
-        this.httpService.post(`${this.aiEngineUrl}/api/pronunciation/assess`, {
-          ...audioPayload,
-          reference_text: transcript,
-          user_id: 'system',
-        }),
+        this.httpService.post(
+          `${this.aiEngineUrl}/api/pronunciation/assess`,
+          {
+            ...audioPayload,
+            reference_text: transcript,
+            user_id: 'system',
+          },
+          this.withAiAuth(),
+        ),
       );
 
       // Backend-ai returns { flagged_errors, pronunciation_score } (no .data wrapper).

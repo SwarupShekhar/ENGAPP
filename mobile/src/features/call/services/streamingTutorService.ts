@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { API_URL as NEST_API_URL } from "../../../api/client";
 import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
 import { readExpoExtra } from "../../../api/expoExtra";
+import { tutorApi } from "../../../api/tutor";
 
 /** Vultr backend-ai WebSocket (docker maps host :4002 → uvicorn :8001, plain WS — no TLS). */
 const VULTR_AI_WS_ORIGIN = "ws://139.84.163.249:4002";
@@ -71,10 +72,14 @@ class StreamingTutorService {
   /** Open WS only when needed (e.g. SSE fallback). Preserves registered onMessage handlers. */
   ensureConnected(sessionId: string, userId: string) {
     if (this.isConnected()) return;
-    this.connect(sessionId, userId);
+    void this.connect(sessionId, userId);
   }
 
   connect(sessionId: string, userId: string) {
+    void this.openConnection(sessionId, userId);
+  }
+
+  private async openConnection(sessionId: string, userId: string) {
     if (this.ws) {
       this.ws.close();
     }
@@ -116,7 +121,17 @@ class StreamingTutorService {
       }
     }
 
-    const fullWs = `${wsUrl}/api/tutor/ws/${sessionId}?user_id=${userId}`;
+    let wsToken = "";
+    try {
+      const { token } = await tutorApi.getStreamingWsToken(sessionId);
+      wsToken = token;
+    } catch (e) {
+      console.warn("[StreamingTutor] WS token fetch failed:", e);
+    }
+
+    const qs = new URLSearchParams({ user_id: userId });
+    if (wsToken) qs.set("ws_token", wsToken);
+    const fullWs = `${wsUrl}/api/tutor/ws/${sessionId}?${qs.toString()}`;
     if (__DEV__) {
       console.log("[StreamingTutor] Connecting", fullWs);
     } else {

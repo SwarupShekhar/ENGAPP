@@ -9,7 +9,12 @@ import { readExpoExtra } from "./expoExtra";
 import { getDevBundleHostname } from "./devPackagerHost";
 import { getCachedToken } from "./authToken";
 
-// Access localhost from emulator/device or use production URL
+/**
+ * EngR / Pulse API client → Nest (matchmaking, P2P sessions, Maya tutor REST, home).
+ * Production: EXPO_PUBLIC_NEST_API_URL or Vultr :4001.
+ * Englivo booking/quota uses englivoClient.ts → englivo.com (Option A).
+ * Same Clerk instance + Bridge API for shared CEFR/streak across modes.
+ */
 const IS_PROD = !__DEV__;
 // For EAS distribution build set to false so the app uses the production API URL.
 // For EAS distribution builds, ALWAYS set this to false.
@@ -169,7 +174,10 @@ export async function getSessionsCount(): Promise<number> {
 export async function getUpcomingSession(): Promise<any | null> {
   try {
     const r = await client.get("/sessions/upcoming");
-    return r.data;
+    const data = r.data;
+    if (data == null) return null;
+    if (Array.isArray(data)) return data.length > 0 ? data[0] : null;
+    return data;
   } catch (error: any) {
     if (error.response?.status === 404) return null;
     throw error;

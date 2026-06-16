@@ -11,12 +11,14 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
 import { ClerkGuard } from '../auth/clerk.guard';
+import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
 
 @Controller('api/tts')
 @UseGuards(ClerkGuard)
 export class TtsController {
   private readonly logger = new Logger(TtsController.name);
   private readonly aiEngineUrl: string;
+  private readonly aiHeaders: Record<string, string>;
 
   constructor(
     private readonly httpService: HttpService,
@@ -24,6 +26,15 @@ export class TtsController {
   ) {
     this.aiEngineUrl =
       this.configService.get<string>('AI_ENGINE_URL') || 'http://localhost:8001';
+    this.aiHeaders = aiEngineAuthHeaders(this.configService);
+  }
+
+  private withAiAuth(options?: Record<string, unknown>) {
+    const opts = (options ?? {}) as { headers?: Record<string, string> };
+    return {
+      ...opts,
+      headers: { ...this.aiHeaders, ...opts.headers },
+    };
   }
 
   @Post('feedback-narration')
@@ -33,7 +44,7 @@ export class TtsController {
         this.httpService.post(
           `${this.aiEngineUrl}/api/tts/feedback-narration`,
           body,
-          { timeout: 15000 },
+          this.withAiAuth({ timeout: 15000 }),
         ),
       );
       return response.data;
@@ -55,7 +66,7 @@ export class TtsController {
         this.httpService.post(
           `${this.aiEngineUrl}/api/tts/full-feedback-narration`,
           body,
-          { timeout: 20000 }, // Full narration takes longer
+          this.withAiAuth({ timeout: 20000 }), // Full narration takes longer
         ),
       );
       return response.data;
@@ -77,7 +88,7 @@ export class TtsController {
         this.httpService.post(
           `${this.aiEngineUrl}/api/tts/speak`,
           body,
-          { timeout: 10000 },
+          this.withAiAuth({ timeout: 10000 }),
         ),
       );
       return response.data;

@@ -387,10 +387,10 @@ export class SessionsService {
     return { count };
   }
 
-  async getUserUpcomingSession(userId: string): Promise<any | null> {
-    // For now, return null as there are no scheduled/upcoming sessions
-    // TODO: Implement when booking system is added
-    return null;
+  async getUserUpcomingSession(userId: string): Promise<any[]> {
+    // P2P app has no scheduled bookings yet; Englivo tutor bookings live on englivo.com.
+    void userId;
+    return [];
   }
 
   async startSession(data: {

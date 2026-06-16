@@ -39,6 +39,8 @@ import { PostHogUserSync } from "./analytics/PostHogUserSync";
 import { CrashlyticsBootstrap } from "./crashlytics/CrashlyticsBootstrap";
 import { CrashlyticsUserSync } from "./crashlytics/CrashlyticsUserSync";
 import { recordCrashlyticsError } from "./crashlytics/crashlytics";
+import { captureSentryException } from "./sentry/sentry";
+import { SentryUserSync } from "./sentry/SentryUserSync";
 import { useAnalytics } from "./analytics/useAnalytics";
 import { AnalyticsEvents } from "./analytics/events";
 import { analyticsMeta } from "./analytics/eventMeta";
@@ -56,6 +58,10 @@ class AppErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("[App] ErrorBoundary caught:", error, errorInfo);
     void recordCrashlyticsError(error, "AppErrorBoundary");
+    captureSentryException(error, {
+      componentStack: errorInfo.componentStack,
+      source: "AppErrorBoundary",
+    });
   }
 
   render() {
@@ -497,6 +503,7 @@ export default function App() {
       <AnalyticsProvider>
       <CrashlyticsBootstrap />
       <CrashlyticsUserSync />
+      <SentryUserSync />
       <PostHogUserSync />
       <AppOpenTracker />
       <StartupReachabilityProbe />

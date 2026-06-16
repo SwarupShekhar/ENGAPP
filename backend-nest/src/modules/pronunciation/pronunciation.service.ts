@@ -43,6 +43,11 @@ function severityForConfidence(confidence?: number): 'high' | 'medium' | 'low' {
   return 'low';
 }
 
+function aiEngineAuthHeadersFromEnv(): Record<string, string> {
+  const key = process.env.INTERNAL_API_KEY;
+  return key ? { 'x-api-key': key } : {};
+}
+
 /**
  * Bridge: backend-ai pronunciation assess → WeaknessService (same pipeline as grammar).
  * Maps rule_category to topic/weakness key (pronunciation_{rule_category}); records delta for Strapi reel alignment.
@@ -151,7 +156,11 @@ export class PronunciationService {
         `assessFromRecordingUrl sending audio_url to backend-ai: ${recordingUrl.substring(0, 80)}...`,
       );
 
-      const res = await fetch(url, { method: 'POST', body: form });
+      const res = await fetch(url, {
+        method: 'POST',
+        body: form,
+        headers: aiEngineAuthHeadersFromEnv(),
+      });
       if (!res.ok) {
         this.logger.warn(`assessFromRecordingUrl backend-ai ${res.status}`);
         return { flagged_errors: [] };
@@ -201,7 +210,11 @@ export class PronunciationService {
       const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'audio/m4a' });
       form.append('audio', blob, file.originalname || 'audio.m4a');
       if (referenceText) form.append('reference_text', referenceText);
-      const res = await fetch(url, { method: 'POST', body: form });
+      const res = await fetch(url, {
+        method: 'POST',
+        body: form,
+        headers: aiEngineAuthHeadersFromEnv(),
+      });
       if (!res.ok) {
         this.logger.warn(`assessFromUploadedFile backend-ai ${res.status}`);
         return { accuracy: 0, errored: true };
@@ -239,7 +252,11 @@ export class PronunciationService {
       const blob = new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'audio/m4a' });
       form.append('audio', blob, file.originalname || 'audio.m4a');
       if (referenceText) form.append('reference_text', referenceText);
-      const res = await fetch(url, { method: 'POST', body: form });
+      const res = await fetch(url, {
+        method: 'POST',
+        body: form,
+        headers: aiEngineAuthHeadersFromEnv(),
+      });
       if (!res.ok) {
         this.logger.warn(`assessFromUploadedFileWithWords backend-ai ${res.status}`);
         return { accuracy: 0, words: [], fluencyScore: null, prosodyScore: null, errored: true };

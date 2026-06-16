@@ -16,6 +16,7 @@ from prometheus_client import make_asgi_app
 from app.core.config import settings
 from app.core.logger import configure_logging, logger
 from app.core.middleware import RequestIDMiddleware
+from app.security.internal_auth import require_internal_api_key
 from app.cache.manager import cache
 from app.features.transcription.async_azure_speech import shutdown_executor
 from app.features.transcription.deepgram_service import deepgram_transcription_service
@@ -79,6 +80,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def internal_api_key_middleware(request: Request, call_next):
+    await require_internal_api_key(request)
+    return await call_next(request)
 
 
 # 3. Global Exception Handler

@@ -8,6 +8,7 @@ services:
     environment:
       AI_ENGINE_URL: http://backend-ai:8001
       FASTAPI_SERVICE_URL: http://backend-ai:8001
+      # INTERNAL_API_KEY must match backend-ai/.env (Nest → AI x-api-key + WS tokens)
       PORT: 3000
       NODE_ENV: production
       # FCM push delivery: set FIREBASE_SERVICE_ACCOUNT_JSON in backend-nest/.env
@@ -84,6 +85,26 @@ services:
       backend-ai:
         condition: service_healthy
 
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme-set-on-vps}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
+    ports:
+      # SSH tunnel: ssh -L 4009:127.0.0.1:4009 user@vultr → http://localhost:4009
+      - "127.0.0.1:4009:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/etc/grafana/dashboards:ro
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+
   caddy:
     image: caddy:2.8
     restart: unless-stopped
@@ -112,3 +133,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  grafana_data:

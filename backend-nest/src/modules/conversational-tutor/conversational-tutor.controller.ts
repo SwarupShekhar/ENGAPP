@@ -12,18 +12,39 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ConversationalTutorService } from './conversational-tutor.service';
-import { StartSessionDto, EndSessionDto } from './dto/tutor.dto';
-import { v4 as uuidv4 } from 'uuid';
+import { EndSessionDto } from './dto/tutor.dto';
 import { ClerkGuard } from '../auth/clerk.guard';
+import { AiWsTokenService } from '../../common/ai-ws-token.service';
 
 @Controller('conversational-tutor')
 @UseGuards(ClerkGuard)
 export class ConversationalTutorController {
-  constructor(private tutorService: ConversationalTutorService) {}
+  constructor(
+    private tutorService: ConversationalTutorService,
+    private readonly aiWsTokenService: AiWsTokenService,
+  ) {}
 
   @Post('start-session')
   async startSession(@Request() req) {
     return this.tutorService.startSession(req.user.id);
+  }
+
+  /** Short-lived token for direct backend-ai tutor WebSocket (mobile fallback path). */
+  @Post('streaming-ws-token')
+  issueStreamingWsToken(
+    @Request() req: { user: { id: string; clerkId: string } },
+    @Body() body: { sessionId: string },
+  ) {
+    if (!body.sessionId?.trim()) {
+      throw new BadRequestException('sessionId is required');
+    }
+    return {
+      token: this.aiWsTokenService.issue(
+        req.user.clerkId,
+        body.sessionId.trim(),
+      ),
+      expiresInSeconds: 3600,
+    };
   }
 
   @Post('process-speech')
@@ -125,7 +146,9 @@ export class ConversationalTutorController {
     @Body('aiText') aiText: string,
   ) {
     if (!sessionId || userText == null || aiText == null) {
-      throw new BadRequestException('sessionId, userText, and aiText are required');
+      throw new BadRequestException(
+        'sessionId, userText, and aiText are required',
+      );
     }
     this.tutorService.appendTurn(sessionId, userText, aiText);
     return { ok: true };

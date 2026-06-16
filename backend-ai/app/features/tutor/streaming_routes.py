@@ -8,6 +8,7 @@ import traceback
 from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
+from app.security.internal_auth import verify_ws_token
 from app.core.config import settings
 from app.middleware.rate_limiter import rate_limiter
 from app.features.tutor.service import StreamingTutorService
@@ -300,11 +301,21 @@ async def stream_tutor_response(
 
 @router.websocket("/ws/{session_id}")
 async def websocket_tutor_session(websocket: WebSocket, session_id: str):
-    await websocket.accept()
-    print(f"[Pulse DEBUG] WebSocket connected session_id={session_id}", flush=True)
-
     query_user_id = websocket.query_params.get("user_id")
     user_id = (query_user_id or "").strip() or f"session:{session_id}"
+
+    try:
+        verify_ws_token(
+            websocket.query_params.get("ws_token"),
+            session_id,
+            query_user_id.strip() if query_user_id else None,
+        )
+    except HTTPException as exc:
+        await websocket.close(code=1008, reason=exc.detail)
+        return
+
+    await websocket.accept()
+    print(f"[Pulse DEBUG] WebSocket connected session_id={session_id}", flush=True)
 
     try:
         await rate_limiter.check_rate_limit(

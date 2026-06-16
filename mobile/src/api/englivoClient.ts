@@ -1,3 +1,8 @@
+/**
+ * Englivo.com API client (Option A).
+ * Human tutor booking, quota, /api/me — NOT served by Nest.
+ * Same Clerk JWT as client.ts; do not point this at the Nest/Vultr URL.
+ */
 import axios from "axios";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
@@ -19,8 +24,7 @@ const EXTRA_API_URL_OVERRIDE = coerceReleaseApiOverride(
   "Englivo API",
 );
 
-// Production: Englivo AI (FastAPI on Render). Nest still serves core session APIs — see client.ts.
-// Default in dev now points to production to avoid missing local routes.
+// Production: englivo.com (Next.js API). Never use Nest URL here.
 export const API_URL =
   (typeof EXTRA_API_URL_OVERRIDE === "string" && EXTRA_API_URL_OVERRIDE.trim()
     ? EXTRA_API_URL_OVERRIDE.trim()

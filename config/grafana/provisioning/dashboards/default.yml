@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: EngR
+    orgId: 1
+    folder: EngR
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards

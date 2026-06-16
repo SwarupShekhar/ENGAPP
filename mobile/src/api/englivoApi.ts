@@ -1,13 +1,10 @@
 /**
- * englivoApi.ts — typed API functions for all Core (Englivo) endpoints.
+ * englivoApi.ts — Englivo tab API (human tutor, quota, booking).
  *
- * Every function here uses `client` from englivoClient, which targets
- * https://englivo.com/api in production and http://<LOCAL_IP>:3000/api in dev.
+ * Base URL: englivoClient → https://englivo.com in production.
+ * Do NOT use client.ts (Nest) here — see docs/internal-qa-checklist.md.
  *
- * Rules:
- *  - This file is ONLY for Core screens.
- *  - Never import client.ts (EngR / Pulse backend) here.
- *  - Never hardcode clerkId — always pass from useAuth() / useUser().
+ * Shared Clerk JWT with EngR; Bridge API holds cross-app CEFR/streak.
  */
 
 import { client } from "./englivoClient";
@@ -28,15 +25,18 @@ export interface BookingResult {
 
 // ─── User / Profile ───────────────────────────────────────────────────────────
 
-/** GET /api/me — Englivo user profile (credits, plan, CEFR, etc.) */
+/** GET /api/me — Englivo user profile (credits, plan, CEFR, etc.) on englivo.com */
 export const getEnglivoMe = () =>
   client.get("/api/me").then((r) => r.data).catch((err) => {
-    if (err?.response?.status === 404) {
-      // Local backend-ai does not expose /api/me in current setup.
+    if (__DEV__ && err?.response?.status === 404) {
+      // Dev-only stub when not hitting englivo.com (e.g. wrong override URL).
+      console.warn(
+        "[Englivo API] GET /api/me 404 — use https://englivo.com or set APP_ENGLIVO_API_URL",
+      );
       return {
-        clerkId: '',
-        plan: 'FREE',
-        status: 'ACTIVE',
+        clerkId: "",
+        plan: "FREE",
+        status: "ACTIVE",
         quota: {
           weeklyLimitSeconds: null,
           usedSeconds: 0,
@@ -56,6 +56,22 @@ export const getEnglivoMe = () =>
 /** GET /api/sessions — user's existing bookings */
 export const getEnglivoSessions = () =>
   client.get("/api/sessions").then((r) => r.data);
+
+/** GET /api/sessions/upcoming — next booked tutor session (englivo.com) */
+export const getEnglivoUpcomingSession = async () => {
+  const r = await client.get("/api/sessions/upcoming");
+  const data = r.data;
+  if (Array.isArray(data)) return data[0] ?? null;
+  return data ?? null;
+};
+
+/** GET /api/sessions/upcoming — all upcoming bookings */
+export const getEnglivoUpcomingSessions = async (): Promise<unknown[]> => {
+  const r = await client.get("/api/sessions/upcoming");
+  const data = r.data;
+  if (Array.isArray(data)) return data;
+  return data ? [data] : [];
+};
 
 /** POST /api/sessions/book — create new booking */
 export const bookSession = (payload: BookingPayload): Promise<BookingResult> =>

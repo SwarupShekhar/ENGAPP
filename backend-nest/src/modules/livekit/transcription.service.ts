@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -17,10 +18,12 @@ const execFileAsync = promisify(execFile);
 export class TranscriptionService {
   private readonly logger = new Logger(TranscriptionService.name);
   private readonly aiEngineUrl: string;
+  private readonly aiHeaders: Record<string, string>;
 
   constructor(private readonly config: ConfigService) {
     this.aiEngineUrl =
       this.config.get<string>('AI_ENGINE_URL') || 'http://localhost:8001';
+    this.aiHeaders = aiEngineAuthHeaders(this.config);
   }
 
   /**
@@ -83,7 +86,7 @@ export class TranscriptionService {
     try {
       const res = await fetch(`${this.aiEngineUrl}/api/transcribe`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...this.aiHeaders },
         body: JSON.stringify({
           audio_url: audioUrl,
           language: opts?.language ?? 'en-US',
