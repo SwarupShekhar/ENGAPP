@@ -7,15 +7,29 @@
 # Public: http://<vultr-ip>:4008  (or proxy api.englivo.com -> 127.0.0.1:4008)
 # For TLS on a domain, use a host reverse proxy or map 443 and set the site block to your domain.
 :80 {
-	encode gzip
+	# SSE tutor stream must not be gzip-buffered (adds seconds of latency).
+	@sse path /conversational-tutor/stream-speech
 
-	header {
-		-Server
-		X-Content-Type-Options nosniff
-		X-Frame-Options DENY
-		Referrer-Policy no-referrer
+	handle @sse {
+		reverse_proxy backend-nest:3000 {
+			flush_interval -1
+			transport http {
+				versions 1.1
+			}
+		}
 	}
 
-	# All traffic → NestJS; backend-ai is never exposed externally.
-	reverse_proxy backend-nest:3000
+	handle {
+		encode gzip
+
+		header {
+			-Server
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy no-referrer
+		}
+
+		# All traffic → NestJS; backend-ai is never exposed externally.
+		reverse_proxy backend-nest:3000
+	}
 }

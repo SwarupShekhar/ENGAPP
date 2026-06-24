@@ -19,7 +19,8 @@ export type NotificationType =
   | 'friend_request'
   | 'incoming_call'
   | 'missed_call'
-  | 'word_of_day';
+  | 'word_of_day'
+  | 'phrase_of_day';
 
 export interface NotificationJobData {
   logId: string;
@@ -113,6 +114,16 @@ const PAYLOADS: Record<NotificationType, (data: Record<string, unknown>) => Push
       definition: d.definition,
       example: d.example,
       partOfSpeech: d.partOfSpeech,
+    },
+  }),
+  phrase_of_day: (d) => ({
+    title: `Phrase of the Day: ${String(d.phrase ?? 'New phrase')}`,
+    body: String(d.definition ?? 'Tap to practice this phrase today.'),
+    data: {
+      type: 'phrase_of_day',
+      phrase: d.phrase,
+      definition: d.definition,
+      example: d.example,
     },
   }),
 };
@@ -253,6 +264,14 @@ export class NotificationService {
           word: data.word,
           part_of_speech: data.partOfSpeech,
           word_source: data.source,
+          devices_targeted: tokens.length,
+          devices_delivered: successful,
+        });
+      }
+      if (type === 'phrase_of_day' && successful > 0) {
+        this.posthog.capture('phrase_of_day_push_sent', userId, {
+          phrase: data.phrase,
+          phrase_source: data.source,
           devices_targeted: tokens.length,
           devices_delivered: successful,
         });

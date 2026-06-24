@@ -1,16 +1,18 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAppTheme } from "../../../theme/useAppTheme";
+import { useHomePracticeTts } from "../voice/useHomePracticeTts";
 
 export type WordOfDayParams = {
   word?: string;
@@ -32,6 +34,20 @@ export default function WordOfDayScreen() {
   const displayDef =
     definition?.trim() || "Open the home tab to see today's vocabulary pick.";
   const displayExample = example?.trim();
+  const listenScript = useMemo(() => {
+    const pos = partOfSpeech ? `${partOfSpeech}. ` : "";
+    return [
+      `${displayWord}. ${pos}`.trim(),
+      displayDef && `Meaning - ${displayDef}`,
+      displayExample && `For example - ${displayExample}`,
+    ]
+      .filter(Boolean)
+      .join(". ");
+  }, [displayWord, displayDef, displayExample, partOfSpeech]);
+
+  const { speak, playingKey, stop } = useHomePracticeTts();
+  const listenKey = "word-of-day-screen:full";
+  const listenPlaying = playingKey === listenKey;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -76,6 +92,34 @@ export default function WordOfDayScreen() {
             <Text style={styles.example}>"{displayExample}"</Text>
           </View>
         ) : null}
+
+        <Pressable
+          onPress={() => {
+            if (listenPlaying) void stop();
+            else void speak(listenKey, listenScript);
+          }}
+          style={({ pressed }) => [
+            styles.listenBtn,
+            {
+              backgroundColor: listenPlaying
+                ? `${theme.colors.primary}22`
+                : `${theme.colors.primary}12`,
+              borderColor: listenPlaying ? theme.colors.primary : theme.colors.border,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Listen to word pronunciation"
+        >
+          <Ionicons
+            name={listenPlaying ? "stop-circle" : "volume-high"}
+            size={18}
+            color={theme.colors.primary}
+          />
+          <Text style={[styles.listenText, { color: theme.colors.primary }]}>
+            {listenPlaying ? "Playing… tap to stop" : "Listen"}
+          </Text>
+        </Pressable>
 
         <TouchableOpacity
           style={styles.homeBtn}
@@ -169,6 +213,20 @@ function getStyles(theme: ReturnType<typeof useAppTheme>) {
       lineHeight: 22,
       fontStyle: "italic",
       color: theme.colors.text.secondary,
+    },
+    listenBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    listenText: {
+      fontSize: 14,
+      fontWeight: "700",
     },
     homeBtn: {
       marginTop: 8,

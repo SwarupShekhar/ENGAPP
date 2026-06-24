@@ -38,8 +38,15 @@ export class LiveKitWebhookController {
     private readonly redis: RedisService,
   ) {}
 
-  @Post('egress')
+  @Post(['egress', 'egress '])
   async onEgress(@Req() req: Request, @Headers('authorization') auth?: string) {
+    const rawPath = req.originalUrl || req.url || '';
+    if (rawPath.includes('egress%20') || rawPath.endsWith('egress ')) {
+      this.logger.warn(
+        'LiveKit webhook URL has a trailing space (egress%20). ' +
+          'Re-save the webhook in LiveKit as exactly https://api.englivo.com/webhooks/livekit/egress',
+      );
+    }
     const apiKey = this.config.get<string>('LIVEKIT_API_KEY');
     const apiSecret = this.config.get<string>('LIVEKIT_API_SECRET');
 

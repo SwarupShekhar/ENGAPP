@@ -142,16 +142,16 @@ export default function PulseHomeCarousel({
     }, [ttsStop, capture, onParentScrollEnabledChange]),
   );
 
-  // Stop stale TTS when API phrase/word updates (e.g. after home cache refresh).
+  // Stop stale TTS only when today's phrase/word text actually changes (not on every home refresh).
+  const phraseSig = phraseOfTheDay
+    ? `${phraseOfTheDay.phrase}|${phraseOfTheDay.definition}`
+    : '';
+  const wordSig = wordOfTheDay
+    ? `${wordOfTheDay.word}|${wordOfTheDay.definition}`
+    : '';
   useEffect(() => {
     ttsStop();
-  }, [
-    phraseOfTheDay?.phrase,
-    phraseOfTheDay?.definition,
-    wordOfTheDay?.word,
-    wordOfTheDay?.definition,
-    ttsStop,
-  ]);
+  }, [phraseSig, wordSig, ttsStop]);
 
   // ── Build slide list ─────────────────────────────────────────────────────────
   const slides = useMemo<PulseSlide[]>(() => {

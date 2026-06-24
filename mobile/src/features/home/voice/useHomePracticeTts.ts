@@ -6,8 +6,8 @@ import * as Speech from 'expo-speech';
 import { fetchErrorSpeak } from '../../../api/tts';
 import { getOrFetchTtsFileUri } from '../../../utils/ttsAudioCache';
 
-// Module-level: confirmed-present URIs this session — skips getInfoAsync on repeat taps (Bug 6)
 const cachedUris = new Map<string, string>();
+const SERVER_BUDGET_MS = 3500;
 
 async function hashInput(input: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, input);
@@ -34,8 +34,6 @@ export function useHomePracticeTts() {
   const activeKeyRef = useRef<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
 
-  // Bug 3 fix: sync state clears happen before any await, so fire-and-forget callers
-  // (useFocusEffect cleanup) see cancelled state immediately without needing to await.
   const stop = useCallback(async () => {
     Speech.stop();
     activeKeyRef.current = null;
@@ -65,10 +63,19 @@ export function useHomePracticeTts() {
       setPlayingKey(key);
       await setPlaybackAudioMode();
 
-      // playUri: loads and plays uri. Guards cancellation before AND after createAsync (Bug 1).
-      // Throws if createAsync fails so caller can evict corrupt cache and re-fetch (Bug 2).
-      const playUri = async (uri: string): Promise<void> => {
-        if (activeKeyRef.current !== key) return;
+      const clearPlaying = () => {
+        if (activeKeyRef.current === key) {
+          activeKeyRef.current = null;
+          setPlayingKey(null);
+        }
+      };
+
+      const textDigest = (await hashInput(trimmed)).slice(0, 16);
+      const storageKey = `${key}:${textDigest}`;
+      const fetchB64 = () => fetchErrorSpeak(trimmed).then((r) => r.audio_base64 ?? '');
+
+      const playUri = async (uri: string): Promise<boolean> => {
+        if (activeKeyRef.current !== key) return false;
 
         let sound: Audio.Sound;
         try {
@@ -76,65 +83,48 @@ export function useHomePracticeTts() {
             { uri },
             { shouldPlay: true, volume: 1.0 },
           ));
-        } catch (err) {
-            // Corrupt/invalid file — evict from both caches so caller can re-fetch (Bug 2)
+        } catch {
           cachedUris.delete(storageKey);
           await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-          throw err;
+          return false;
         }
 
-        // Re-check after await — stop() may have fired during createAsync (Bug 1)
         if (activeKeyRef.current !== key) {
           sound.unloadAsync().catch(() => {});
-          return;
+          return false;
         }
 
+        Speech.stop();
         soundRef.current = sound;
         sound.setOnPlaybackStatusUpdate((status) => {
           if (!status.isLoaded) return;
           if (status.didJustFinish && activeKeyRef.current === key) {
-            activeKeyRef.current = null;
-            setPlayingKey(null);
+            clearPlaying();
             sound.unloadAsync().catch(() => {});
             soundRef.current = null;
           }
         });
+        return true;
       };
 
-      const fetchB64 = () => fetchErrorSpeak(trimmed).then((r) => r.audio_base64 ?? '');
-      // Key disk + memory cache by spoken text so stale phrase-of-day audio cannot replay after home refresh.
-      const textDigest = (await hashInput(trimmed)).slice(0, 16);
-      const storageKey = `${key}:${textDigest}`;
+      const cached = cachedUris.get(storageKey);
+      if (cached && (await playUri(cached))) {
+        return;
+      }
 
-      try {
-        // Bug 6: use in-memory map to skip getInfoAsync on repeat taps
-        let uri = cachedUris.get(storageKey) ?? null;
+      const serverTask = getOrFetchTtsFileUri(storageKey, fetchB64);
+      const serverUri = await Promise.race([
+        serverTask,
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), SERVER_BUDGET_MS),
+        ),
+      ]);
 
-        if (!uri) {
-          // Bug 4: use shared utility instead of bespoke getInfoAsync→fetch→write
-          uri = await getOrFetchTtsFileUri(storageKey, fetchB64);
-          if (uri) cachedUris.set(storageKey, uri);
+      if (serverUri) {
+        cachedUris.set(storageKey, serverUri);
+        if (activeKeyRef.current === key && (await playUri(serverUri))) {
+          return;
         }
-
-        if (uri && activeKeyRef.current === key) {
-          try {
-            await playUri(uri);
-            return;
-          } catch {
-            // playUri already evicted from cachedUris + deleted corrupt file (Bug 2).
-            // One re-fetch attempt with a fresh file.
-            if (activeKeyRef.current === key) {
-              const freshUri = await getOrFetchTtsFileUri(storageKey, fetchB64);
-              if (freshUri && activeKeyRef.current === key) {
-                cachedUris.set(storageKey, freshUri);
-                await playUri(freshUri);
-                return;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        if (__DEV__) console.warn('[HomePractice] server TTS failed, fallback to device:', e);
       }
 
       if (activeKeyRef.current !== key) return;
@@ -142,16 +132,17 @@ export function useHomePracticeTts() {
       Speech.speak(trimmed, {
         language: 'en-US',
         rate: 0.78,
-        onDone: () => {
-          if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
-        },
-        onStopped: () => {
-          if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
-        },
-        onError: () => {
-          if (activeKeyRef.current === key) { activeKeyRef.current = null; setPlayingKey(null); }
-        },
+        onDone: clearPlaying,
+        onStopped: clearPlaying,
+        onError: clearPlaying,
       });
+
+      // Finish server fetch in background for a higher-quality replay on the next tap.
+      void serverTask
+        .then((uri) => {
+          if (uri) cachedUris.set(storageKey, uri);
+        })
+        .catch(() => {});
     },
     [stop],
   );

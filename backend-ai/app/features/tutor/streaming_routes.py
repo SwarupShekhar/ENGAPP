@@ -107,7 +107,14 @@ async def _generate_stream_response(
         try:
             _coaching_ctx = coaching_get_context(user_id, session_id)
             if _coaching_ctx:
-                _coaching_hint_payload = await coaching_get_hint(user_utterance, _coaching_ctx)
+                try:
+                    _coaching_hint_payload = await asyncio.wait_for(
+                        coaching_get_hint(user_utterance, _coaching_ctx),
+                        timeout=0.25,
+                    )
+                except asyncio.TimeoutError:
+                    logger.info("coaching hint skipped (250ms budget) — starting LLM without hint")
+                    _coaching_hint_payload = None
                 if _coaching_hint_payload:
                     _coaching_hint_text = _coaching_hint_payload.get("text")
         except Exception as _ce:
@@ -447,9 +454,16 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                         _ws_coaching_ctx = coaching_get_context(user_id, session_id)
                         if _ws_coaching_ctx:
                             _ws_elapsed = time.time() - ws_session_start
-                            _ws_hint_payload = await coaching_get_hint(
-                                user_utterance, _ws_coaching_ctx, _ws_elapsed
-                            )
+                            try:
+                                _ws_hint_payload = await asyncio.wait_for(
+                                    coaching_get_hint(
+                                        user_utterance, _ws_coaching_ctx, _ws_elapsed
+                                    ),
+                                    timeout=0.25,
+                                )
+                            except asyncio.TimeoutError:
+                                logger.info("coaching hint skipped (WS, 250ms budget)")
+                                _ws_hint_payload = None
                             if _ws_hint_payload:
                                 _ws_hint_text = _ws_hint_payload.get("text")
                     except Exception as _wce:

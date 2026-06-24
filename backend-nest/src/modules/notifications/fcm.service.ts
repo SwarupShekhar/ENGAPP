@@ -10,6 +10,16 @@ const INVALID_TOKEN_CODES = new Set([
   'messaging/invalid-argument',
 ]);
 
+function isInvalidTokenError(code: string, message: string): boolean {
+  if (INVALID_TOKEN_CODES.has(code)) return true;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('registration-token-not-registered') ||
+    lower.includes('invalid-registration-token') ||
+    lower.includes('requested entity was not found')
+  );
+}
+
 @Injectable()
 export class FcmService implements OnModuleInit {
   private readonly logger = new Logger(FcmService.name);
@@ -99,7 +109,7 @@ export class FcmService implements OnModuleInit {
           token,
           success: false,
           error: errorMsg,
-          invalidToken: INVALID_TOKEN_CODES.has(code),
+          invalidToken: isInvalidTokenError(code, errorMsg),
         };
       });
     } catch (err) {

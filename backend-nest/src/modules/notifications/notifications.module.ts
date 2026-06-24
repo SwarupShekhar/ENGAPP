@@ -9,6 +9,7 @@ import { Processor, Process } from '@nestjs/bull';
 import { RedisModule } from '../../redis/redis.module';
 import { HomeModule } from '../home/home.module';
 import { WordOfDayScheduler } from './word-of-day.scheduler';
+import { PhraseOfDayScheduler } from './phrase-of-day.scheduler';
 import { PosthogAnalyticsService } from './posthog-analytics.service';
 
 @Processor('notifications')
@@ -43,6 +44,7 @@ class NotificationDeliveryProcessor {
     NotificationService,
     SmartReminderScheduler,
     WordOfDayScheduler,
+    PhraseOfDayScheduler,
     NotificationDeliveryProcessor,
   ],
   exports: [NotificationService],

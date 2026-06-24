@@ -125,12 +125,23 @@ class SpeakRequest(BaseModel):
 
 @router.post("/speak", response_model=FeedbackNarrationResponse)
 async def speak(request: Request, body: SpeakRequest):
-    # Prefer Gemini TTS — significantly more natural for vocabulary/phrase teaching cards.
-    # Falls back to Inworld if Gemini is not configured or returns empty audio.
-    audio_bytes = b""
-    if google_gemini_tts_service.is_configured():
-        audio_bytes = await google_gemini_tts_service.synthesize_async(body.text)
+    log = get_logger(request)
+    clean = (body.text or "").strip()
+    if not clean:
+        return FeedbackNarrationResponse(audio_base64="", text="")
+
+    # Inworld is faster and already used for feedback narration; Gemini TTS is the fallback.
+    audio_bytes = await inworld_tts_service.synthesize_async(
+        clean, speaking_rate=body.speaking_rate
+    )
+    if not audio_bytes and google_gemini_tts_service.is_configured():
+        audio_bytes = await google_gemini_tts_service.synthesize_async(clean)
+
     if not audio_bytes:
-        audio_bytes = await inworld_tts_service.synthesize_async(body.text, speaking_rate=body.speaking_rate)
+        log.error("speak_tts_failed text_len=%s inworld=%s gemini=%s",
+                  len(clean), inworld_tts_service.is_configured(),
+                  google_gemini_tts_service.is_configured())
+        return FeedbackNarrationResponse(audio_base64="", text=clean)
+
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-    return FeedbackNarrationResponse(audio_base64=audio_b64, text=body.text)
+    return FeedbackNarrationResponse(audio_base64=audio_b64, text=clean)

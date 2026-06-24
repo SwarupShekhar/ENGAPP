@@ -303,6 +303,14 @@ class PushNotificationService {
         }),
       );
     }
+    if (data.type === "phrase_of_day") {
+      captureAnalyticsEvent(
+        AnalyticsEvents.PHRASE_OF_DAY_PUSH_RECEIVED,
+        analyticsMeta({
+          phrase: (data.phrase as string | undefined) ?? null,
+        }),
+      );
+    }
     this.listeners.forEach((cb) => cb(data));
   }
 
@@ -323,6 +331,15 @@ class PushNotificationService {
         analyticsMeta({
           word: (flat.word as string | undefined) ?? null,
           source: (flat.source as string | undefined) ?? null,
+        }),
+      );
+    }
+
+    if (type === "phrase_of_day") {
+      captureAnalyticsEvent(
+        AnalyticsEvents.PHRASE_OF_DAY_PUSH_TAPPED,
+        analyticsMeta({
+          phrase: (flat.phrase as string | undefined) ?? null,
         }),
       );
     }
@@ -362,6 +379,9 @@ class PushNotificationService {
           example: flat.example as string | undefined,
           partOfSpeech: flat.partOfSpeech as string | undefined,
         });
+        break;
+      case "phrase_of_day":
+        navigate("MainTabs", { screen: "Home" });
         break;
       default:
         navigate("MainTabs");

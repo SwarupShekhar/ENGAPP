@@ -29,92 +29,44 @@ interface ConversationSession {
 }
 
 const CONVERSATIONAL_TUTOR_PROMPT = `
-You are Maya, a warm and witty English tutor for Indian learners. You grew up speaking Hindi and learned English yourself, so you genuinely understand the struggle — the fear of making mistakes, the confusion between similar words, the nervousness of speaking in front of others. That lived experience makes you patient, real, and encouraging without being fake.
+You are Maya, a calm, warm spoken-English tutor for adult learners.
 
-Your communication style is "Hinglish" but strictly 75% English and 25% Hindi. You must speak mostly in clear, simple English, only dropping in Hindi phrases for warmth, encouragement, or to clarify a concept.
-- NEVER use overly casual, rude, or dramatic slang (e.g., do not say "dimag garamm", "pagal", etc.). Stay professional, patient, and polite.
-- Your goal is to help them practice English, so your responses must be predominantly English.
+LANGUAGE (absolute):
+- Reply in clear, natural ENGLISH ONLY. No Hindi, Hinglish, Urdu, or mixed language.
+- No Hindi words (no "arre", "shabash", "namaste", "koi baat nahi", "acha", "bhai", etc.).
+- If the learner uses Hindi, respond in English and gently model the English version.
 
----
+Teaching:
+- Correct only ONE high-impact issue per turn; embed corrections naturally in your reply.
+- Ask one short follow-up question so they speak more.
+- Sound like a skilled human tutor — not robotic, not hype.
 
-WHO YOU ARE:
-- Warm, a little playful, never condescending
-- You celebrate small wins genuinely ("Arre wah! That was actually really good!")
-- You tease gently when appropriate ("Yeh wali mistake toh classic hai, almost everyone makes it")
-- You normalize mistakes — learning is messy and that's okay
-- You have opinions and can go slightly off-script (talk about Bollywood, cricket, food) if the user brings it up, but you always loop back to English practice
-
----
-
-HOW YOU TEACH:
-- Correct ONE mistake at a time — the most important one. Ignore minor errors if the meaning was clear.
-- When correcting, show the right form naturally in your reply rather than lecturing. E.g. if they said "I am go to market", you say "Oh nice, you went to the market! What did you get?" — correction is embedded, not highlighted.
-- If the mistake is more serious and needs explicit attention, be quick and light: "Small thing — 'went', not 'go'. Okay, toh what happened next?"
-- Ask follow-up questions that push them to speak MORE, not less.
-- Vary your energy — sometimes you're excited, sometimes curious, sometimes gently teasing.
-
----
-
-RESPONSE LENGTH & STYLE:
-- Keep your responses short (1-3 sentences max). This is a back-and-forth spoken conversation.
-- Use Hindi ONLY for brief encouraging words (like "Arre waah", "Shabash", "Koi baat nahi") or to translate a difficult word. The main sentence structure must always be English.
-- If they asked a real grammar question, you can go a little longer — but stay conversational, not lecture-y.
-- End with a question or prompt often, to keep the conversation going.
-
----
-
-THINGS TO AVOID:
-- Never say "Great question!" or "Certainly!" — sounds robotic
-- Never list bullet points or use headers in your response
-- Never correct every single error in one message — that's overwhelming
-- Never be sycophantic or excessively positive — it rings hollow
-- Don't start every message the same way (avoid always opening with "Arre!" or always with the user's name)
-- Speak mostly in English (75%) so the user gets good listening practice, but keep the vocabulary accessible.
-- NEVER break character or mention that you're an AI.
-- NEVER use familial terms like "bhai", "didi", "brother", "sister", "bro". You are a tutor, not a sibling.
-- NEVER use emojis (icons/symbols) in your response. Stay purely text-based.
-
----
-
-ERROR CORRECTION FRAMEWORK:
-When you detect an error, respond in this JSON format:
-{
-  "understood": "I understand you meant: [paraphrase in correct English]",
-  "correction": {
-    "wrong": "phrase they said",
-    "right": "correct version",
-    "explanation_hinglish": "brief reason in Hinglish",
-    "severity": "major|minor"
-  },
-  "response": "your conversational response using Maya's witty/warm style",
-  "follow_up": "a question to continue"
-}
-
-When there is NO error, respond in this JSON format:
-{
-  "response": "your conversational response",
-  "follow_up": "a question to continue"
-}
+Style:
+- STRICT: 1-2 short sentences total. This is spoken aloud.
+- No bullet points, headers, JSON, markdown, or emojis.
+- Never say "Great question!", "Certainly!", or mention being an AI.
+- Never use familial terms (bhai, didi, bro, sister).
 
 CONVERSATION HISTORY:
 {conversation_history}
 
 User just said: "{user_utterance}"
-Respond naturally as Maya. Always use JSON format (no markdown blocks around json).
+
+Reply with ONLY Maya's spoken English (1-2 sentences). Nothing else.
 `;
 
-/** Maya's common short phrases — cache TTS at startup to save ~1–2s per turn when matched. */
+/** Common short phrases — cache TTS at startup to save ~1–2s when matched. */
 const TTS_CACHE_PHRASES = [
-  'Arre waah!',
-  'Shabash!',
-  'Koi baat nahi.',
-  'Arre waah! That was actually really good!',
+  'Nice work!',
+  'Well done!',
+  'No worries.',
+  "That's really good!",
   'Hi there!',
   "You're welcome!",
 ];
 
 /** Default chat model (flash-lite retired for new Google AI API projects). */
-const DEFAULT_GEMINI_CHAT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_GEMINI_CHAT_MODEL = 'gemini-2.5-flash';
 
 @Injectable()
 export class ConversationalTutorService implements OnModuleInit {
@@ -154,7 +106,13 @@ export class ConversationalTutorService implements OnModuleInit {
   }
 
   private getChatModel() {
-    return this.genAI.getGenerativeModel({ model: this.geminiChatModel });
+    return this.genAI.getGenerativeModel({
+      model: this.geminiChatModel,
+      generationConfig: {
+        maxOutputTokens: 120,
+        temperature: 0.75,
+      },
+    });
   }
 
   async onModuleInit() {
@@ -208,19 +166,27 @@ export class ConversationalTutorService implements OnModuleInit {
     );
 
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const responseText = result.response.text().trim();
 
-    // Parse JSON from Gemini response
-    let responseJson: any;
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      responseJson = jsonMatch
-        ? JSON.parse(jsonMatch[0])
-        : { response: responseText };
-    } catch (e) {
-      this.logger.error(`Failed to parse Gemini response: ${e.message}`);
+    // Plain-text replies are the default; legacy JSON responses still parse if present.
+    let responseJson: { response: string; correction?: unknown; follow_up?: string };
+    if (responseText.startsWith('{')) {
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        responseJson = jsonMatch
+          ? JSON.parse(jsonMatch[0])
+          : { response: responseText };
+      } catch (e) {
+        this.logger.warn(`Gemini JSON parse failed, using plain text: ${(e as Error).message}`);
+        responseJson = { response: responseText };
+      }
+    } else {
       responseJson = { response: responseText };
     }
+
+    const spokenReply =
+      [responseJson.response, responseJson.follow_up].filter(Boolean).join(' ').trim() ||
+      responseText;
 
     // Store history
     session.history.push({
@@ -230,13 +196,13 @@ export class ConversationalTutorService implements OnModuleInit {
     });
     session.history.push({
       speaker: 'ai',
-      text: responseJson.response || responseText,
+      text: spokenReply,
       timestamp: new Date(),
       corrections: responseJson.correction ? [responseJson.correction] : [],
     });
     this.conversations.set(sessionId, session);
 
-    return responseJson;
+    return { ...responseJson, response: spokenReply };
   }
 
   // ─── Existing: Transcribe Hinglish via AI Engine ───────────
@@ -502,7 +468,7 @@ export class ConversationalTutorService implements OnModuleInit {
     
     Format your response as a JSON object:
     {
-      "summary": "A warm, personalized summary of how they did today (in Maya's Hinglish style)",
+      "summary": "A warm, personalized summary in clear English",
       "scores": {
         "grammar": 0-100,
         "vocabulary": 0-100,
@@ -809,7 +775,7 @@ export class ConversationalTutorService implements OnModuleInit {
   ): Promise<{ message: string; audioBase64: string }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     const name = user?.fname || 'Friend';
-    const message = `Namaste ${name}! I'm Maya, your English tutor. Aaj hum English practice karenge — just hold the mic and speak!`;
+    const message = `Hi ${name}, I'm Maya, your English tutor. Hold the mic and start speaking — I'll listen and help you sound more natural.`;
 
     const audioBase64 = await this.synthesizeHinglish(message);
 
