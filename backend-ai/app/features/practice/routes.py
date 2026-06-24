@@ -27,7 +27,8 @@ class JudgeResponse(BaseModel):
 
 async def _simple_completion(prompt: str) -> str:
     genai.configure(api_key=settings.google_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    chat_model = (settings.google_gemini_chat_model or "gemini-2.5-flash").strip()
+    model = genai.GenerativeModel(chat_model)
     response = await model.generate_content_async(prompt)
     return (response.text or "").strip()
 

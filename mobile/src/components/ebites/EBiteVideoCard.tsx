@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import ShareReelModal from "../../features/chat/components/ShareReelModal";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const WATCH_THRESHOLD_PERCENT = 80;
+const DOUBLE_TAP_MS = 280;
 
 interface Props {
   item: any;
@@ -46,7 +47,10 @@ export default function EBiteVideoCard({
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [shareVisible, setShareVisible] = useState(false);
+  const [showFireBurst, setShowFireBurst] = useState(false);
   const hasReportedUnlock = useRef(false);
+  const lastTapRef = useRef(0);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const reelId = Number(item.id);
@@ -55,9 +59,9 @@ export default function EBiteVideoCard({
       ? item.videoUrl.match(/stream\.mux\.com\/([^/.]+)/)?.[1]
       : undefined;
   const reelSnapshot =
-    reelId && !Number.isNaN(reelId) && item.title
+    reelId && !Number.isNaN(reelId)
       ? {
-          title: String(item.title),
+          title: String(item.title || "eBite"),
           muxPlaybackId,
           thumbnailUrl: muxPlaybackId
             ? `https://image.mux.com/${muxPlaybackId}/thumbnail.jpg`
@@ -92,6 +96,14 @@ export default function EBiteVideoCard({
     }
   }, [isActive, isPausedByUser]);
 
+  useEffect(() => {
+    return () => {
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+      }
+    };
+  }, []);
+
   const handlePlaybackStatusUpdate = (update: AVPlaybackStatus) => {
     if (update.isLoaded) {
       setStatus(update);
@@ -113,7 +125,12 @@ export default function EBiteVideoCard({
     setIsPausedByUser((prev) => !prev);
   };
 
-  const toggleLike = async () => {
+  const flashFireBurst = useCallback(() => {
+    setShowFireBurst(true);
+    setTimeout(() => setShowFireBurst(false), 650);
+  }, []);
+
+  const toggleLike = useCallback(async () => {
     if (!reelId || Number.isNaN(reelId)) return;
     const prevLiked = liked;
     const prevCount = likeCount;
@@ -130,6 +147,31 @@ export default function EBiteVideoCard({
       setLikeCount(prevCount);
       setCachedEngagement(reelId, prevLiked, prevCount);
     }
+  }, [reelId, liked, likeCount]);
+
+  const likeFromDoubleTap = useCallback(() => {
+    flashFireBurst();
+    if (!liked) {
+      void toggleLike();
+    }
+  }, [flashFireBurst, liked, toggleLike]);
+
+  const handleVideoPress = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+      lastTapRef.current = 0;
+      likeFromDoubleTap();
+      return;
+    }
+    lastTapRef.current = now;
+    singleTapTimerRef.current = setTimeout(() => {
+      singleTapTimerRef.current = null;
+      togglePlayPause();
+    }, DOUBLE_TAP_MS);
   };
 
   const progress =
@@ -139,7 +181,7 @@ export default function EBiteVideoCard({
 
   return (
     <View style={styles.container}>
-      <TouchableWithoutFeedback onPress={togglePlayPause}>
+      <TouchableWithoutFeedback onPress={handleVideoPress}>
         <View style={styles.tapArea}>
           <Video
             ref={videoRef}
@@ -150,6 +192,12 @@ export default function EBiteVideoCard({
             onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
             shouldPlay={isActive && !isPausedByUser}
           />
+
+          {showFireBurst && (
+            <View style={styles.fireBurstOverlay} pointerEvents="none">
+              <Text style={styles.fireBurstEmoji}>🔥</Text>
+            </View>
+          )}
 
           {isPausedByUser && (
             <View style={styles.pauseOverlay}>
@@ -168,7 +216,6 @@ export default function EBiteVideoCard({
               )}
             </View>
 
-            {/* Progress Bar */}
             <View
               style={[
                 styles.progressBarContainer,
@@ -183,11 +230,9 @@ export default function EBiteVideoCard({
 
       <View style={[styles.actionRail, { bottom: insets.bottom + 100 }]}>
         <TouchableOpacity style={styles.actionBtn} onPress={toggleLike}>
-          <Ionicons
-            name={liked ? "heart" : "heart-outline"}
-            size={30}
-            color={liked ? "#FF3040" : "#FFF"}
-          />
+          <Text style={[styles.fireEmoji, liked && styles.fireEmojiActive]}>
+            🔥
+          </Text>
           {likeCount > 0 && (
             <Text style={styles.actionCount}>{likeCount}</Text>
           )}
@@ -207,7 +252,8 @@ export default function EBiteVideoCard({
           reelSnapshot={reelSnapshot}
           onClose={() => setShareVisible(false)}
           onSharedToChat={(target) => {
-            navigation.navigate("Chat", target);
+            const rootNav = navigation.getParent() ?? navigation;
+            rootNav.navigate("Chat", target);
           }}
         />
       )}
@@ -218,7 +264,7 @@ export default function EBiteVideoCard({
 const styles = StyleSheet.create({
   container: {
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT, // Snap size
+    height: SCREEN_HEIGHT,
     backgroundColor: "#000",
   },
   tapArea: {
@@ -229,6 +275,18 @@ const styles = StyleSheet.create({
   video: {
     width: "100%",
     height: "100%",
+  },
+  fireBurstOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.12)",
+  },
+  fireBurstEmoji: {
+    fontSize: 88,
+    textShadowColor: "rgba(255,120,0,0.6)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 16,
   },
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -246,6 +304,14 @@ const styles = StyleSheet.create({
   actionBtn: {
     alignItems: "center",
   },
+  fireEmoji: {
+    fontSize: 30,
+    opacity: 0.55,
+  },
+  fireEmojiActive: {
+    opacity: 1,
+    transform: [{ scale: 1.12 }],
+  },
   actionCount: {
     color: "#FFF",
     fontSize: 12,
@@ -258,7 +324,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingTop: 60,
-    paddingBottom: 90, // space for tab bar
+    paddingBottom: 90,
     paddingHorizontal: 20,
   },
   bottomContent: {
@@ -282,7 +348,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     overflow: "hidden",
     position: "absolute",
-    bottom: 85, // just above the tab bar
+    bottom: 85,
     left: 20,
     right: 20,
   },

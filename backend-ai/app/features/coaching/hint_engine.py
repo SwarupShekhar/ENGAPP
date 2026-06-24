@@ -106,7 +106,11 @@ async def check_missed_opportunity(
 
     try:
         import google.generativeai as genai
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        from app.core.config import settings
+
+        genai.configure(api_key=settings.google_api_key)
+        chat_model = (settings.google_gemini_chat_model or "gemini-2.5-flash").strip()
+        model = genai.GenerativeModel(chat_model)
         prompt = (
             f'The user said: "{transcript}"\n'
             f'They are learning the {"phrase" if kind == "phrase" else "word"}: "{candidate}"\n'

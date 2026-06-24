@@ -337,9 +337,9 @@ class AnalysisService:
         if settings.google_api_key:
             genai.configure(api_key=settings.google_api_key)
             # Use fast model for quick analyses (using main flash model as it's fast enough and available)
-            self.fast_model = genai.GenerativeModel('gemini-2.0-flash')
-            # Use standard model for complex analyses
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
+            chat_model = (settings.google_gemini_chat_model or "gemini-2.5-flash").strip()
+            self.fast_model = genai.GenerativeModel(chat_model)
+            self.model = genai.GenerativeModel(chat_model)
         else:
             logger.warning("Google API key not configured. AnalysisService is disabled.")
             

@@ -39,8 +39,8 @@ class Settings(BaseSettings):
         "Say the following in a calm, clear, neutral English voice suitable for a language tutor. "
         "Speak at a steady, natural pace without being overly expressive."
     )
-    # Maya streaming tutor + analysis (gemini-2.0-flash-lite retired for new API keys)
-    google_gemini_chat_model: str = "gemini-2.0-flash"
+    # Maya streaming tutor + analysis (gemini-2.0-* shut down 2026-06-01 → use 2.5+)
+    google_gemini_chat_model: str = "gemini-2.5-flash"
     anthropic_api_key: Optional[str] = None
     
     # Azure

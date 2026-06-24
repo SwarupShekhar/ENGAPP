@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { ChatService } from '../chat/chat.service';
@@ -21,6 +22,8 @@ export type { AggregatedReaction };
 
 @Injectable()
 export class EngagementService {
+  private readonly logger = new Logger(EngagementService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatService: ChatService,
@@ -189,10 +192,16 @@ export class EngagementService {
       metadata,
     );
 
-    await this.chatGateway.broadcastNewMessage(
-      normalizedConversationId,
-      message,
-    );
+    try {
+      await this.chatGateway.broadcastNewMessage(
+        normalizedConversationId,
+        message,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `reel_share broadcast failed for conversation ${normalizedConversationId}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
 
     return message;
   }
