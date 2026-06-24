@@ -142,17 +142,7 @@ export default function PulseHomeCarousel({
     }, [ttsStop, capture, onParentScrollEnabledChange]),
   );
 
-  // Stop stale TTS only when today's phrase/word text actually changes (not on every home refresh).
-  const phraseSig = phraseOfTheDay
-    ? `${phraseOfTheDay.phrase}|${phraseOfTheDay.definition}`
-    : '';
-  const wordSig = wordOfTheDay
-    ? `${wordOfTheDay.word}|${wordOfTheDay.definition}`
-    : '';
-  useEffect(() => {
-    ttsStop();
-  }, [phraseSig, wordSig, ttsStop]);
-
+  // Do not auto-stop listen when home refreshes — only stop on screen blur (useFocusEffect cleanup).
   // ── Build slide list ─────────────────────────────────────────────────────────
   const slides = useMemo<PulseSlide[]>(() => {
     const date = todayKey();
@@ -210,6 +200,11 @@ export default function PulseHomeCarousel({
     (slide: PulseSlide) => {
       void (async () => {
         if (capture.isRecording) return;
+        let Haptics: any = { impactAsync: async () => {} };
+        try {
+          Haptics = require('expo-haptics');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle?.Light ?? 'light').catch(() => {});
+        } catch (_) {}
         if (slide.kind === 'phrase_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
           const { phrase, definition, example } = slide.phrase;

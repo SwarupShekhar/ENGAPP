@@ -7,7 +7,6 @@ import { fetchErrorSpeak } from '../../../api/tts';
 import { getOrFetchTtsFileUri } from '../../../utils/ttsAudioCache';
 
 const cachedUris = new Map<string, string>();
-const SERVER_BUDGET_MS = 3500;
 
 async function hashInput(input: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, input);
@@ -51,7 +50,10 @@ export function useHomePracticeTts() {
   const speak = useCallback(
     async (key: string, text: string) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
+      if (!trimmed) {
+        if (__DEV__) console.warn('[HomePractice] listen skipped — empty script');
+        return;
+      }
 
       if (activeKeyRef.current === key) {
         await stop();
@@ -61,7 +63,6 @@ export function useHomePracticeTts() {
       await stop();
       activeKeyRef.current = key;
       setPlayingKey(key);
-      await setPlaybackAudioMode();
 
       const clearPlaying = () => {
         if (activeKeyRef.current === key) {
@@ -70,79 +71,87 @@ export function useHomePracticeTts() {
         }
       };
 
-      const textDigest = (await hashInput(trimmed)).slice(0, 16);
-      const storageKey = `${key}:${textDigest}`;
-      const fetchB64 = () => fetchErrorSpeak(trimmed).then((r) => r.audio_base64 ?? '');
+      try {
+        await setPlaybackAudioMode();
 
-      const playUri = async (uri: string): Promise<boolean> => {
-        if (activeKeyRef.current !== key) return false;
+        const textDigest = (await hashInput(trimmed)).slice(0, 16);
+        const storageKey = `${key}:${textDigest}`;
+        const fetchB64 = () =>
+          fetchErrorSpeak(trimmed)
+            .then((r) => r.audio_base64 ?? '')
+            .catch((e) => {
+              if (__DEV__) console.warn('[HomePractice] server TTS failed:', e);
+              return '';
+            });
 
-        let sound: Audio.Sound;
-        try {
-          ({ sound } = await Audio.Sound.createAsync(
-            { uri },
-            { shouldPlay: true, volume: 1.0 },
-          ));
-        } catch {
-          cachedUris.delete(storageKey);
-          await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-          return false;
-        }
+        const playUri = async (uri: string): Promise<boolean> => {
+          if (activeKeyRef.current !== key) return false;
 
-        if (activeKeyRef.current !== key) {
-          sound.unloadAsync().catch(() => {});
-          return false;
-        }
-
-        Speech.stop();
-        soundRef.current = sound;
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (!status.isLoaded) return;
-          if (status.didJustFinish && activeKeyRef.current === key) {
-            clearPlaying();
-            sound.unloadAsync().catch(() => {});
-            soundRef.current = null;
+          let sound: Audio.Sound;
+          try {
+            ({ sound } = await Audio.Sound.createAsync(
+              { uri },
+              { shouldPlay: true, volume: 1.0 },
+            ));
+          } catch (e) {
+            if (__DEV__) console.warn('[HomePractice] MP3 playback failed:', e);
+            cachedUris.delete(storageKey);
+            await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+            return false;
           }
-        });
-        return true;
-      };
 
-      const cached = cachedUris.get(storageKey);
-      if (cached && (await playUri(cached))) {
-        return;
-      }
+          if (activeKeyRef.current !== key) {
+            sound.unloadAsync().catch(() => {});
+            return false;
+          }
 
-      const serverTask = getOrFetchTtsFileUri(storageKey, fetchB64);
-      const serverUri = await Promise.race([
-        serverTask,
-        new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), SERVER_BUDGET_MS),
-        ),
-      ]);
+          Speech.stop();
+          soundRef.current = sound;
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (!status.isLoaded) return;
+            if (status.didJustFinish && activeKeyRef.current === key) {
+              clearPlaying();
+              sound.unloadAsync().catch(() => {});
+              soundRef.current = null;
+            }
+          });
+          return true;
+        };
 
-      if (serverUri) {
-        cachedUris.set(storageKey, serverUri);
-        if (activeKeyRef.current === key && (await playUri(serverUri))) {
+        // Cached server MP3 from a previous tap — play immediately.
+        const knownUri = cachedUris.get(storageKey);
+        if (knownUri && (await playUri(knownUri))) {
           return;
         }
+
+        // Device TTS first so every tap gets instant audio (works offline / when API fails).
+        Speech.speak(trimmed, {
+          language: 'en-US',
+          rate: 0.78,
+          onDone: clearPlaying,
+          onStopped: clearPlaying,
+          onError: () => {
+            if (__DEV__) console.warn('[HomePractice] device TTS error');
+            clearPlaying();
+          },
+        });
+
+        // Upgrade to server MP3 in background when available (next tap uses cache).
+        void getOrFetchTtsFileUri(storageKey, fetchB64)
+          .then(async (uri) => {
+            if (!uri || activeKeyRef.current !== key) return;
+            cachedUris.set(storageKey, uri);
+            // If device speech is still playing this turn, swap to higher-quality audio.
+            const upgraded = await playUri(uri);
+            if (upgraded && __DEV__) {
+              console.log('[HomePractice] upgraded to server TTS');
+            }
+          })
+          .catch(() => {});
+      } catch (e) {
+        if (__DEV__) console.warn('[HomePractice] speak failed:', e);
+        clearPlaying();
       }
-
-      if (activeKeyRef.current !== key) return;
-
-      Speech.speak(trimmed, {
-        language: 'en-US',
-        rate: 0.78,
-        onDone: clearPlaying,
-        onStopped: clearPlaying,
-        onError: clearPlaying,
-      });
-
-      // Finish server fetch in background for a higher-quality replay on the next tap.
-      void serverTask
-        .then((uri) => {
-          if (uri) cachedUris.set(storageKey, uri);
-        })
-        .catch(() => {});
     },
     [stop],
   );

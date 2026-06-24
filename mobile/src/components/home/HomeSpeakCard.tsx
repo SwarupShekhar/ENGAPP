@@ -92,7 +92,6 @@ export function HomeSpeakCard({
       {showListen ? (
         <Pressable
           onPress={onListenPress}
-          disabled={disabled}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel="Listen to pronunciation"
