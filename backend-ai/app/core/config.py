@@ -118,6 +118,10 @@ class Settings(BaseSettings):
     pa_stream_wait_ms: int = 0
     # Max concurrent Azure PA enrichments process-wide (protects single-node Vultr).
     pa_enrich_max_concurrent: int = 8
+    # Seconds before in-call coaching hints fire (lower = faster first hints in Maya).
+    coaching_warmup_seconds: int = 5
+    # Max ms to wait for coaching hint LLM (0 = fire hint fetch in background only).
+    coaching_hint_budget_ms: int = 150
     
     # Monitoring
     sentry_dsn: Optional[str] = None

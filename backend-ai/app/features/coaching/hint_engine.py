@@ -17,6 +17,14 @@ MIN_GAP_SECONDS = 90
 MAX_HINTS_PER_CALL = 3
 
 
+def _warmup_seconds() -> float:
+    try:
+        from app.core.config import settings
+        return max(0.0, float(getattr(settings, "coaching_warmup_seconds", WARMUP_SECONDS)))
+    except Exception:
+        return float(WARMUP_SECONDS)
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -158,7 +166,7 @@ async def get_hint(
     """
     Returns a hint payload or None. Does NOT update Redis — caller does that.
     """
-    if call_elapsed_seconds < WARMUP_SECONDS:
+    if call_elapsed_seconds < _warmup_seconds():
         return None
     if _throttled(ctx):
         return None

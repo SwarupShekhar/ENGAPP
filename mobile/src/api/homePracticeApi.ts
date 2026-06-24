@@ -71,6 +71,7 @@ export const homePracticeApi = {
   assess: async (formData: FormData): Promise<AssessResult> => {
     const res = await client.post('/home/practice/assess', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 45000,
     });
     return res.data;
   },

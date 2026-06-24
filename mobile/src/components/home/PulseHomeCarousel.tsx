@@ -92,16 +92,26 @@ export default function PulseHomeCarousel({
   const [cardHints, setCardHints] = useState<Map<string, string>>(new Map());
   const trackedCarousel = useRef(false);
   const assessingLock = useRef(false);
+  const micBusyRef = useRef(false);
+  const recordingSlideKeyRef = useRef<string | null>(null);
 
   const capture = useHomePracticeCapture();
+  const {
+    captureState,
+    isRecording,
+    start: captureStart,
+    finish: captureFinish,
+    cancel: captureCancel,
+  } = capture;
   const tts = useHomePracticeTts();
-  // Destructure stable refs so useFocusEffect deps don't re-fire on every
-  // playingKey state change (tts object is new each render, but speak/stop are not).
+  // Destructure stable callbacks — never put the whole `capture` / `tts` object in effect deps
+  // (new object each render); that re-ran blur cleanup and stopped Listen immediately.
   const { speak: ttsSpeak, stop: ttsStop } = tts;
 
   useEffect(() => {
-    onParentScrollEnabledChange?.(capture.captureState !== 'recording');
-  }, [capture.captureState, onParentScrollEnabledChange]);
+    const recording = captureState === 'recording';
+    onParentScrollEnabledChange?.(!recording);
+  }, [captureState, onParentScrollEnabledChange]);
 
   // ── Load practice tasks on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -136,10 +146,11 @@ export default function PulseHomeCarousel({
       return () => {
         alive = false;
         ttsStop();
-        void capture.cancel();
+        recordingSlideKeyRef.current = null;
+        void captureCancel();
         onParentScrollEnabledChange?.(true);
       };
-    }, [ttsStop, capture, onParentScrollEnabledChange]),
+    }, [ttsStop, captureCancel, onParentScrollEnabledChange]),
   );
 
   // Do not auto-stop listen when home refreshes — only stop on screen blur (useFocusEffect cleanup).
@@ -199,7 +210,7 @@ export default function PulseHomeCarousel({
   const handleListen = useCallback(
     (slide: PulseSlide) => {
       void (async () => {
-        if (capture.isRecording) return;
+        if (isRecording) return;
         let Haptics: any = { impactAsync: async () => {} };
         try {
           Haptics = require('expo-haptics');
@@ -227,19 +238,24 @@ export default function PulseHomeCarousel({
         }
       })();
     },
-    [analytics, capture.isRecording, ttsSpeak],
+    [analytics, isRecording, ttsSpeak],
   );
 
   const submitRecording = useCallback(
     async (slide: PulseSlide) => {
       analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_ENDED, { kind: slide.kind });
 
-      const finished = await capture.finish();
+      const finished = await captureFinish();
+      recordingSlideKeyRef.current = null;
+      onParentScrollEnabledChange?.(true);
+
       if (!finished.ok) {
         const hint =
           finished.reason === 'too_short'
-            ? 'Speak for at least 1 second, then tap stop'
-            : 'Could not capture audio — try again';
+            ? 'Hold the mic, say the phrase, then tap stop'
+            : finished.reason === 'permission_denied'
+              ? 'Allow microphone access in Settings'
+              : 'Could not capture audio — tap Listen, then try the mic again';
         setCardState(slide.key, 'fail' as CardState);
         setCardHint(slide.key, hint);
         setTimeout(() => {
@@ -320,17 +336,23 @@ export default function PulseHomeCarousel({
       assessingLock.current = false;
     }
     },
-    [analytics, capture, setCardHint, setCardState],
+    [analytics, captureFinish, onParentScrollEnabledChange, setCardHint, setCardState],
   );
 
   const handleMicPress = useCallback(
     async (slide: PulseSlide) => {
-      if (assessingLock.current) return;
+      if (assessingLock.current || micBusyRef.current) return;
 
       const state = cardStates.get(slide.key) ?? ('ready' as CardState);
+      const ownsRecording =
+        recordingSlideKeyRef.current === slide.key && (state === 'recording' || isRecording);
 
-      if (state === 'recording' || capture.isRecording) {
+      if (ownsRecording) {
         await submitRecording(slide);
+        return;
+      }
+
+      if (isRecording && recordingSlideKeyRef.current && recordingSlideKeyRef.current !== slide.key) {
         return;
       }
 
@@ -338,21 +360,40 @@ export default function PulseHomeCarousel({
         return;
       }
 
-      await ttsStop();
-      analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
-      setCardHint(slide.key, undefined);
-      setCardState(slide.key, 'recording' as CardState);
+      micBusyRef.current = true;
+      try {
+        onParentScrollEnabledChange?.(false);
+        await ttsStop();
+        analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
+        setCardHint(slide.key, undefined);
 
-      const started = await capture.start();
-      if (!started) {
-        setCardState(slide.key, 'ready' as CardState);
-        Alert.alert(
-          'Microphone',
-          'Allow microphone access in Settings to practice on this card.',
-        );
+        const started = await captureStart();
+        if (!started) {
+          onParentScrollEnabledChange?.(true);
+          Alert.alert(
+            'Microphone',
+            'Allow microphone access in Settings to practice on this card.',
+          );
+          return;
+        }
+
+        recordingSlideKeyRef.current = slide.key;
+        setCardState(slide.key, 'recording' as CardState);
+      } finally {
+        micBusyRef.current = false;
       }
     },
-    [analytics, capture, cardStates, setCardHint, setCardState, submitRecording, ttsStop],
+    [
+      analytics,
+      captureStart,
+      cardStates,
+      isRecording,
+      onParentScrollEnabledChange,
+      setCardHint,
+      setCardState,
+      submitRecording,
+      ttsStop,
+    ],
   );
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -462,9 +503,16 @@ export default function PulseHomeCarousel({
         data={slides}
         renderItem={renderSlide}
         keyExtractor={(s) => s.key}
+        extraData={`${captureState}:${tts.playingKey}:${active}`}
         horizontal
         nestedScrollEnabled
-        scrollEnabled={capture.captureState !== 'recording'}
+        scrollEnabled={captureState !== 'recording'}
+        bounces={captureState !== 'recording'}
+        onScrollBeginDrag={() => {
+          if (captureState === 'recording') {
+            listRef.current?.scrollToOffset({ offset: active * CARD_W, animated: false });
+          }
+        }}
         showsHorizontalScrollIndicator={false}
         snapToInterval={CARD_W}
         snapToAlignment="start"

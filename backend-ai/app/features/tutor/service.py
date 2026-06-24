@@ -198,13 +198,21 @@ class StreamingTutorService:
             cefr_level=cefr_level,
         ):
             tts_input = strip_pron_tags_for_mobile(sentence)
-            audio_bytes = await self._synthesize_tts_sentence(tts_input) if self.tts_services else None
+            # Text first — mobile shows reply immediately; audio follows in a separate chunk.
             yield {
                 "type": "sentence",
                 "text": sentence,
-                "audio": audio_bytes,
+                "audio": None,
                 "is_final": False,
             }
+            if self.tts_services and tts_input:
+                audio_bytes = await self._synthesize_tts_sentence(tts_input)
+                if audio_bytes:
+                    yield {
+                        "type": "audio",
+                        "audio": audio_bytes,
+                        "is_final": False,
+                    }
             await asyncio.sleep(0.01)
 
     def get_quick_acknowledgment(self, text: str) -> str:

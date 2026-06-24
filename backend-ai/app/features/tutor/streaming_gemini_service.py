@@ -294,11 +294,27 @@ The conversation so far:
                 f"{coaching_hint}\n"
             )
 
+        learner_profile = (phonetic_context or {}).get("learner_profile")
+        if learner_profile:
+            system_prompt += learner_profile
+
+        if (phonetic_context or {}).get("answer_from_profile"):
+            system_prompt += (
+                "\n\nThe user is asking about their mistakes or what to practice. "
+                "Answer using LEARNER PROFILE above with specific examples. "
+                "Do not give generic praise.\n"
+            )
+
         opportunity_directive = (phonetic_context or {}).get("opportunityDirective")
         if opportunity_directive:
             system_prompt += opportunity_directive
 
-        _pa_keys = set(phonetic_context or {}) - {"coaching_hint", "opportunityDirective"}
+        _pa_keys = set(phonetic_context or {}) - {
+            "coaching_hint",
+            "opportunityDirective",
+            "learner_profile",
+            "answer_from_profile",
+        }
         if phonetic_context and _pa_keys:
             context_str = "\n---\nCURRENT PRONUNCIATION CONTEXT:\n"
 

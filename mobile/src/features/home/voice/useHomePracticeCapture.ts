@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import * as Speech from 'expo-speech';
 
 export type CaptureState = 'idle' | 'recording' | 'processing';
 
@@ -13,16 +14,29 @@ export type FinishCaptureResult =
   | { ok: true; audio: HomePracticeAudioUpload }
   | { ok: false; reason: 'too_short' | 'no_audio' | 'permission_denied' | 'failed' };
 
-/** Minimum hold time before stop — Azure needs real speech in the clip. */
-const MIN_RECORDING_MS = 900;
+/** Minimum clip length — Azure needs a real utterance, not a tap. */
+const MIN_RECORDING_MS = 750;
+
+async function setRecordingAudioMode(): Promise<void> {
+  await Audio.setAudioModeAsync({
+    allowsRecordingIOS: true,
+    playsInSilentModeIOS: true,
+    staysActiveInBackground: false,
+    shouldDuckAndroid: true,
+    playThroughEarpieceAndroid: false,
+    interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+    interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+  });
+}
 
 /**
- * Simple expo-av recording (same path as PracticeTaskScreen).
- * Avoids Maya VAD / Silero — hold gestures inside ScrollView are unreliable on Android.
+ * Tap-to-record for home carousel (phrase / word / mistake cards).
+ * Releases any device TTS and switches expo-av into recording mode before capture.
  */
 export function useHomePracticeCapture() {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const startedAtRef = useRef(0);
+  const startPromiseRef = useRef<Promise<boolean> | null>(null);
   const [captureState, setCaptureState] = useState<CaptureState>('idle');
 
   const isRecording = captureState === 'recording';
@@ -32,35 +46,49 @@ export function useHomePracticeCapture() {
     if (perm.status !== 'granted' && !perm.granted) {
       return false;
     }
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-    });
     return true;
   }, []);
 
   const start = useCallback(async (): Promise<boolean> => {
     if (recordingRef.current) return true;
-    const micOk = await ensureMicReady();
-    if (!micOk) return false;
+    if (startPromiseRef.current) return startPromiseRef.current;
 
-    try {
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-      recordingRef.current = recording;
-      startedAtRef.current = Date.now();
-      setCaptureState('recording');
-      return true;
-    } catch (e) {
-      if (__DEV__) console.warn('[HomePractice] start recording failed:', e);
-      recordingRef.current = null;
-      setCaptureState('idle');
-      return false;
-    }
+    startPromiseRef.current = (async () => {
+      const micOk = await ensureMicReady();
+      if (!micOk) return false;
+
+      try {
+        // Listen uses expo-speech + expo-av playback — must release before recording.
+        Speech.stop();
+        await setRecordingAudioMode();
+
+        const { recording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        );
+        recordingRef.current = recording;
+        startedAtRef.current = Date.now();
+        setCaptureState('recording');
+        return true;
+      } catch (e) {
+        if (__DEV__) console.warn('[HomePractice] start recording failed:', e);
+        recordingRef.current = null;
+        setCaptureState('idle');
+        return false;
+      } finally {
+        startPromiseRef.current = null;
+      }
+    })();
+
+    return startPromiseRef.current;
   }, [ensureMicReady]);
 
   const finish = useCallback(async (): Promise<FinishCaptureResult> => {
+    if (startPromiseRef.current) {
+      try {
+        await startPromiseRef.current;
+      } catch (_) {}
+    }
+
     const recording = recordingRef.current;
     if (!recording) {
       return { ok: false, reason: 'no_audio' };
@@ -82,16 +110,6 @@ export function useHomePracticeCapture() {
       const uri = recording.getURI();
       recordingRef.current = null;
       setCaptureState('idle');
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      } catch (_) {
-        /* non-fatal — Listen uses playback mode */
-      }
       if (!uri) return { ok: false, reason: 'no_audio' };
       return {
         ok: true,
@@ -106,6 +124,11 @@ export function useHomePracticeCapture() {
   }, []);
 
   const cancel = useCallback(async () => {
+    if (startPromiseRef.current) {
+      try {
+        await startPromiseRef.current;
+      } catch (_) {}
+    }
     const recording = recordingRef.current;
     if (recording) {
       try {

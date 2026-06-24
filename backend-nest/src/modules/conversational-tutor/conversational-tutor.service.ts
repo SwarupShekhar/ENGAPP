@@ -300,8 +300,8 @@ export class ConversationalTutorService implements OnModuleInit {
     };
     this.conversations.set(sessionId, session);
 
-    // 3. Pre-build coaching context so backend-ai can read hints mid-session. Fire-and-forget.
-    this.inCallCoaching.buildContext(userId, sessionId).catch((err) => {
+    // 3. Pre-build coaching context so Maya can answer "past mistakes" and fire hints.
+    await this.inCallCoaching.buildContext(userId, sessionId).catch((err) => {
       this.logger.warn(`[Coaching] failed to pre-build context for tutor session=${sessionId}: ${err?.message ?? err}`);
     });
 
@@ -667,6 +667,26 @@ export class ConversationalTutorService implements OnModuleInit {
     }
     if (cefrLevel) {
       form.append('cefr_level', cefrLevel);
+    }
+
+    // Fallback if backend-ai Redis miss — same shape as coaching Redis payload.
+    try {
+      let ctx = await this.inCallCoaching.getContext(userId, sessionId);
+      if (!ctx) {
+        ctx = await this.inCallCoaching.buildContext(userId, sessionId);
+      }
+      if (ctx?.activeTasks?.length) {
+        form.append(
+          'learner_context',
+          JSON.stringify({
+            activeTasks: ctx.activeTasks,
+            phraseOfDay: ctx.phraseOfDay,
+            wordOfDay: ctx.wordOfDay,
+          }),
+        );
+      }
+    } catch (e) {
+      this.logger.warn(`[Coaching] learner_context for stream skipped: ${(e as Error).message}`);
     }
 
     const url = `${this.aiBackendUrl}/api/tutor/stream-response`;

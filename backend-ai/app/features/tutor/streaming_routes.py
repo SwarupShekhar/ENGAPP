@@ -33,11 +33,21 @@ try:
     from app.features.coaching.coaching_context import get_context as coaching_get_context
     from app.features.coaching.coaching_context import update_context as coaching_update_context
     from app.features.coaching.hint_engine import get_hint as coaching_get_hint
+    from app.features.coaching.learner_profile import (
+        build_learner_profile_block,
+        user_asks_about_mistakes_or_practice,
+    )
     from datetime import datetime, timezone as _tz
     _COACHING_ENABLED = True
 except Exception as _coaching_import_err:
     logger.warning("Coaching imports failed — hints disabled: %s", _coaching_import_err)
     _COACHING_ENABLED = False
+
+    def build_learner_profile_block(_ctx):  # type: ignore
+        return ""
+
+    def user_asks_about_mistakes_or_practice(_u: str) -> bool:  # type: ignore
+        return False
 
 router = APIRouter()
 streaming_tutor_service = StreamingTutorService()
@@ -50,6 +60,7 @@ async def _generate_stream_response(
     conversation_history: list,
     trace_id: str = "",
     cefr_level: str | None = None,
+    learner_context: dict | None = None,
 ):
     """Yield SSE events: transcript, then sentence chunks (text + audio base64), then done."""
     timings = TraceTimings(trace_id)
@@ -99,26 +110,54 @@ async def _generate_stream_response(
     except Exception as _e:
         logger.warning("[coaching] feedback loop check failed (SSE): %s", _e)
 
-    # Coaching hint injection (fire-and-forget — never blocks the call)
+    # Coaching hint + PA enrichment in parallel (don't stack latencies).
     _coaching_hint_text: str | None = None
     _coaching_hint_payload: dict | None = None
     _coaching_ctx: dict | None = None
-    if _COACHING_ENABLED:
+
+    async def _fetch_coaching() -> tuple[dict | None, dict | None, str | None]:
+        if not _COACHING_ENABLED:
+            return None, None, None
         try:
-            _coaching_ctx = coaching_get_context(user_id, session_id)
-            if _coaching_ctx:
+            ctx = coaching_get_context(user_id, session_id)
+            if not ctx and learner_context:
+                ctx = {
+                    "userId": user_id,
+                    "sessionId": session_id,
+                    "activeTasks": learner_context.get("activeTasks") or [],
+                    "phraseOfDay": learner_context.get("phraseOfDay"),
+                    "wordOfDay": learner_context.get("wordOfDay"),
+                }
+            if not ctx:
+                return None, None, None
+            payload = None
+            hint_text = None
+            budget_s = max(0.0, settings.coaching_hint_budget_ms) / 1000.0
+            if budget_s > 0:
                 try:
-                    _coaching_hint_payload = await asyncio.wait_for(
-                        coaching_get_hint(user_utterance, _coaching_ctx),
-                        timeout=0.25,
+                    payload = await asyncio.wait_for(
+                        coaching_get_hint(user_utterance, ctx),
+                        timeout=budget_s,
                     )
                 except asyncio.TimeoutError:
-                    logger.info("coaching hint skipped (250ms budget) — starting LLM without hint")
-                    _coaching_hint_payload = None
-                if _coaching_hint_payload:
-                    _coaching_hint_text = _coaching_hint_payload.get("text")
+                    logger.info(
+                        "coaching hint skipped (%.0fms budget) — starting LLM without hint",
+                        settings.coaching_hint_budget_ms,
+                    )
+            if payload:
+                hint_text = payload.get("text")
+            return ctx, payload, hint_text
         except Exception as _ce:
             logger.warning("coaching hint fetch failed (SSE): %s", _ce)
+            return None, None, None
+
+    pa_task = start_phonetic_enrichment_task(audio_bytes, user_utterance)
+    timings.mark("pa_task_started")
+    coaching_task = asyncio.create_task(_fetch_coaching())
+    phonetic_context, pa_in_prompt = await phonetic_context_for_stream(
+        pa_task, timings=timings
+    )
+    _coaching_ctx, _coaching_hint_payload, _coaching_hint_text = await coaching_task
 
     # Opportunity prompt: append once per call so Maya creates a natural usage moment
     try:
@@ -154,19 +193,20 @@ async def _generate_stream_response(
     except Exception as _e:
         logger.warning("[coaching] set_pending_hint_check failed (SSE): %s", _e)
 
-    pa_task = start_phonetic_enrichment_task(audio_bytes, user_utterance)
-    timings.mark("pa_task_started")
-    phonetic_context, pa_in_prompt = await phonetic_context_for_stream(
-        pa_task, timings=timings
-    )
-
     if pa_in_prompt:
         yield {"type": "phonetic_ready"}
 
+    # Learner profile + coaching metadata for Gemini
+    if phonetic_context is None:
+        phonetic_context = {}
+    profile_block = build_learner_profile_block(_coaching_ctx)
+    if profile_block:
+        phonetic_context["learner_profile"] = profile_block
+    if user_asks_about_mistakes_or_practice(user_utterance):
+        phonetic_context["answer_from_profile"] = True
+
     # Attach coaching hint and opportunity directive to phonetic_context
     if _coaching_hint_text or (_coaching_ctx and _coaching_ctx.get("opportunityDirective")):
-        if phonetic_context is None:
-            phonetic_context = {}
         if _coaching_hint_text:
             phonetic_context["coaching_hint"] = _coaching_hint_text
         _opp_dir = (_coaching_ctx or {}).get("opportunityDirective")
@@ -194,6 +234,15 @@ async def _generate_stream_response(
         cefr_level=cefr_level,
     ):
         if chunk.get("type") == "transcript":
+            continue
+        if chunk.get("type") == "audio" and chunk.get("audio"):
+            if not first_audio_marked:
+                timings.mark("first_audio")
+                first_audio_marked = True
+            yield {
+                "type": "audio",
+                "audio": base64.b64encode(chunk["audio"]).decode("utf-8"),
+            }
             continue
         if chunk.get("type") == "sentence":
             if first_sentence:
@@ -268,6 +317,7 @@ async def stream_tutor_response(
     conversation_history: str = Form(default="[]"),
     trace_id: str = Form(default=""),
     cefr_level: str = Form(default=""),
+    learner_context: str = Form(default=""),
 ):
     """
     Stream tutor response via SSE. Accepts multipart: audio file + session_id + user_id + conversation_history (JSON array).
@@ -287,6 +337,12 @@ async def stream_tutor_response(
         history = json.loads(conversation_history) if conversation_history else []
     except json.JSONDecodeError:
         history = []
+    parsed_learner_ctx: dict | None = None
+    if learner_context:
+        try:
+            parsed_learner_ctx = json.loads(learner_context)
+        except json.JSONDecodeError:
+            parsed_learner_ctx = None
 
     async def event_generator():
         try:
@@ -297,6 +353,7 @@ async def stream_tutor_response(
                 history,
                 trace_id=trace_id,
                 cefr_level=cefr_level or None,
+                learner_context=parsed_learner_ctx,
             ):
                 yield {"data": json.dumps(event)}
         except Exception as e:

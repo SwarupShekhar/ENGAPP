@@ -32,8 +32,11 @@ export function useHomePracticeTts() {
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const activeKeyRef = useRef<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  /** Bumps on every stop/speak so stale Speech callbacks cannot clear UI state. */
+  const speakSessionRef = useRef(0);
 
   const stop = useCallback(async () => {
+    speakSessionRef.current += 1;
     Speech.stop();
     activeKeyRef.current = null;
     setPlayingKey(null);
@@ -45,6 +48,18 @@ export function useHomePracticeTts() {
         await s.unloadAsync();
       } catch (_) {}
     }
+    // Hand audio session back so the mic can record on the next tap.
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      });
+    } catch (_) {}
   }, []);
 
   const speak = useCallback(
@@ -61,11 +76,15 @@ export function useHomePracticeTts() {
       }
 
       await stop();
+      const session = ++speakSessionRef.current;
       activeKeyRef.current = key;
       setPlayingKey(key);
 
+      const isActive = () =>
+        speakSessionRef.current === session && activeKeyRef.current === key;
+
       const clearPlaying = () => {
-        if (activeKeyRef.current === key) {
+        if (isActive()) {
           activeKeyRef.current = null;
           setPlayingKey(null);
         }
@@ -85,7 +104,7 @@ export function useHomePracticeTts() {
             });
 
         const playUri = async (uri: string): Promise<boolean> => {
-          if (activeKeyRef.current !== key) return false;
+          if (!isActive()) return false;
 
           let sound: Audio.Sound;
           try {
@@ -100,16 +119,15 @@ export function useHomePracticeTts() {
             return false;
           }
 
-          if (activeKeyRef.current !== key) {
+          if (!isActive()) {
             sound.unloadAsync().catch(() => {});
             return false;
           }
 
-          Speech.stop();
           soundRef.current = sound;
           sound.setOnPlaybackStatusUpdate((status) => {
             if (!status.isLoaded) return;
-            if (status.didJustFinish && activeKeyRef.current === key) {
+            if (status.didJustFinish && isActive()) {
               clearPlaying();
               sound.unloadAsync().catch(() => {});
               soundRef.current = null;
@@ -124,28 +142,21 @@ export function useHomePracticeTts() {
           return;
         }
 
-        // Device TTS first so every tap gets instant audio (works offline / when API fails).
+        // Device TTS — instant feedback; never call Speech.stop() mid-utterance (breaks onStopped).
         Speech.speak(trimmed, {
           language: 'en-US',
           rate: 0.78,
           onDone: clearPlaying,
-          onStopped: clearPlaying,
           onError: () => {
             if (__DEV__) console.warn('[HomePractice] device TTS error');
             clearPlaying();
           },
         });
 
-        // Upgrade to server MP3 in background when available (next tap uses cache).
+        // Prefetch server MP3 for the *next* tap only (no mid-playback swap).
         void getOrFetchTtsFileUri(storageKey, fetchB64)
-          .then(async (uri) => {
-            if (!uri || activeKeyRef.current !== key) return;
-            cachedUris.set(storageKey, uri);
-            // If device speech is still playing this turn, swap to higher-quality audio.
-            const upgraded = await playUri(uri);
-            if (upgraded && __DEV__) {
-              console.log('[HomePractice] upgraded to server TTS');
-            }
+          .then((uri) => {
+            if (uri) cachedUris.set(storageKey, uri);
           })
           .catch(() => {});
       } catch (e) {
