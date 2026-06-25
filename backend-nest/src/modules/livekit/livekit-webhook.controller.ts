@@ -210,39 +210,32 @@ export class LiveKitWebhookController {
           },
         );
 
-        if (!transcript?.trim()) {
-          this.logger.warn(
-            `Empty transcript for participant=${participant.userId} — skipping PQS`,
-          );
-        } else {
-          // 1. Get Azure pronunciation details.
-          // Pass transcript as referenceText so Azure runs aligned assessment
-          // instead of free-speech mode — improves phoneme-level accuracy.
-          const { flagged_errors, pronunciation_score } =
-            await this.pronunciationService.assessFromRecordingUrl(
-              participant.userId,
-              effectiveFileLocation,
-              transcript.trim(),
-            );
-          const wordsChecked: number =
-            (pronunciation_score as any)?.azure_result?.Words?.length ??
-            (pronunciation_score as any)?.azure_result?.Nbests?.[0]?.Words
-              ?.length ??
-            0;
-          this.logger.log(
-            `[Core PA] session=${participant.sessionId} issues=${flagged_errors.length} words_checked=${wordsChecked}`,
-          );
-
-          // 2. Persist Issues to DB
-          await this.savePronunciationIssues(
-            participant.sessionId,
+        // Free-speech PA on the recording — never pass STT transcript as reference_text
+        // (self-reference trap: Azure aligns speech to its own transcript → masked errors).
+        const { flagged_errors, pronunciation_score } =
+          await this.pronunciationService.assessFromRecordingUrl(
             participant.userId,
-            participant.id,
-            flagged_errors,
-            transcript.trim(),
+            effectiveFileLocation,
+            undefined,
           );
+        const wordsChecked: number =
+          (pronunciation_score as any)?.azure_result?.Words?.length ??
+          (pronunciation_score as any)?.azure_result?.Nbests?.[0]?.Words
+            ?.length ??
+          0;
+        this.logger.log(
+          `[Core PA] session=${participant.sessionId} mode=free-speech issues=${flagged_errors.length} words_checked=${wordsChecked}`,
+        );
 
-          // 3. Trigger Phase 2 Authoritative PQS Scoring
+        await this.savePronunciationIssues(
+          participant.sessionId,
+          participant.userId,
+          participant.id,
+          flagged_errors,
+          transcript?.trim() || '',
+        );
+
+        if (transcript?.trim()) {
           const callDuration =
             (Number(info.endedAt) - Number(info.startedAt)) / 1_000_000_000;
           const userSpokeSeconds =
@@ -259,9 +252,13 @@ export class LiveKitWebhookController {
             callDuration,
             userSpokeSeconds,
           );
+        } else {
+          this.logger.warn(
+            `Empty transcript for participant=${participant.userId} — PA saved, PQS skipped`,
+          );
         }
 
-        // 4. Redis Tracking for Race Condition (Step 4 Fix)
+        // Redis tracking: egress PA pipeline complete for this participant
         const completedKey = `session:${participant.sessionId}:participants_done`;
         const count = await this.redis.incr(completedKey);
         await this.redis.expire(completedKey, 3600); // 1 hour TTL

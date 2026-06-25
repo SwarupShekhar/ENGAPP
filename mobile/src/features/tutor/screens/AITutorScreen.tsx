@@ -296,6 +296,8 @@ export default function AITutorScreen({ navigation, route }: any) {
   };
 
   const turnTraceIdRef = useRef<string | null>(null);
+  /** Latest STT text for the in-flight user turn (WS / stream chunks). */
+  const lastUserTranscriptRef = useRef<string>("");
   /** Set when SSE/WS delivers transcript, sentence, audio, or blocking fallback completes. */
   const turnHadResponseRef = useRef(false);
   /** Learner CEFR level (A1..C2). Set after startSession; piped into WS fallback so backend-ai
@@ -538,8 +540,12 @@ export default function AITutorScreen({ navigation, route }: any) {
   const runProcessSpeechFallback = async (
     formData: FormData,
     activeSessionId: string | null,
-  ): Promise<"ok" | "rate_limited" | "fail"> => {
-    if (!activeSessionId) return "fail";
+  ): Promise<
+    | { status: "ok"; userText: string }
+    | { status: "rate_limited" }
+    | { status: "fail" }
+  > => {
+    if (!activeSessionId) return { status: "fail" };
     try {
       activeLatencyTimeline.startSpan("process_speech_fallback");
       const res = await tutorApi.processSpeech(formData);
@@ -550,11 +556,14 @@ export default function AITutorScreen({ navigation, route }: any) {
         (res as { aiResponse?: string })?.aiResponse?.trim() || "";
       const audioB64 =
         (res as { audioBase64?: string })?.audioBase64 || null;
-      if (!transcription && !aiResponse) return "fail";
+      if (!transcription && !aiResponse) return { status: "fail" };
       applyBlockingTutorTurn(transcription, aiResponse, audioB64);
       setStreamPath("ws-fallback");
       setStreamDebugReason("process_speech_https");
-      return "ok";
+      return {
+        status: "ok",
+        userText: transcription || "(no speech detected)",
+      };
     } catch (e: any) {
       activeLatencyTimeline.endSpan("process_speech_fallback");
       console.warn(
@@ -563,9 +572,9 @@ export default function AITutorScreen({ navigation, route }: any) {
       );
       if (isRateLimitError(e)) {
         setError(MAYA_RATE_LIMIT_MESSAGE);
-        return "rate_limited";
+        return { status: "rate_limited" };
       }
-      return "fail";
+      return { status: "fail" };
     }
   };
 
@@ -610,8 +619,10 @@ export default function AITutorScreen({ navigation, route }: any) {
 
     // "transcript" = first chunk from stream (backend-ai); "transcription" = legacy WebSocket key
     if (chunk.type === "transcription" || chunk.type === "transcript") {
+      setIsProcessing(false);
       // Update the placeholder user bubble with the actual transcription
       if (chunk.text) {
+        lastUserTranscriptRef.current = chunk.text;
         setTranscript((prev) => {
           const tempIndex = prev.findIndex(
             (p) => p.speaker === "user" && p.tempId,
@@ -640,6 +651,7 @@ export default function AITutorScreen({ navigation, route }: any) {
         });
       }
     } else if (chunk.type === "sentence") {
+      setIsProcessing(false);
       setIsStreaming(true);
       if (chunk.text) {
         setTranscript((prev) => {
@@ -887,94 +899,20 @@ export default function AITutorScreen({ navigation, route }: any) {
         setFirstChunkLatencyMs(null);
         setTurnStartAtLabel(new Date(turnStartMsRef.current).toLocaleTimeString());
 
-        const refText = referenceTextForNextTurn;
+        const turnIndexForUpload = turnCount;
         const activeSessionId = sessionIdRef.current;
+        lastUserTranscriptRef.current = "";
 
-        // Parallelize: base64 encode (needed only for WS fallback) + token fetch simultaneously.
-        // Silero path already produced base64 in-memory — skip the disk re-read.
-        activeLatencyTimeline.startSpan("audio_read");
-        const [audioBase64, token] = await Promise.all([
-          prebuiltAudioBase64 !== undefined
-            ? Promise.resolve(prebuiltAudioBase64)
-            : FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
-                .catch((e) => { console.warn("[AITutor] Could not read audio file:", e); return undefined; }),
-          getToken ? getCachedToken(getToken) : Promise.resolve<string | null>(null),
-        ]);
-        activeLatencyTimeline.endSpan("audio_read");
+        // SSE path only needs the file URI — skip base64 encode (saves ~200–800ms on device).
+        activeLatencyTimeline.startSpan("auth_token");
+        const token = getToken
+          ? await getCachedToken(getToken)
+          : null;
+        activeLatencyTimeline.endSpan("auth_token");
 
-        if (refText && activeSessionId) {
-          setReferenceTextForNextTurn(null);
-          activeLatencyTimeline.startSpan("assess_pronunciation");
-          const requestId = `pron_${activeSessionId}_${Date.now()}`;
-          const assessStartedAt = Date.now();
-          analytics.capture(
-            AnalyticsEvents.PRON_FEEDBACK_REQUESTED,
-            analyticsMeta({
-              session_id: activeSessionId,
-              request_id: requestId,
-            }),
-          );
-          analytics.capture(
-            AnalyticsEvents.AZURE_PROSODY_STARTED,
-            analyticsMeta({
-              session_id: activeSessionId,
-              request_id: requestId,
-            }),
-          );
-          const assessForm = new FormData();
-          assessForm.append("audio", {
-            uri,
-            type: uploadMime,
-            name: uploadName,
-          } as any);
-          assessForm.append("userId", user?.id || "test");
-          assessForm.append("referenceText", refText);
-          assessForm.append("sessionId", activeSessionId);
-          assessForm.append("requestId", requestId);
-          void tutorApi
-            .assessPronunciation(assessForm)
-            .then((res) => {
-              activeLatencyTimeline.endSpan("assess_pronunciation");
-              analytics.capture(
-                AnalyticsEvents.AZURE_PROSODY_COMPLETED,
-                analyticsMeta({
-                  session_id: activeSessionId,
-                  request_id: requestId,
-                  latency_ms: Date.now() - assessStartedAt,
-                  passed: Boolean(res?.passed),
-                  accuracy_score: Number(res?.accuracy_score ?? 0),
-                  error_code: null,
-                }),
-              );
-              setTranscript((prev) =>
-                prev.map((m) =>
-                  m.tempId && m.speaker === "user"
-                    ? {
-                        ...m,
-                        tempId: false,
-                        text: res.recognized_text || m.text || refText,
-                        assessmentResult: res,
-                      }
-                    : m,
-                ),
-              );
-            })
-            .catch((e) => {
-              activeLatencyTimeline.endSpan("assess_pronunciation");
-              analytics.capture(
-                AnalyticsEvents.AZURE_PROSODY_FAILED,
-                analyticsMeta({
-                  session_id: activeSessionId,
-                  request_id: requestId,
-                  latency_ms: Date.now() - assessStartedAt,
-                  error_code: e?.response?.status ?? e?.code ?? "unknown",
-                }),
-              );
-              if (__DEV__) console.warn("[AITutor] parallel assess failed:", e);
-            });
-        }
+        // Live Azure PA removed from turn path — clips upload after each turn for post-session analysis.
 
-        // SSE first (~2–3s to first audio); pronunciation assess runs in parallel when needed.
+        // SSE first (~2–3s to first audio).
         setTranscript((prev) => [
           ...prev,
           {
@@ -1087,6 +1025,22 @@ export default function AITutorScreen({ navigation, route }: any) {
                     .appendTurn(activeSessionId, userTranscript, aiText.trim())
                     .catch(() => {});
                 }
+                if (activeSessionId && uri) {
+                  void tutorApi
+                    .uploadTurnAudio(
+                      activeSessionId,
+                      turnIndexForUpload,
+                      uri,
+                      uploadMime,
+                      uploadName,
+                      userTranscript || undefined,
+                    )
+                    .catch((e) => {
+                      if (__DEV__) {
+                        console.warn("[AITutor] turn audio upload failed:", e);
+                      }
+                    });
+                }
                 if (sseAbortRef.current === abortController) {
                   sseAbortRef.current = null;
                 }
@@ -1113,7 +1067,17 @@ export default function AITutorScreen({ navigation, route }: any) {
           }
           if (turnRateLimited) {
             setTranscript((prev) => prev.filter((m) => !m.tempId));
-          } else if (!usedSSE && audioBase64 && activeSessionId) {
+          } else if (!usedSSE && activeSessionId) {
+            let wsAudioBase64 = prebuiltAudioBase64;
+            if (wsAudioBase64 === undefined) {
+              wsAudioBase64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: FileSystem.EncodingType.Base64,
+              }).catch((e) => {
+                console.warn("[AITutor] Could not read audio for WS fallback:", e);
+                return undefined;
+              });
+            }
+            if (wsAudioBase64) {
             if (!sseSkipped) {
               setStreamPath("ws-fallback");
               setStreamDebugReason("sse_failed_trying_ws");
@@ -1125,7 +1089,7 @@ export default function AITutorScreen({ navigation, route }: any) {
             streamingTutor.sendText(
               null,
               null,
-              audioBase64,
+              wsAudioBase64,
               turnTraceIdRef.current ?? undefined,
               cefrLevelRef.current,
             );
@@ -1133,9 +1097,22 @@ export default function AITutorScreen({ navigation, route }: any) {
               12_000,
               () => turnHadResponseRef.current,
             );
-          } else if (!usedSSE && !audioBase64) {
+            if (activeSessionId && uri) {
+              void tutorApi
+                .uploadTurnAudio(
+                  activeSessionId,
+                  turnIndexForUpload,
+                  uri,
+                  uploadMime,
+                  uploadName,
+                  lastUserTranscriptRef.current || undefined,
+                )
+                .catch(() => {});
+            }
+            } else {
             setStreamPath("ws-fallback");
             setStreamDebugReason("no_audio_base64");
+            }
           }
 
           if (!turnRateLimited && !turnHadResponseRef.current) {
@@ -1143,24 +1120,48 @@ export default function AITutorScreen({ navigation, route }: any) {
               formData,
               activeSessionId,
             );
-            if (fallbackResult !== "ok") {
+            if (fallbackResult.status === "ok") {
+              if (activeSessionId && uri) {
+                void tutorApi
+                  .uploadTurnAudio(
+                    activeSessionId,
+                    turnIndexForUpload,
+                    uri,
+                    uploadMime,
+                    uploadName,
+                    fallbackResult.userText,
+                  )
+                  .catch((e) => {
+                    if (__DEV__) {
+                      console.warn("[AITutor] fallback turn upload failed:", e);
+                    }
+                  });
+              }
+            } else if (fallbackResult.status === "rate_limited") {
               setTranscript((prev) =>
                 prev.map((m) =>
                   m.tempId
                     ? {
                         ...m,
-                        text:
-                          fallbackResult === "rate_limited"
-                            ? "Rate limited — wait a moment and try again."
-                            : "Couldn't reach Maya. Hold the mic and try again.",
+                        text: "Rate limited — wait a moment and try again.",
                         tempId: false,
                       }
                     : m,
                 ),
               );
-              if (fallbackResult === "fail") {
-                setError("Maya didn't respond. Check your connection and try again.");
-              }
+            } else {
+              setTranscript((prev) =>
+                prev.map((m) =>
+                  m.tempId
+                    ? {
+                        ...m,
+                        text: "Couldn't reach Maya. Hold the mic and try again.",
+                        tempId: false,
+                      }
+                    : m,
+                ),
+              );
+              setError("Maya didn't respond. Check your connection and try again.");
             }
           }
         setTurnCount((c) => c + 1);

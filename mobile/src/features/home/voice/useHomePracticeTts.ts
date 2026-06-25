@@ -83,11 +83,23 @@ export function useHomePracticeTts() {
       const isActive = () =>
         speakSessionRef.current === session && activeKeyRef.current === key;
 
+      // True while we tear down device TTS to hand off to the server MP3 on the
+      // same tap — keeps Speech's onDone/onError from clearing the playing state.
+      let swapping = false;
+      // While server MP3 is in flight, ignore device onDone — silent device TTS
+      // often completes immediately and would clear UI before the swap can run.
+      let serverPending = true;
+
       const clearPlaying = () => {
         if (isActive()) {
           activeKeyRef.current = null;
           setPlayingKey(null);
         }
+      };
+
+      const onSpeechEvent = () => {
+        if (swapping || serverPending) return;
+        clearPlaying();
       };
 
       try {
@@ -142,23 +154,43 @@ export function useHomePracticeTts() {
           return;
         }
 
-        // Device TTS — instant feedback; never call Speech.stop() mid-utterance (breaks onStopped).
+        // Device TTS for instant feedback when audible; server MP3 is the reliable path.
         Speech.speak(trimmed, {
           language: 'en-US',
           rate: 0.78,
-          onDone: clearPlaying,
+          onDone: onSpeechEvent,
           onError: () => {
             if (__DEV__) console.warn('[HomePractice] device TTS error');
-            clearPlaying();
+            onSpeechEvent();
           },
         });
 
-        // Prefetch server MP3 for the *next* tap only (no mid-playback swap).
+        // Fetch the higher-quality server MP3 and play it on THIS tap. This is the
+        // reliable path (expo-av) — device TTS can be silent on some builds, so we
+        // must not depend on it alone. Swap in the MP3 once it arrives if still active.
         void getOrFetchTtsFileUri(storageKey, fetchB64)
-          .then((uri) => {
-            if (uri) cachedUris.set(storageKey, uri);
+          .then(async (uri) => {
+            serverPending = false;
+            if (!isActive()) return;
+            if (!uri) {
+              clearPlaying();
+              return;
+            }
+            cachedUris.set(storageKey, uri);
+            swapping = true; // latched: device-TTS callbacks must not clear once we swap
+            Speech.stop();
+            const ok = await playUri(uri);
+            if (ok) {
+              if (__DEV__) console.log('[HomePractice] swapped to server TTS');
+            } else {
+              // Stopped device TTS but MP3 wouldn't play — don't leave UI stuck.
+              clearPlaying();
+            }
           })
-          .catch(() => {});
+          .catch(() => {
+            serverPending = false;
+            if (isActive()) clearPlaying();
+          });
       } catch (e) {
         if (__DEV__) console.warn('[HomePractice] speak failed:', e);
         clearPlaying();

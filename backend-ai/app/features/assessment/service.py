@@ -1249,6 +1249,27 @@ Answer with JSON:
             segments_data.append(f"[{s.speaker_id} at {s.timestamp}s]: {s.text}")
         
         transcript_block = "\n".join(segments_data)
+
+        pa_lines: list[str] = []
+        pa_by_speaker: dict[str, list] = {}
+        for s in request.segments:
+            if s.pa_flagged_errors:
+                pa_by_speaker.setdefault(s.speaker_id, []).extend(s.pa_flagged_errors)
+        for speaker_id, errors in pa_by_speaker.items():
+            for e in errors:
+                spoken = e.get("spoken", "")
+                correct = e.get("correct", "")
+                rule = e.get("rule_category", "general_mispronunciation")
+                conf = e.get("confidence", 50)
+                target = f' (expected: "{correct}")' if correct else ""
+                pa_lines.append(
+                    f'- [{speaker_id}] heard "{spoken}"{target} — {rule}, confidence {conf}'
+                )
+        pa_block = (
+            "\n".join(pa_lines)
+            if pa_lines
+            else "No Azure pronunciation flags for this session."
+        )
         
         return f"""You are a professional ESL Conversational Coach and Linguist.
 Analyze the following multi-speaker transcript of an English practice session.
@@ -1258,11 +1279,17 @@ Analyze the following multi-speaker transcript of an English practice session.
 {transcript_block}
 ---
 
+**Azure Pronunciation Assessment (objective acoustic evidence — weight heavily for pronunciation_score):**
+---
+{pa_block}
+---
+
 **ANALYSIS OBJECTIVES:**
 1. **Conversational Metrics**: Analyze interaction quality (turn-taking, backchanneling like 'uh-huh', building on partner's ideas).
 2. **Peer Comparison**: Compare participant strengths and weaknesses relatively.
 3. **Individual Feedback**: Provide granular feedback for EACH participant (scores, errors, confidence, vocabulary).
 4. **Learning Synergy**: Identify what participants can learn from each other.
+5. **Pronunciation**: When Azure flags exist for a speaker, reflect them in pronunciation_score and cite specific mispronunciations in errors/feedback. Do not ignore acoustic evidence.
 
 **CRITICAL SCORING CALIBRATION (you MUST follow these rules):**
 - Count the number of MEANINGFUL words each participant spoke (exclude greetings, "hello", "hi", "am I audible", "can you hear me", "yes", "no", "okay").

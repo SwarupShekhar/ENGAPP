@@ -154,6 +154,29 @@ export class ConversationalTutorController {
     return { ok: true };
   }
 
+  @Post('upload-turn-audio')
+  @UseInterceptors(FileInterceptor('audio'))
+  async uploadTurnAudio(
+    @UploadedFile() audio: Express.Multer.File,
+    @Body('sessionId') sessionId: string,
+    @Body('turnIndex') turnIndex: string,
+    @Body('transcript') transcript: string | undefined,
+    @Request() req,
+  ) {
+    if (!audio) throw new BadRequestException('Audio file is required');
+    if (!sessionId) throw new BadRequestException('sessionId is required');
+
+    const index = Number.parseInt(turnIndex ?? '0', 10);
+    return this.tutorService.uploadTurnAudio(
+      req.user.id,
+      sessionId,
+      Number.isFinite(index) ? index : 0,
+      audio.buffer,
+      audio.mimetype || 'audio/m4a',
+      transcript,
+    );
+  }
+
   @Post('end-session')
   async endSession(@Body() dto: EndSessionDto) {
     return this.tutorService.endSession(dto.sessionId);

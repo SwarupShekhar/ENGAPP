@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     rate_limit_per_hour: int = 1000
 
+    # Maya tutor: skip live Azure PA during stream-response; assess clips after session ends.
+    tutor_defer_pronunciation: bool = True
+
     # Tutor streaming: pronunciation enrichment (Phase 2.1)
     # Max ms to wait for PA before starting Gemini (0 = never wait, stream immediately).
     pa_stream_wait_ms: int = 0

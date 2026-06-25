@@ -81,9 +81,10 @@ class StreamingGeminiService:
             content = full_prompt
         
         buffer = ""
-        sentence_endings = re.compile(r'[.!?]\s')
+        sentence_endings = re.compile(r'[.!?]\s*')
         emitted_sentences = 0
         max_sentences = 2
+        min_words_per_sentence = 4
         
         max_retries = 3
         for attempt in range(max_retries + 1):
@@ -93,10 +94,10 @@ class StreamingGeminiService:
                     content,
                     stream=True,
                     generation_config={
-                        'temperature': 0.5,
+                        'temperature': 0.55,
                         'top_p': 0.9,
                         'top_k': 40,
-                        'max_output_tokens': 140,
+                        'max_output_tokens': 220,
                     }
                 )
                 
@@ -158,7 +159,9 @@ class StreamingGeminiService:
         
         if buffer.strip() and emitted_sentences < max_sentences:
             tail = self._sanitize_sentence(buffer.strip())
-            if tail:
+            # Avoid showing fragments like "Yes, Roberto," — require a real sentence ending.
+            word_count = len(tail.split())
+            if tail and (tail[-1] in ".!?" or word_count >= min_words_per_sentence + 2):
                 yield tail
 
     @staticmethod
@@ -236,7 +239,9 @@ Teaching behavior:
 - Prioritize clarity, fluency, and confidence over perfection.
 
 Response style:
-- STRICT LIMIT: 1-2 sentences.
+- ALWAYS reply with exactly 2 complete spoken sentences (never one word or a fragment).
+- Each sentence must end with . ! or ? — never end on a comma or mid-thought.
+- Total length: about 15–35 words (enough to answer + one follow-up question).
 - Keep sentences clean and natural for speech synthesis.
 - Avoid long dashes, heavy punctuation, or text that sounds theatrical when spoken.
 - Avoid repeating the same opener pattern every turn.
@@ -264,7 +269,7 @@ IMPORTANT: The user's speech is STT-transcribed and normalized.
 1. If the sentence sounds grammatically odd (e.g., "People English" instead of "English people"), the user likely mispronounced words and the STT cleaned them up.
 2. If the user's message is complete gibberish (e.g., "English speaking is people making people"), DO NOT invent context or stories. Just say: "I didn't quite catch that. Could you say it again?"
 
-STRICT OUTPUT: 1-2 sentences maximum. No emojis.
+STRICT OUTPUT: 2 complete sentences. No emojis. Never explain that you are brief.
 
 Additionally, when audio is attached for this turn OR pronunciation context lists issues below, and you detect any pronunciation error (from audio or from that context),
 append ONE tag per error at the very end of your response (after your natural 1-2 sentences):

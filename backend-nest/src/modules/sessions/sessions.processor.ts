@@ -9,6 +9,7 @@ import { Logger } from '@nestjs/common';
 import axios from 'axios';
 import { Job, Queue } from 'bull';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AssessmentService } from '../assessment/assessment.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -23,6 +24,7 @@ export class SessionsProcessor {
 
   constructor(
     private prisma: PrismaService,
+    private redis: RedisService,
     private notificationService: NotificationService,
     private assessmentService: AssessmentService,
     private tasksService: TasksService,
@@ -32,6 +34,48 @@ export class SessionsProcessor {
     private pronunciationScorerService: PronunciationScorerService,
     @InjectQueue('sessions') private sessionsQueue: Queue,
   ) {}
+
+  /**
+   * Wait for LiveKit per-participant egress PA (webhook increments participants_done).
+   * Avoids joint analysis running before Azure flags exist in DB.
+   */
+  private async waitForParticipantEgressPa(
+    sessionId: string,
+    participants: { userId: string; participantEgressId: string | null }[],
+  ): Promise<void> {
+    const withEgress = participants.filter(
+      (p) =>
+        p.participantEgressId &&
+        !p.participantEgressId.startsWith('pending_'),
+    );
+    if (withEgress.length === 0) {
+      this.logger.log(
+        `[SessionsProcessor] Session ${sessionId}: no participant egress — skip PA wait`,
+      );
+      return;
+    }
+
+    const redisKey = `session:${sessionId}:participants_done`;
+    const maxWaitMs = 120_000;
+    const pollMs = 3_000;
+    const deadline = Date.now() + maxWaitMs;
+
+    while (Date.now() < deadline) {
+      const raw = await this.redis.get(redisKey);
+      const done = parseInt(raw || '0', 10);
+      if (done >= withEgress.length) {
+        this.logger.log(
+          `[SessionsProcessor] Session ${sessionId}: egress PA ready (${done}/${withEgress.length})`,
+        );
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+
+    this.logger.warn(
+      `[SessionsProcessor] Session ${sessionId}: timed out waiting for egress PA (${withEgress.length} expected)`,
+    );
+  }
 
   @OnQueueFailed()
   onFailed(job: Job, error: Error) {
@@ -206,6 +250,8 @@ export class SessionsProcessor {
       this.logger.log(
         `[SessionsProcessor] Proceeding with AI analysis for session ${sessionId} (${segments.length} segments).`,
       );
+
+      await this.waitForParticipantEgressPa(sessionId, session.participants);
 
       const aiStatus = this.brainService.getAiEngineStatus();
       if (!aiStatus.healthy) {

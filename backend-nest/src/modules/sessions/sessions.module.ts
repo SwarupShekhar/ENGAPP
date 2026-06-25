@@ -4,6 +4,7 @@ import { SessionsService } from './sessions.service';
 import { SessionsController } from './sessions.controller';
 import { SessionsProcessor } from './sessions.processor';
 import { PrismaModule } from '../../database/prisma/prisma.module';
+import { RedisModule } from '../../redis/redis.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { IntegrationsModule } from '../../integrations/integrations.module';
 import { AssessmentModule } from '../assessment/assessment.module';
@@ -17,6 +18,7 @@ import { InCallCoachingModule } from '../in-call-coaching/in-call-coaching.modul
 @Module({
   imports: [
     PrismaModule,
+    RedisModule,
     TasksModule,
     IntegrationsModule,
     forwardRef(() => AssessmentModule),

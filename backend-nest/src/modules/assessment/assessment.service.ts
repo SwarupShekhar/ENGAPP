@@ -1078,6 +1078,23 @@ export class AssessmentService {
   }
 
   // Restore for regular session analysis. When segments are provided (per-device submission), use them directly.
+  private mapPronunciationIssuesToPa(
+    issues: {
+      spoken?: string | null;
+      correct?: string | null;
+      word?: string | null;
+      ruleCategory?: string | null;
+      confidence?: number | null;
+    }[],
+  ) {
+    return issues.map((i) => ({
+      correct: i.correct ?? i.word ?? '',
+      spoken: i.spoken ?? i.word ?? '',
+      rule_category: i.ruleCategory ?? 'general_mispronunciation',
+      confidence: i.confidence != null ? Number(i.confidence) : 50,
+    }));
+  }
+
   async analyzeAndStoreJoint(
     sessionId: string,
     audioUrls: Record<string, string>,
@@ -1108,35 +1125,35 @@ export class AssessmentService {
         `Using ${segments.length} segments from per-participant feedback (Session: ${sessionId})`,
       );
 
-      // Enrich segments with pronunciation issues saved by the realtime gateway during the call.
-      // audioUrls is always {} in the live call flow, so we query the DB instead of re-running Azure PA.
-      const pronEnrichJobs = session.participants.map(async (p) => {
-        try {
-          const existingAnalysis = await this.prisma.analysis.findFirst({
-            where: { sessionId, participantId: p.id },
-            include: { pronunciationIssues: true },
-            orderBy: { createdAt: 'desc' },
-          });
-          const issues = existingAnalysis?.pronunciationIssues ?? [];
-          if (issues.length === 0) return;
-          const seg = segments.find((s) => s.speaker_id === p.userId);
-          if (!seg) return;
-          seg.pa_flagged_errors = issues.map((i: any) => ({
-            correct: i.correct ?? i.word ?? '',
-            spoken: i.spoken ?? '',
-            rule_category: i.ruleCategory ?? 'general_mispronunciation',
-            confidence: i.confidence != null ? Number(i.confidence) : 50,
-          }));
-          this.logger.log(
-            `Enriched segment for ${p.userId} with ${issues.length} saved pronunciation issue(s) (Session: ${sessionId})`,
-          );
-        } catch (e: any) {
-          this.logger.warn(
-            `Pronunciation enrichment skipped for ${p.userId} (Session: ${sessionId}): ${e?.message}`,
-          );
+      // Enrich ALL segments for each speaker with egress PA issues (webhook path).
+      const paByUser = new Map<string, ReturnType<typeof this.mapPronunciationIssuesToPa>>();
+      await Promise.all(
+        session.participants.map(async (p) => {
+          try {
+            const existingAnalysis = await this.prisma.analysis.findFirst({
+              where: { sessionId, participantId: p.id },
+              include: { pronunciationIssues: true },
+              orderBy: { createdAt: 'desc' },
+            });
+            const issues = existingAnalysis?.pronunciationIssues ?? [];
+            if (issues.length === 0) return;
+            paByUser.set(p.userId, this.mapPronunciationIssuesToPa(issues));
+            this.logger.log(
+              `Loaded ${issues.length} pronunciation issue(s) for ${p.userId} (Session: ${sessionId})`,
+            );
+          } catch (e: any) {
+            this.logger.warn(
+              `Pronunciation enrichment skipped for ${p.userId} (Session: ${sessionId}): ${e?.message}`,
+            );
+          }
+        }),
+      );
+      for (const seg of segments) {
+        const pa = paByUser.get(seg.speaker_id);
+        if (pa?.length) {
+          seg.pa_flagged_errors = pa;
         }
-      });
-      await Promise.all(pronEnrichJobs);
+      }
     } else {
       // Legacy: build segments from string transcript or audio URLs
       const participantLines: Record<string, string[]> = {};
@@ -1203,43 +1220,60 @@ export class AssessmentService {
       const evidence = participantEvidence[pa.participant_id];
       const feedback = pa.analysis;
 
-      const analysis = await this.prisma.analysis.create({
-        data: {
-          sessionId,
-          participantId: participant.id,
-          rawData: {
-            transcript: {
-              transcript_text: transcriptText,
-              segments,
-            },
-            azureEvidence: evidence,
-            aiFeedback: feedback.feedback || '',
-            strengths: feedback.strengths || [],
-            improvementAreas: feedback.improvement_areas || [],
-            confidenceTimeline: pa.confidence_timeline,
-            hesitationMarkers: pa.hesitation_markers,
-            topicVocabulary: pa.topic_vocabulary,
-          } as any,
-          cefrLevel: feedback.cefr_assessment?.level || 'B1',
-          scores: feedback.metrics as any,
-          confidenceTimeline: pa.confidence_timeline as any,
-          hesitationMarkers: pa.hesitation_markers as any,
-          topicVocabulary: pa.topic_vocabulary as any,
-          mistakes: {
-            create:
-              feedback.errors?.map((e) => ({
-                type: e.type || 'general',
-                severity: e.severity || 'medium',
-                original: e.original_text,
-                corrected: e.corrected_text,
-                explanation: e.explanation || '',
-                example: e.example || null,
-                timestamp: 0,
-                segmentId: '0',
-              })) || [],
+      const mistakeRows =
+        feedback.errors?.map((e) => ({
+          type: e.type || 'general',
+          severity: e.severity || 'medium',
+          original: e.original_text,
+          corrected: e.corrected_text,
+          explanation: e.explanation || '',
+          example: e.example || null,
+          timestamp: 0,
+          segmentId: '0',
+        })) || [];
+
+      const analysisPayload = {
+        rawData: {
+          transcript: {
+            transcript_text: transcriptText,
+            segments,
+          },
+          azureEvidence: evidence,
+          aiFeedback: feedback.feedback || '',
+          strengths: feedback.strengths || [],
+          improvementAreas: feedback.improvement_areas || [],
+          confidenceTimeline: pa.confidence_timeline,
+          hesitationMarkers: pa.hesitation_markers,
+          topicVocabulary: pa.topic_vocabulary,
+        } as any,
+        cefrLevel: feedback.cefr_assessment?.level || 'B1',
+        scores: feedback.metrics as any,
+        confidenceTimeline: pa.confidence_timeline as any,
+        hesitationMarkers: pa.hesitation_markers as any,
+        topicVocabulary: pa.topic_vocabulary as any,
+      };
+
+      const analysis = await this.prisma.analysis.upsert({
+        where: {
+          sessionId_participantId: {
+            sessionId,
+            participantId: participant.id,
           },
         },
-        include: { mistakes: true },
+        create: {
+          sessionId,
+          participantId: participant.id,
+          ...analysisPayload,
+          mistakes: { create: mistakeRows },
+        },
+        update: {
+          ...analysisPayload,
+          mistakes: {
+            deleteMany: {},
+            create: mistakeRows,
+          },
+        },
+        include: { mistakes: true, pronunciationIssues: true },
       });
 
       // Persist Azure PA pronunciation issues so mobile can render post-call feedback
@@ -1296,8 +1330,14 @@ export class AssessmentService {
       this.logger.warn(
         `Joint analysis missing participant ${participant.userId}; creating placeholder (Session: ${sessionId})`,
       );
-      await this.prisma.analysis.create({
-        data: {
+      await this.prisma.analysis.upsert({
+        where: {
+          sessionId_participantId: {
+            sessionId,
+            participantId: participant.id,
+          },
+        },
+        create: {
           sessionId,
           participantId: participant.id,
           rawData: {
@@ -1318,6 +1358,7 @@ export class AssessmentService {
             overall_score: 50,
           } as any,
         },
+        update: {},
       });
     }
 

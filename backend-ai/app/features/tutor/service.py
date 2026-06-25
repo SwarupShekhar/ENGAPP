@@ -189,7 +189,8 @@ class StreamingTutorService:
             "is_final": True,
         }
 
-        # Stream Gemini + TTS sentence by sentence
+        # Stream Gemini text first; overlap TTS so sentence 2 synth runs during sentence 1 playback prep.
+        pending_tts: asyncio.Task | None = None
         async for sentence in self.gemini_service.stream_response(
             user_utterance,
             conversation_history,
@@ -198,22 +199,40 @@ class StreamingTutorService:
             cefr_level=cefr_level,
         ):
             tts_input = strip_pron_tags_for_mobile(sentence)
-            # Text first — mobile shows reply immediately; audio follows in a separate chunk.
             yield {
                 "type": "sentence",
                 "text": sentence,
                 "audio": None,
                 "is_final": False,
             }
+            if pending_tts is not None:
+                try:
+                    prev_audio = await pending_tts
+                    if prev_audio:
+                        yield {
+                            "type": "audio",
+                            "audio": prev_audio,
+                            "is_final": False,
+                        }
+                except Exception as e:
+                    logger.warning("TTS task failed: %s", e)
             if self.tts_services and tts_input:
-                audio_bytes = await self._synthesize_tts_sentence(tts_input)
-                if audio_bytes:
+                pending_tts = asyncio.create_task(self._synthesize_tts_sentence(tts_input))
+            else:
+                pending_tts = None
+            await asyncio.sleep(0)
+
+        if pending_tts is not None:
+            try:
+                last_audio = await pending_tts
+                if last_audio:
                     yield {
                         "type": "audio",
-                        "audio": audio_bytes,
+                        "audio": last_audio,
                         "is_final": False,
                     }
-            await asyncio.sleep(0.01)
+            except Exception as e:
+                logger.warning("Final TTS task failed: %s", e)
 
     def get_quick_acknowledgment(self, text: str) -> str:
         """

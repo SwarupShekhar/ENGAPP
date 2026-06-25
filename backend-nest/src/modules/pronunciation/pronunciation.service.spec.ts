@@ -59,4 +59,26 @@ describe('PronunciationService', () => {
       ],
     });
   });
+
+  it('persists spoken-only flags when correct is absent (free-speech PA)', async () => {
+    await (service as any).savePronunciationIssues('analysis-2', [
+      {
+        spoken: 'vater',
+        rule_category: 'w_to_v',
+        confidence: 40,
+      },
+    ]);
+
+    expect(prisma.pronunciationIssue.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          analysisId: 'analysis-2',
+          spoken: 'vater',
+          correct: null,
+          word: 'vater',
+          ruleCategory: 'w_to_v',
+        }),
+      ],
+    });
+  });
 });

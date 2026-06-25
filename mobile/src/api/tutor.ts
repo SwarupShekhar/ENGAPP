@@ -52,7 +52,27 @@ export const tutorApi = {
         return res.data;
     },
 
-
+    /** Fire-and-forget: store turn audio for deferred Azure PA after session ends. */
+    uploadTurnAudio: async (
+        sessionId: string,
+        turnIndex: number,
+        uri: string,
+        mimeType: string,
+        fileName: string,
+        transcript?: string,
+    ) => {
+        const formData = new FormData();
+        formData.append('audio', { uri, type: mimeType, name: fileName } as any);
+        formData.append('sessionId', sessionId);
+        formData.append('turnIndex', String(turnIndex));
+        if (transcript?.trim()) {
+            formData.append('transcript', transcript.trim());
+        }
+        await client.post('/conversational-tutor/upload-turn-audio', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 20000,
+        });
+    },
 
     transcribe: async (formData: FormData) => {
         const res = await client.post('/conversational-tutor/transcribe', formData, {

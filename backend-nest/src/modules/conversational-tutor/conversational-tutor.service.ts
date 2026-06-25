@@ -1,12 +1,18 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { firstValueFrom } from 'rxjs';
 import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { WeaknessService } from '../reels/weakness.service';
 import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
+import { RedisService } from '../../redis/redis.service';
+import { AzureStorageService } from '../../integrations/azure-storage.service';
+import { PronunciationService } from '../pronunciation/pronunciation.service';
+import { NotificationService } from '../notifications/notification.service';
 import * as FormData from 'form-data';
 import { Response } from 'express';
 
@@ -24,6 +30,24 @@ interface ConversationSession {
     accuracy: number;
     passed: boolean;
     timestamp: Date;
+    problemWords: string[];
+  }[];
+}
+
+export interface MayaSessionJobData {
+  sessionId: string;
+  userId?: string;
+  history: {
+    speaker: 'user' | 'ai';
+    text: string;
+    timestamp: string;
+    corrections?: any[];
+  }[];
+  pronunciationAttempts: {
+    referenceText: string;
+    accuracy: number;
+    passed: boolean;
+    timestamp: string;
     problemWords: string[];
   }[];
 }
@@ -84,6 +108,11 @@ export class ConversationalTutorService implements OnModuleInit {
     private prisma: PrismaService,
     private weaknessService: WeaknessService,
     private inCallCoaching: InCallCoachingService,
+    private redis: RedisService,
+    private azureStorage: AzureStorageService,
+    private pronunciation: PronunciationService,
+    private notificationService: NotificationService,
+    @InjectQueue('sessions') private sessionsQueue: Queue,
   ) {
     this.genAI = new GoogleGenerativeAI(
       this.configService.get<string>('GEMINI_API_KEY'),
@@ -113,6 +142,62 @@ export class ConversationalTutorService implements OnModuleInit {
         temperature: 0.75,
       },
     });
+  }
+
+  /** Higher token budget for end-of-session JSON recap (not live turns). */
+  private getRecapModel() {
+    return this.genAI.getGenerativeModel({
+      model: this.geminiChatModel,
+      generationConfig: {
+        maxOutputTokens: 512,
+        temperature: 0.5,
+      },
+    });
+  }
+
+  private userTextByTurnIndex(
+    history: ConversationTurn[],
+    userTurnIndex: number,
+  ): string {
+    let seen = 0;
+    for (const turn of history) {
+      if (turn.speaker !== 'user') continue;
+      if (seen === userTurnIndex) return turn.text.trim();
+      seen += 1;
+    }
+    return '';
+  }
+
+  /** Allow in-flight mobile uploads to land before deferred PA runs. */
+  private async waitForMayaTurnUploads(
+    sessionId: string,
+    expectedCount: number,
+  ): Promise<void> {
+    if (expectedCount <= 0) return;
+    const key = `maya:turns:${sessionId}`;
+    const maxWaitMs = 12_000;
+    const stableMs = 800;
+    const pollMs = 400;
+    const deadline = Date.now() + maxWaitMs;
+    let lastCount = -1;
+    let stableSince = 0;
+
+    while (Date.now() < deadline) {
+      const count = await this.redis.llen(key);
+      if (count >= expectedCount) {
+        if (count === lastCount) {
+          if (stableSince === 0) stableSince = Date.now();
+          if (Date.now() - stableSince >= stableMs) return;
+        } else {
+          stableSince = 0;
+        }
+      }
+      lastCount = count;
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+    this.logger.warn(
+      `Maya upload wait timed out session=${sessionId} expected=${expectedCount} last=${lastCount}`,
+    );
   }
 
   async onModuleInit() {
@@ -316,25 +401,236 @@ export class ConversationalTutorService implements OnModuleInit {
     };
   }
 
+  async uploadTurnAudio(
+    userId: string,
+    sessionId: string,
+    turnIndex: number,
+    audioBuffer: Buffer,
+    mimeType: string,
+    transcript?: string,
+  ) {
+    const participant = await this.prisma.sessionParticipant.findUnique({
+      where: { sessionId_userId: { sessionId, userId } },
+      include: { session: { select: { status: true } } },
+    });
+    if (!participant) {
+      throw new ForbiddenException('Not a participant in this session');
+    }
+    if (
+      participant.session.status !== 'IN_PROGRESS' &&
+      participant.session.status !== 'PROCESSING'
+    ) {
+      throw new BadRequestException('Session is not accepting turn uploads');
+    }
+
+    const ext = mimeType.includes('wav') ? 'wav' : 'm4a';
+    const key = `maya/${sessionId}/turn_${turnIndex}_${Date.now()}.${ext}`;
+    const url = await this.azureStorage.uploadFile(
+      audioBuffer,
+      key,
+      mimeType || 'audio/m4a',
+    );
+    const meta = JSON.stringify({
+      url,
+      turnIndex,
+      transcript: (transcript ?? '').trim(),
+    });
+    const redisKey = `maya:turns:${sessionId}`;
+    await this.redis.rpush(redisKey, meta);
+    await this.redis.expire(redisKey, 86_400);
+    this.logger.log(
+      `Maya turn audio stored session=${sessionId} turn=${turnIndex} user=${userId}`,
+    );
+    return { ok: true };
+  }
+
   async endSession(sessionId: string) {
     const session = this.conversations.get(sessionId);
     if (!session) {
+      const existing = await this.prisma.conversationSession.findUnique({
+        where: { id: sessionId },
+        select: { status: true },
+      });
+      if (
+        existing?.status === 'PROCESSING' ||
+        existing?.status === 'COMPLETED'
+      ) {
+        return {
+          status: existing.status,
+          sessionId,
+          message: 'Session already ended',
+        };
+      }
       return { message: 'Session not found or already ended' };
     }
 
     const turnCount = session.history.length;
-    const userTurns = session.history.filter((h) => h.speaker === 'user');
+    const dbSession = await this.prisma.conversationSession.findUnique({
+      where: { id: sessionId },
+      include: { participants: true },
+    });
+    const participant = dbSession?.participants[0];
+    const userId = participant?.userId;
 
-    // 1. Build Transcript
+    const transcript = session.history
+      .map((t) => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
+      .join('\n\n');
+
+    const durationSec = Math.floor(
+      (Date.now() - (dbSession?.createdAt?.getTime() || Date.now())) / 1000,
+    );
+
+    if (participant && transcript.trim()) {
+      const segments = [
+        {
+          speaker_id: participant.userId,
+          text: transcript,
+          timestamp: 0,
+        },
+      ];
+      await this.prisma.feedback.upsert({
+        where: {
+          sessionId_participantId: { sessionId, participantId: participant.id },
+        },
+        create: {
+          sessionId,
+          participantId: participant.id,
+          transcript: segments as any,
+        },
+        update: { transcript: segments as any },
+      });
+    }
+
+    await this.prisma.conversationSession.update({
+      where: { id: sessionId },
+      data: {
+        status: 'PROCESSING',
+        endedAt: new Date(),
+        duration: durationSec,
+      },
+    });
+
+    await this.sessionsQueue.add(
+      'process-maya-session',
+      {
+        sessionId,
+        userId,
+        history: session.history.map((h) => ({
+          speaker: h.speaker,
+          text: h.text,
+          timestamp: h.timestamp.toISOString(),
+          corrections: h.corrections,
+        })),
+        pronunciationAttempts: session.pronunciationAttempts.map((p) => ({
+          referenceText: p.referenceText,
+          accuracy: p.accuracy,
+          passed: p.passed,
+          timestamp: p.timestamp.toISOString(),
+          problemWords: p.problemWords,
+        })),
+      }       satisfies MayaSessionJobData,
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        delay: 6000,
+      },
+    );
+
+    this.conversations.delete(sessionId);
+
+    this.logger.log(
+      `[endSession] Maya session ${sessionId} → PROCESSING (${turnCount} turns). Queued deferred analysis.`,
+    );
+
+    return {
+      status: 'PROCESSING',
+      sessionId,
+      turnCount,
+      pronunciationAttempts: session.pronunciationAttempts.length,
+    };
+  }
+
+  async completeMayaSessionAnalysis(data: MayaSessionJobData) {
+    const { sessionId, userId } = data;
+    const session: ConversationSession = {
+      history: data.history.map((h) => ({
+        speaker: h.speaker,
+        text: h.text,
+        timestamp: new Date(h.timestamp),
+        corrections: h.corrections,
+      })),
+      pronunciationAttempts: data.pronunciationAttempts.map((p) => ({
+        referenceText: p.referenceText,
+        accuracy: p.accuracy,
+        passed: p.passed,
+        timestamp: new Date(p.timestamp),
+        problemWords: p.problemWords,
+      })),
+    };
+
+    if (userId) {
+      const expectedUploads = session.history.filter(
+        (h) => h.speaker === 'user',
+      ).length;
+      await this.waitForMayaTurnUploads(sessionId, expectedUploads);
+
+      const turnMetas = await this.redis.lrange(
+        `maya:turns:${sessionId}`,
+        0,
+        -1,
+      );
+      for (const raw of turnMetas) {
+        try {
+          const meta = JSON.parse(raw) as {
+            url?: string;
+            turnIndex?: number;
+            transcript?: string;
+          };
+          if (!meta.url) continue;
+          const res = await this.pronunciation.assessFromRecordingUrl(
+            userId,
+            meta.url,
+            undefined,
+          );
+          const score = res.pronunciation_score?.score ?? 0;
+          const turnLabel = `Turn ${meta.turnIndex ?? '?'}`;
+          session.pronunciationAttempts.push({
+            referenceText: turnLabel,
+            accuracy: score,
+            passed: score >= 65,
+            timestamp: new Date(),
+            problemWords: res.pronunciation_score?.dominant_errors ?? [],
+          });
+        } catch (e) {
+          this.logger.warn(
+            `Deferred Maya PA failed session=${sessionId}: ${(e as Error).message}`,
+          );
+        }
+      }
+    }
+
     const transcript = session.history
       .map((t) => `${t.speaker === 'user' ? 'User' : 'Maya'}: ${t.text}`)
       .join('\n\n');
 
     try {
-      // 2. Perform Final Analysis with Gemini
+      const existingAnalysis = await this.prisma.analysis.findFirst({
+        where: { sessionId },
+      });
+      if (existingAnalysis) {
+        this.logger.log(
+          `Maya session ${sessionId} already has analysis — skipping duplicate job`,
+        );
+        await this.prisma.conversationSession.update({
+          where: { id: sessionId },
+          data: { status: 'COMPLETED' },
+        });
+        await this.redis.del(`maya:turns:${sessionId}`);
+        return;
+      }
+
       const analysisData = await this.generateFinalRecap(session);
 
-      // 3. Find participant record
       const dbSession = await this.prisma.conversationSession.findUnique({
         where: { id: sessionId },
         include: { participants: true },
@@ -342,7 +638,6 @@ export class ConversationalTutorService implements OnModuleInit {
       const participant = dbSession?.participants[0];
 
       if (participant) {
-        // 4. Create Analysis and Mistakes
         await this.prisma.analysis.create({
           data: {
             sessionId: sessionId,
@@ -379,8 +674,6 @@ export class ConversationalTutorService implements OnModuleInit {
           },
         });
 
-        // ─── Smart Coach: Sync weaknesses to eBites feed ──────
-        // This bridges session analysis → eBites personalization.
         try {
           await this.weaknessService.ingestFromSessionAnalysis(
             participant.userId,
@@ -394,15 +687,13 @@ export class ConversationalTutorService implements OnModuleInit {
           );
         } catch (weaknessError) {
           this.logger.warn(
-            `Failed to sync weaknesses to eBites: ${weaknessError.message}`,
+            `Failed to sync weaknesses to eBites: ${(weaknessError as Error).message}`,
           );
         }
       }
 
-      // 5. Update Session Status and store transcript as one participant's feedback
       const durationSec = Math.floor(
-        (new Date().getTime() - (dbSession?.createdAt?.getTime() || 0)) /
-          1000,
+        (Date.now() - (dbSession?.createdAt?.getTime() || Date.now())) / 1000,
       );
       await this.prisma.conversationSession.update({
         where: { id: sessionId },
@@ -412,7 +703,8 @@ export class ConversationalTutorService implements OnModuleInit {
           duration: durationSec,
         },
       });
-      if (participant) {
+
+      if (participant && transcript.trim()) {
         const segments = [
           {
             speaker_id: participant.userId,
@@ -432,26 +724,29 @@ export class ConversationalTutorService implements OnModuleInit {
           update: { transcript: segments as any },
         });
       }
+
+      if (userId) {
+        const scores = (analysisData.scores as Record<string, number>) ?? {};
+        const overall = scores.overall ?? scores.fluency ?? null;
+        await this.notificationService.notify(userId, 'session_ready', {
+          sessionId,
+          score: overall != null ? Math.round(overall) : null,
+        });
+      }
+
+      await this.redis.del(`maya:turns:${sessionId}`);
     } catch (error) {
       this.logger.error(
-        `Final analysis failed for AI session: ${error.message}`,
+        `Final analysis failed for AI session ${sessionId}: ${(error as Error).message}`,
       );
-      // Mark session as ended anyway
       await this.prisma.conversationSession
         .update({
           where: { id: sessionId },
-          data: { status: 'ENDED', endedAt: new Date() },
+          data: { status: 'ANALYSIS_FAILED', endedAt: new Date() },
         })
         .catch(() => {});
+      throw error;
     }
-
-    this.conversations.delete(sessionId);
-
-    return {
-      message: 'Session ended and analyzed',
-      turnCount,
-      pronunciationAttempts: session.pronunciationAttempts.length,
-    };
   }
 
   async generateFinalRecap(session: ConversationSession) {
@@ -494,7 +789,7 @@ export class ConversationalTutorService implements OnModuleInit {
     Respond STRICTLY in JSON.
     `;
 
-    const model = this.getChatModel();
+    const model = this.getRecapModel();
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 

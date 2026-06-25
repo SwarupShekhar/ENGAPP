@@ -151,12 +151,18 @@ async def _generate_stream_response(
             logger.warning("coaching hint fetch failed (SSE): %s", _ce)
             return None, None, None
 
-    pa_task = start_phonetic_enrichment_task(audio_bytes, user_utterance)
-    timings.mark("pa_task_started")
     coaching_task = asyncio.create_task(_fetch_coaching())
-    phonetic_context, pa_in_prompt = await phonetic_context_for_stream(
-        pa_task, timings=timings
-    )
+    if settings.tutor_defer_pronunciation:
+        pa_task = None
+        phonetic_context = {}
+        pa_in_prompt = False
+        timings.mark("pa_deferred")
+    else:
+        pa_task = start_phonetic_enrichment_task(audio_bytes, user_utterance)
+        timings.mark("pa_task_started")
+        phonetic_context, pa_in_prompt = await phonetic_context_for_stream(
+            pa_task, timings=timings
+        )
     _coaching_ctx, _coaching_hint_payload, _coaching_hint_text = await coaching_task
 
     # Opportunity prompt: append once per call so Maya creates a natural usage moment
@@ -259,24 +265,25 @@ async def _generate_stream_response(
             yield payload
 
     timings.mark("llm_stream_end")
-    capture_phonetic = await phonetic_context_for_capture(
-        pa_task, phonetic_context, timings=timings
-    )
-
-    if full_response_text.strip() and session_id:
-        turn_issues = build_turn_capture(
-            full_response_text.strip(),
-            user_utterance,
-            phonetic_context=capture_phonetic,
+    if not settings.tutor_defer_pronunciation:
+        capture_phonetic = await phonetic_context_for_capture(
+            pa_task, phonetic_context, timings=timings
         )
-        if turn_issues:
-            append_pronunciation_issues(session_id, turn_issues)
-            timings.mark("pron_capture_count")
-            logger.info(
-                "[SSE] pronunciation issues captured session_id=%s count=%s",
-                session_id,
-                len(turn_issues),
+
+        if full_response_text.strip() and session_id:
+            turn_issues = build_turn_capture(
+                full_response_text.strip(),
+                user_utterance,
+                phonetic_context=capture_phonetic,
             )
+            if turn_issues:
+                append_pronunciation_issues(session_id, turn_issues)
+                timings.mark("pron_capture_count")
+                logger.info(
+                    "[SSE] pronunciation issues captured session_id=%s count=%s",
+                    session_id,
+                    len(turn_issues),
+                )
 
     # Persist coaching hint state to Redis (hintCount + lastHintAt only — markField is
     # set only on confirmed phrase usage in the feedback loop above, not on hint fire)
@@ -445,7 +452,10 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                         )
                         user_utterance = transcription.get("text")
 
-                        if not has_usable_phonetic_context(client_phonetic):
+                        if (
+                            not has_usable_phonetic_context(client_phonetic)
+                            and not settings.tutor_defer_pronunciation
+                        ):
                             pa_task = start_phonetic_enrichment_task(
                                 audio_bytes,
                                 user_utterance or "",
@@ -639,29 +649,37 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                     except Exception as _wme:
                         logger.warning("[coaching] consecutive misses update failed (WS): %s", _wme)
 
-                capture_phonetic = await phonetic_context_for_capture(
-                    pa_task, stream_phonetic, timings=ws_timings
-                )
+                if not settings.tutor_defer_pronunciation:
+                    capture_phonetic = await phonetic_context_for_capture(
+                        pa_task, stream_phonetic, timings=ws_timings
+                    )
 
-                if full_response_text:
-                    assistant_raw = full_response_text.strip()
-                    assistant_clean = strip_pron_tags_for_mobile(assistant_raw)
-                    if audio_base64:
-                        print(
-                            f"[Pulse DEBUG] about to call build_turn_capture "
-                            f"audio_base64={'present' if audio_base64 else 'MISSING'} "
-                            f"phonetic_context={'present' if capture_phonetic else 'MISSING'} "
-                            f"transcript='{(user_utterance or '')[:30] if user_utterance else 'NONE'}'",
-                            flush=True,
+                    if full_response_text:
+                        assistant_raw = full_response_text.strip()
+                        assistant_clean = strip_pron_tags_for_mobile(assistant_raw)
+                        if audio_base64:
+                            print(
+                                f"[Pulse DEBUG] about to call build_turn_capture "
+                                f"audio_base64={'present' if audio_base64 else 'MISSING'} "
+                                f"phonetic_context={'present' if capture_phonetic else 'MISSING'} "
+                                f"transcript='{(user_utterance or '')[:30] if user_utterance else 'NONE'}'",
+                                flush=True,
+                            )
+                            turn_issues = build_turn_capture(
+                                assistant_raw,
+                                (user_utterance or "").strip(),
+                                phonetic_context=capture_phonetic or {},
+                                conversation_history=conversation_history,
+                            )
+                            if turn_issues:
+                                append_pronunciation_issues(session_id, turn_issues)
+                        conversation_history.append(
+                            {"role": "assistant", "content": assistant_clean}
                         )
-                        turn_issues = build_turn_capture(
-                            assistant_raw,
-                            (user_utterance or "").strip(),
-                            phonetic_context=capture_phonetic or {},
-                            conversation_history=conversation_history,
-                        )
-                        if turn_issues:
-                            append_pronunciation_issues(session_id, turn_issues)
+                elif full_response_text:
+                    assistant_clean = strip_pron_tags_for_mobile(
+                        full_response_text.strip()
+                    )
                     conversation_history.append(
                         {"role": "assistant", "content": assistant_clean}
                     )

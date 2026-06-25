@@ -5,7 +5,7 @@ import { WeaknessService } from '../reels/weakness.service';
 
 export type FlaggedPronunciationError = {
   spoken: string;
-  correct: string;
+  correct?: string;
   rule_category: string;
   reel_id?: string | null;
   confidence: number;
@@ -101,22 +101,27 @@ export class PronunciationService {
     });
 
     const data = (flaggedErrors || [])
-      .filter((err) => err?.spoken && err?.correct)
-      .map((err) => ({
-        analysisId,
-        word: err.spoken,
-        spoken: err.spoken,
-        correct: err.correct,
-        ruleCategory: err.rule_category,
-        reelId: err.reel_id || null,
-        issueType: err.rule_category,
-        severity: severityForConfidence(err.confidence),
-        confidence: err.confidence,
-        suggestion: formatPronunciationSuggestion(
-          err.rule_category,
-          err.correct,
-        ),
-      }));
+      .filter((err) => Boolean(err?.spoken?.trim()))
+      .map((err) => {
+        const spoken = err.spoken.trim();
+        const correct = err.correct?.trim() || null;
+        const ruleCategory = err.rule_category || 'general_mispronunciation';
+        return {
+          analysisId,
+          word: spoken,
+          spoken,
+          correct,
+          ruleCategory,
+          reelId: err.reel_id || null,
+          issueType: ruleCategory,
+          severity: severityForConfidence(err.confidence),
+          confidence: err.confidence,
+          suggestion: formatPronunciationSuggestion(
+            ruleCategory,
+            correct || spoken,
+          ),
+        };
+      });
 
     if (data.length === 0) {
       return 0;
