@@ -42,7 +42,6 @@ import MistakesCard from '../components/MistakesCard';
 import { getHomeData, HomeData } from '../services/homeApi';
 import { getBridgeUser } from '../../../api/bridgeClient';
 import { HOME_DATA_CACHE_KEY } from '../../../services/cacheKeys';
-import FeedPrefetchService from '../../../services/feedPrefetchService';
 import { tasksApi } from '../../../api/tasks';
 
 let Haptics: {
@@ -741,9 +740,8 @@ export default function HomeScreen() {
       } catch {
         setLoadingHome(true);
       }
-    } else {
-      setLoadingHome(true);
     }
+    // Pull-to-refresh: keep showing cached content; only the RefreshControl spinner.
 
     try {
       const fresh = await getHomeData();
@@ -751,8 +749,6 @@ export default function HomeScreen() {
       await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
       if (forceFresh) {
         void tasksApi.loadPracticeCarouselTasks().catch(() => {});
-        FeedPrefetchService.getInstance().invalidate();
-        void FeedPrefetchService.getInstance().prefetch();
       }
     } catch (e) {
       console.warn('[HomeV1] home data:', e);
