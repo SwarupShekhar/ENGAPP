@@ -74,6 +74,21 @@ function buildFormData(slide: PulseSlide, audio: HomePracticeAudioUpload): FormD
   return fd;
 }
 
+function buildAssessFailHint(
+  message: string | undefined,
+  overallAccuracy: number,
+): string {
+  const trimmed = message?.trim();
+  if (trimmed && overallAccuracy > 0) {
+    return `${trimmed} (${overallAccuracy}%)`;
+  }
+  if (trimmed) return trimmed;
+  if (overallAccuracy > 0) {
+    return `${overallAccuracy}% — not quite right, try again`;
+  }
+  return 'Try again';
+}
+
 export default function PulseHomeCarousel({
   phraseOfTheDay,
   wordOfTheDay,
@@ -94,6 +109,27 @@ export default function PulseHomeCarousel({
   const assessingLock = useRef(false);
   const micBusyRef = useRef(false);
   const recordingSlideKeyRef = useRef<string | null>(null);
+  const resetTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const clearResetTimer = useCallback((slideKey: string) => {
+    const pending = resetTimersRef.current.get(slideKey);
+    if (pending) {
+      clearTimeout(pending);
+      resetTimersRef.current.delete(slideKey);
+    }
+  }, []);
+
+  const scheduleResetTimer = useCallback(
+    (slideKey: string, delayMs: number, onReset: () => void) => {
+      clearResetTimer(slideKey);
+      const id = setTimeout(() => {
+        resetTimersRef.current.delete(slideKey);
+        onReset();
+      }, delayMs);
+      resetTimersRef.current.set(slideKey, id);
+    },
+    [clearResetTimer],
+  );
 
   const capture = useHomePracticeCapture();
   const {
@@ -145,6 +181,8 @@ export default function PulseHomeCarousel({
       })();
       return () => {
         alive = false;
+        resetTimersRef.current.forEach((id) => clearTimeout(id));
+        resetTimersRef.current.clear();
         ttsStop();
         recordingSlideKeyRef.current = null;
         void captureCancel();
@@ -258,13 +296,14 @@ export default function PulseHomeCarousel({
               : 'Could not capture audio — tap Listen, then try the mic again';
         setCardState(slide.key, 'fail' as CardState);
         setCardHint(slide.key, hint);
-        setTimeout(() => {
+        scheduleResetTimer(slide.key, 2500, () => {
           setCardState(slide.key, 'ready' as CardState);
           setCardHint(slide.key, undefined);
-        }, 2500);
+        });
         return;
       }
 
+      clearResetTimer(slide.key);
       assessingLock.current = true;
       setCardState(slide.key, 'assessing' as CardState);
 
@@ -286,14 +325,15 @@ export default function PulseHomeCarousel({
             result.message ||
               "We couldn't hear you. Tap Listen, speak clearly, then tap the mic again.",
           );
-          setTimeout(() => {
+          scheduleResetTimer(slide.key, 3000, () => {
             setCardState(slide.key, 'ready' as CardState);
             setCardHint(slide.key, undefined);
-          }, 3000);
+          });
           return;
         }
 
         if (result.pass && result.doneForToday) {
+          clearResetTimer(slide.key);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setCardState(slide.key, 'done_today' as CardState);
           setCardHint(slide.key, result.message || undefined);
@@ -310,35 +350,34 @@ export default function PulseHomeCarousel({
               correctStreak: result.correctStreak,
             });
           }
-          setTimeout(() => {
+          scheduleResetTimer(slide.key, 3500, () => {
             setCardState(slide.key, 'ready' as CardState);
             setCardHint(slide.key, undefined);
-          }, 3500);
+          });
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
           setCardState(slide.key, 'fail' as CardState);
-          const scoreHint =
-            result.overallAccuracy > 0
-              ? `${result.overallAccuracy}% — not quite right, try again`
-              : result.message;
-          setCardHint(slide.key, scoreHint || 'Try again');
-          setTimeout(() => {
+          setCardHint(
+            slide.key,
+            buildAssessFailHint(result.message, result.overallAccuracy),
+          );
+          scheduleResetTimer(slide.key, 4000, () => {
             setCardState(slide.key, 'ready' as CardState);
             setCardHint(slide.key, undefined);
-          }, 4000);
+          });
         }
     } catch {
       setCardState(slide.key, 'fail' as CardState);
       setCardHint(slide.key, 'Network error — try again');
-      setTimeout(() => {
+      scheduleResetTimer(slide.key, 2000, () => {
         setCardState(slide.key, 'ready' as CardState);
         setCardHint(slide.key, undefined);
-      }, 2000);
+      });
     } finally {
       assessingLock.current = false;
     }
     },
-    [analytics, captureFinish, onParentScrollEnabledChange, setCardHint, setCardState],
+    [analytics, captureFinish, clearResetTimer, onParentScrollEnabledChange, scheduleResetTimer, setCardHint, setCardState],
   );
 
   const handleMicPress = useCallback(
@@ -364,6 +403,7 @@ export default function PulseHomeCarousel({
 
       micBusyRef.current = true;
       try {
+        clearResetTimer(slide.key);
         onParentScrollEnabledChange?.(false);
         await ttsStop();
         analytics.capture(AnalyticsEvents.HOME_PRACTICE_RECORD_STARTED, { kind: slide.kind });
@@ -389,6 +429,7 @@ export default function PulseHomeCarousel({
       analytics,
       captureStart,
       cardStates,
+      clearResetTimer,
       isRecording,
       onParentScrollEnabledChange,
       setCardHint,

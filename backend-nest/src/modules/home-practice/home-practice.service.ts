@@ -210,7 +210,9 @@ export class HomePracticeService {
     if (expected.length === 0) {
       return { ok: true, expectedCount: 0, heardCount: 0, ratio: 1 };
     }
-    const heard = new Set(assessed.map((w) => w.word.toLowerCase().trim()).filter(Boolean));
+    const heard = new Set(
+      assessed.flatMap((w) => this.tokenizeReference(w.word)),
+    );
     const matched = expected.filter((t) => heard.has(t)).length;
     const ratio = matched / expected.length;
     const minRatio =

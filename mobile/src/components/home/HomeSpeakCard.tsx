@@ -104,6 +104,11 @@ export function HomeSpeakCard({
     }
   })();
 
+  const showFeedbackBanner =
+    cardState === 'fail' || cardState === 'pass_partial';
+  const feedbackBannerText =
+    failMessage ?? (cardState === 'fail' ? 'Try again' : 'Once more');
+
   const showListen =
     listenEnabled &&
     onListenPress &&
@@ -156,7 +161,7 @@ export function HomeSpeakCard({
       ) : null}
 
       <View style={styles.micArea}>
-        {cardState === 'fail' || cardState === 'pass_partial' ? (
+        {showFeedbackBanner ? (
           <View
             style={[
               styles.feedbackBanner,
@@ -177,7 +182,7 @@ export function HomeSpeakCard({
                 { color: cardState === 'fail' ? error : warning },
               ]}
             >
-              {micLabel}
+              {feedbackBannerText}
             </Text>
           </View>
         ) : null}
@@ -215,7 +220,11 @@ export function HomeSpeakCard({
             )}
           </Pressable>
         )}
-        <Text style={[styles.micLabel, { color: c.text.secondary }]}>{micLabel}</Text>
+        {!showFeedbackBanner ? (
+          <Text style={[styles.micLabel, { color: c.text.secondary }]}>{micLabel}</Text>
+        ) : (
+          <Text style={[styles.micLabel, { color: c.text.secondary }]}>Tap mic to try again</Text>
+        )}
       </View>
     </View>
   );
