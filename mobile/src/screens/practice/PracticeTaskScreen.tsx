@@ -7,8 +7,13 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  KeyboardStickyView,
+  useKeyboardHandler,
+} from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
@@ -16,6 +21,7 @@ import Animated, {
   Easing,
   FadeIn,
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -24,6 +30,9 @@ import Animated, {
   withSpring,
   useAnimatedProps,
 } from "react-native-reanimated";
+
+/** Typing composer (input + check + labels) — keeps prompt above the bar */
+const TYPING_COMPOSER_HEIGHT = 175;
 
 import { useAppTheme } from "../../theme/useAppTheme";
 import { tasksApi, type LearningTask } from "../../api/tasks";
@@ -111,6 +120,35 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
   // Audio recording
   const recordingRef = useRef<Audio.Recording | null>(null);
   const timerIntervalRef = useRef<any>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
+
+  useKeyboardHandler(
+    {
+      onMove: (e) => {
+        "worklet";
+        runOnJS(setKeyboardInset)(e.height);
+      },
+      onEnd: (e) => {
+        "worklet";
+        runOnJS(setKeyboardInset)(e.height);
+        if (!isPronunciation && state === "RECORDING") {
+          runOnJS(scrollToBottom)();
+        }
+      },
+    },
+    [scrollToBottom, isPronunciation, state],
+  );
+
+  const typingScrollBottomPad =
+    TYPING_COMPOSER_HEIGHT + Math.max(insets.bottom, 10) + keyboardInset;
 
   const pulse = useSharedValue(0);
 
@@ -343,110 +381,89 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
 
   const expectedPhonemes = task.content?.phonemes?.expected;
 
-  return (
-    <View style={styles.root}>
-      {header}
+  const promptContent = (
+    <>
+      <Text style={styles.bigIcon}>{typeIcon(task.type)}</Text>
+      <Text style={styles.typeLabel}>{typeLabel(task.type)}</Text>
 
-      <Animated.View entering={FadeIn.duration(180)} style={styles.content}>
-        <Text style={styles.bigIcon}>{typeIcon(task.type)}</Text>
-        <Text style={styles.typeLabel}>{typeLabel(task.type)}</Text>
-
-        <Text style={styles.targetText}>{task.content?.target}</Text>
-        {task.content?.userSaid != null &&
-        task.content?.correct != null &&
-        normalizeText(task.content.userSaid) === normalizeText(task.content.correct) ? (
+      <Text style={styles.targetText}>{task.content?.target}</Text>
+      {task.content?.userSaid != null &&
+      task.content?.correct != null &&
+      normalizeText(task.content.userSaid) ===
+        normalizeText(task.content.correct) ? (
+        <Text style={styles.secondaryText} numberOfLines={2}>
+          Recorded from your call — practice the pronunciation below
+        </Text>
+      ) : (
+        <>
           <Text style={styles.secondaryText} numberOfLines={2}>
-            Recorded from your call — practice the pronunciation below
+            You said: {task.content?.userSaid || "—"}
           </Text>
-        ) : (
-          <>
-            <Text style={styles.secondaryText} numberOfLines={2}>
-              You said: {task.content?.userSaid || "—"}
-            </Text>
-            <Text style={styles.secondaryText} numberOfLines={2}>
-              Correct: {task.content?.correct || "—"}
-            </Text>
-          </>
-        )}
+          <Text style={styles.secondaryText} numberOfLines={2}>
+            Correct: {task.content?.correct || "—"}
+          </Text>
+        </>
+      )}
+    </>
+  );
 
-        {/* READY/RECORDING: pronunciation hint row when available */}
-        {isPronunciation && expectedPhonemes ? (
-          <View style={styles.hintRow}>
-            <Ionicons
-              name="sparkles-outline"
-              size={16}
-              color={theme.colors.text.secondary}
-            />
-            <Text style={styles.hintText} numberOfLines={1}>
-              Phonetic hint: /{expectedPhonemes}/
-            </Text>
-          </View>
-        ) : null}
+  if (!isPronunciation) {
+    return (
+      <View style={styles.root}>
+        {header}
 
-        {/* STATE 1 / 2 / 3 / 4 rendering (only one block at a time) */}
-        {state === "READY" && (
-          <View style={styles.bottomArea}>
-            {isPronunciation ? (
-              <>
-                <View style={styles.micWrap}>
-                  <TouchableOpacity
-                    style={styles.micButton}
-                    onPress={startRecording}
-                    activeOpacity={0.9}
-                    accessibilityLabel="Tap to record"
-                  >
-                    <Ionicons name="mic" size={26} color="white" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.bottomLabel}>Tap to record</Text>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={startRecording}
-                  activeOpacity={0.9}
-                >
-                  <Text style={styles.primaryBtnText}>Type your answer</Text>
-                </TouchableOpacity>
-                <Text style={styles.bottomLabel}>
-                  Enter the corrected version to complete
-                </Text>
-              </>
-            )}
+        <View style={styles.flex}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.flex}
+            contentContainerStyle={[
+              styles.scrollContent,
+              state === "RECORDING" && {
+                paddingBottom: typingScrollBottomPad,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View entering={FadeIn.duration(180)}>
+              {promptContent}
+            </Animated.View>
+          </ScrollView>
 
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Text style={styles.skipText}>Skip for now</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          {state === "READY" && (
+            <View style={styles.bottomAreaStatic}>
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={startRecording}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.primaryBtnText}>Type your answer</Text>
+              </TouchableOpacity>
+              <Text style={styles.bottomLabel}>
+                Enter the corrected version to complete
+              </Text>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.skipText}>Skip for now</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {state === "RECORDING" && (
-          <View style={styles.bottomArea}>
-            {isPronunciation ? (
-              <>
-                <View style={styles.micWrap}>
-                  <Animated.View style={[styles.micRing, ringStyle]} />
-                  <TouchableOpacity
-                    style={[styles.micButton, styles.micButtonRecording]}
-                    onPress={stopRecording}
-                    activeOpacity={0.9}
-                    accessibilityLabel="Tap to stop recording"
-                  >
-                    <Ionicons name="stop" size={24} color="white" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.bottomLabel}>
-                  Recording... tap to stop
-                </Text>
-                <Text style={styles.timerText}>{timerSec}s</Text>
-              </>
-            ) : (
-              <>
+          {state === "RECORDING" && (
+            <KeyboardStickyView
+              offset={{ closed: 0, opened: insets.bottom }}
+            >
+              <View
+                style={[
+                  styles.typingComposer,
+                  { paddingBottom: Math.max(insets.bottom, 10) },
+                ]}
+              >
                 <View style={styles.inputWrap}>
                   <TextInput
                     value={textInput}
                     onChangeText={setTextInput}
+                    onFocus={scrollToBottom}
                     placeholder="Type the correct version..."
                     placeholderTextColor={theme.colors.text.secondary}
                     style={styles.textInput}
@@ -465,8 +482,132 @@ export default function PracticeTaskScreen({ navigation, route }: any) {
                 <Text style={styles.bottomLabel}>
                   Compare your answer with the correction
                 </Text>
-              </>
-            )}
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                  <Text style={styles.skipText}>Skip for now</Text>
+                </TouchableOpacity>
+              </View>
+            </KeyboardStickyView>
+          )}
+
+          {state === "ANALYZING" && (
+            <View style={styles.bottomAreaStatic}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.bottomLabel}>Analyzing your answer...</Text>
+            </View>
+          )}
+
+          {state === "RESULT" && (
+            <View style={styles.bottomAreaStatic}>
+              {errorMsg ? (
+                <>
+                  <Text style={styles.errorTitle}>Something went wrong</Text>
+                  <Text style={styles.secondaryText}>{errorMsg}</Text>
+                  <TouchableOpacity
+                    style={styles.primaryBtn}
+                    onPress={resetToReady}
+                    activeOpacity={0.9}
+                  >
+                    <Text style={styles.primaryBtnText}>Retry</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <AnimatedNumber
+                    value={score ?? 0}
+                    color={scoreColor(score ?? 0, theme)}
+                  />
+                  <Text style={styles.resultMsg}>
+                    {scoreMessage(score ?? 0)}
+                  </Text>
+                  {graduated ? (
+                    <Text style={styles.typeLabel}>Mastered 🎉</Text>
+                  ) : null}
+
+                  {(score ?? 0) >= 80 ? (
+                    <TouchableOpacity
+                      style={styles.completeBtn}
+                      onPress={handleComplete}
+                      activeOpacity={0.9}
+                    >
+                      <Text style={styles.completeBtnText}>Complete Task ✓</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.primaryBtn}
+                      onPress={resetToReady}
+                      activeOpacity={0.9}
+                    >
+                      <Text style={styles.primaryBtnText}>Try Again</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.skipText}>Skip for now</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
+      {header}
+
+      <Animated.View entering={FadeIn.duration(180)} style={styles.content}>
+        {promptContent}
+
+        {expectedPhonemes ? (
+          <View style={styles.hintRow}>
+            <Ionicons
+              name="sparkles-outline"
+              size={16}
+              color={theme.colors.text.secondary}
+            />
+            <Text style={styles.hintText} numberOfLines={1}>
+              Phonetic hint: /{expectedPhonemes}/
+            </Text>
+          </View>
+        ) : null}
+
+        {state === "READY" && (
+          <View style={styles.bottomArea}>
+            <View style={styles.micWrap}>
+              <TouchableOpacity
+                style={styles.micButton}
+                onPress={startRecording}
+                activeOpacity={0.9}
+                accessibilityLabel="Tap to record"
+              >
+                <Ionicons name="mic" size={26} color="white" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.bottomLabel}>Tap to record</Text>
+
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.skipText}>Skip for now</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {state === "RECORDING" && (
+          <View style={styles.bottomArea}>
+            <View style={styles.micWrap}>
+              <Animated.View style={[styles.micRing, ringStyle]} />
+              <TouchableOpacity
+                style={[styles.micButton, styles.micButtonRecording]}
+                onPress={stopRecording}
+                activeOpacity={0.9}
+                accessibilityLabel="Tap to stop recording"
+              >
+                <Ionicons name="stop" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.bottomLabel}>Recording... tap to stop</Text>
+            <Text style={styles.timerText}>{timerSec}s</Text>
 
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <Text style={styles.skipText}>Skip for now</Text>
@@ -563,6 +704,15 @@ const getStyles = (theme: any) =>
       fontWeight: "800",
       color: theme.colors.text.primary,
     },
+    flex: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      alignItems: "center",
+      paddingHorizontal: theme.spacing.l,
+      paddingTop: theme.spacing.m,
+    },
     content: {
       flex: 1,
       paddingHorizontal: theme.spacing.l,
@@ -620,6 +770,22 @@ const getStyles = (theme: any) =>
       bottom: 30,
       alignItems: "center",
       paddingHorizontal: theme.spacing.l,
+    },
+    bottomAreaStatic: {
+      width: "100%",
+      alignItems: "center",
+      paddingHorizontal: theme.spacing.l,
+      paddingTop: theme.spacing.m,
+      paddingBottom: 30,
+    },
+    typingComposer: {
+      width: "100%",
+      alignItems: "center",
+      paddingHorizontal: theme.spacing.l,
+      paddingTop: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
     },
     micWrap: {
       width: 96,

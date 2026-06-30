@@ -69,7 +69,7 @@ export const tasksApi = {
         return response.data?.tasks ?? [];
     },
 
-    /** Home carousel queue (due + pending, deduped). GET /users/me/tasks/carousel */
+    /** Home carousel queue (due + actionable, deduped). GET /users/me/tasks/carousel */
     getCarouselTasks: async (): Promise<LearningTask[]> => {
         const response = await client.get('/users/me/tasks/carousel');
         return response.data?.tasks ?? [];
@@ -79,36 +79,12 @@ export const tasksApi = {
      * Best-effort load for home practice slides — never throws; returns [] on total failure.
      */
     loadPracticeCarouselTasks: async (): Promise<LearningTask[]> => {
-        const seen = new Set<string>();
-        const merged: LearningTask[] = [];
-        const add = (tasks: LearningTask[]) => {
-            for (const t of tasks) {
-                if (!t?.id || seen.has(t.id)) continue;
-                seen.add(t.id);
-                merged.push(t);
-            }
-        };
-
-        const loaders: Array<() => Promise<LearningTask[]>> = [
-            () => tasksApi.getCarouselTasks(),
-            () => tasksApi.getDueTasks(),
-            () => tasksApi.getPendingTasks(),
-            async () => {
-                const response = await client.get('/tasks/daily');
-                return response.data?.tasks ?? [];
-            },
-        ];
-
-        for (const load of loaders) {
-            try {
-                add(await load());
-                if (merged.length >= 8) break;
-            } catch {
-                // try next source
-            }
+        try {
+            const tasks = await tasksApi.getCarouselTasks();
+            return tasks.slice(0, 5);
+        } catch {
+            return [];
         }
-
-        return merged.slice(0, 8);
     },
 
     /** Submit a practice attempt. POST /tasks/:id/attempt */

@@ -12,6 +12,14 @@ export const LEGACY_CACHE_KEYS = [
   "@ebites_feed_cache_v2",
 ];
 
+/** UTC-dated phrase/word snapshot — `engr:daily_content:YYYY-MM-DD` */
+export const DAILY_CONTENT_CACHE_PREFIX = "engr:daily_content:";
+
+/** UTC date key matching backend engr:potd:YYYY-MM-DD */
+export function utcTodayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /** Per-user onboarding state (profile + assessment), TTL-managed in onboardingCache.ts */
 export const ONBOARDING_CACHE_PREFIX = "engr:onboarding:";
 /** Set when MainTabs is reached; read on next launch to skip splash */

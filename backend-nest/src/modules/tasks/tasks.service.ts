@@ -430,28 +430,42 @@ export class TasksService {
     }
 
     /**
-     * Home carousel: merge SR-due, pending, and daily queues (deduped).
-     * One endpoint so the app does not fail when /tasks/due is empty or unavailable.
+     * Home carousel: top actionable mistakes only (due now, not yet mastered).
+     * Caps at 5 cards, deduped by mistakeKey, sorted by severity.
      */
-    async getCarouselTasksForUser(userId: string, limit = 8) {
-        type CarouselTaskRow =
-            | Awaited<ReturnType<typeof this.getDueTasksForUser>>[number]
-            | Awaited<ReturnType<typeof this.getPendingTasksForUser>>[number]
-            | Awaited<ReturnType<typeof this.getDailyTasks>>[number];
+    async getCarouselTasksForUser(userId: string, limit = 5) {
+        const cap = Math.min(Math.max(limit, 1), 5);
+        const now = new Date();
 
-        const byId = new Map<string, CarouselTaskRow>();
+        const rows = await this.prisma.learningTask.findMany({
+            where: {
+                userId,
+                type: { in: ['pronunciation', 'grammar', 'vocabulary'] },
+                srState: 'LEARNING',
+                status: { not: 'completed' },
+                dueAt: { lte: now },
+            },
+            include: { session: { select: { id: true, createdAt: true } } },
+            take: 50,
+            orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
+        });
 
-        const add = (rows: CarouselTaskRow[]) => {
-            for (const row of rows) {
-                if (row?.id) byId.set(row.id, row);
+        const byMistakeKey = new Map<string, (typeof rows)[number]>();
+        for (const row of rows) {
+            const key =
+                row.mistakeKey ||
+                this.computeMistakeKey({ type: row.type, content: row.content });
+            const existing = byMistakeKey.get(key);
+            if (!existing) {
+                byMistakeKey.set(key, row);
+                continue;
             }
-        };
+            const sa = Number((row.content as { severityScore?: number })?.severityScore ?? 0);
+            const sb = Number((existing.content as { severityScore?: number })?.severityScore ?? 0);
+            if (sa > sb) byMistakeKey.set(key, row);
+        }
 
-        add(await this.getDueTasksForUser(userId, limit));
-        add(await this.getPendingTasksForUser(userId, limit));
-        add((await this.getDailyTasks(userId)).slice(0, limit));
-
-        const list = [...byId.values()];
+        const list = [...byMistakeKey.values()];
         list.sort((a, b) => {
             const tr = this.dueTaskTypeRank(a.type) - this.dueTaskTypeRank(b.type);
             if (tr !== 0) return tr;
@@ -461,7 +475,7 @@ export class TasksService {
             return b.createdAt.getTime() - a.createdAt.getTime();
         });
 
-        return list.slice(0, limit);
+        return list.slice(0, cap);
     }
 
     async completeTaskForUser(taskId: string, userId: string) {
@@ -589,6 +603,7 @@ export class TasksService {
             return { pass: false, errored: true, reason: reason || 'scoring_error' };
         }
 
+        const passesToGraduate = task.type === 'pronunciation' ? 2 : 1;
         const t = applySrTransition(
             {
                 srState: task.srState as 'LEARNING' | 'GRADUATED',
@@ -598,6 +613,7 @@ export class TasksService {
             },
             pass,
             new Date(),
+            { passesToGraduate },
         );
 
         await this.prisma.learningTask.update({

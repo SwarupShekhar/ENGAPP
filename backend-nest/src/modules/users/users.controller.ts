@@ -48,7 +48,7 @@ export class UsersController {
     /** Merged due + pending practice cards for home carousel */
     @Get('me/tasks/carousel')
     async getCarouselTasks(@Request() req) {
-        const tasks = await this.tasksService.getCarouselTasksForUser(req.user.id, 8);
+        const tasks = await this.tasksService.getCarouselTasksForUser(req.user.id, 5);
         return { tasks };
     }
 

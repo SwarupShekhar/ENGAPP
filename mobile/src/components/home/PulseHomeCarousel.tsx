@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -49,6 +57,20 @@ type PulseSlide =
   | { key: string; kind: 'word_daily'; word: { word: string; definition: string; example: string; partOfSpeech?: string | null } }
   | { key: string; kind: 'mistake_task'; task: LearningTask };
 
+export type PulseCarouselSlideKind =
+  | 'grammar'
+  | 'vocabulary'
+  | 'pronunciation'
+  | 'fluency'
+  | 'phrase_daily'
+  | 'word_daily';
+
+export type PulseHomeCarouselHandle = {
+  scrollToIndex: (index: number) => void;
+  scrollToSlideKind: (kind: PulseCarouselSlideKind) => boolean;
+  scrollToPillar: (pillar: string) => boolean;
+};
+
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -89,13 +111,16 @@ function buildAssessFailHint(
   return 'Try again';
 }
 
-export default function PulseHomeCarousel({
-  phraseOfTheDay,
-  wordOfTheDay,
-  dailyPracticeStatus,
-  loadingPhrase = false,
-  onParentScrollEnabledChange,
-}: Props) {
+const PulseHomeCarousel = forwardRef<PulseHomeCarouselHandle, Props>(function PulseHomeCarousel(
+  {
+    phraseOfTheDay,
+    wordOfTheDay,
+    dailyPracticeStatus,
+    loadingPhrase = false,
+    onParentScrollEnabledChange,
+  },
+  ref,
+) {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const analytics = useAnalytics();
@@ -149,16 +174,24 @@ export default function PulseHomeCarousel({
     onParentScrollEnabledChange?.(!recording);
   }, [captureState, onParentScrollEnabledChange]);
 
-  // ── Load practice tasks on mount ────────────────────────────────────────────
-  useEffect(() => {
+  // ── Load practice tasks on mount + refetch when home regains focus ───────────
+  const reloadCarouselTasks = useCallback(() => {
     let alive = true;
     void (async () => {
       const t = await tasksApi.loadPracticeCarouselTasks();
       if (!alive) return;
       setTasks(t);
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  useEffect(() => reloadCarouselTasks(), [reloadCarouselTasks]);
+
+  useFocusEffect(
+    useCallback(() => reloadCarouselTasks(), [reloadCarouselTasks]),
+  );
 
   // ── Refetch status on focus ──────────────────────────────────────────────────
   useFocusEffect(
@@ -443,6 +476,44 @@ export default function PulseHomeCarousel({
     setActive(Math.round(e.nativeEvent.contentOffset.x / CARD_W));
   };
 
+  const scrollToIndex = useCallback(
+    (index: number) => {
+      if (slides.length === 0) return;
+      const clamped = Math.max(0, Math.min(index, slides.length - 1));
+      listRef.current?.scrollToOffset({ offset: clamped * CARD_W, animated: true });
+      setActive(clamped);
+    },
+    [slides.length],
+  );
+
+  const scrollToSlideKind = useCallback(
+    (kind: PulseCarouselSlideKind): boolean => {
+      const idx = slides.findIndex((s) => {
+        if (kind === 'phrase_daily' || kind === 'word_daily') return s.kind === kind;
+        return s.kind === 'mistake_task' && (s.task.type || '').toLowerCase() === kind;
+      });
+      if (idx < 0) return false;
+      scrollToIndex(idx);
+      return true;
+    },
+    [slides, scrollToIndex],
+  );
+
+  const scrollToPillar = useCallback(
+    (pillar: string) => scrollToSlideKind(pillar.toLowerCase() as PulseCarouselSlideKind),
+    [scrollToSlideKind],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToIndex,
+      scrollToSlideKind,
+      scrollToPillar,
+    }),
+    [scrollToIndex, scrollToSlideKind, scrollToPillar],
+  );
+
   const carouselExtraData = useMemo(() => {
     const stateKey = slides
       .map(
@@ -586,8 +657,9 @@ export default function PulseHomeCarousel({
       ) : null}
     </View>
   );
-}
+});
 
+export default PulseHomeCarousel;
 
 const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
   StyleSheet.create({

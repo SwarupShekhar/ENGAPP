@@ -93,6 +93,7 @@ describe('TasksService SR', () => {
     const r = await service.submitAttempt('t1', 'u1', { transcript: 'I went there' });
     expect(r.pass).toBe(true);
     expect(r.correctStreak).toBe(1);
+    expect(r.graduated).toBe(true);
     expect(prisma.learningTask.update).toHaveBeenCalled();
   });
 

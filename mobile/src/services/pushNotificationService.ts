@@ -5,6 +5,7 @@ import { AnalyticsEvents } from "../analytics/events";
 import { analyticsMeta } from "../analytics/eventMeta";
 import { client, getNestAuthToken } from "../api/client";
 import { navigate } from "../navigation/navigationRef";
+import { patchDailyContentFromPush } from "./dailyContentCache";
 import {
   displayForegroundNotification,
   ensureNotificationChannel,
@@ -293,7 +294,34 @@ class PushNotificationService {
     };
   }
 
+  private async syncDailyContentFromPush(data: PushPayload): Promise<void> {
+    const type = data.type as string | undefined;
+    if (type === "word_of_day" && data.word) {
+      await patchDailyContentFromPush({
+        wordOfTheDay: {
+          word: String(data.word),
+          definition: String(data.definition ?? ""),
+          example: String(data.example ?? ""),
+          partOfSpeech: (data.partOfSpeech as string | undefined) ?? null,
+          source: (data.source as string | undefined) ?? undefined,
+        },
+      });
+      return;
+    }
+    if (type === "phrase_of_day" && data.phrase) {
+      await patchDailyContentFromPush({
+        phraseOfTheDay: {
+          phrase: String(data.phrase),
+          definition: String(data.definition ?? ""),
+          example: String(data.example ?? ""),
+          source: (data.source as string | undefined) ?? undefined,
+        },
+      });
+    }
+  }
+
   private dispatchNotification(data: PushPayload): void {
+    void this.syncDailyContentFromPush(data);
     if (data.type === "word_of_day") {
       captureAnalyticsEvent(
         AnalyticsEvents.WORD_OF_DAY_PUSH_RECEIVED,
@@ -324,6 +352,8 @@ class PushNotificationService {
     const type = flat.type as string | undefined;
     const sessionId = flat.sessionId as string | undefined;
     const conversationId = flat.conversationId as string | undefined;
+
+    void this.syncDailyContentFromPush(flat);
 
     if (type === "word_of_day") {
       captureAnalyticsEvent(
@@ -381,7 +411,10 @@ class PushNotificationService {
         });
         break;
       case "phrase_of_day":
-        navigate("MainTabs", { screen: "Home" });
+        navigate("MainTabs", {
+          screen: "Home",
+          params: { scrollToDaily: "phrase" },
+        });
         break;
       default:
         navigate("MainTabs");

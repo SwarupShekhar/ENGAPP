@@ -18,7 +18,13 @@ export interface SrResult {
   graduated: boolean;
 }
 
-export function applySrTransition(input: SrInput, pass: boolean, now: Date): SrResult {
+export function applySrTransition(
+  input: SrInput,
+  pass: boolean,
+  now: Date,
+  opts?: { passesToGraduate?: number },
+): SrResult {
+  const passesToGraduate = opts?.passesToGraduate ?? 2;
   const maxStep = INTERVALS_DAYS.length - 1;
   let { srStep, correctStreak } = input;
   let srState: 'LEARNING' | 'GRADUATED' = 'LEARNING';
@@ -30,7 +36,7 @@ export function applySrTransition(input: SrInput, pass: boolean, now: Date): SrR
       now.getTime() - input.lastAttemptAt.getTime() >= INTERVALS_DAYS[srStep] * DAY_MS;
     if (spacedEnough) {
       correctStreak += 1;
-      if (correctStreak >= 2) {
+      if (correctStreak >= passesToGraduate) {
         srState = 'GRADUATED';
         graduated = true;
       } else {

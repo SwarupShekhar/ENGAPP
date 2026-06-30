@@ -12,10 +12,11 @@ import {
   Modal,
   RefreshControl,
   AccessibilityInfo,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useUser } from '@clerk/clerk-expo';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,14 +36,22 @@ import Animated, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { ModeSwitcher } from '../../../components/navigation/ModeSwitcher';
-import PulseHomeCarousel from '../../../components/home/PulseHomeCarousel';
+import PulseHomeCarousel, {
+  type PulseHomeCarouselHandle,
+} from '../../../components/home/PulseHomeCarousel';
 import { homeTheme } from '../theme/homeTheme';
 import ConnectHeroCard from '../components/ConnectHeroCard';
 import MistakesCard from '../components/MistakesCard';
 import { getHomeData, HomeData } from '../services/homeApi';
 import { getBridgeUser } from '../../../api/bridgeClient';
-import { HOME_DATA_CACHE_KEY } from '../../../services/cacheKeys';
-import { tasksApi } from '../../../api/tasks';
+import {
+  getDailyContentForToday,
+  mergeHomeWithDailyContent,
+  onDailyContentUpdated,
+  setDailyContentForToday,
+} from '../../../services/dailyContentCache';
+import { HOME_DATA_CACHE_KEY, utcTodayKey } from '../../../services/cacheKeys';
+import { tasksApi, type LearningTask } from '../../../api/tasks';
 
 let Haptics: {
   impactAsync: (s: unknown) => Promise<void>;
@@ -215,6 +224,17 @@ interface Phrase { id?: string; phrase: string; definition: string; example: str
 
 const LEVEL_ORDER = ['a1','a2','b1','b2','c1','c2'];
 type LevelKey = 'a1'|'a2'|'b1'|'b2'|'c1'|'c2';
+
+const PILLAR_ALERT_LABEL: Record<string, string> = {
+  pronunciation: 'pronunciation clarity',
+  fluency: 'fluency',
+  grammar: 'grammar',
+  vocabulary: 'vocabulary',
+};
+
+function taskMatchesPillar(task: LearningTask, pillar: string): boolean {
+  return (task.type || '').toLowerCase() === pillar.toLowerCase();
+}
 
 function cefrKey(l: string): LevelKey {
   const k = l.toLowerCase().replace('-','') as LevelKey;
@@ -683,8 +703,10 @@ export default function HomeScreen() {
   const { theme } = useTheme();
   const { user, isLoaded } = useUser();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const socketService = useRef(SocketService.getInstance()).current;
+  const carouselRef = useRef<PulseHomeCarouselHandle>(null);
 
   const [homeData, setHomeData]       = useState<HomeData | null>(null);
   const [bridgeHeader, setBridgeHeader] = useState<{ level?: string; streak?: number }>({});
@@ -726,13 +748,26 @@ export default function HomeScreen() {
 
   const loadHome = useCallback(async (options?: { forceFresh?: boolean }) => {
     const forceFresh = options?.forceFresh === true;
+    const today = utcTodayKey();
+    let datedDaily = await getDailyContentForToday();
+
+    const mergeDailyFields = (data: HomeData): HomeData => ({
+      ...data,
+      phraseOfTheDay: datedDaily?.phraseOfTheDay ?? data.phraseOfTheDay,
+      wordOfTheDay: datedDaily?.wordOfTheDay ?? data.wordOfTheDay,
+    });
 
     if (!forceFresh) {
       try {
         const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
         if (cached) {
-          const parsed = JSON.parse(cached) as HomeData;
-          setHomeData(parsed);
+          const parsed = JSON.parse(cached) as HomeData & { _cachedUtcDate?: string };
+          const merged = mergeHomeWithDailyContent(
+            parsed as unknown as Record<string, unknown>,
+            parsed._cachedUtcDate,
+            datedDaily,
+          ) as unknown as HomeData;
+          setHomeData(mergeDailyFields(merged));
           setLoadingHome(false);
         } else {
           setLoadingHome(true);
@@ -745,8 +780,18 @@ export default function HomeScreen() {
 
     try {
       const fresh = await getHomeData();
-      setHomeData(fresh);
-      await AsyncStorage.setItem(HOME_DATA_CACHE_KEY, JSON.stringify(fresh));
+      datedDaily = await getDailyContentForToday();
+      const withDaily = mergeDailyFields(fresh);
+      setHomeData(withDaily);
+      await setDailyContentForToday({
+        phraseOfTheDay: fresh.phraseOfTheDay ?? null,
+        wordOfTheDay: fresh.wordOfTheDay ?? null,
+      });
+      const { phraseOfTheDay: _p, wordOfTheDay: _w, ...homeWithoutDaily } = fresh;
+      await AsyncStorage.setItem(
+        HOME_DATA_CACHE_KEY,
+        JSON.stringify({ ...homeWithoutDaily, _cachedUtcDate: today }),
+      );
       if (forceFresh) {
         void tasksApi.loadPracticeCarouselTasks().catch(() => {});
       }
@@ -774,6 +819,36 @@ export default function HomeScreen() {
       };
     }, [loadHome]),
   );
+
+  // Live-update phrase/word when a daily push arrives in foreground.
+  useEffect(() => {
+    return onDailyContentUpdated((snapshot) => {
+      setHomeData((prev) => {
+        if (!prev || snapshot.date !== utcTodayKey()) return prev;
+        return {
+          ...prev,
+          ...(snapshot.phraseOfTheDay !== undefined && snapshot.phraseOfTheDay !== null
+            ? { phraseOfTheDay: snapshot.phraseOfTheDay }
+            : {}),
+          ...(snapshot.wordOfTheDay !== undefined && snapshot.wordOfTheDay !== null
+            ? { wordOfTheDay: snapshot.wordOfTheDay }
+            : {}),
+        };
+      });
+    });
+  }, []);
+
+  // Phrase/word-of-day notification tap → scroll carousel to matching slide.
+  useEffect(() => {
+    const target = route.params?.scrollToDaily as string | undefined;
+    if (!target) return;
+    const kind = target === 'word' ? 'word_daily' : 'phrase_daily';
+    const timer = setTimeout(() => {
+      carouselRef.current?.scrollToSlideKind(kind);
+      navigation.setParams({ scrollToDaily: undefined });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [route.params?.scrollToDaily, navigation]);
 
   // ── Bridge overlay (shared CEFR / streak with Englivo mode) ────────────────
   useFocusEffect(
@@ -886,23 +961,45 @@ export default function HomeScreen() {
     navigation.navigate('MayaTutor', { source: 'home_fallback' });
   }, [navigation]);
 
-  // Mistakes card — practice the weakest pillar. PracticeTask needs a real task
-  // payload, so fetch a matching pending task; fall back to the practice flow.
+  // Mistakes card — practice the weakest pillar; skip tasks already on the carousel.
   const goMistakesPractice = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const focus = (weakestPillar ?? '').toLowerCase();
+    if (!focus) {
+      navigation.navigate('PracticeTask', { source: 'home_mistakes' });
+      return;
+    }
+
     try {
-      const tasks = await tasksApi.loadPracticeCarouselTasks();
-      const focus = (weakestPillar ?? '').toLowerCase();
-      const match =
-        tasks.find((t) => (t.type || '').toLowerCase() === focus) ?? tasks[0] ?? null;
-      if (match) {
-        navigation.navigate('PracticeTask', { task: match, source: 'home_mistakes', focus });
+      const [carouselTasks, dueTasks] = await Promise.all([
+        tasksApi.loadPracticeCarouselTasks(),
+        tasksApi.getDueTasks(),
+      ]);
+      const carouselIds = new Set(carouselTasks.map((t) => t.id));
+      const offCarousel = dueTasks.find(
+        (t) => taskMatchesPillar(t, focus) && !carouselIds.has(t.id),
+      );
+
+      if (offCarousel) {
+        navigation.navigate('PracticeTask', {
+          task: offCarousel,
+          source: 'home_mistakes',
+          focus,
+        });
+        return;
+      }
+
+      const onCarousel = carouselTasks.find((t) => taskMatchesPillar(t, focus));
+      if (onCarousel) {
+        carouselRef.current?.scrollToPillar(focus);
+        const pillarLabel = PILLAR_ALERT_LABEL[focus] ?? focus;
+        Alert.alert('Practice in carousel', `Your ${pillarLabel} fixes are in the carousel`);
         return;
       }
     } catch {
       /* fall through to default flow */
     }
-    // No task available — route to the practice flow rather than an empty screen.
+
     navigation.navigate('PracticeTask', { source: 'home_mistakes', focus: weakestPillar });
   }, [navigation, weakestPillar]);
 
@@ -1030,6 +1127,7 @@ export default function HomeScreen() {
         {/* ── Phrase carousel ─────────────────────────────────────────────── */}
         <Animated.View entering={playEntry ? enterAt(3) : undefined} style={{ gap: 10 }}>
           <PulseHomeCarousel
+            ref={carouselRef}
             phraseOfTheDay={homeData?.phraseOfTheDay ?? null}
             wordOfTheDay={homeData?.wordOfTheDay ?? null}
             dailyPracticeStatus={homeData?.dailyPracticeStatus ?? null}

@@ -57,7 +57,7 @@ export interface HomeData {
     definition: string;
     example: string;
     partOfSpeech?: string | null;
-    source?: 'wordnik' | 'fallback';
+    source?: string;
   };
   phraseOfTheDay?: {
     phrase: string;

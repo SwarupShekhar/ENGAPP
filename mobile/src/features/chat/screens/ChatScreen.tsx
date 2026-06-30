@@ -16,7 +16,11 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { KeyboardStickyView } from "react-native-keyboard-controller";
+import {
+  KeyboardStickyView,
+  useKeyboardHandler,
+} from "react-native-keyboard-controller";
+import { runOnJS } from "react-native-reanimated";
 import {
   useNavigation,
   useRoute,
@@ -39,6 +43,11 @@ import MessageRunRow from "../components/MessageRunRow";
 import { chatThreadTheme } from "../theme/chatTheme";
 
 const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+/** Composer row height (emoji + input + send) — keeps last bubble above the bar */
+const COMPOSER_ROW_HEIGHT = 56;
+/** Dark text on the light IG-style composer pill (theme text.primary is light on dark app chrome) */
+const CHAT_COMPOSER_TEXT = "#111827";
+const CHAT_COMPOSER_PLACEHOLDER = "#6B7280";
 
 // ── Types ───────────────────────────────────────────────
 
@@ -403,11 +412,31 @@ export default function ChatScreen() {
     });
   }, []);
 
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useKeyboardHandler(
+    {
+      onMove: (e) => {
+        "worklet";
+        runOnJS(setKeyboardInset)(e.height);
+      },
+      onEnd: (e) => {
+        "worklet";
+        runOnJS(setKeyboardInset)(e.height);
+        runOnJS(scrollToLatest)();
+      },
+    },
+    [scrollToLatest],
+  );
+
+  const listBottomPad =
+    COMPOSER_ROW_HEIGHT + Math.max(insets.bottom, 10) + keyboardInset;
+
   useEffect(() => {
     if (!loading && messages.length > 0) {
       scrollToLatest();
     }
-  }, [loading, messages.length, scrollToLatest]);
+  }, [loading, messages.length, scrollToLatest, keyboardInset]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -473,7 +502,10 @@ export default function ChatScreen() {
             renderItem={renderListItem}
             keyExtractor={(item) => item.id}
             style={styles.flex}
-            contentContainerStyle={styles.messagesList}
+            contentContainerStyle={[
+              styles.messagesList,
+              { paddingBottom: listBottomPad },
+            ]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             onContentSizeChange={() =>
@@ -527,7 +559,7 @@ export default function ChatScreen() {
               onChangeText={handleTextChange}
               onFocus={scrollToLatest}
               placeholder="Message..."
-              placeholderTextColor={theme.colors.text.light}
+              placeholderTextColor={CHAT_COMPOSER_PLACEHOLDER}
               multiline
               maxLength={1000}
             />
@@ -759,7 +791,7 @@ const getStyles = (theme: any) =>
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: theme.colors.text.primary,
+    color: CHAT_COMPOSER_TEXT,
     maxHeight: 100,
   },
   reactionOverlay: {
