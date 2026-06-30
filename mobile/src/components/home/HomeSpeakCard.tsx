@@ -44,6 +44,46 @@ export function HomeSpeakCard({
   const theme = useAppTheme();
   const c = theme.colors;
   const styles = getStyles(theme);
+  const success = (c as { success?: string }).success ?? '#22c55e';
+  const error = (c as { error?: string }).error ?? '#ef4444';
+  const warning = (c as { warning?: string }).warning ?? '#f59e0b';
+
+  const cardShellStyle = (() => {
+    switch (cardState) {
+      case 'fail':
+        return {
+          borderColor: error,
+          borderWidth: 2,
+          backgroundColor: `${error}12`,
+        };
+      case 'pass_partial':
+        return {
+          borderColor: warning,
+          borderWidth: 2,
+          backgroundColor: `${warning}10`,
+        };
+      case 'done_today':
+        return {
+          borderColor: success,
+          borderWidth: 2,
+          backgroundColor: `${success}10`,
+        };
+      case 'recording':
+        return {
+          borderColor: error,
+          borderWidth: 2,
+          backgroundColor: theme.colors.surface,
+        };
+      case 'assessing':
+        return {
+          borderColor: c.primary,
+          borderWidth: 2,
+          backgroundColor: `${c.primary}08`,
+        };
+      default:
+        return { borderColor: c.border, borderWidth: 1, backgroundColor: theme.colors.surface };
+    }
+  })();
 
   const micDisabled = disabled || cardState === 'assessing' || cardState === 'done_today';
 
@@ -72,7 +112,7 @@ export function HomeSpeakCard({
     cardState !== 'recording';
 
   return (
-    <View style={[styles.card, { borderColor: c.border }]}>
+    <View style={[styles.card, cardShellStyle]}>
       <View style={styles.pillRow}>
         <View style={[styles.pill, { backgroundColor: `${pillColor}18` }]}>
           <Ionicons name="mic" size={13} color={pillColor} />
@@ -116,6 +156,31 @@ export function HomeSpeakCard({
       ) : null}
 
       <View style={styles.micArea}>
+        {cardState === 'fail' || cardState === 'pass_partial' ? (
+          <View
+            style={[
+              styles.feedbackBanner,
+              {
+                backgroundColor:
+                  cardState === 'fail' ? `${error}18` : `${warning}18`,
+              },
+            ]}
+          >
+            <Ionicons
+              name={cardState === 'fail' ? 'close-circle' : 'checkmark-circle'}
+              size={18}
+              color={cardState === 'fail' ? error : warning}
+            />
+            <Text
+              style={[
+                styles.feedbackBannerText,
+                { color: cardState === 'fail' ? error : warning },
+              ]}
+            >
+              {micLabel}
+            </Text>
+          </View>
+        ) : null}
         {cardState === 'done_today' ? (
           <View style={[styles.doneRow, { backgroundColor: `${(c as any).success ?? '#4ade80'}18` }]}>
             <Ionicons name="checkmark-circle" size={20} color={(c as any).success ?? '#4ade80'} />
@@ -162,8 +227,6 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       flex: 1,
       padding: 16,
       borderRadius: 20,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
       gap: 10,
       justifyContent: 'space-between',
       minHeight: 248,
@@ -208,4 +271,14 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>) =>
       borderRadius: 12,
     },
     doneText: { fontWeight: '700', fontSize: 13 },
+    feedbackBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      width: '100%',
+    },
+    feedbackBannerText: { flex: 1, fontWeight: '700', fontSize: 13 },
   });

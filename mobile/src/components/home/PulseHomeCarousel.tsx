@@ -313,17 +313,19 @@ export default function PulseHomeCarousel({
           setTimeout(() => {
             setCardState(slide.key, 'ready' as CardState);
             setCardHint(slide.key, undefined);
-          }, 2000);
+          }, 3500);
         } else {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
           setCardState(slide.key, 'fail' as CardState);
           const scoreHint =
-            result.overallAccuracy > 0 ? `${result.overallAccuracy}% — try again` : result.message;
+            result.overallAccuracy > 0
+              ? `${result.overallAccuracy}% — not quite right, try again`
+              : result.message;
           setCardHint(slide.key, scoreHint || 'Try again');
           setTimeout(() => {
             setCardState(slide.key, 'ready' as CardState);
             setCardHint(slide.key, undefined);
-          }, 2000);
+          }, 4000);
         }
     } catch {
       setCardState(slide.key, 'fail' as CardState);
@@ -399,6 +401,16 @@ export default function PulseHomeCarousel({
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     setActive(Math.round(e.nativeEvent.contentOffset.x / CARD_W));
   };
+
+  const carouselExtraData = useMemo(() => {
+    const stateKey = slides
+      .map(
+        (s) =>
+          `${s.key}:${cardStates.get(s.key) ?? 'ready'}:${cardHints.get(s.key) ?? ''}`,
+      )
+      .join(';');
+    return `${captureState}:${tts.playingKey}:${active}:${stateKey}`;
+  }, [slides, cardStates, cardHints, captureState, tts.playingKey, active]);
 
   if (loadingPhrase && tasks === null) {
     const tint = `${theme.colors.primary}22`;
@@ -503,7 +515,7 @@ export default function PulseHomeCarousel({
         data={slides}
         renderItem={renderSlide}
         keyExtractor={(s) => s.key}
-        extraData={`${captureState}:${tts.playingKey}:${active}`}
+        extraData={carouselExtraData}
         horizontal
         nestedScrollEnabled
         scrollEnabled={captureState !== 'recording'}

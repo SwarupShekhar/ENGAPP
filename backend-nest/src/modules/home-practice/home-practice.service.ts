@@ -5,9 +5,12 @@ import { WordOfDayService } from '../home/services/word-of-day.service';
 import { PhraseOfDayService } from '../home/services/phrase-of-day.service';
 import { applySrTransition } from '../tasks/sr-scheduler';
 
-const THRESHOLD_DAILY = 70;
-const THRESHOLD_MISTAKE = 75;
-const THRESHOLD_FOCUS_WORD = 70;
+const THRESHOLD_DAILY = 78;
+const THRESHOLD_MISTAKE = 80;
+const THRESHOLD_FOCUS_WORD = 75;
+const MIN_WORD_ACCURACY = 72;
+/** Fraction of reference words Azure must assess (catches partial / wrong phrases). */
+const MIN_REFERENCE_COVERAGE = 0.85;
 const MISTAKE_STREAK_TARGET = 2;
 
 @Injectable()
@@ -88,7 +91,15 @@ export class HomePracticeService {
     }
 
     const threshold = cardType === 'mistake_task' ? THRESHOLD_MISTAKE : THRESHOLD_DAILY;
-    let pass = result.accuracy >= threshold;
+    const coverage = this.referenceCoverage(referenceText, result.words);
+    let pass = result.accuracy >= threshold && coverage.ok;
+
+    if (pass && result.words.length > 0) {
+      const weakest = Math.min(...result.words.map((w) => w.accuracy));
+      if (weakest < MIN_WORD_ACCURACY) {
+        pass = false;
+      }
+    }
 
     const focusWordResults = focusWords.map((fw) => {
       const match = result.words.find((w) => w.word === fw.toLowerCase());
@@ -103,6 +114,22 @@ export class HomePracticeService {
     const streakTarget = MISTAKE_STREAK_TARGET;
     let doneForToday = false;
     let message = '';
+
+    if (!pass) {
+      if (!coverage.ok) {
+        message =
+          coverage.heardCount < coverage.expectedCount
+            ? `Say the full phrase — we only heard ${coverage.heardCount}/${coverage.expectedCount} words`
+            : 'Match the phrase on the card, then try again';
+        this.logger.debug(
+          `Home practice coverage fail user=${userId} heard=${coverage.heardCount}/${coverage.expectedCount} ref="${referenceText.slice(0, 60)}"`,
+        );
+      } else if (result.accuracy < threshold) {
+        message = `${Math.round(result.accuracy)}% — speak more clearly and try again`;
+      } else {
+        message = 'A few words need work — listen and try again';
+      }
+    }
 
     if (cardType === 'phrase_daily' || cardType === 'word_daily') {
       const kind = cardType === 'phrase_daily' ? 'phrase' : 'word';
@@ -160,6 +187,39 @@ export class HomePracticeService {
       prosody: result.prosodyScore !== null
         ? { fluency: result.fluencyScore, prosody: result.prosodyScore }
         : undefined,
+    };
+  }
+
+  private tokenizeReference(text: string): string[] {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  /**
+   * Azure PA often scores only the words it heard — omitting the rest of the reference.
+   * Require most reference tokens to appear in the assessed word list.
+   */
+  private referenceCoverage(
+    referenceText: string,
+    assessed: Array<{ word: string; accuracy: number }>,
+  ): { ok: boolean; expectedCount: number; heardCount: number; ratio: number } {
+    const expected = this.tokenizeReference(referenceText);
+    if (expected.length === 0) {
+      return { ok: true, expectedCount: 0, heardCount: 0, ratio: 1 };
+    }
+    const heard = new Set(assessed.map((w) => w.word.toLowerCase().trim()).filter(Boolean));
+    const matched = expected.filter((t) => heard.has(t)).length;
+    const ratio = matched / expected.length;
+    const minRatio =
+      expected.length === 1 ? 1 : MIN_REFERENCE_COVERAGE;
+    return {
+      ok: ratio >= minRatio,
+      expectedCount: expected.length,
+      heardCount: matched,
+      ratio,
     };
   }
 
