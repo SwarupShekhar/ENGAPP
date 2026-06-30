@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
@@ -22,6 +24,7 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
 import livekitConfig from './config/livekit.config';
+import throttleConfig from './config/throttler.config';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { ReliabilityModule } from './modules/reliability/reliability.module';
 import { ReelsModule } from './modules/reels/reels.module';
@@ -37,6 +40,7 @@ import { HomePracticeModule } from './modules/home-practice/home-practice.module
 import { InCallCoachingModule } from './modules/in-call-coaching/in-call-coaching.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { MetricsModule } from './metrics/metrics.module';
+import { AppThrottlerGuard } from './guards/app-throttler.guard';
 
 @Module({
   imports: [
@@ -45,8 +49,26 @@ import { MetricsModule } from './metrics/metrics.module';
     MetricsModule,
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, livekitConfig],
+      load: [appConfig, databaseConfig, redisConfig, livekitConfig, throttleConfig],
       envFilePath: ['.env', '.env.local'],
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const enabled = config.get<boolean>('throttle.enabled') !== false;
+        const ttl = config.get<number>('throttle.defaultTtlMs') ?? 60_000;
+        const defaultLimit = config.get<number>('throttle.defaultLimit') ?? 120;
+        const matchmakingLimit =
+          config.get<number>('throttle.matchmakingLimit') ?? 30;
+        return {
+          skipIf: () => !enabled,
+          throttlers: [
+            { name: 'default', ttl, limit: defaultLimit },
+            { name: 'matchmaking', ttl, limit: matchmakingLimit },
+          ],
+        };
+      },
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -88,6 +110,9 @@ import { MetricsModule } from './metrics/metrics.module';
     InCallCoachingModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: AppThrottlerGuard },
+  ],
 })
 export class AppModule {}

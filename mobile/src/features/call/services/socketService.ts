@@ -125,12 +125,18 @@ class SocketService {
       this.stopHeartbeat();
     });
 
-    // Re-register existing listeners on reconnect
-    this.socket.on("connect", () => {
-      this.listeners.forEach((callbacks, event) => {
-        callbacks.forEach((cb) => {
-          this.socket?.on(event, cb);
-        });
+    // Tracked app listeners (on/off) attach once via on(); socket.io keeps them across reconnects.
+    // Do not re-on() on every connect — that duplicated handlers and leaked memory.
+    this.bindTrackedListeners();
+  }
+
+  /** Attach callbacks registered via on() before the socket existed (e.g. early mount). */
+  private bindTrackedListeners(): void {
+    if (!this.socket) return;
+    this.listeners.forEach((callbacks, event) => {
+      callbacks.forEach((cb) => {
+        this.socket!.off(event, cb);
+        this.socket!.on(event, cb);
       });
     });
   }

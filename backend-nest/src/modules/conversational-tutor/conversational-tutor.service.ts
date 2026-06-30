@@ -13,26 +13,11 @@ import { RedisService } from '../../redis/redis.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { NotificationService } from '../notifications/notification.service';
+import { SESSIONS_MAYA_QUEUE } from '../../queues/sessions-queue.constants';
+import { MayaSessionStore } from './maya-session.store';
+import { MayaConversationSession, MayaConversationTurn } from './maya-session.types';
 import * as FormData from 'form-data';
 import { Response } from 'express';
-
-interface ConversationTurn {
-  speaker: 'user' | 'ai';
-  text: string;
-  timestamp: Date;
-  corrections?: any[];
-}
-
-interface ConversationSession {
-  history: ConversationTurn[];
-  pronunciationAttempts: {
-    referenceText: string;
-    accuracy: number;
-    passed: boolean;
-    timestamp: Date;
-    problemWords: string[];
-  }[];
-}
 
 export interface MayaSessionJobData {
   sessionId: string;
@@ -96,7 +81,6 @@ const DEFAULT_GEMINI_CHAT_MODEL = 'gemini-2.5-flash';
 export class ConversationalTutorService implements OnModuleInit {
   private readonly logger = new Logger(ConversationalTutorService.name);
   private genAI: GoogleGenerativeAI;
-  private conversations: Map<string, ConversationSession> = new Map();
   private aiBackendUrl: string;
   private readonly aiHeaders: Record<string, string>;
   private readonly ttsCache = new Map<string, string>();
@@ -112,7 +96,8 @@ export class ConversationalTutorService implements OnModuleInit {
     private azureStorage: AzureStorageService,
     private pronunciation: PronunciationService,
     private notificationService: NotificationService,
-    @InjectQueue('sessions') private sessionsQueue: Queue,
+    private sessionStore: MayaSessionStore,
+    @InjectQueue(SESSIONS_MAYA_QUEUE) private sessionsQueue: Queue,
   ) {
     this.genAI = new GoogleGenerativeAI(
       this.configService.get<string>('GEMINI_API_KEY'),
@@ -156,7 +141,7 @@ export class ConversationalTutorService implements OnModuleInit {
   }
 
   private userTextByTurnIndex(
-    history: ConversationTurn[],
+    history: MayaConversationTurn[],
     userTurnIndex: number,
   ): string {
     let seen = 0;
@@ -233,7 +218,7 @@ export class ConversationalTutorService implements OnModuleInit {
     userUtterance: string,
     userId: string,
   ) {
-    const session = this.getOrCreateSession(sessionId);
+    const session = await this.sessionStore.getOrCreate(sessionId);
 
     // Build conversation history for context
     const historyStr = session.history
@@ -285,7 +270,7 @@ export class ConversationalTutorService implements OnModuleInit {
       timestamp: new Date(),
       corrections: responseJson.correction ? [responseJson.correction] : [],
     });
-    this.conversations.set(sessionId, session);
+    await this.sessionStore.persist(sessionId, session);
 
     return { ...responseJson, response: spokenReply };
   }
@@ -383,7 +368,7 @@ export class ConversationalTutorService implements OnModuleInit {
       ],
       pronunciationAttempts: [],
     };
-    this.conversations.set(sessionId, session);
+    await this.sessionStore.persist(sessionId, session);
 
     // 3. Pre-build coaching context so Maya can answer "past mistakes" and fire hints.
     await this.inCallCoaching.buildContext(userId, sessionId).catch((err) => {
@@ -445,7 +430,7 @@ export class ConversationalTutorService implements OnModuleInit {
   }
 
   async endSession(sessionId: string) {
-    const session = this.conversations.get(sessionId);
+    const session = await this.sessionStore.get(sessionId);
     if (!session) {
       const existing = await this.prisma.conversationSession.findUnique({
         where: { id: sessionId },
@@ -536,7 +521,7 @@ export class ConversationalTutorService implements OnModuleInit {
       },
     );
 
-    this.conversations.delete(sessionId);
+    await this.sessionStore.delete(sessionId);
 
     this.logger.log(
       `[endSession] Maya session ${sessionId} → PROCESSING (${turnCount} turns). Queued deferred analysis.`,
@@ -552,7 +537,7 @@ export class ConversationalTutorService implements OnModuleInit {
 
   async completeMayaSessionAnalysis(data: MayaSessionJobData) {
     const { sessionId, userId } = data;
-    const session: ConversationSession = {
+    const session: MayaConversationSession = {
       history: data.history.map((h) => ({
         speaker: h.speaker,
         text: h.text,
@@ -749,7 +734,7 @@ export class ConversationalTutorService implements OnModuleInit {
     }
   }
 
-  async generateFinalRecap(session: ConversationSession) {
+  async generateFinalRecap(session: MayaConversationSession) {
     const historyStr = session.history
       .map((h) => `${h.speaker === 'user' ? 'User' : 'AI'}: ${h.text}`)
       .join('\n');
@@ -844,7 +829,7 @@ export class ConversationalTutorService implements OnModuleInit {
       const result = response.data.data; // unwrap StandardResponse
 
       // Store assessment in session history
-      const session = this.getOrCreateSession(sessionId);
+      const session = await this.sessionStore.getOrCreate(sessionId);
       session.pronunciationAttempts.push({
         referenceText,
         accuracy: result.accuracy_score,
@@ -852,7 +837,7 @@ export class ConversationalTutorService implements OnModuleInit {
         timestamp: new Date(),
         problemWords: result.problem_words || [],
       });
-      this.conversations.set(sessionId, session);
+      await this.sessionStore.persist(sessionId, session);
 
       this.logger.log(
         JSON.stringify({
@@ -931,7 +916,7 @@ export class ConversationalTutorService implements OnModuleInit {
     uploadFilename = 'audio.m4a',
     uploadMime = 'audio/m4a',
   ): Promise<void> {
-    const session = this.getOrCreateSession(sessionId);
+    const session = await this.sessionStore.getOrCreate(sessionId);
     const history = session.history
       .slice(-6)
       .map((t) => ({ role: t.speaker, content: t.text }));
@@ -1030,7 +1015,7 @@ export class ConversationalTutorService implements OnModuleInit {
           this.withAiAuth(),
         ),
       ),
-      Promise.resolve(this.getOrCreateSession(sessionId)),
+      this.sessionStore.getOrCreate(sessionId),
     ]);
 
     const sttResult = sttResponse.data.data; // unwrap StandardResponse
@@ -1043,7 +1028,7 @@ export class ConversationalTutorService implements OnModuleInit {
         text: sttResult.text,
         timestamp: new Date(),
       });
-      this.conversations.set(sessionId, session);
+      await this.sessionStore.persist(sessionId, session);
 
       return {
         transcription: sttResult.text,
@@ -1101,25 +1086,14 @@ export class ConversationalTutorService implements OnModuleInit {
    * Append a turn to in-memory session history after SSE stream completes.
    * Ensures the next stream-speech request has correct context.
    */
-  appendTurn(
+  async appendTurn(
     sessionId: string,
     userText: string,
     aiText: string,
-  ): void {
-    const session = this.getOrCreateSession(sessionId);
+  ): Promise<void> {
+    const session = await this.sessionStore.getOrCreate(sessionId);
     session.history.push({ speaker: 'user', text: userText, timestamp: new Date() });
     session.history.push({ speaker: 'ai', text: aiText, timestamp: new Date(), corrections: [] });
-    this.conversations.set(sessionId, session);
-  }
-
-  // ─── Helper: get or create session ─────────────────────────
-
-  private getOrCreateSession(sessionId: string): ConversationSession {
-    let session = this.conversations.get(sessionId);
-    if (!session) {
-      session = { history: [], pronunciationAttempts: [] };
-      this.conversations.set(sessionId, session);
-    }
-    return session;
+    await this.sessionStore.persist(sessionId, session);
   }
 }

@@ -7,6 +7,7 @@ import { TranscriptionService } from '../livekit/transcription.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
 import { getQueueToken } from '@nestjs/bull';
+import { SESSIONS_P2P_QUEUE } from '../../queues/sessions-queue.constants';
 
 describe('SessionsService pagination', () => {
   let service: SessionsService;
@@ -24,7 +25,7 @@ describe('SessionsService pagination', () => {
         { provide: TranscriptionService, useValue: {} },
         { provide: PronunciationService, useValue: {} },
         { provide: InCallCoachingService, useValue: {} },
-        { provide: getQueueToken('sessions'), useValue: { add: jest.fn() } },
+        { provide: getQueueToken(SESSIONS_P2P_QUEUE), useValue: { add: jest.fn() } },
       ],
     }).compile();
     service = mod.get(SessionsService);

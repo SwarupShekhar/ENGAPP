@@ -1,5 +1,4 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
 import { SessionsService } from './sessions.service';
 import { SessionsController } from './sessions.controller';
 import { SessionsProcessor } from './sessions.processor';
@@ -14,6 +13,7 @@ import { BrainModule } from '../brain/brain.module';
 import { PronunciationModule } from '../pronunciation/pronunciation.module';
 import { LivekitModule } from '../livekit/livekit.module';
 import { InCallCoachingModule } from '../in-call-coaching/in-call-coaching.module';
+import { SessionsQueuesModule } from '../../queues/sessions-queues.module';
 
 @Module({
   imports: [
@@ -22,9 +22,7 @@ import { InCallCoachingModule } from '../in-call-coaching/in-call-coaching.modul
     TasksModule,
     IntegrationsModule,
     forwardRef(() => AssessmentModule),
-    BullModule.registerQueue({
-      name: 'sessions',
-    }),
+    SessionsQueuesModule,
     ReliabilityModule,
     HomeModule,
     BrainModule,

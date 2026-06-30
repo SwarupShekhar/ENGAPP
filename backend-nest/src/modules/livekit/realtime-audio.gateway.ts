@@ -70,6 +70,10 @@ export class RealtimeAudioGateway implements OnGatewayConnection, OnGatewayDisco
         this.cleanupStream(client.id);
     }
 
+    getActiveConnectionCount(): number {
+        return this.server?.sockets?.sockets?.size ?? 0;
+    }
+
     @SubscribeMessage('startStream')
     async handleStartStream(
         @ConnectedSocket() client: Socket,

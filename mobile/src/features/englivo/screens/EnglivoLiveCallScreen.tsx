@@ -28,11 +28,9 @@ import {
   useTracks,
 } from "@livekit/react-native";
 import { Track } from "livekit-client";
+import { ENGLIVO_LIVEKIT_URL } from "../../../api/livekitConfig";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-
-// Core LiveKit cloud project (NEXT_PUBLIC_LIVEKIT_URL from englivo.com).
-const ENGLIVO_LIVEKIT_URL = "wss://ssengst-174tfe9o.livekit.cloud";
 
 const C = {
   void: "#080C14",

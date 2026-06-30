@@ -1,5 +1,5 @@
-import React, { useEffect, useState, Component } from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import React, { useEffect, useState, useRef, Component } from "react";
+import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import RootNavigator from "./navigation/RootNavigator";
 import { navigationRef, navigate } from "./navigation/navigationRef";
@@ -28,6 +28,7 @@ import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
+import { onAfterFirstInteractiveFrame } from "./utils/deferredStartup";
 import { migrateAppCaches } from "./services/cacheMigration";
 import PushNotificationService from "./services/pushNotificationService";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -44,6 +45,15 @@ import { SentryUserSync } from "./sentry/SentryUserSync";
 import { useAnalytics } from "./analytics/useAnalytics";
 import { AnalyticsEvents } from "./analytics/events";
 import { analyticsMeta } from "./analytics/eventMeta";
+import {
+  clearAllOnboardingState,
+  getOnboardingCache,
+  getWarmStartFlag,
+  isOnboardingCacheComplete,
+  setOnboardingCache,
+  setWarmStartFlag,
+  invalidateOnboardingCache,
+} from "./services/onboardingCache";
 
 class AppErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -150,36 +160,145 @@ function AuthTokenInjector({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function scheduleDeferredFeedPrefetch(): void {
+  onAfterFirstInteractiveFrame(() => {
+    FeedPrefetchService.getInstance().prefetch();
+  });
+}
+
+type ClerkUserLike = {
+  id: string;
+  firstName: string | null;
+  unsafeMetadata?: Record<string, unknown>;
+  update: (params: {
+    unsafeMetadata: Record<string, unknown>;
+  }) => Promise<unknown>;
+};
+
+function readOnboardingFlags(user: ClerkUserLike): {
+  hasProfile: boolean;
+  hasCompletedAssessment: boolean;
+} {
+  const meta = user.unsafeMetadata ?? {};
+  return {
+    hasProfile: !!meta.profileCompleted || !!user.firstName,
+    hasCompletedAssessment: !!meta.assessmentCompleted,
+  };
+}
+
+function routeForOnboarding(
+  hasProfile: boolean,
+  hasCompletedAssessment: boolean,
+): string {
+  if (!hasProfile) return "CreateProfile";
+  if (!hasCompletedAssessment) return "AssessmentIntro";
+  return "MainTabs";
+}
+
+async function persistOnboardingCache(
+  userId: string,
+  hasProfile: boolean,
+  hasCompletedAssessment: boolean,
+): Promise<void> {
+  await setOnboardingCache(userId, {
+    profileCompleted: hasProfile,
+    assessmentCompleted: hasCompletedAssessment,
+  });
+  if (hasProfile && hasCompletedAssessment) {
+    await setWarmStartFlag();
+  }
+}
+
+function resetRootRoute(routeName: string): void {
+  if (!navigationRef.isReady()) return;
+  navigationRef.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [{ name: routeName }],
+    }),
+  );
+}
+
+async function verifyAssessmentWithBackend(
+  user: ClerkUserLike,
+): Promise<boolean | null> {
+  const { hasCompletedAssessment } = readOnboardingFlags(user);
+  if (hasCompletedAssessment) return true;
+
+  try {
+    const dashboard = await assessmentApi.getDashboard();
+    const backendHasAssessment =
+      dashboard?.state === "DASHBOARD" || !!dashboard?.assessmentId;
+
+    if (backendHasAssessment) {
+      try {
+        await user.update({
+          unsafeMetadata: {
+            ...(user.unsafeMetadata || {}),
+            assessmentCompleted: true,
+          },
+        });
+      } catch (metaErr) {
+        console.warn(
+          "[OnboardingGate] Failed to sync assessmentCompleted metadata:",
+          metaErr,
+        );
+      }
+      return true;
+    }
+
+    return false;
+  } catch (dashboardErr) {
+    console.warn(
+      "[OnboardingGate] Dashboard verify failed:",
+      dashboardErr,
+    );
+    return null;
+  }
+}
+
+function OnboardingCacheClearOnSignOut() {
+  const { isSignedIn, userId } = useAuth();
+  const lastSignedInUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isSignedIn && userId) {
+      lastSignedInUserId.current = userId;
+      return;
+    }
+
+    if (!isSignedIn && lastSignedInUserId.current) {
+      const signedOutUserId = lastSignedInUserId.current;
+      lastSignedInUserId.current = null;
+      void clearAllOnboardingState(signedOutUserId);
+    }
+  }, [isSignedIn, userId]);
+
+  return null;
+}
+
 function AppSocketHandler({ children }: { children: React.ReactNode }) {
   const { getToken, userId, isSignedIn } = useAuth();
   const socketService = SocketService.getInstance();
 
   useEffect(() => {
+    if (!isSignedIn || !userId) {
+      socketService.disconnect();
+      return;
+    }
+
     let mounted = true;
+    let subscription: ReturnType<typeof AppState.addEventListener> | undefined;
 
     const connectSocket = async () => {
-      if (isSignedIn && userId) {
-        try {
-          // Pass the getToken function directly so socket.io can
-          // fetch a fresh Clerk JWT on every connection/reconnection attempt
-          socketService.connect(() => getToken(), userId);
-        } catch (err) {
-          console.warn("[App] Socket connection failed:", err);
-        }
-      } else {
-        socketService.disconnect();
+      if (!mounted || !isSignedIn || !userId) return;
+      try {
+        socketService.connect(() => getToken(), userId);
+      } catch (err) {
+        console.warn("[App] Socket connection failed:", err);
       }
     };
 
-    connectSocket();
-
-    const subscription = AppState.addEventListener("change", (nextAppState: string) => {
-      if (nextAppState === "active" && isSignedIn) {
-        connectSocket();
-      }
-    });
-
-    // Incoming Call Listener
     const handleIncomingCall = (data: {
       initiatorName: string;
       sessionId: string;
@@ -245,13 +364,23 @@ function AppSocketHandler({ children }: { children: React.ReactNode }) {
 
     socketService.onFriendRequest(handleFriendRequest);
 
+    onAfterFirstInteractiveFrame(() => {
+      if (!mounted) return;
+      void connectSocket();
+      subscription = AppState.addEventListener("change", (nextAppState: string) => {
+        if (nextAppState === "active" && isSignedIn) {
+          void connectSocket();
+        }
+      });
+    });
+
     return () => {
       mounted = false;
-      subscription.remove();
+      subscription?.remove();
       socketService.offIncomingCall(handleIncomingCall);
       socketService.offFriendRequest(handleFriendRequest);
     };
-  }, [isSignedIn, userId]);
+  }, [isSignedIn, userId, getToken]);
 
   return <>{children}</>;
 }
@@ -300,6 +429,7 @@ function OnboardingGate() {
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const usedCacheFastPath = useRef(false);
 
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
@@ -315,60 +445,83 @@ function OnboardingGate() {
       return () => clearTimeout(timeout);
     }
 
+    const applyRoute = (route: string) => {
+      if (cancelled) return;
+      setInitialRoute(route);
+      if (route === "MainTabs") {
+        scheduleDeferredFeedPrefetch();
+      }
+    };
+
+    const verifyInBackground = async () => {
+      const { hasProfile, hasCompletedAssessment } = readOnboardingFlags(user);
+      let verifiedAssessment = hasCompletedAssessment;
+
+      if (!verifiedAssessment) {
+        const backendResult = await verifyAssessmentWithBackend(user);
+        if (backendResult === null) {
+          return;
+        }
+        verifiedAssessment = backendResult;
+      }
+
+      const correctRoute = routeForOnboarding(hasProfile, verifiedAssessment);
+
+      await persistOnboardingCache(user.id, hasProfile, verifiedAssessment);
+
+      if (cancelled) return;
+
+      if (usedCacheFastPath.current && correctRoute !== "MainTabs") {
+        console.warn(
+          "[OnboardingGate] Cache mismatch; correcting route to",
+          correctRoute,
+        );
+        await invalidateOnboardingCache(user.id);
+        applyRoute(correctRoute);
+        resetRootRoute(correctRoute);
+      }
+    };
+
     const resolveInitialRoute = async () => {
-      const hasProfile =
-        !!(user.unsafeMetadata as any)?.profileCompleted || !!user.firstName;
-      const hasCompletedAssessment = !!(user.unsafeMetadata as any)
-        ?.assessmentCompleted;
+      const { hasProfile, hasCompletedAssessment } = readOnboardingFlags(user);
+
+      if (hasProfile && hasCompletedAssessment) {
+        await persistOnboardingCache(user.id, true, true);
+        applyRoute("MainTabs");
+        return;
+      }
+
+      const cached = await getOnboardingCache(user.id);
+      if (isOnboardingCacheComplete(cached)) {
+        usedCacheFastPath.current = true;
+        applyRoute("MainTabs");
+        void verifyInBackground();
+        return;
+      }
 
       if (!hasProfile) {
-        if (!cancelled) setInitialRoute("CreateProfile");
+        applyRoute("CreateProfile");
         return;
       }
 
       if (hasCompletedAssessment) {
-        if (!cancelled) setInitialRoute("MainTabs");
-        setTimeout(() => {
-          FeedPrefetchService.getInstance().prefetch();
-        }, 500);
+        await persistOnboardingCache(user.id, true, true);
+        applyRoute("MainTabs");
         return;
       }
 
-      // Clerk metadata can become stale; verify completed assessment state from backend.
-      try {
-        const dashboard = await assessmentApi.getDashboard();
-        const backendHasAssessment =
-          dashboard?.state === "DASHBOARD" || !!dashboard?.assessmentId;
-
-        if (backendHasAssessment) {
-          try {
-            await user.update({
-              unsafeMetadata: {
-                ...(user.unsafeMetadata || {}),
-                assessmentCompleted: true,
-              },
-            });
-          } catch (metaErr) {
-            console.warn(
-              "[OnboardingGate] Failed to sync assessmentCompleted metadata:",
-              metaErr,
-            );
-          }
-
-          if (!cancelled) setInitialRoute("MainTabs");
-          setTimeout(() => {
-            FeedPrefetchService.getInstance().prefetch();
-          }, 500);
-          return;
-        }
-      } catch (dashboardErr) {
-        console.warn(
-          "[OnboardingGate] Dashboard check failed; falling back to AssessmentIntro:",
-          dashboardErr,
-        );
+      const backendHasAssessment = await verifyAssessmentWithBackend(user);
+      if (backendHasAssessment === true) {
+        await persistOnboardingCache(user.id, true, true);
+        applyRoute("MainTabs");
+        return;
+      }
+      if (backendHasAssessment === null) {
+        applyRoute("AssessmentIntro");
+        return;
       }
 
-      if (!cancelled) setInitialRoute("AssessmentIntro");
+      applyRoute("AssessmentIntro");
     };
 
     void resolveInitialRoute();
@@ -382,6 +535,7 @@ function OnboardingGate() {
   const handleRetry = () => {
     setError(null);
     setInitialRoute(null);
+    usedCacheFastPath.current = false;
     setRetryKey((k) => k + 1);
   };
 
@@ -475,10 +629,24 @@ function AuthGate() {
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(Platform.OS !== "web");
+  const [showSplash, setShowSplash] = useState<boolean | null>(
+    Platform.OS === "web" ? false : null,
+  );
 
   useEffect(() => {
     void migrateAppCaches();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    let alive = true;
+    void getWarmStartFlag().then((warm) => {
+      if (!alive) return;
+      setShowSplash(!warm);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   if (!CLERK_PUBLISHABLE_KEY) {
@@ -506,6 +674,7 @@ export default function App() {
       <SentryUserSync />
       <PostHogUserSync />
       <AppOpenTracker />
+      <OnboardingCacheClearOnSignOut />
       <StartupReachabilityProbe />
       <AuthTokenInjector>
         <AppSocketHandler>
@@ -558,7 +727,7 @@ export default function App() {
                         <AuthGate />
                       </NavigationContainer>
 
-                      {showSplash && (
+                      {showSplash === true && (
                         <SplashAnimation
                           onFinish={() => setShowSplash(false)}
                         />

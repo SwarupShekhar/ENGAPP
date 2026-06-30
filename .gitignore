@@ -28,6 +28,10 @@ Pods/
 .env.development.local
 .env.test.local
 .env.production.local
+# Broader env variants (real secrets stay local)
+.env.*
+!.env.example
+!**/.env.example
 
 # Logs
 *.log
@@ -101,3 +105,7 @@ google-services (3).json
 
 # Git worktrees (local development only)
 worktrees/
+
+# Artillery local output (reports may contain run metadata)
+backend-nest/scripts/load/results/*.json
+backend-nest/scripts/load/results/*.html

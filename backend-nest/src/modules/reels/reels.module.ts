@@ -4,11 +4,13 @@ import { ReelsController } from './reels.controller';
 import { ReelsService } from './reels.service';
 import { WeaknessService } from './weakness.service';
 import { IntegrationsModule } from '../../integrations/integrations.module';
+import { RedisModule } from '../../redis/redis.module';
 
 @Module({
   imports: [
     HttpModule,
     IntegrationsModule, // Provides MuxService
+    RedisModule,
   ],
   controllers: [ReelsController],
   providers: [ReelsService, WeaknessService],

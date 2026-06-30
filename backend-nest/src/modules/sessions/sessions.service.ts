@@ -10,6 +10,7 @@ import {
   FlaggedPronunciationError,
 } from '../pronunciation/pronunciation.service';
 import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
+import { SESSIONS_P2P_QUEUE } from '../../queues/sessions-queue.constants';
 
 @Injectable()
 export class SessionsService {
@@ -19,7 +20,7 @@ export class SessionsService {
     private prisma: PrismaService,
     private azureStorage: AzureStorageService,
     private reliabilityService: ReliabilityService,
-    @InjectQueue('sessions') private sessionsQueue: Queue,
+    @InjectQueue(SESSIONS_P2P_QUEUE) private sessionsQueue: Queue,
     private readonly transcription: TranscriptionService,
     private readonly pronunciationService: PronunciationService,
     private readonly inCallCoaching: InCallCoachingService,

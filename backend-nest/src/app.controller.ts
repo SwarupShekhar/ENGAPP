@@ -1,7 +1,9 @@
 import { Controller, Get, Logger, NotFoundException } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { AppService } from './app.service';
 
 @Controller()
+@SkipThrottle()
 export class AppController {
   private readonly logger = new Logger(AppController.name);
 

@@ -11,6 +11,7 @@ import {
 import { TieredMatchmakingService } from './tiered-matchmaking.service';
 import { MatchmakingService } from './matchmaking.service';
 import { ClerkGuard } from '../auth/clerk.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('matchmaking')
 @UseGuards(ClerkGuard)
@@ -40,6 +41,7 @@ export class MatchmakingController {
   }
 
   @Get('status')
+  @Throttle({ matchmaking: { limit: 30, ttl: 60_000 } })
   async checkMatch(
     @Request() req: { user: { clerkId: string } },
     @Query('level') level: string,

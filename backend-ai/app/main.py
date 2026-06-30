@@ -24,6 +24,7 @@ from app.security.internal_auth import require_internal_api_key
 from app.cache.manager import cache
 from app.features.transcription.async_azure_speech import shutdown_executor
 from app.features.transcription.deepgram_service import deepgram_transcription_service
+from app.middleware.rate_limiter import rate_limiter
 from app.models.response import StandardResponse, ErrorResponse, Meta
 
 # 1. Initialize Sentry
@@ -56,11 +57,13 @@ async def lifespan(app: FastAPI):
     )
 
     await cache.initialize()
+    rate_limiter.start_cleanup_task()
 
     yield
 
     # Shutdown
     logger.info("application_shutdown")
+    await rate_limiter.stop_cleanup_task()
     await cache.close()
     await shutdown_executor()
 

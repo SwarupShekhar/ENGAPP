@@ -1,0 +1,42 @@
+# Breakpoint test — ramp request rate until errors or latency SLO breach.
+# Measures raw Nest + Caddy capacity on GET /health (no auth, no throttler).
+#
+# arrivalRate = NEW virtual users per second (not concurrent users).
+# Concurrent ≈ arrivalRate × (mean response time in seconds).
+#
+# Env: ARTILLERY_NEST_TARGET (default https://api.englivo.com)
+
+config:
+  target: "{{ $processEnvironment.ARTILLERY_NEST_TARGET }}"
+  http:
+    timeout: 30
+  phases:
+    - duration: 20
+      arrivalRate: 2
+      name: "Baseline 2 req/s"
+    - duration: 40
+      arrivalRate: 5
+      rampTo: 20
+      name: "Ramp 5→20 req/s"
+    - duration: 40
+      arrivalRate: 20
+      rampTo: 50
+      name: "Ramp 20→50 req/s"
+    - duration: 40
+      arrivalRate: 50
+      rampTo: 80
+      name: "Ramp 50→80 req/s"
+    - duration: 40
+      arrivalRate: 80
+      rampTo: 120
+      name: "Ramp 80→120 req/s"
+  plugins:
+    expect: {}
+
+scenarios:
+  - name: Nest GET /health
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200

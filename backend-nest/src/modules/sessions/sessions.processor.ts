@@ -17,8 +17,12 @@ import { SessionHandlerService } from '../home/services/session-handler.service'
 import { BrainService } from '../brain/brain.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { PronunciationScorerService } from '../pronunciation/pronunciation-scorer.service';
+import {
+  SESSIONS_P2P_QUEUE,
+  sessionsP2pConcurrency,
+} from '../../queues/sessions-queue.constants';
 
-@Processor('sessions')
+@Processor(SESSIONS_P2P_QUEUE)
 export class SessionsProcessor {
   private readonly logger = new Logger(SessionsProcessor.name);
 
@@ -32,7 +36,7 @@ export class SessionsProcessor {
     private brainService: BrainService,
     private pronunciationService: PronunciationService,
     private pronunciationScorerService: PronunciationScorerService,
-    @InjectQueue('sessions') private sessionsQueue: Queue,
+    @InjectQueue(SESSIONS_P2P_QUEUE) private sessionsQueue: Queue,
   ) {}
 
   /**
@@ -91,7 +95,7 @@ export class SessionsProcessor {
     );
   }
 
-  @Process('process-session')
+  @Process({ name: 'process-session', concurrency: sessionsP2pConcurrency() })
   async handleProcessSession(job: Job<any>) {
     const { sessionId, audioUrls } = job.data;
     this.logger.log(

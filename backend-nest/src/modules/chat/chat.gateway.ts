@@ -475,6 +475,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  getActiveConnectionCount(): number {
+    return this.server?.sockets?.sockets?.size ?? 0;
+  }
+
   private async isUserViewingConversation(
     userId: string,
     conversationId: string,

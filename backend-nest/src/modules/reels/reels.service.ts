@@ -1,30 +1,33 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { MuxService } from '../../integrations/mux.service';
 import { WeaknessService } from './weakness.service';
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
-export class ReelsService {
+export class ReelsService implements OnModuleInit {
   private readonly logger = new Logger(ReelsService.name);
   private readonly strapiBaseUrl: string;
   private readonly strapiToken: string;
+  private readonly feedCacheTtlMs: number;
+  private readonly strapiCacheTtlMs: number;
+  private readonly strapiCacheTtlSec: number;
+  private static readonly STRAPI_REDIS_PREFIX = 'engr:strapi:reels:';
 
-  // ─── In-memory feed cache (5-min TTL per user) ────────────
+  // ─── In-memory feed cache (per user) ────────────
   private readonly feedCache = new Map<
     string,
     { data: any; expiresAt: number }
   >();
-  private readonly FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  // ─── Strapi response cache (fallback when Strapi is cold/down) ───
+  // ─── Strapi response L1 cache (optional fast layer over Redis) ───
   private readonly strapiCache = new Map<
     string,
     { data: any[]; savedAt: number }
   >();
-  private readonly STRAPI_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
   constructor(
     private readonly prisma: PrismaService,
@@ -32,15 +35,88 @@ export class ReelsService {
     private readonly configService: ConfigService,
     private readonly muxService: MuxService,
     private readonly weaknessService: WeaknessService,
+    private readonly redis: RedisService,
   ) {
     this.strapiBaseUrl = this.configService.get<string>('STRAPI_BASE_URL');
     this.strapiToken = this.configService.get<string>('STRAPI_API_KEY');
+    this.feedCacheTtlMs = this.parseTtlSec('REELS_FEED_CACHE_TTL_SEC', 300) * 1000;
+    this.strapiCacheTtlSec = this.parseTtlSec('STRAPI_FEED_CACHE_TTL_SEC', 3600);
+    this.strapiCacheTtlMs = this.strapiCacheTtlSec * 1000;
 
     // Periodic cleanup of expired cache entries (every 10 min)
     setInterval(() => this.cleanExpiredCache(), 10 * 60 * 1000);
 
     // Keep Strapi alive — ping every 4 min to prevent Render free-tier sleep
     setInterval(() => this.keepStrapiAlive(), 4 * 60 * 1000);
+  }
+
+  onModuleInit() {
+    void this.warmStrapiCache().catch((err) =>
+      this.logger.warn(`Strapi feed warm-cache failed: ${err.message}`),
+    );
+  }
+
+  /** Prefetch general + featured reels into Redis/L1 so first feed avoids cold Strapi. */
+  private async warmStrapiCache() {
+    if (!this.strapiBaseUrl) {
+      this.logger.debug('STRAPI_BASE_URL unset — skipping feed warm-cache');
+      return;
+    }
+    this.logger.log('Warming Strapi reels cache (general + featured)...');
+    await Promise.all([
+      this.fetchReelsFromStrapi([], 15),
+      this.fetchFeaturedReels(5),
+    ]);
+    this.logger.log('Strapi reels cache warm complete');
+  }
+
+  private strapiRedisKey(cacheKey: string): string {
+    return `${ReelsService.STRAPI_REDIS_PREFIX}${cacheKey}`;
+  }
+
+  private async getStrapiCacheEntry(
+    cacheKey: string,
+  ): Promise<{ data: any[]; savedAt: number } | null> {
+    const l1 = this.strapiCache.get(cacheKey);
+    if (l1 && Date.now() - l1.savedAt < this.strapiCacheTtlMs) {
+      return l1;
+    }
+
+    try {
+      const raw = await this.redis.get(this.strapiRedisKey(cacheKey));
+      if (!raw) return null;
+      const entry = JSON.parse(raw) as { data: any[]; savedAt: number };
+      if (Date.now() - entry.savedAt < this.strapiCacheTtlMs) {
+        this.strapiCache.set(cacheKey, entry);
+        return entry;
+      }
+    } catch (err) {
+      this.logger.warn(`Strapi Redis cache read failed: ${err.message}`);
+    }
+    return null;
+  }
+
+  private async setStrapiCacheEntry(
+    cacheKey: string,
+    data: any[],
+  ): Promise<void> {
+    const entry = { data, savedAt: Date.now() };
+    this.strapiCache.set(cacheKey, entry);
+    try {
+      await this.redis.set(
+        this.strapiRedisKey(cacheKey),
+        JSON.stringify(entry),
+        this.strapiCacheTtlSec,
+      );
+    } catch (err) {
+      this.logger.warn(`Strapi Redis cache write failed: ${err.message}`);
+    }
+  }
+
+  private parseTtlSec(envKey: string, fallback: number): number {
+    const raw = this.configService.get<string>(envKey);
+    const parsed = raw != null ? Number(raw) : fallback;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
   /** Pings Strapi health endpoint to prevent cold starts on Render free tier. */
@@ -225,9 +301,11 @@ export class ReelsService {
       if (!cursor) {
         this.feedCache.set(cacheKey, {
           data: result,
-          expiresAt: Date.now() + this.FEED_CACHE_TTL_MS,
+          expiresAt: Date.now() + this.feedCacheTtlMs,
         });
-        this.logger.debug(`Feed cached for user ${userId} (TTL: 5m)`);
+        this.logger.debug(
+          `Feed cached for user ${userId} (TTL: ${this.feedCacheTtlMs / 1000}s)`,
+        );
       }
 
       return result;
@@ -346,14 +424,12 @@ export class ReelsService {
         }),
       );
       const data = response.data.data || [];
-      // Persist fresh result so future cold-start requests can fall back to it
-      this.strapiCache.set(cacheKey, { data, savedAt: Date.now() });
+      await this.setStrapiCacheEntry(cacheKey, data);
       return data;
     } catch (error) {
       this.logger.error(`Strapi request failed: ${error.message}`);
-      // Return last good response if available and not stale
-      const fallback = this.strapiCache.get(cacheKey);
-      if (fallback && Date.now() - fallback.savedAt < this.STRAPI_CACHE_TTL_MS) {
+      const fallback = await this.getStrapiCacheEntry(cacheKey);
+      if (fallback) {
         this.logger.warn(
           `Strapi offline — using cached reels (age: ${Math.round((Date.now() - fallback.savedAt) / 60000)}m)`,
         );
@@ -365,7 +441,7 @@ export class ReelsService {
 
   /**
    * Fetch editorially featured reels.
-   * Falls back to the last cached Strapi response if the instance is cold/down.
+   * Falls back to Redis/L1 cache if the instance is cold/down.
    */
   private async fetchFeaturedReels(limit: number) {
     const url = `${this.strapiBaseUrl}/api/reels?populate=*&pagination[limit]=${limit}&filters[is_featured][$eq]=true`;
@@ -378,12 +454,12 @@ export class ReelsService {
         }),
       );
       const data = response.data.data || [];
-      this.strapiCache.set(cacheKey, { data, savedAt: Date.now() });
+      await this.setStrapiCacheEntry(cacheKey, data);
       return data;
     } catch (error) {
       this.logger.error(`Strapi featured request failed: ${error.message}`);
-      const fallback = this.strapiCache.get(cacheKey);
-      if (fallback && Date.now() - fallback.savedAt < this.STRAPI_CACHE_TTL_MS) {
+      const fallback = await this.getStrapiCacheEntry(cacheKey);
+      if (fallback) {
         this.logger.warn(
           `Strapi offline — using cached featured reels (age: ${Math.round((Date.now() - fallback.savedAt) / 60000)}m)`,
         );
@@ -473,11 +549,11 @@ export class ReelsService {
     };
   }
 
-  /** Search in-memory Strapi list caches when direct /reels/:id is stale or 404. */
+  /** Search L1 Strapi list caches when direct /reels/:id is stale or 404. */
   private findReelInStrapiCache(strapiReelId: number) {
     const now = Date.now();
     for (const entry of this.strapiCache.values()) {
-      if (now - entry.savedAt > this.STRAPI_CACHE_TTL_MS) continue;
+      if (now - entry.savedAt > this.strapiCacheTtlMs) continue;
       const match = entry.data.find((r) => Number(r.id) === strapiReelId);
       if (match) return this.parseStrapiReelRecord(match);
     }

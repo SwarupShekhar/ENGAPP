@@ -1,14 +1,14 @@
-import { client, API_URL } from './client';
+import { aiClient, API_URL } from './client';
 
 export const tutorApi = {
     startSession: async (userId: string) => {
-        const res = await client.post('/conversational-tutor/start-session', { userId });
+        const res = await aiClient.post('/conversational-tutor/start-session', { userId });
         return res.data;
     },
 
     /** Short-lived HMAC token for direct backend-ai tutor WebSocket. */
     getStreamingWsToken: async (sessionId: string) => {
-        const res = await client.post<{ token: string; expiresInSeconds: number }>(
+        const res = await aiClient.post<{ token: string; expiresInSeconds: number }>(
             '/conversational-tutor/streaming-ws-token',
             { sessionId },
         );
@@ -17,7 +17,7 @@ export const tutorApi = {
 
     /** Blocking flow (STT → Gemini → TTS). Use for fallback or when SSE not available. */
     processSpeech: async (formData: FormData) => {
-        const res = await client.post('/conversational-tutor/process-speech', formData, {
+        const res = await aiClient.post('/conversational-tutor/process-speech', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 120000, // 2 min for STT + Gemini + TTS pipeline
         });
@@ -45,7 +45,7 @@ export const tutorApi = {
     },
 
     assessPronunciation: async (formData: FormData) => {
-        const res = await client.post('/conversational-tutor/assess-pronunciation', formData, {
+        const res = await aiClient.post('/conversational-tutor/assess-pronunciation', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 30000, // 30s for pronunciation assessment
         });
@@ -68,14 +68,14 @@ export const tutorApi = {
         if (transcript?.trim()) {
             formData.append('transcript', transcript.trim());
         }
-        await client.post('/conversational-tutor/upload-turn-audio', formData, {
+        await aiClient.post('/conversational-tutor/upload-turn-audio', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 20000,
         });
     },
 
     transcribe: async (formData: FormData) => {
-        const res = await client.post('/conversational-tutor/transcribe', formData, {
+        const res = await aiClient.post('/conversational-tutor/transcribe', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 15000,
         });
@@ -84,7 +84,7 @@ export const tutorApi = {
 
     /** After SSE stream completes, append the turn so next request has correct history. */
     appendTurn: async (sessionId: string, userText: string, aiText: string) => {
-        await client.post('/conversational-tutor/append-turn', {
+        await aiClient.post('/conversational-tutor/append-turn', {
             sessionId,
             userText,
             aiText,
@@ -92,7 +92,7 @@ export const tutorApi = {
     },
 
     endSession: async (sessionId: string) => {
-        const res = await client.post('/conversational-tutor/end-session', { sessionId });
+        const res = await aiClient.post('/conversational-tutor/end-session', { sessionId });
         return res.data;
     },
 };

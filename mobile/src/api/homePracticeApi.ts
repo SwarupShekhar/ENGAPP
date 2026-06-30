@@ -1,4 +1,4 @@
-import { client } from './client';
+import { client, aiClient } from './client';
 
 export interface DailyPracticeStatus {
   date: string;
@@ -69,7 +69,7 @@ export const homePracticeApi = {
   },
 
   assess: async (formData: FormData): Promise<AssessResult> => {
-    const res = await client.post('/home/practice/assess', formData, {
+    const res = await aiClient.post('/home/practice/assess', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 45000,
     });

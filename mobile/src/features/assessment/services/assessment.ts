@@ -1,4 +1,4 @@
-import { client } from "../../../api/client";
+import { client, aiClient } from "../../../api/client";
 
 export interface AssessmentResult {
   assessmentId: string;
@@ -32,12 +32,12 @@ export const assessmentApi = {
     audioBase64: string,
     attempt: number = 1,
   ) => {
-    const response = await client.post("/assessment/submit", {
+    const response = await aiClient.post("/assessment/submit", {
       assessmentId,
       phase,
       audioBase64,
       attempt,
-    });
+    }, { timeout: 120000 });
     return response.data;
   },
 

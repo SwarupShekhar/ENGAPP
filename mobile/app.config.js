@@ -56,6 +56,18 @@ if (process.env.ENGLIVO_API_URL_OVERRIDE?.trim()) {
 if (process.env.ENGLIVO_WS_URL_OVERRIDE?.trim()) {
   extra.englivoWsUrlOverride = process.env.ENGLIVO_WS_URL_OVERRIDE.trim();
 }
+if (process.env.EXPO_PUBLIC_LIVEKIT_URL?.trim()) {
+  extra.livekitUrl = process.env.EXPO_PUBLIC_LIVEKIT_URL.trim();
+}
+if (process.env.APP_LIVEKIT_URL?.trim()) {
+  extra.livekitUrl = process.env.APP_LIVEKIT_URL.trim();
+}
+if (process.env.EXPO_PUBLIC_ENGLIVO_LIVEKIT_URL?.trim()) {
+  extra.englivoLivekitUrl = process.env.EXPO_PUBLIC_ENGLIVO_LIVEKIT_URL.trim();
+}
+if (process.env.APP_ENGLIVO_LIVEKIT_URL?.trim()) {
+  extra.englivoLivekitUrl = process.env.APP_ENGLIVO_LIVEKIT_URL.trim();
+}
 
 const sentryBuildPlugin =
   process.env.SENTRY_ORG?.trim() && process.env.SENTRY_PROJECT?.trim()

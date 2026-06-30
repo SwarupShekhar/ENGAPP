@@ -5,8 +5,12 @@ import {
   ConversationalTutorService,
   MayaSessionJobData,
 } from './conversational-tutor.service';
+import {
+  SESSIONS_MAYA_QUEUE,
+  sessionsMayaConcurrency,
+} from '../../queues/sessions-queue.constants';
 
-@Processor('sessions')
+@Processor(SESSIONS_MAYA_QUEUE)
 export class MayaSessionProcessor {
   private readonly logger = new Logger(MayaSessionProcessor.name);
 
@@ -19,7 +23,7 @@ export class MayaSessionProcessor {
     );
   }
 
-  @Process('process-maya-session')
+  @Process({ name: 'process-maya-session', concurrency: sessionsMayaConcurrency() })
   async handleProcessMayaSession(job: Job<MayaSessionJobData>) {
     const { sessionId } = job.data;
     this.logger.log(

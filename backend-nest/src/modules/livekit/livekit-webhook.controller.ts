@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { WebhookReceiver } from 'livekit-server-sdk';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@app/prisma/prisma.service';
 import { BrainService } from '../brain/brain.service';
@@ -24,6 +25,7 @@ import { RedisService } from '../../redis/redis.service';
  * Optionally verify LIVEKIT_WEBHOOK_SECRET in Authorization header.
  */
 @Controller('webhooks/livekit')
+@SkipThrottle()
 export class LiveKitWebhookController {
   private readonly logger = new Logger(LiveKitWebhookController.name);
   private readonly processedEgress = new Set<string>();

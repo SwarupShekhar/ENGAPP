@@ -9,6 +9,7 @@ export default function SocketDebugScreen() {
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState("Checking...");
   const [socketId, setSocketId] = useState<string | null>(null);
+  const [loadTestToken, setLoadTestToken] = useState<string | null>(null);
 
   const addLog = (msg: string) => {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
@@ -43,6 +44,16 @@ export default function SocketDebugScreen() {
     }
   };
 
+  const handleShowLoadTestToken = async () => {
+    const token = await getToken({ skipCache: true });
+    if (!token) {
+      addLog("No Clerk token — sign in first");
+      return;
+    }
+    setLoadTestToken(token);
+    addLog(`Load-test JWT ready (${token.length} chars) — long-press below to copy`);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Socket Debugger</Text>
@@ -74,6 +85,19 @@ export default function SocketDebugScreen() {
           <Text style={styles.buttonText}>Force Reconnect</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: "#10B981", marginBottom: 12 }]}
+        onPress={handleShowLoadTestToken}
+      >
+        <Text style={styles.buttonText}>Show load-test JWT</Text>
+      </TouchableOpacity>
+
+      {loadTestToken ? (
+        <Text selectable style={styles.tokenText}>
+          {loadTestToken}
+        </Text>
+      ) : null}
 
       <ScrollView style={styles.logContainer}>
         {logs.map((log, i) => (
@@ -137,6 +161,15 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     fontSize: 12,
     marginBottom: 4,
+  },
+  tokenText: {
+    color: "#FDE68A",
+    fontFamily: "monospace",
+    fontSize: 10,
+    marginBottom: 12,
+    padding: 8,
+    backgroundColor: "#1E293B",
+    borderRadius: 8,
   },
 });
 

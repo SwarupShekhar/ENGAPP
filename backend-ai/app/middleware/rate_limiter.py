@@ -11,9 +11,60 @@ class RateLimiter:
     def __init__(self):
         self.user_requests: Dict[str, list] = {}
         self.active_sessions: Dict[str, int] = {}  # userId -> count
-        self.cleanup_task = None
-        # Protect active_sessions against concurrent access
+        self.cleanup_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
+        self._request_window_sec = 60
+        self._cleanup_interval_sec = 300  # 5 minutes
+
+    def _prune_user_requests(self, now: float | None = None) -> int:
+        """Drop expired timestamps and remove idle user keys. Returns users removed."""
+        now = now or time.time()
+        removed_users = 0
+        stale_user_ids: list[str] = []
+        for user_id, timestamps in list(self.user_requests.items()):
+            pruned = [
+                req_time
+                for req_time in timestamps
+                if now - req_time < self._request_window_sec
+            ]
+            if pruned:
+                self.user_requests[user_id] = pruned
+            else:
+                stale_user_ids.append(user_id)
+        for user_id in stale_user_ids:
+            del self.user_requests[user_id]
+            removed_users += 1
+        return removed_users
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(self._cleanup_interval_sec)
+                removed = self._prune_user_requests()
+                if removed:
+                    logger.debug(
+                        "Rate limiter cleanup removed %s inactive user entries",
+                        removed,
+                    )
+            except asyncio.CancelledError:
+                break
+
+    def start_cleanup_task(self) -> None:
+        if self.cleanup_task is None or self.cleanup_task.done():
+            self.cleanup_task = asyncio.create_task(self._cleanup_loop())
+            logger.info(
+                "Rate limiter background cleanup started (every %ss)",
+                self._cleanup_interval_sec,
+            )
+
+    async def stop_cleanup_task(self) -> None:
+        if self.cleanup_task and not self.cleanup_task.done():
+            self.cleanup_task.cancel()
+            try:
+                await self.cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self.cleanup_task = None
     
     async def check_rate_limit(
         self,
@@ -33,7 +84,7 @@ class RateLimiter:
         if user_id in self.user_requests:
             self.user_requests[user_id] = [
                 req_time for req_time in self.user_requests[user_id]
-                if now - req_time < 60
+                if now - req_time < self._request_window_sec
             ]
         else:
             self.user_requests[user_id] = []
@@ -68,7 +119,7 @@ class RateLimiter:
         if user_id in self.user_requests:
             self.user_requests[user_id] = [
                 req_time for req_time in self.user_requests[user_id]
-                if now - req_time < 60
+                if now - req_time < self._request_window_sec
             ]
         else:
             self.user_requests[user_id] = []

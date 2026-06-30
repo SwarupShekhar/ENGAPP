@@ -62,10 +62,9 @@ import {
   pickStarters,
 } from "../data/conversationStarters";
 import { inCallCoachingApi, PreloadedHint } from "../../../api/homePracticeApi";
+import { ENGR_LIVEKIT_URL } from "../../../api/livekitConfig";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-// In a real app, these would come from environment variables
-const LIVEKIT_URL = "wss://engrapp-8lz8v8ia.livekit.cloud";
 
 // Restart STT before engine hard-stops (~60s on most engines)
 const STT_MAX_DURATION_MS = 50000;
@@ -1489,7 +1488,7 @@ export default function InCallScreen({ navigation, route }: any) {
   return (
     <View style={styles.container}>
       <LiveKitRoom
-        serverUrl={LIVEKIT_URL}
+        serverUrl={ENGR_LIVEKIT_URL}
         token={token}
         connect={!!token}
         audio={true}

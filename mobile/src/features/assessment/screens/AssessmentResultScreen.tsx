@@ -19,6 +19,10 @@ import { RecurringErrorsCard } from "../components/RecurringErrorsCard";
 import { ReadinessCard } from "../components/ReadinessCard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { assessmentApi } from "../services/assessment";
+import {
+  setOnboardingCache,
+  setWarmStartFlag,
+} from "../../../services/onboardingCache";
 
 // Graceful no-op when expo-haptics is unavailable (web / stripped builds)
 let Haptics: any = { notificationAsync: async () => {}, NotificationFeedbackType: {} };
@@ -79,6 +83,14 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
             assessmentCompleted: true,
           },
         });
+        const meta = user.unsafeMetadata ?? {};
+        const profileCompleted =
+          !!meta.profileCompleted || !!user.firstName;
+        await setOnboardingCache(user.id, {
+          profileCompleted,
+          assessmentCompleted: true,
+        });
+        await setWarmStartFlag();
       }
     } catch (err) {
       console.error("Failed to update assessment status:", err);

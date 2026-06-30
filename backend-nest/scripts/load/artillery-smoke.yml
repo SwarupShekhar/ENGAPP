@@ -1,0 +1,37 @@
+# Phase 0 smoke — 1 virtual user per second for 60 seconds.
+# Targets: Nest GET /health (required). Optional AI health if ARTILLERY_AI_TARGET is reachable.
+#
+# Env (see run-artillery-smoke.mjs):
+#   ARTILLERY_NEST_TARGET  default https://api.englivo.com
+#   ARTILLERY_AI_TARGET    default http://139.84.163.249:4002 (skipped when preflight fails)
+#   ARTILLERY_API_KEY      Artillery Cloud recording (optional)
+
+config:
+  target: "{{ $processEnvironment.ARTILLERY_NEST_TARGET }}"
+  phases:
+    - duration: 60
+      arrivalRate: 1
+      name: "Phase 0 smoke (1 VU/s × 60s)"
+  ensure:
+    maxErrorRate: 0
+  plugins:
+    expect: {}
+
+scenarios:
+  - name: Nest GET /health
+    weight: 9
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: status
+
+  - name: AI GET /api/health
+    weight: 1
+    flow:
+      - get:
+          url: "{{ $processEnvironment.ARTILLERY_AI_TARGET }}/api/health"
+          expect:
+            - statusCode: 200

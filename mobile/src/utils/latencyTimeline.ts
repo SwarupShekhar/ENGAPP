@@ -1,7 +1,9 @@
 /**
  * Lightweight span timeline for latency debugging (Maya, feedback, home).
- * Dev: full timeline + JSON log. Prod: optional sampled export later.
+ * Dev: full timeline + JSON log. Prod: sampled export to PostHog + Sentry.
  */
+
+import { exportSampledTrace } from "./latencyExport";
 
 export type LatencyJourney =
   | 'maya_turn'
@@ -124,14 +126,15 @@ export class LatencyTimeline {
   finish(meta?: Record<string, string | number | boolean>): void {
     if (!this.trace) return;
     this.markInstant('trace_end', meta);
-    if (__DEV__) {
-      const snap = this.getSnapshot();
-      if (snap) {
+    const snap = this.getSnapshot();
+    if (snap) {
+      if (__DEV__) {
         console.log(
           `[Latency:${snap.journey}] ${snap.traceId}`,
           JSON.stringify(snap, null, 0),
         );
       }
+      exportSampledTrace(snap);
     }
   }
 

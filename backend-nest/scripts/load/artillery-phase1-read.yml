@@ -1,0 +1,54 @@
+# Phase 1 read-heavy — realistic mobile poll mix (requires Clerk JWT).
+# Set ARTILLERY_CLERK_BEARER_TOKEN in .env (Bearer prefix optional).
+#
+# Note: throttler applies — 120/min default, matchmaking status 30/min per user.
+# Use 2+ tokens (ARTILLERY_CLERK_BEARER_TOKEN_2) to simulate multiple users.
+
+config:
+  target: "{{ $processEnvironment.ARTILLERY_NEST_TARGET }}"
+  http:
+    timeout: 30
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "Warm 2 req/s"
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 20
+      name: "Ramp 5→20 req/s"
+    - duration: 60
+      arrivalRate: 20
+      rampTo: 50
+      name: "Ramp 20→50 req/s"
+    - duration: 60
+      arrivalRate: 50
+      rampTo: 80
+      name: "Ramp 50→80 req/s"
+  plugins:
+    expect: {}
+  processor: "./artillery-processor.mjs"
+  variables:
+    clerkToken: "{{ $processEnvironment.ARTILLERY_CLERK_BEARER_TOKEN }}"
+
+scenarios:
+  - name: Home feed
+    weight: 5
+    flow:
+      - get:
+          url: "/home"
+          headers:
+            Authorization: "Bearer {{ clerkToken }}"
+
+  - name: Matchmaking poll
+    weight: 3
+    flow:
+      - get:
+          url: "/matchmaking/status?level=B1"
+          headers:
+            Authorization: "Bearer {{ clerkToken }}"
+
+  - name: Health
+    weight: 2
+    flow:
+      - get:
+          url: "/health"

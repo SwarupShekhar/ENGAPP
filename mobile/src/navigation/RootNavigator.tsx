@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet as RNStyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { markFirstInteractiveFrame } from "../utils/deferredStartup";
 import CreateProfileScreen from "../features/auth/screens/CreateProfileScreen";
 import AssessmentIntroScreen from "../features/assessment/screens/AssessmentIntroScreen";
 import AssessmentSpeakingScreen from "../features/assessment/screens/AssessmentSpeakingScreen";
@@ -154,6 +155,9 @@ export default function RootNavigator({ initialRoute }: RootNavigatorProps) {
     <Stack.Navigator
       initialRouteName={initialRoute}
       screenOptions={{ headerShown: false }}
+      screenListeners={{
+        focus: () => markFirstInteractiveFrame(),
+      }}
     >
       <Stack.Screen name="MainTabs" component={ActiveTabs} />
       <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />

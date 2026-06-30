@@ -1,4 +1,4 @@
-import { client } from './client';
+import { aiClient } from './client';
 
 export type FeedbackSection = 'pronunciation' | 'grammar' | 'vocabulary' | 'fluency';
 
@@ -38,7 +38,7 @@ export interface FeedbackNarrationResponse {
 export async function fetchFeedbackNarration(
   payload: FeedbackNarrationPayload,
 ): Promise<FeedbackNarrationResponse> {
-  const res = await client.post<FeedbackNarrationResponse>(
+  const res = await aiClient.post<FeedbackNarrationResponse>(
     '/api/tts/feedback-narration',
     payload,
     { timeout: 15000 },
@@ -72,7 +72,7 @@ export interface FullFeedbackNarrationPayload {
 export async function fetchFullFeedbackNarration(
   payload: FullFeedbackNarrationPayload,
 ): Promise<FeedbackNarrationResponse> {
-  const res = await client.post<FeedbackNarrationResponse>(
+  const res = await aiClient.post<FeedbackNarrationResponse>(
     '/api/tts/full-feedback-narration',
     payload,
     { timeout: 20000 },
@@ -81,7 +81,7 @@ export async function fetchFullFeedbackNarration(
 }
 
 export async function fetchErrorSpeak(text: string): Promise<FeedbackNarrationResponse> {
-  const res = await client.post<FeedbackNarrationResponse>(
+  const res = await aiClient.post<FeedbackNarrationResponse>(
     '/api/tts/speak',
     { text },
     { timeout: 10000 },

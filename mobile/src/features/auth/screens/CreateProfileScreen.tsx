@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { useUser } from "@clerk/clerk-expo";
 import { client } from "../../../api/client";
+import { setOnboardingCache } from "../../../services/onboardingCache";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TOTAL_STEPS = 4;
@@ -237,6 +238,11 @@ export default function CreateProfileScreen({ navigation, onFinish }: any) {
         },
       });
       console.log("Clerk metadata updated.");
+      await setOnboardingCache(user.id, {
+        profileCompleted: true,
+        assessmentCompleted: !!(user.unsafeMetadata as Record<string, unknown>)
+          ?.assessmentCompleted,
+      });
 
       // 2. Register user in backend DB (non-blocking)
       console.log("2. Syncing with backend...");

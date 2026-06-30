@@ -1,4 +1,10 @@
-import { Counter, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
+import {
+  Counter,
+  Gauge,
+  Histogram,
+  Registry,
+  collectDefaultMetrics,
+} from 'prom-client';
 
 export const register = new Registry();
 collectDefaultMetrics({ register });
@@ -15,6 +21,32 @@ export const httpRequestsTotal = new Counter({
   name: 'http_requests_total',
   help: 'Total number of HTTP requests',
   labelNames: ['method', 'route', 'status_code'] as const,
+  registers: [register],
+});
+
+export const bullQueueWaiting = new Gauge({
+  name: 'bull_queue_waiting',
+  help: 'Number of jobs waiting in a Bull queue',
+  labelNames: ['queue'] as const,
+  registers: [register],
+});
+
+export const bullQueueActive = new Gauge({
+  name: 'bull_queue_active',
+  help: 'Number of jobs actively processing in a Bull queue',
+  labelNames: ['queue'] as const,
+  registers: [register],
+});
+
+export const redisConnected = new Gauge({
+  name: 'redis_connected',
+  help: 'Whether the app Redis client can ping successfully (1 = up, 0 = down)',
+  registers: [register],
+});
+
+export const socketConnectionsActive = new Gauge({
+  name: 'socket_connections_active',
+  help: 'Total active Socket.io connections across all gateways',
   registers: [register],
 });
 

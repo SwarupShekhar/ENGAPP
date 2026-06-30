@@ -140,7 +140,7 @@ export class ConversationalTutorController {
   }
 
   @Post('append-turn')
-  appendTurn(
+  async appendTurn(
     @Body('sessionId') sessionId: string,
     @Body('userText') userText: string,
     @Body('aiText') aiText: string,
@@ -150,7 +150,7 @@ export class ConversationalTutorController {
         'sessionId, userText, and aiText are required',
       );
     }
-    this.tutorService.appendTurn(sessionId, userText, aiText);
+    await this.tutorService.appendTurn(sessionId, userText, aiText);
     return { ok: true };
   }
 

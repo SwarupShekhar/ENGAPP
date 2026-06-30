@@ -34,6 +34,11 @@ import { RedisModule } from '../../redis/redis.module';
     EgressService,
     TranscriptionService,
   ],
-  exports: [LivekitService, EgressService, TranscriptionService],
+  exports: [
+    LivekitService,
+    EgressService,
+    TranscriptionService,
+    RealtimeAudioGateway,
+  ],
 })
 export class LivekitModule {}

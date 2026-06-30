@@ -1,9 +1,11 @@
 import { Controller, Get, Header, Res, UseGuards } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { register } from './prometheus';
 import { MetricsAuthGuard } from '../guards/metrics-auth.guard';
 
 @Controller()
+@SkipThrottle()
 export class MetricsController {
   @Get('metrics')
   @UseGuards(MetricsAuthGuard)
