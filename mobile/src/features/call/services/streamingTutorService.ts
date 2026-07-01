@@ -4,15 +4,17 @@ import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
 import { readExpoExtra } from "../../../api/expoExtra";
 import { tutorApi } from "../../../api/tutor";
 
-/** Vultr backend-ai WebSocket (docker maps host :4002 → uvicorn :8001, plain WS — no TLS). */
-const VULTR_AI_WS_ORIGIN = "ws://139.84.163.249:4002";
+/** Vultr host port for backend-ai (docker-compose.prod.yml). Not 8001 — used by vaidik_backend. */
+const VULTR_AI_HOST_PORT = "4010";
+/** Vultr backend-ai WebSocket (host :4010 → container :8001, plain WS — no TLS). */
+const VULTR_AI_WS_ORIGIN = `ws://139.84.163.249:${VULTR_AI_HOST_PORT}`;
 
-/** Port 4002 is HTTP/ws only; wss:// to the raw IP never completes the TLS handshake. */
+/** Raw IP + AI port is HTTP/ws only; wss:// never completes the TLS handshake. */
 function normalizeTutorWsUrl(url: string): string {
   try {
     const u = new URL(url);
     const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname);
-    if (isIpv4 && u.port === "4002" && u.protocol === "wss:") {
+    if (isIpv4 && u.port === VULTR_AI_HOST_PORT && u.protocol === "wss:") {
       u.protocol = "ws:";
       return u.toString().replace(/\/$/, "");
     }
@@ -96,11 +98,11 @@ class StreamingTutorService {
       try {
         const u = new URL(nestBase.startsWith("http") ? nestBase : `http://${nestBase}`);
         const wsScheme = u.protocol === "https:" ? "wss" : "ws";
-        // api.englivo.com only reverse-proxies Nest; backend-ai WS stays on Vultr :4002.
+        // api.englivo.com only reverse-proxies Nest; backend-ai WS stays on Vultr AI port.
         if (u.hostname === "api.englivo.com") {
           wsUrl = normalizeTutorWsUrl(VULTR_AI_WS_ORIGIN);
         } else {
-          wsUrl = normalizeTutorWsUrl(`${wsScheme}://${u.hostname}:4002`);
+          wsUrl = normalizeTutorWsUrl(`${wsScheme}://${u.hostname}:${VULTR_AI_HOST_PORT}`);
         }
       } catch {
         const base = ENGLIVO_API_URL.replace(/\/$/, "");

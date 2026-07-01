@@ -32,30 +32,25 @@ export class HeaderBuilder {
       const key = ts.topicTag.replace('pillar_', '');
       pillarMap[key] = Math.round(Number(ts.score) || 0);
     }
+    const pillarSum = Object.values(pillarMap).reduce((a, b) => a + b, 0);
+    const hasUsefulPillarData = topicScores.length > 0 && pillarSum > 0;
 
-    const hasComprehension = pillarMap.comprehension != null;
     let score: number;
-    if (topicScores.length === 0) {
+    if (!hasUsefulPillarData) {
       score = 0;
-    } else if (hasComprehension) {
-      score = Math.round(
-        (pillarMap.pronunciation || 0) * 0.22 +
-        (pillarMap.fluency || 0) * 0.25 +
-        (pillarMap.grammar || 0) * 0.22 +
-        (pillarMap.vocabulary || 0) * 0.18 +
-        (pillarMap.comprehension || 0) * 0.13
-      );
     } else {
+      // Match Progress screen weighted overall (0–100)
       score = Math.round(
-        (pillarMap.pronunciation || 0) * 0.255 +
-        (pillarMap.fluency || 0) * 0.291 +
-        (pillarMap.grammar || 0) * 0.255 +
-        (pillarMap.vocabulary || 0) * 0.209
+        (pillarMap.fluency || 0) * 0.25 +
+          (pillarMap.grammar || 0) * 0.22 +
+          (pillarMap.pronunciation || 0) * 0.22 +
+          (pillarMap.vocabulary || 0) * 0.18 +
+          (pillarMap.comprehension || 0) * 0.13,
       );
     }
 
     // Fallback for score/level if no UserTopicScore rows exist
-    if (score === 0 || !user.assessmentLevel) {
+    if (!hasUsefulPillarData) {
       const latestAssessment = await this.prisma.assessmentSession.findFirst({
         where: { userId, status: 'COMPLETED' },
         orderBy: { completedAt: 'desc' },

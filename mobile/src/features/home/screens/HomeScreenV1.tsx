@@ -779,8 +779,9 @@ export default function HomeScreen() {
         const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached) as HomeData & { _cachedUtcDate?: string };
+          const { phraseOfTheDay: _hp, wordOfTheDay: _hw, ...parsedRest } = parsed;
           const merged = mergeHomeWithDailyContent(
-            parsed as unknown as Record<string, unknown>,
+            parsedRest as unknown as Record<string, unknown>,
             parsed._cachedUtcDate,
             datedDaily,
           ) as unknown as HomeData;
@@ -922,7 +923,7 @@ export default function HomeScreen() {
   const score     = Number(scoreRaw ?? 0);
   const nestLevel = (homeData?.header.level ?? '').trim();
   const bridgeLevel = (bridgeHeader.level ?? '').trim();
-  const level     = bridgeLevel || nestLevel;
+  const level     = nestLevel || bridgeLevel;
   const goalTgt   = homeData?.header.goalTarget ?? 100;
   const goalLabel = homeData?.header.goalLabel ?? (level ? nextCefr(level) : 'Next Level');
   const streak    = bridgeHeader.streak ?? homeData?.header.streak ?? 0;
@@ -983,14 +984,18 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const focus = (weakestPillar ?? '').toLowerCase();
     if (!focus) {
-      navigation.navigate('PracticeTask', { source: 'home_mistakes' });
+      Alert.alert(
+        'No practice tasks yet',
+        'Complete a call with Maya or a partner to get personalized fixes.',
+      );
       return;
     }
 
     try {
-      const [carouselTasks, dueTasks] = await Promise.all([
+      const [carouselTasks, dueTasks, pendingTasks] = await Promise.all([
         tasksApi.loadPracticeCarouselTasks(),
         tasksApi.getDueTasks(),
+        tasksApi.getPendingTasks().catch(() => [] as LearningTask[]),
       ]);
       const carouselIds = new Set(carouselTasks.map((t) => t.id));
       const offCarousel = dueTasks.find(
@@ -1010,14 +1015,47 @@ export default function HomeScreen() {
       if (onCarousel) {
         carouselRef.current?.scrollToPillar(focus);
         const pillarLabel = PILLAR_ALERT_LABEL[focus] ?? focus;
-        Alert.alert('Practice in carousel', `Your ${pillarLabel} fixes are in the carousel`);
+        Alert.alert('Practice in carousel', `Your ${pillarLabel} fixes are in the carousel below`);
+        return;
+      }
+
+      const anyDue = dueTasks.find((t) => taskMatchesPillar(t, focus));
+      if (anyDue) {
+        navigation.navigate('PracticeTask', {
+          task: anyDue,
+          source: 'home_mistakes',
+          focus,
+        });
+        return;
+      }
+
+      const pendingMatch = pendingTasks.find((t) => taskMatchesPillar(t, focus));
+      if (pendingMatch) {
+        navigation.navigate('PracticeTask', {
+          task: pendingMatch,
+          source: 'home_mistakes',
+          focus,
+        });
+        return;
+      }
+
+      const anyTask = dueTasks[0] ?? pendingTasks[0] ?? carouselTasks[0];
+      if (anyTask) {
+        navigation.navigate('PracticeTask', {
+          task: anyTask,
+          source: 'home_mistakes',
+          focus,
+        });
         return;
       }
     } catch {
-      /* fall through to default flow */
+      /* fall through to user message */
     }
 
-    navigation.navigate('PracticeTask', { source: 'home_mistakes', focus: weakestPillar });
+    Alert.alert(
+      'No practice tasks yet',
+      'Complete a call with Maya or a partner — we will turn your mistakes into practice cards.',
+    );
   }, [navigation, weakestPillar]);
 
   // ── Entry choreography (cascade) ───────────────────────────────────────────

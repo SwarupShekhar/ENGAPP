@@ -15,18 +15,36 @@ export class SkillsBuilder {
 
     const totalSessions = user.totalSessions || 0;
 
-    const latestAnalysis = await this.prisma.analysis.findFirst({
-      where: { participant: { userId } },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        mistakes: true,
-        pronunciationIssues: true,
-      },
-    });
+    const PILLAR_TAGS = ['pronunciation', 'fluency', 'grammar', 'vocabulary', 'comprehension'];
+    const [topicScores, latestAnalysis, latestAssessment] = await Promise.all([
+      this.prisma.userTopicScore.findMany({
+        where: {
+          userId,
+          topicTag: { in: PILLAR_TAGS.map((t) => `pillar_${t}`) },
+        },
+      }),
+      this.prisma.analysis.findFirst({
+        where: { participant: { userId } },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          mistakes: true,
+          pronunciationIssues: true,
+        },
+      }),
+      this.prisma.assessmentSession.findFirst({
+        where: { userId, status: 'COMPLETED' },
+        orderBy: { completedAt: 'desc' },
+      }),
+    ]);
 
-    let currentScores = latestAnalysis?.scores as any;
+    const pillarMap: Record<string, number> = {};
+    for (const ts of topicScores) {
+      const key = ts.topicTag.replace('pillar_', '');
+      pillarMap[key] = Math.round(Number(ts.score) || 0);
+    }
+    const pillarSum = PILLAR_TAGS.reduce((sum, k) => sum + (pillarMap[k] ?? 0), 0);
+    const hasUsefulPillarData = topicScores.length > 0 && pillarSum > 0;
 
-    // Check if the latest analysis scores are actually useful (not all zeros)
     const isAllZero = (scores: any) => {
       if (!scores) return true;
       return (
@@ -37,16 +55,12 @@ export class SkillsBuilder {
       );
     };
 
-    if (!latestAnalysis || isAllZero(currentScores)) {
-      const latestAssessment = await this.prisma.assessmentSession.findFirst({
-        where: { userId, status: 'COMPLETED' },
-        orderBy: { completedAt: 'desc' },
-      });
-
-      if (latestAssessment && latestAssessment.skillBreakdown) {
-        currentScores = this.flattenSkills(latestAssessment.skillBreakdown);
+    let fallbackScores: any = latestAnalysis?.scores;
+    if (!latestAnalysis || isAllZero(fallbackScores)) {
+      if (latestAssessment?.skillBreakdown) {
+        fallbackScores = this.flattenSkills(latestAssessment.skillBreakdown);
       } else {
-        currentScores = {
+        fallbackScores = {
           fluency: user.assessmentScore || 50,
           grammar: user.assessmentScore || 50,
           vocabulary: user.assessmentScore || 50,
@@ -54,6 +68,21 @@ export class SkillsBuilder {
         };
       }
     }
+
+    const currentScores = {
+      pronunciation: hasUsefulPillarData
+        ? (pillarMap.pronunciation ?? fallbackScores.pronunciation ?? 0)
+        : (fallbackScores.pronunciation ?? 0),
+      fluency: hasUsefulPillarData
+        ? (pillarMap.fluency ?? fallbackScores.fluency ?? 0)
+        : (fallbackScores.fluency ?? 0),
+      grammar: hasUsefulPillarData
+        ? (pillarMap.grammar ?? fallbackScores.grammar ?? 0)
+        : (fallbackScores.grammar ?? 0),
+      vocabulary: hasUsefulPillarData
+        ? (pillarMap.vocabulary ?? fallbackScores.vocabulary ?? 0)
+        : (fallbackScores.vocabulary ?? 0),
+    };
 
     // Process detailed insights for each skill
     const skillDetails = this.formatSkillDetails(latestAnalysis, currentScores);

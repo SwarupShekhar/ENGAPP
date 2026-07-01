@@ -181,21 +181,20 @@ export default function ConnectHeroCard({
   onMayaFallback,
   reduceMotion,
 }: ConnectHeroCardProps) {
-  // Floor: never show below 5, copy changes when floored
-  const displayCount = Math.max(onlineCount, 5);
-  const isFloored = onlineCount < 5;
-  const liveLabel = isFloored
-    ? `${displayCount} learners around the world`
-    : `${displayCount} learners practicing now`;
+  const displayCount = Math.max(0, onlineCount);
+  const liveLabel =
+    displayCount === 0
+      ? 'Be the first — learners join throughout the day'
+      : displayCount === 1
+        ? '1 learner practicing now'
+        : `${displayCount} learners practicing now`;
 
   // Clamp avatars to max 4
   const clampedAvatars = avatars.slice(0, 4);
 
-  // Avatar list: if empty, show 3 placeholders
+  // Avatar list: show real peers only; skip decorative placeholders when alone.
   const avatarItems: Array<string | null> =
-    clampedAvatars.length > 0
-      ? clampedAvatars
-      : [null, null, null];
+    clampedAvatars.length > 0 ? clampedAvatars : [];
 
   // Button press scale
   const btnScale = useSharedValue(1);
@@ -243,16 +242,18 @@ export default function ConnectHeroCard({
         </View>
 
         {/* ── Avatar stack ── */}
-        <View style={styles.avatarRow}>
-          {avatarItems.map((initials, i) => (
-            <AvatarCircle
-              key={i}
-              initials={initials}
-              index={i}
-              reduceMotion={reduceMotion}
-            />
-          ))}
-        </View>
+        {avatarItems.length > 0 ? (
+          <View style={styles.avatarRow}>
+            {avatarItems.map((initials, i) => (
+              <AvatarCircle
+                key={i}
+                initials={initials}
+                index={i}
+                reduceMotion={reduceMotion}
+              />
+            ))}
+          </View>
+        ) : null}
 
         {/* ── Find a Partner CTA ── */}
         <Animated.View style={btnStyle}>
@@ -297,8 +298,9 @@ const styles = StyleSheet.create({
 
   inner: {
     backgroundColor: homeTheme.cardFill,
-    padding: homeTheme.cardPadding,
-    gap: 16,
+    paddingHorizontal: homeTheme.cardPadding,
+    paddingVertical: 12,
+    gap: 10,
   },
 
   // Live indicator row
@@ -326,9 +328,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(109,40,217,0.18)',
     borderWidth: 1,
     borderColor: homeTheme.cardBorder,
@@ -348,8 +350,8 @@ const styles = StyleSheet.create({
   // CTA button
   ctaButton: {
     backgroundColor: homeTheme.action,
-    borderRadius: 14,
-    height: 52,
+    borderRadius: 12,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -368,13 +370,13 @@ const styles = StyleSheet.create({
   mayaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 2,
+    gap: 8,
+    paddingVertical: 0,
   },
   mayaIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: 'rgba(109,40,217,0.18)',
     alignItems: 'center',
     justifyContent: 'center',

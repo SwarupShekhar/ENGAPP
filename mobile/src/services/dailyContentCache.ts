@@ -169,8 +169,8 @@ export function mergeHomeWithDailyContent(
   const homeWord = home.wordOfTheDay as DailyWord | undefined;
   return {
     ...rest,
-    phraseOfTheDay: mergeDailyPhraseFields(daily?.phraseOfTheDay, homePhrase),
-    wordOfTheDay: mergeDailyWordFields(daily?.wordOfTheDay, homeWord),
+    phraseOfTheDay: daily?.phraseOfTheDay ?? homePhrase,
+    wordOfTheDay: daily?.wordOfTheDay ?? homeWord,
   };
 }
 
@@ -181,7 +181,17 @@ export async function patchDailyContentFromPush(
   await patchDailyContent(patch);
 }
 
-/** Merge /home daily fields into dated cache; always refresh listenAudio when the API sends it. */
+function dailyTextChanged(
+  existing: DailyPhrase | DailyWord | null | undefined,
+  incoming: DailyPhrase | DailyWord,
+  textKey: "phrase" | "word",
+): boolean {
+  const prev = (existing as Record<string, string | undefined>)?.[textKey]?.trim();
+  const next = (incoming as Record<string, string | undefined>)?.[textKey]?.trim();
+  return Boolean(next && prev !== next);
+}
+
+/** Merge /home daily fields into dated cache; API text always wins; refresh listenAudio when sent. */
 export async function setDailyContentForToday(
   patch: Partial<Pick<DailyContent, "phraseOfTheDay" | "wordOfTheDay">>,
 ): Promise<void> {
@@ -198,7 +208,12 @@ export async function setDailyContentForToday(
       existing?.phraseOfTheDay?.listenAudio,
       patch.phraseOfTheDay.listenAudio,
     );
-    if (!existing?.phraseOfTheDay || audioArrived) {
+    const textChanged = dailyTextChanged(
+      existing?.phraseOfTheDay,
+      patch.phraseOfTheDay,
+      "phrase",
+    );
+    if (!existing?.phraseOfTheDay || audioArrived || textChanged) {
       toPatch.phraseOfTheDay = merged ?? patch.phraseOfTheDay;
     }
   }
@@ -209,7 +224,12 @@ export async function setDailyContentForToday(
       existing?.wordOfTheDay?.listenAudio,
       patch.wordOfTheDay.listenAudio,
     );
-    if (!existing?.wordOfTheDay || audioArrived) {
+    const textChanged = dailyTextChanged(
+      existing?.wordOfTheDay,
+      patch.wordOfTheDay,
+      "word",
+    );
+    if (!existing?.wordOfTheDay || audioArrived || textChanged) {
       toPatch.wordOfTheDay = merged ?? patch.wordOfTheDay;
     }
   }

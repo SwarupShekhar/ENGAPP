@@ -1,5 +1,5 @@
 /** Bump APP_CACHE_SCHEMA_VERSION when invalidating on-disk caches. */
-export const APP_CACHE_SCHEMA_VERSION = 3;
+export const APP_CACHE_SCHEMA_VERSION = 4;
 export const APP_CACHE_SCHEMA_KEY = "@app_cache_schema_version";
 
 export const HOME_DATA_CACHE_KEY = "@home_data_cache_v3";

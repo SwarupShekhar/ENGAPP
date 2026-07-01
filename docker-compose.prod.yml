@@ -56,7 +56,9 @@ services:
       # Coaching context (Maya tutor) reads REDIS_URL — must point at the same Redis as backend-nest.
       # Set REDIS_URL in backend-ai/.env on the server (not localhost inside Docker).
     ports:
-      - "0.0.0.0:4002:8001"
+      # Host 8001 is used by vaidik_backend on this VPS — publish AI on 4010 instead.
+      # Container still listens on 8001; Nest reaches it via http://backend-ai:8001 on the Docker network.
+      - "0.0.0.0:4010:8001"
     restart: unless-stopped
     networks:
       - internal

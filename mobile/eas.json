@@ -18,14 +18,14 @@
       },
       "env": {
         "EXPO_PUBLIC_NEST_API_URL": "https://api.englivo.com",
-        "ENGLIVO_WS_URL_OVERRIDE": "ws://139.84.163.249:4002"
+        "ENGLIVO_WS_URL_OVERRIDE": "ws://139.84.163.249:4010"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_NEST_API_URL": "https://api.englivo.com",
-        "ENGLIVO_WS_URL_OVERRIDE": "ws://139.84.163.249:4002"
+        "ENGLIVO_WS_URL_OVERRIDE": "ws://139.84.163.249:4010"
       }
     }
   },
