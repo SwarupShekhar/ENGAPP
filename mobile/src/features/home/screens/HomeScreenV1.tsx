@@ -731,6 +731,7 @@ export default function HomeScreen() {
 
   // Entry choreography fires ONCE per cold land, not on every tab refocus.
   const hasPlayedEntry = useRef(false);
+  const authRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playEntry = !reduceMotion && !hasPlayedEntry.current;
 
   const c = theme.colors;
@@ -756,6 +757,15 @@ export default function HomeScreen() {
   // Mark entry as played after first render so refocus renders the final state.
   useEffect(() => {
     hasPlayedEntry.current = true;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (authRetryTimerRef.current) {
+        clearTimeout(authRetryTimerRef.current);
+        authRetryTimerRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -810,15 +820,32 @@ export default function HomeScreen() {
     }
     // Pull-to-refresh: keep showing cached content; only the RefreshControl spinner.
 
+    let skippedForAuth = false;
     try {
       let token = await getNestAuthToken();
-      for (let i = 0; i < 4 && !token; i += 1) {
+      for (let i = 0; i < 8 && !token; i += 1) {
         await new Promise((r) => setTimeout(r, 350));
         token = await getNestAuthToken();
       }
       if (!token) {
-        console.warn('[HomeV1] home fetch skipped — no auth token yet');
+        skippedForAuth = true;
+        console.warn('[HomeV1] home fetch deferred — waiting for auth token');
+        if (!homeCache.hasSnapshot()) {
+          setLoadingHome(true);
+        }
+        if (authRetryTimerRef.current) {
+          clearTimeout(authRetryTimerRef.current);
+        }
+        authRetryTimerRef.current = setTimeout(() => {
+          authRetryTimerRef.current = null;
+          void loadHome({ forceFresh });
+        }, 1500);
         return;
+      }
+
+      if (authRetryTimerRef.current) {
+        clearTimeout(authRetryTimerRef.current);
+        authRetryTimerRef.current = null;
       }
 
       const fresh = await getHomeData();
@@ -831,8 +858,10 @@ export default function HomeScreen() {
     } catch (e) {
       console.warn('[HomeV1] home data:', e);
     } finally {
-      setLoadingHome(false);
-      setRefreshingHome(false);
+      if (!skippedForAuth) {
+        setLoadingHome(false);
+        setRefreshingHome(false);
+      }
     }
   }, []);
 

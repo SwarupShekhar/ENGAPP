@@ -130,3 +130,5 @@ archive/
 Pods/
 .eas-logs/
 # ci: noop trigger commit
+
+appprelaunchchecklist.md

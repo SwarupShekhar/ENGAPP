@@ -100,32 +100,33 @@ class HomeCacheService {
     return withDaily;
   }
 
-  async prefetch(retryCount = 0): Promise<void> {
+  private async doPrefetchAttempt(retryCount: number): Promise<void> {
+    let token = await getNestAuthToken();
+    for (let i = 0; i < 4 && !token; i += 1) {
+      await new Promise((r) => setTimeout(r, 350));
+      token = await getNestAuthToken();
+    }
+    if (!token) return;
+
+    try {
+      const fresh = await getHomeData();
+      await this.persistFresh(fresh);
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if ((status === 401 || status === 403) && retryCount < 2) {
+        await new Promise((r) => setTimeout(r, 1200));
+        return this.doPrefetchAttempt(retryCount + 1);
+      }
+      console.warn("[HomeCache] prefetch failed:", status ?? e?.message ?? e);
+    }
+  }
+
+  async prefetch(): Promise<void> {
     if (this.prefetchPromise) return this.prefetchPromise;
 
-    this.prefetchPromise = (async () => {
-      try {
-        let token = await getNestAuthToken();
-        for (let i = 0; i < 4 && !token; i += 1) {
-          await new Promise((r) => setTimeout(r, 350));
-          token = await getNestAuthToken();
-        }
-        if (!token) return;
-
-        const fresh = await getHomeData();
-        await this.persistFresh(fresh);
-      } catch (e: any) {
-        const status = e?.response?.status;
-        if ((status === 401 || status === 403) && retryCount < 2) {
-          await new Promise((r) => setTimeout(r, 1200));
-          await this.prefetch(retryCount + 1);
-          return;
-        }
-        console.warn("[HomeCache] prefetch failed:", status ?? e?.message ?? e);
-      } finally {
-        this.prefetchPromise = null;
-      }
-    })();
+    this.prefetchPromise = this.doPrefetchAttempt(0).finally(() => {
+      this.prefetchPromise = null;
+    });
 
     return this.prefetchPromise;
   }
