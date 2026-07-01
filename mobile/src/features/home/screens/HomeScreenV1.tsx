@@ -54,7 +54,7 @@ import {
 } from '../../../services/dailyContentCache';
 import { HOME_DATA_CACHE_KEY, utcTodayKey } from '../../../services/cacheKeys';
 import HomeCacheService from '../../../services/homeCacheService';
-import { getNestAuthToken } from '../../../api/client';
+import { client, getNestAuthToken } from '../../../api/client';
 import { tasksApi, type LearningTask } from '../../../api/tasks';
 import { DailyListenVoiceModal } from '../../../components/settings/DailyListenVoiceModal';
 import type { DailyListenVoice } from '../../../types/dailyListenVoice';
@@ -249,6 +249,101 @@ function cefrKey(l: string): LevelKey {
 function nextCefr(l: string): string {
   const i = LEVEL_ORDER.indexOf(l.toLowerCase().replace('-',''));
   return i >= 0 && i < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[i+1].toUpperCase() : 'C2';
+}
+
+function readClerkAssessmentCompleted(user: { unsafeMetadata?: unknown } | null | undefined): boolean {
+  const meta = (user?.unsafeMetadata ?? {}) as Record<string, unknown>;
+  return meta.assessmentCompleted === true;
+}
+
+function homeNeedsProgressFallback(data: HomeData | null | undefined): boolean {
+  if (!data?.header) return true;
+  const score = Number(data.header.score ?? 0);
+  const latestId = data.header.latestAssessmentId;
+  const level = (data.header.level ?? '').trim();
+  return score <= 0 && !latestId && !level;
+}
+
+async function fetchProgressHomePatch(): Promise<Partial<HomeData> | null> {
+  try {
+    const { data } = await client.get<{
+      current?: {
+        overallScore?: number;
+        cefrLevel?: string;
+        grammar?: number;
+        pronunciation?: number;
+        fluency?: number;
+        vocabulary?: number;
+      };
+      streak?: number;
+    }>('/progress/detailed-metrics');
+    const current = data?.current;
+    if (!current) return null;
+    const score = Number(current.overallScore ?? 0);
+    const level = (current.cefrLevel ?? '').trim();
+    if (score <= 0 && !level) return null;
+
+    return {
+      header: {
+        greeting: '',
+        userName: '',
+        level: level || 'A2',
+        score,
+        streak: Number(data?.streak ?? 0),
+        percentile: null,
+        specialBadge: null,
+        scoreDelta: null,
+        dailyGoalDone: 0,
+        dailyGoalTarget: 3,
+        xpToday: 0,
+        goalTarget: 70,
+        goalLabel: level ? `Reach ${level}` : 'Next Level',
+        lastSessionDate: null,
+        latestAssessmentId: null,
+      },
+      skills: {
+        scores: {
+          grammar: Number(current.grammar ?? 0),
+          pronunciation: Number(current.pronunciation ?? 0),
+          fluency: Number(current.fluency ?? 0),
+          vocabulary: Number(current.vocabulary ?? 0),
+        },
+      } as HomeData['skills'],
+    };
+  } catch (e) {
+    if (__DEV__) console.warn('[HomeV1] progress fallback failed:', e);
+    return null;
+  }
+}
+
+function mergeHomeWithProgress(
+  base: HomeData | null | undefined,
+  patch: Partial<HomeData>,
+): HomeData {
+  const baseHeader = base?.header;
+  const patchHeader = patch.header;
+  const baseSkills = base?.skills;
+  const patchSkills = patch.skills;
+  return {
+    stage: base?.stage ?? 1,
+    header: { ...baseHeader, ...patchHeader } as HomeData['header'],
+    primaryCTA: base?.primaryCTA ?? patch.primaryCTA!,
+    skills: {
+      ...(baseSkills ?? {}),
+      ...(patchSkills ?? {}),
+      scores: {
+        ...(baseSkills?.scores ?? {}),
+        ...(patchSkills?.scores ?? {}),
+      },
+    } as HomeData['skills'],
+    contextualCards: base?.contextualCards ?? [],
+    weeklyActivity: base?.weeklyActivity ?? [],
+    phraseOfTheDay: base?.phraseOfTheDay,
+    wordOfTheDay: base?.wordOfTheDay,
+    dailyPracticeStatus: base?.dailyPracticeStatus,
+    community: base?.community ?? { onlineCount: 0, avatars: [] },
+    listenVoicePreference: base?.listenVoicePreference,
+  };
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -732,6 +827,8 @@ export default function HomeScreen() {
   // Entry choreography fires ONCE per cold land, not on every tab refocus.
   const hasPlayedEntry = useRef(false);
   const authRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const authRetryCountRef = useRef(0);
+  const MAX_AUTH_RETRIES = 12;
   const playEntry = !reduceMotion && !hasPlayedEntry.current;
 
   const c = theme.colors;
@@ -774,6 +871,22 @@ export default function HomeScreen() {
     setListenVoice(pref.voice);
     setShowVoicePicker(!pref.chosen);
   }, [homeData?.listenVoicePreference]);
+
+  const clerkAssessed = readClerkAssessmentCompleted(user);
+
+  const applyProgressFallbackIfNeeded = useCallback(
+    async (current: HomeData | null | undefined, assessed: boolean): Promise<HomeData | null> => {
+      if (!assessed || !homeNeedsProgressFallback(current)) {
+        return current ?? null;
+      }
+      const patch = await fetchProgressHomePatch();
+      if (!patch) return current ?? null;
+      const merged = mergeHomeWithProgress(current, patch);
+      HomeCacheService.getInstance().setSnapshot(merged);
+      return merged;
+    },
+    [],
+  );
 
   const loadHome = useCallback(async (options?: { forceFresh?: boolean }) => {
     const forceFresh = options?.forceFresh === true;
@@ -833,15 +946,29 @@ export default function HomeScreen() {
         if (!homeCache.hasSnapshot()) {
           setLoadingHome(true);
         }
-        if (authRetryTimerRef.current) {
-          clearTimeout(authRetryTimerRef.current);
+        if (authRetryCountRef.current < MAX_AUTH_RETRIES) {
+          authRetryCountRef.current += 1;
+          if (authRetryTimerRef.current) {
+            clearTimeout(authRetryTimerRef.current);
+          }
+          authRetryTimerRef.current = setTimeout(() => {
+            authRetryTimerRef.current = null;
+            void loadHome({ forceFresh });
+          }, 1500);
+        } else if (clerkAssessed) {
+          skippedForAuth = false;
+          const fallback = await applyProgressFallbackIfNeeded(
+            homeCache.getSnapshot(),
+            clerkAssessed,
+          );
+          if (fallback) {
+            setHomeData(mergeDailyFields(fallback));
+          }
         }
-        authRetryTimerRef.current = setTimeout(() => {
-          authRetryTimerRef.current = null;
-          void loadHome({ forceFresh });
-        }, 1500);
         return;
       }
+
+      authRetryCountRef.current = 0;
 
       if (authRetryTimerRef.current) {
         clearTimeout(authRetryTimerRef.current);
@@ -850,20 +977,37 @@ export default function HomeScreen() {
 
       const fresh = await getHomeData();
       datedDaily = await getDailyContentForToday();
-      const withDaily = await homeCache.persistFresh(fresh);
+      let withDaily = await homeCache.persistFresh(fresh);
+      withDaily =
+        (await applyProgressFallbackIfNeeded(withDaily, clerkAssessed)) ?? withDaily;
       setHomeData(mergeDailyFields(withDaily));
       if (forceFresh) {
         void tasksApi.loadPracticeCarouselTasks().catch(() => {});
       }
     } catch (e) {
       console.warn('[HomeV1] home data:', e);
+      if (clerkAssessed) {
+        const fallback = await applyProgressFallbackIfNeeded(
+          homeCache.getSnapshot(),
+          clerkAssessed,
+        );
+        if (fallback) {
+          setHomeData(mergeDailyFields(fallback));
+        }
+      }
     } finally {
       if (!skippedForAuth) {
         setLoadingHome(false);
         setRefreshingHome(false);
       }
     }
-  }, []);
+  }, [applyProgressFallbackIfNeeded, clerkAssessed]);
+
+  useEffect(() => {
+    if (!isLoaded || !user?.id) return;
+    authRetryCountRef.current = 0;
+    void loadHome();
+  }, [isLoaded, user?.id, loadHome]);
 
   const onRefreshHome = useCallback(() => {
     setRefreshingHome(true);
@@ -988,7 +1132,8 @@ export default function HomeScreen() {
     Boolean(lastSessionDate) ||
     hasSkillScores ||
     (homeData?.stage ?? 0) > 1 ||
-    Boolean(bridgeLevel);
+    Boolean(bridgeLevel) ||
+    clerkAssessed;
   const levelForUi   = level || '—';
   const initials     = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`.toUpperCase() || '?';
 
