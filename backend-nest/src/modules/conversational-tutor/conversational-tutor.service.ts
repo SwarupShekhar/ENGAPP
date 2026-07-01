@@ -6,6 +6,7 @@ import { Queue } from 'bull';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { firstValueFrom } from 'rxjs';
 import { aiEngineAuthHeaders } from '../../common/ai-engine-auth';
+import { DAILY_LISTEN_VOICES, DailyListenVoice } from '../home/utils/daily-listen-script';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { WeaknessService } from '../reels/weakness.service';
 import { InCallCoachingService } from '../in-call-coaching/in-call-coaching.service';
@@ -186,6 +187,56 @@ export class ConversationalTutorService implements OnModuleInit {
   }
 
   async onModuleInit() {
+    const kittenEnabled =
+      this.configService.get<string>('KITTEN_TTS_ENABLED') !== 'false';
+    if (kittenEnabled) {
+      await this.warmKittenTtsCache();
+    } else {
+      await this.warmLegacyTtsCache();
+    }
+    if (this.ttsCache.size > 0) {
+      this.logger.log(`TTS cache warmed: ${this.ttsCache.size} phrases`);
+    }
+  }
+
+  private async warmKittenTtsCache(): Promise<void> {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let warmed = 0;
+      for (const voice of DAILY_LISTEN_VOICES) {
+        for (const phrase of TTS_CACHE_PHRASES) {
+          const cacheKey = `${voice}:${phrase.trim()}`;
+          if (this.ttsCache.has(cacheKey)) continue;
+          try {
+            const response = await firstValueFrom(
+              this.httpService.post(
+                `${this.aiBackendUrl}/api/tts/kitten/speak`,
+                { text: phrase, voice },
+                this.withAiAuth(),
+              ),
+            );
+            const base64 = response.data?.audio_base64;
+            if (base64) {
+              this.ttsCache.set(cacheKey, base64);
+              warmed += 1;
+            }
+          } catch (e) {
+            this.logger.warn(
+              `Kitten TTS cache skip "${phrase}" (${voice}): ${(e as Error).message}`,
+            );
+          }
+        }
+      }
+      if (warmed === 0 || this.ttsCache.size >= TTS_CACHE_PHRASES.length * DAILY_LISTEN_VOICES.length) {
+        return;
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      }
+    }
+  }
+
+  private async warmLegacyTtsCache(): Promise<void> {
     for (const phrase of TTS_CACHE_PHRASES) {
       try {
         const response = await firstValueFrom(
@@ -200,14 +251,11 @@ export class ConversationalTutorService implements OnModuleInit {
         );
         const base64 = response.data?.data?.audio_base64;
         if (base64) {
-          this.ttsCache.set(phrase.trim(), base64);
+          this.ttsCache.set(`Kiki:${phrase.trim()}`, base64);
         }
       } catch (e) {
         this.logger.warn(`TTS cache skip "${phrase}": ${(e as Error).message}`);
       }
-    }
-    if (this.ttsCache.size > 0) {
-      this.logger.log(`TTS cache warmed: ${this.ttsCache.size} phrases`);
     }
   }
 
@@ -304,10 +352,21 @@ export class ConversationalTutorService implements OnModuleInit {
     }
   }
 
+  private async getUserListenVoice(userId: string): Promise<DailyListenVoice> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { dailyListenVoice: true },
+    });
+    return user?.dailyListenVoice === 'Jasper' ? 'Jasper' : 'Kiki';
+  }
+
   // ─── Existing: Synthesize Hinglish via AI Engine ───────────
 
-  async synthesizeHinglish(text: string): Promise<string> {
-    const key = text.trim();
+  async synthesizeHinglish(
+    text: string,
+    voice: DailyListenVoice = 'Kiki',
+  ): Promise<string> {
+    const key = `${voice}:${text.trim()}`;
     const cached = this.ttsCache.get(key);
     if (cached) return cached;
     try {
@@ -1051,8 +1110,9 @@ export class ConversationalTutorService implements OnModuleInit {
 
     // Step 4: Synthesize AI response to speech
     const responseText = aiResult.response || '';
+    const listenVoice = await this.getUserListenVoice(userId);
     const audioBase64Response = responseText
-      ? await this.synthesizeHinglish(responseText)
+      ? await this.synthesizeHinglish(responseText, listenVoice)
       : '';
 
     return {
@@ -1077,7 +1137,8 @@ export class ConversationalTutorService implements OnModuleInit {
     const name = user?.fname || 'Friend';
     const message = `Hi ${name}, I'm Maya, your English tutor. Hold the mic and start speaking — I'll listen and help you sound more natural.`;
 
-    const audioBase64 = await this.synthesizeHinglish(message);
+    const listenVoice = await this.getUserListenVoice(userId);
+    const audioBase64 = await this.synthesizeHinglish(message, listenVoice);
 
     return { message, audioBase64 };
   }

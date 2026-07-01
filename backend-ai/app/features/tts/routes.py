@@ -7,6 +7,7 @@ from typing import List, Optional
 from app.features.tts.narration_service import build_narration_script, build_full_feedback_script
 from app.features.transcription.inworld_tts_service import inworld_tts_service
 from app.features.transcription.google_gemini_tts_service import google_gemini_tts_service
+from app.features.transcription.kitten_tts_service import kitten_tts_service
 from app.api.deps import get_logger
 
 router = APIRouter(prefix="/tts", tags=["TTS"])
@@ -145,3 +146,51 @@ async def speak(request: Request, body: SpeakRequest):
 
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     return FeedbackNarrationResponse(audio_base64=audio_b64, text=clean)
+
+
+class KittenSpeakRequest(BaseModel):
+    text: str
+    voice: str = "Kiki"
+
+
+class KittenSpeakResponse(BaseModel):
+    audio_base64: str
+    text: str
+    voice: str
+    content_type: str = "audio/mpeg"
+
+
+@router.post("/kitten/speak", response_model=KittenSpeakResponse)
+async def kitten_speak(request: Request, body: KittenSpeakRequest):
+    """Local CPU TTS for daily phrase/word and static ack clips."""
+    log = get_logger(request)
+    clean = (body.text or "").strip()
+    voice = (body.voice or "Kiki").strip()
+    if not clean:
+        return KittenSpeakResponse(audio_base64="", text="", voice=voice)
+
+    if not kitten_tts_service.is_enabled():
+        log.warning("kitten_speak_disabled")
+        return KittenSpeakResponse(audio_base64="", text=clean, voice=voice)
+
+    start = time.time()
+    audio_bytes = await kitten_tts_service.synthesize_async(clean, voice=voice)
+    if not audio_bytes:
+        log.error("kitten_speak_failed text_len=%s voice=%s", len(clean), voice)
+        return KittenSpeakResponse(audio_base64="", text=clean, voice=voice)
+
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    ms = int((time.time() - start) * 1000)
+    log.info(
+        "kitten_speak_completed ms=%s voice=%s text_len=%s audio_bytes=%s",
+        ms,
+        voice,
+        len(clean),
+        len(audio_bytes),
+    )
+    return KittenSpeakResponse(
+        audio_base64=audio_b64,
+        text=clean,
+        voice=voice,
+        content_type="audio/mpeg",
+    )

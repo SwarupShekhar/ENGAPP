@@ -30,6 +30,11 @@ export interface NotificationPreferences {
     practiceRemindersEnabled: boolean;
 }
 
+export interface ListenVoicePreference {
+    voice: 'Kiki' | 'Jasper';
+    chosen: boolean;
+}
+
 export interface TestNotificationResult {
     ok: boolean;
     pushConfigured: boolean;
@@ -69,6 +74,18 @@ export const userApi = {
             '/users/me/notification-preferences',
             prefs,
         );
+        return response.data;
+    },
+
+    getListenVoice: async (): Promise<ListenVoicePreference> => {
+        const response = await client.get('/users/me/listen-voice');
+        return response.data;
+    },
+
+    updateListenVoice: async (
+        prefs: Partial<ListenVoicePreference>,
+    ): Promise<ListenVoicePreference> => {
+        const response = await client.patch('/users/me/listen-voice', prefs);
         return response.data;
     },
 

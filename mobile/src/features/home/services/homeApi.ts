@@ -58,12 +58,18 @@ export interface HomeData {
     example: string;
     partOfSpeech?: string | null;
     source?: string;
+    listenAudio?: { Kiki?: string; Jasper?: string };
   };
   phraseOfTheDay?: {
     phrase: string;
     definition: string;
     example: string;
     source?: string;
+    listenAudio?: { Kiki?: string; Jasper?: string };
+  };
+  listenVoicePreference?: {
+    voice: 'Kiki' | 'Jasper';
+    chosen: boolean;
   };
   dailyPracticeStatus?: {
     date: string;

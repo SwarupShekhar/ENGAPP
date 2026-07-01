@@ -26,7 +26,7 @@ export class HomeService {
   async getHomeData(userId: string) {
     const stage = await this.stageResolver.getCachedStage(userId);
 
-    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay, phraseOfTheDay, dailyPracticeStatus, community] =
+    const [header, primaryCTA, skills, contextualCards, weeklyActivity, wordOfTheDay, phraseOfTheDay, dailyPracticeStatus, community, listenVoicePreference] =
       await Promise.all([
         this.headerBuilder.buildHeaderData(userId, stage),
         this.ctaBuilder.buildPrimaryCTA(userId, stage),
@@ -37,6 +37,7 @@ export class HomeService {
         this.phraseOfDayService.getPhraseOfTheDay(),
         this.getDailyPracticeStatus(userId),
         this.communityBuilder.buildCommunityData(userId),
+        this.getListenVoicePreference(userId),
       ]);
 
     return {
@@ -50,6 +51,19 @@ export class HomeService {
       phraseOfTheDay,
       dailyPracticeStatus,
       community,
+      listenVoicePreference,
+    };
+  }
+
+  private async getListenVoicePreference(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { dailyListenVoice: true, dailyListenVoiceChosen: true },
+    });
+    const voice = user?.dailyListenVoice === 'Jasper' ? 'Jasper' : 'Kiki';
+    return {
+      voice,
+      chosen: user?.dailyListenVoiceChosen ?? false,
     };
   }
 

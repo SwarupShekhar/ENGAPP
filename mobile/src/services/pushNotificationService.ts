@@ -403,11 +403,9 @@ class PushNotificationService {
         navigate("MainTabs", { screen: "Home" });
         break;
       case "word_of_day":
-        navigate("WordOfDay", {
-          word: flat.word as string | undefined,
-          definition: flat.definition as string | undefined,
-          example: flat.example as string | undefined,
-          partOfSpeech: flat.partOfSpeech as string | undefined,
+        navigate("MainTabs", {
+          screen: "Home",
+          params: { scrollToDaily: "word" },
         });
         break;
       case "phrase_of_day":

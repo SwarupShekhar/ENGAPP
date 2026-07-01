@@ -63,9 +63,10 @@ export function useHomePracticeTts() {
   }, []);
 
   const speak = useCallback(
-    async (key: string, text: string) => {
+    async (key: string, text: string, options?: { audioUrl?: string }) => {
       const trimmed = text.trim();
-      if (!trimmed) {
+      const directUrl = options?.audioUrl?.trim();
+      if (!trimmed && !directUrl) {
         if (__DEV__) console.warn('[HomePractice] listen skipped — empty script');
         return;
       }
@@ -101,7 +102,7 @@ export function useHomePracticeTts() {
       try {
         await setPlaybackAudioMode();
 
-        const textDigest = (await hashInput(trimmed)).slice(0, 16);
+        const textDigest = (await hashInput(trimmed || directUrl || key)).slice(0, 16);
         const storageKey = `${key}:${textDigest}`;
         const fetchB64 = () =>
           fetchErrorSpeak(trimmed)
@@ -149,7 +150,20 @@ export function useHomePracticeTts() {
           return;
         }
 
-        // Server neural TTS only — avoids robotic device voice + double-play overlap.
+        if (directUrl) {
+          const ok = await playUri(directUrl);
+          if (ok) return;
+          if (__DEV__) {
+            console.warn('[HomePractice] pre-baked audio failed — falling back to server TTS');
+          }
+        }
+
+        if (!trimmed) {
+          clearPlaying();
+          return;
+        }
+
+        // Server neural TTS — pre-baked URL miss/expiry or no URL provided.
         const uri = await getOrFetchTtsFileUri(storageKey, fetchB64);
         if (!isActive()) return;
         if (!uri) {

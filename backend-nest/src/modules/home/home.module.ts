@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { HomeController } from './home.controller';
 import { HomeService } from './home.service';
 import { StageResolverService } from './services/stage-resolver.service';
@@ -14,9 +15,10 @@ import { RedisModule } from '../../redis/redis.module';
 import { BrainModule } from '../brain/brain.module';
 import { WordOfDayService } from './services/word-of-day.service';
 import { PhraseOfDayService } from './services/phrase-of-day.service';
+import { DailyTtsService } from './services/daily-tts.service';
 
 @Module({
-  imports: [PrismaModule, RedisModule, BrainModule],
+  imports: [PrismaModule, RedisModule, BrainModule, HttpModule],
   controllers: [HomeController],
   providers: [
     HomeService,
@@ -30,7 +32,8 @@ import { PhraseOfDayService } from './services/phrase-of-day.service';
     WeeklySummaryBuilder,
     WordOfDayService,
     PhraseOfDayService,
+    DailyTtsService,
   ],
-  exports: [HomeService, SessionHandlerService, WordOfDayService, PhraseOfDayService],
+  exports: [HomeService, SessionHandlerService, WordOfDayService, PhraseOfDayService, DailyTtsService],
 })
 export class HomeModule {}

@@ -75,6 +75,8 @@ public/uploads/
 # Catch-all: all Markdown stays local unless you force-add (don't).
 *.md
 docs/
+docs/cost.md
+cost.md
 .planning/
 PRD.md
 Swarup.md

@@ -17,6 +17,8 @@ librosa>=0.10.2
 soundfile>=0.12.1
 pydub>=0.25.1
 numpy>=1.26.0
+# Local CPU TTS for daily phrase/word + static acks (Kitten TTS Mini 0.8)
+https://github.com/KittenML/KittenTTS/releases/download/0.8/kittentts-0.8.0-py3-none-any.whl
 
 # ML/NLP
 nltk>=3.8.1

@@ -19,6 +19,7 @@ export type WordOfDayParams = {
   definition?: string;
   example?: string;
   partOfSpeech?: string | null;
+  listenAudioUrl?: string;
 };
 
 type WordOfDayRoute = RouteProp<{ WordOfDay: WordOfDayParams }, "WordOfDay">;
@@ -28,7 +29,7 @@ export default function WordOfDayScreen() {
   const styles = getStyles(theme);
   const navigation = useNavigation();
   const route = useRoute<WordOfDayRoute>();
-  const { word, definition, example, partOfSpeech } = route.params ?? {};
+  const { word, definition, example, partOfSpeech, listenAudioUrl } = route.params ?? {};
 
   const displayWord = word?.trim() || "Word of the day";
   const displayDef =
@@ -96,7 +97,7 @@ export default function WordOfDayScreen() {
         <Pressable
           onPress={() => {
             if (listenPlaying) void stop();
-            else void speak(listenKey, listenScript);
+            else void speak(listenKey, listenScript, { audioUrl: listenAudioUrl });
           }}
           style={({ pressed }) => [
             styles.listenBtn,

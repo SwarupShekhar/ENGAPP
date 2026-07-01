@@ -57,6 +57,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** SET key value NX — returns true when this caller won the race. */
+  async setNx(key: string, value: string, expireInSeconds?: number): Promise<boolean> {
+    const result = expireInSeconds
+      ? await this.client.set(key, value, 'EX', expireInSeconds, 'NX')
+      : await this.client.set(key, value, 'NX');
+    return result === 'OK';
+  }
+
   async incr(key: string): Promise<number> {
     return await this.client.incr(key);
   }

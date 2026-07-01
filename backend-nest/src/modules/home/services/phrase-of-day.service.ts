@@ -1,12 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../../../redis/redis.service';
+import { DailyTtsService } from './daily-tts.service';
+import { PhraseOfDay } from '../types/daily-content.types';
 
-export interface PhraseOfDay {
-  phrase: string;
-  definition: string;
-  example: string;
-  source: 'curated';
-}
+export type { PhraseOfDay } from '../types/daily-content.types';
 
 const FALLBACK_PHRASES: ReadonlyArray<PhraseOfDay> = [
   { phrase: 'Let\'s circle back on this', definition: 'To return to a topic or task later.', example: 'Let\'s circle back on this after the meeting ends.', source: 'curated' },
@@ -27,22 +24,40 @@ const FALLBACK_PHRASES: ReadonlyArray<PhraseOfDay> = [
 export class PhraseOfDayService {
   private readonly logger = new Logger(PhraseOfDayService.name);
 
-  constructor(private readonly redis: RedisService) {}
+  constructor(
+    private readonly redis: RedisService,
+    private readonly dailyTts: DailyTtsService,
+  ) {}
 
   async getPhraseOfTheDay(date = new Date()): Promise<PhraseOfDay> {
-    const cacheKey = `engr:potd:${this.toUtcDateString(date)}`;
+    const dateKey = this.toUtcDateString(date);
+    const cacheKey = `engr:potd:${dateKey}`;
     const cached = await this.redis.get(cacheKey);
+    let value: PhraseOfDay;
+    let contentJustResolved = false;
     if (cached) {
       try {
-        return JSON.parse(cached) as PhraseOfDay;
+        value = JSON.parse(cached) as PhraseOfDay;
       } catch {
-        // fall through to fresh value
+        value = this.getForDay(date);
+        const ttl = this.secondsUntilNextUtcDay(date);
+        await this.redis.set(cacheKey, JSON.stringify(value), ttl);
+        contentJustResolved = true;
       }
+    } else {
+      value = this.getForDay(date);
+      const ttl = this.secondsUntilNextUtcDay(date);
+      await this.redis.set(cacheKey, JSON.stringify(value), ttl);
+      contentJustResolved = true;
     }
-    const value = this.getForDay(date);
-    const ttl = this.secondsUntilNextUtcDay(date);
-    await this.redis.set(cacheKey, JSON.stringify(value), ttl);
-    return value;
+
+    const listenAudio = await this.dailyTts.resolveListenAudio(
+      'phrase',
+      dateKey,
+      value,
+      { blockOnMissing: contentJustResolved },
+    );
+    return listenAudio ? { ...value, listenAudio } : value;
   }
 
   private getForDay(date: Date): PhraseOfDay {

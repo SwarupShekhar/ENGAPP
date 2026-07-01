@@ -2,14 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { RedisService } from '../../../redis/redis.service';
+import { DailyTtsService } from './daily-tts.service';
+import { WordOfTheDay } from '../types/daily-content.types';
 
-export interface WordOfTheDay {
-  word: string;
-  definition: string;
-  example: string;
-  partOfSpeech: string | null;
-  source: 'wordnik' | 'fallback';
-}
+export type { WordOfTheDay } from '../types/daily-content.types';
 
 interface WordnikDefinition {
   text?: string;
@@ -72,24 +68,39 @@ export class WordOfDayService {
   constructor(
     private readonly config: ConfigService,
     private readonly redis: RedisService,
+    private readonly dailyTts: DailyTtsService,
   ) {}
 
   async getWordOfTheDay(date = new Date()): Promise<WordOfTheDay> {
+    const dateKey = this.toUtcDateString(date);
     const cacheKey = this.buildCacheKey(date);
     const cached = await this.redis.get(cacheKey);
+    let value: WordOfTheDay;
+    let contentJustResolved = false;
     if (cached) {
       try {
-        return JSON.parse(cached) as WordOfTheDay;
+        value = JSON.parse(cached) as WordOfTheDay;
       } catch {
-        // Continue with fresh fetch when cached blob is malformed.
+        value = (await this.fetchFromWordnik(date)) ?? this.getFallbackForDay(date);
+        const ttlSeconds = this.secondsUntilNextUtcDay(date);
+        await this.redis.set(cacheKey, JSON.stringify(value), ttlSeconds);
+        contentJustResolved = true;
       }
+    } else {
+      const fromApi = await this.fetchFromWordnik(date);
+      value = fromApi ?? this.getFallbackForDay(date);
+      const ttlSeconds = this.secondsUntilNextUtcDay(date);
+      await this.redis.set(cacheKey, JSON.stringify(value), ttlSeconds);
+      contentJustResolved = true;
     }
 
-    const fromApi = await this.fetchFromWordnik(date);
-    const value = fromApi ?? this.getFallbackForDay(date);
-    const ttlSeconds = this.secondsUntilNextUtcDay(date);
-    await this.redis.set(cacheKey, JSON.stringify(value), ttlSeconds);
-    return value;
+    const listenAudio = await this.dailyTts.resolveListenAudio(
+      'word',
+      dateKey,
+      value,
+      { blockOnMissing: contentJustResolved },
+    );
+    return listenAudio ? { ...value, listenAudio } : value;
   }
 
   private async fetchFromWordnik(date: Date): Promise<WordOfTheDay | null> {

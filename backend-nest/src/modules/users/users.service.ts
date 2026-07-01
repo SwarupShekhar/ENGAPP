@@ -335,4 +335,34 @@ export class UsersService {
     });
     return { practiceRemindersEnabled: user.practiceRemindersEnabled };
   }
+
+  async getListenVoicePreference(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { dailyListenVoice: true, dailyListenVoiceChosen: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    const voice =
+      user.dailyListenVoice === 'Jasper' ? 'Jasper' : ('Kiki' as const);
+    return { voice, chosen: user.dailyListenVoiceChosen };
+  }
+
+  async updateListenVoicePreference(
+    userId: string,
+    data: { voice?: 'Kiki' | 'Jasper'; chosen?: boolean },
+  ) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.voice !== undefined ? { dailyListenVoice: data.voice } : {}),
+        ...(data.chosen !== undefined
+          ? { dailyListenVoiceChosen: data.chosen }
+          : {}),
+      },
+      select: { dailyListenVoice: true, dailyListenVoiceChosen: true },
+    });
+    const voice =
+      user.dailyListenVoice === 'Jasper' ? 'Jasper' : ('Kiki' as const);
+    return { voice, chosen: user.dailyListenVoiceChosen };
+  }
 }

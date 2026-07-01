@@ -46,12 +46,16 @@ import { getHomeData, HomeData } from '../services/homeApi';
 import { getBridgeUser } from '../../../api/bridgeClient';
 import {
   getDailyContentForToday,
+  mergeDailyPhraseFields,
+  mergeDailyWordFields,
   mergeHomeWithDailyContent,
   onDailyContentUpdated,
   setDailyContentForToday,
 } from '../../../services/dailyContentCache';
 import { HOME_DATA_CACHE_KEY, utcTodayKey } from '../../../services/cacheKeys';
 import { tasksApi, type LearningTask } from '../../../api/tasks';
+import { DailyListenVoiceModal } from '../../../components/settings/DailyListenVoiceModal';
+import type { DailyListenVoice } from '../../../types/dailyListenVoice';
 
 let Haptics: {
   impactAsync: (s: unknown) => Promise<void>;
@@ -716,6 +720,8 @@ export default function HomeScreen() {
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
   const [homeScrollEnabled, setHomeScrollEnabled] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [listenVoice, setListenVoice] = useState<DailyListenVoice>('Kiki');
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
 
   // Entry choreography fires ONCE per cold land, not on every tab refocus.
   const hasPlayedEntry = useRef(false);
@@ -746,6 +752,13 @@ export default function HomeScreen() {
     hasPlayedEntry.current = true;
   }, []);
 
+  useEffect(() => {
+    const pref = homeData?.listenVoicePreference;
+    if (!pref) return;
+    setListenVoice(pref.voice);
+    setShowVoicePicker(!pref.chosen);
+  }, [homeData?.listenVoicePreference]);
+
   const loadHome = useCallback(async (options?: { forceFresh?: boolean }) => {
     const forceFresh = options?.forceFresh === true;
     const today = utcTodayKey();
@@ -753,8 +766,12 @@ export default function HomeScreen() {
 
     const mergeDailyFields = (data: HomeData): HomeData => ({
       ...data,
-      phraseOfTheDay: datedDaily?.phraseOfTheDay ?? data.phraseOfTheDay,
-      wordOfTheDay: datedDaily?.wordOfTheDay ?? data.wordOfTheDay,
+      phraseOfTheDay:
+        mergeDailyPhraseFields(datedDaily?.phraseOfTheDay, data.phraseOfTheDay) ??
+        data.phraseOfTheDay,
+      wordOfTheDay:
+        mergeDailyWordFields(datedDaily?.wordOfTheDay, data.wordOfTheDay) ??
+        data.wordOfTheDay,
     });
 
     if (!forceFresh) {
@@ -1130,12 +1147,29 @@ export default function HomeScreen() {
             ref={carouselRef}
             phraseOfTheDay={homeData?.phraseOfTheDay ?? null}
             wordOfTheDay={homeData?.wordOfTheDay ?? null}
+            listenVoice={listenVoice}
             dailyPracticeStatus={homeData?.dailyPracticeStatus ?? null}
             loadingPhrase={loadingHome}
             onParentScrollEnabledChange={setHomeScrollEnabled}
           />
         </Animated.View>
       </ScrollView>
+
+      <DailyListenVoiceModal
+        visible={showVoicePicker}
+        onComplete={(voice) => {
+          setListenVoice(voice);
+          setShowVoicePicker(false);
+          setHomeData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  listenVoicePreference: { voice, chosen: true },
+                }
+              : prev,
+          );
+        }}
+      />
 
       <HomeSkillDetailModalV1
         visible={skillSheet !== null}

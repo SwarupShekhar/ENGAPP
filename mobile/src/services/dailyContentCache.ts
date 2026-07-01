@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DAILY_CONTENT_CACHE_PREFIX, utcTodayKey } from "./cacheKeys";
+import type { DailyListenAudioMap } from "../types/dailyListenVoice";
 
 export { utcTodayKey } from "./cacheKeys";
 
@@ -8,6 +9,7 @@ export type DailyPhrase = {
   definition: string;
   example: string;
   source?: string;
+  listenAudio?: DailyListenAudioMap;
 };
 
 export type DailyWord = {
@@ -16,6 +18,7 @@ export type DailyWord = {
   example: string;
   partOfSpeech?: string | null;
   source?: string;
+  listenAudio?: DailyListenAudioMap;
 };
 
 export interface DailyContent {
@@ -42,6 +45,34 @@ export function onDailyContentUpdated(
 
 function emit(content: DailyContent): void {
   listeners.forEach((listener) => listener(content));
+}
+
+function mergeListenAudio<T extends { listenAudio?: DailyListenAudioMap }>(
+  cached: T | null | undefined,
+  fresh: T | null | undefined,
+): T | null | undefined {
+  if (!cached && !fresh) return undefined;
+  if (!cached) return fresh ?? undefined;
+  if (!fresh) return cached;
+  return {
+    ...cached,
+    ...fresh,
+    listenAudio: fresh.listenAudio ?? cached.listenAudio,
+  };
+}
+
+export function mergeDailyPhraseFields(
+  cached: DailyPhrase | null | undefined,
+  fresh: DailyPhrase | null | undefined,
+): DailyPhrase | null | undefined {
+  return mergeListenAudio(cached, fresh);
+}
+
+export function mergeDailyWordFields(
+  cached: DailyWord | null | undefined,
+  fresh: DailyWord | null | undefined,
+): DailyWord | null | undefined {
+  return mergeListenAudio(cached, fresh);
 }
 
 export async function getDailyContent(
@@ -83,9 +114,21 @@ export async function patchDailyContent(
     ...existing,
     date,
     ...(patch.phraseOfTheDay !== undefined
-      ? { phraseOfTheDay: patch.phraseOfTheDay }
+      ? {
+          phraseOfTheDay: mergeDailyPhraseFields(
+            existing.phraseOfTheDay,
+            patch.phraseOfTheDay,
+          ),
+        }
       : {}),
-    ...(patch.wordOfTheDay !== undefined ? { wordOfTheDay: patch.wordOfTheDay } : {}),
+    ...(patch.wordOfTheDay !== undefined
+      ? {
+          wordOfTheDay: mergeDailyWordFields(
+            existing.wordOfTheDay,
+            patch.wordOfTheDay,
+          ),
+        }
+      : {}),
   };
   await setDailyContent(merged);
   return merged;
@@ -99,33 +142,52 @@ export function mergeHomeWithDailyContent(
 ): Record<string, unknown> {
   const { phraseOfTheDay: _p, wordOfTheDay: _w, _cachedUtcDate: _d, ...rest } =
     home;
+  const homePhrase = home.phraseOfTheDay as DailyPhrase | undefined;
+  const homeWord = home.wordOfTheDay as DailyWord | undefined;
   return {
     ...rest,
-    phraseOfTheDay: daily?.phraseOfTheDay ?? undefined,
-    wordOfTheDay: daily?.wordOfTheDay ?? undefined,
+    phraseOfTheDay: mergeDailyPhraseFields(daily?.phraseOfTheDay, homePhrase),
+    wordOfTheDay: mergeDailyWordFields(daily?.wordOfTheDay, homeWord),
   };
 }
 
-/** Foreground push — always overwrite today's phrase/word. */
+/** Foreground push — always overwrite today's phrase/word text (keeps listenAudio if present). */
 export async function patchDailyContentFromPush(
   patch: Partial<Pick<DailyContent, "phraseOfTheDay" | "wordOfTheDay">>,
 ): Promise<void> {
   await patchDailyContent(patch);
 }
 
-/** Seed dated cache from /home API without clobbering push-delivered content. */
+/** Merge /home daily fields into dated cache; always refresh listenAudio when the API sends it. */
 export async function setDailyContentForToday(
   patch: Partial<Pick<DailyContent, "phraseOfTheDay" | "wordOfTheDay">>,
 ): Promise<void> {
   const existing = await getDailyContentForToday();
   const toPatch: Partial<Pick<DailyContent, "phraseOfTheDay" | "wordOfTheDay">> =
     {};
-  if (patch.phraseOfTheDay && !existing?.phraseOfTheDay) {
-    toPatch.phraseOfTheDay = patch.phraseOfTheDay;
+
+  if (patch.phraseOfTheDay) {
+    const merged = mergeDailyPhraseFields(
+      existing?.phraseOfTheDay,
+      patch.phraseOfTheDay,
+    );
+    const audioArrived =
+      patch.phraseOfTheDay.listenAudio &&
+      !existing?.phraseOfTheDay?.listenAudio;
+    if (!existing?.phraseOfTheDay || audioArrived) {
+      toPatch.phraseOfTheDay = merged ?? patch.phraseOfTheDay;
+    }
   }
-  if (patch.wordOfTheDay && !existing?.wordOfTheDay) {
-    toPatch.wordOfTheDay = patch.wordOfTheDay;
+
+  if (patch.wordOfTheDay) {
+    const merged = mergeDailyWordFields(existing?.wordOfTheDay, patch.wordOfTheDay);
+    const audioArrived =
+      patch.wordOfTheDay.listenAudio && !existing?.wordOfTheDay?.listenAudio;
+    if (!existing?.wordOfTheDay || audioArrived) {
+      toPatch.wordOfTheDay = merged ?? patch.wordOfTheDay;
+    }
   }
+
   if (Object.keys(toPatch).length > 0) {
     await patchDailyContent(toPatch);
   }

@@ -159,6 +159,7 @@ export default function ProfileScreenV2() {
   const { sendTest: sendTestPush, sending: sendingTestPush } =
     useTestPushNotification();
   const [practiceReminders, setPracticeReminders] = useState(true);
+  const [listenVoice, setListenVoice] = useState<"Kiki" | "Jasper">("Kiki");
   const [reliability, setReliability] = useState<UserReliability | null>(null);
 
   const meta = (user?.unsafeMetadata || {}) as any;
@@ -181,8 +182,32 @@ export default function ProfileScreenV2() {
         .catch((err: any) =>
           console.error("Failed to fetch notification preferences", err),
         );
+      userApi
+        .getListenVoice()
+        .then((prefs) => setListenVoice(prefs.voice))
+        .catch((err: any) => console.error("Failed to fetch listen voice", err));
     }, [user?.id]),
   );
+
+  const handleListenVoicePress = () => {
+    Alert.alert("Listen voice", "Choose the voice for phrase/word of the day", [
+      { text: "Kiki", onPress: () => void handleListenVoiceChange("Kiki") },
+      { text: "Jasper", onPress: () => void handleListenVoiceChange("Jasper") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const handleListenVoiceChange = async (voice: "Kiki" | "Jasper") => {
+    const previous = listenVoice;
+    setListenVoice(voice);
+    try {
+      await userApi.updateListenVoice({ voice, chosen: true });
+    } catch (err) {
+      console.error("Failed to update listen voice", err);
+      setListenVoice(previous);
+      Alert.alert("Could not save", "Listen voice was not updated. Please try again.");
+    }
+  };
 
   const handlePracticeRemindersChange = async (enabled: boolean) => {
     const previous = practiceReminders;
@@ -441,6 +466,13 @@ export default function ProfileScreenV2() {
                   thumbColor={tokensV2.colors.textPrimary}
                 />
               }
+            />
+            <View style={styles.separator} />
+            <SettingRowV2
+              icon="volume-high-outline"
+              label="Listen voice"
+              subtitle={`${listenVoice} — phrase & word of the day`}
+              onPress={handleListenVoicePress}
             />
             <View style={styles.separator} />
             <SettingRowV2

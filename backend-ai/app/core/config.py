@@ -108,6 +108,7 @@ class Settings(BaseSettings):
     enable_error_tagging: bool = True
     enable_cross_session_analysis: bool = True
     enable_feature_extraction: bool = True
+    kitten_tts_enabled: bool = True
     
     # Rate Limiting
     rate_limit_per_minute: int = 60

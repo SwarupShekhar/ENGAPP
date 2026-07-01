@@ -34,6 +34,8 @@ model User {
   lastSessionAt          DateTime?
   totalSessions          Int                       @default(0)
   practiceRemindersEnabled Boolean                 @default(true)
+  dailyListenVoice         String                  @default("Kiki")
+  dailyListenVoiceChosen   Boolean                 @default(false)
   email                  String                    @unique
   assessments            AssessmentSession[]
   blockedBy              BlockedUser[]             @relation("BlockedUser")

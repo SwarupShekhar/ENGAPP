@@ -30,6 +30,7 @@ import {
   type HomePracticeAudioUpload,
 } from '../../features/home/voice/useHomePracticeCapture';
 import { useHomePracticeTts } from '../../features/home/voice/useHomePracticeTts';
+import type { DailyListenAudioMap, DailyListenVoice } from '../../types/dailyListenVoice';
 
 // Graceful no-op when expo-haptics is unavailable (web / stripped builds)
 let Haptics: any = { notificationAsync: async () => {}, NotificationFeedbackType: {} };
@@ -40,9 +41,25 @@ const HPAD = 16;
 const CARD_W = SCREEN_W - HPAD * 2;
 const CAROUSEL_MIN_H = 248;
 
+type DailyCardFields = {
+  phrase: string;
+  definition: string;
+  example: string;
+  listenAudio?: DailyListenAudioMap;
+};
+
+type DailyWordFields = {
+  word: string;
+  definition: string;
+  example: string;
+  partOfSpeech?: string | null;
+  listenAudio?: DailyListenAudioMap;
+};
+
 type Props = {
-  phraseOfTheDay?: { phrase: string; definition: string; example: string } | null;
-  wordOfTheDay?: { word: string; definition: string; example: string; partOfSpeech?: string | null } | null;
+  phraseOfTheDay?: DailyCardFields | null;
+  wordOfTheDay?: DailyWordFields | null;
+  listenVoice?: DailyListenVoice;
   dailyPracticeStatus?: {
     phrase: { done: boolean };
     word: { done: boolean };
@@ -53,8 +70,8 @@ type Props = {
 };
 
 type PulseSlide =
-  | { key: string; kind: 'phrase_daily'; phrase: { phrase: string; definition: string; example: string } }
-  | { key: string; kind: 'word_daily'; word: { word: string; definition: string; example: string; partOfSpeech?: string | null } }
+  | { key: string; kind: 'phrase_daily'; phrase: DailyCardFields }
+  | { key: string; kind: 'word_daily'; word: DailyWordFields }
   | { key: string; kind: 'mistake_task'; task: LearningTask };
 
 export type PulseCarouselSlideKind =
@@ -115,6 +132,7 @@ const PulseHomeCarousel = forwardRef<PulseHomeCarouselHandle, Props>(function Pu
   {
     phraseOfTheDay,
     wordOfTheDay,
+    listenVoice = 'Kiki',
     dailyPracticeStatus,
     loadingPhrase = false,
     onParentScrollEnabledChange,
@@ -289,14 +307,15 @@ const PulseHomeCarousel = forwardRef<PulseHomeCarouselHandle, Props>(function Pu
         } catch (_) {}
         if (slide.kind === 'phrase_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-          const { phrase, definition, example } = slide.phrase;
+          const { phrase, definition, example, listenAudio } = slide.phrase;
           const def = definition || '';
           const ex = example || '';
           const script = [phrase, def && `Meaning - ${def}`, ex && `For example - ${ex}`].filter(Boolean).join('. ');
-          await ttsSpeak(`${slide.key}:full`, script);
+          const audioUrl = listenAudio?.[listenVoice];
+          await ttsSpeak(`${slide.key}:full`, script, { audioUrl });
         } else if (slide.kind === 'word_daily') {
           analytics.capture(AnalyticsEvents.HOME_PRACTICE_LISTEN_TAPPED, { kind: slide.kind });
-          const { word, definition, example, partOfSpeech } = slide.word;
+          const { word, definition, example, partOfSpeech, listenAudio } = slide.word;
           const pos = partOfSpeech ? `${partOfSpeech}. ` : '';
           const def = definition || '';
           const ex = example || '';
@@ -305,11 +324,12 @@ const PulseHomeCarousel = forwardRef<PulseHomeCarouselHandle, Props>(function Pu
             def && `Meaning - ${def}`,
             ex && `For example - ${ex}`,
           ].filter(Boolean).join('. ');
-          await ttsSpeak(`${slide.key}:full`, script);
+          const audioUrl = listenAudio?.[listenVoice];
+          await ttsSpeak(`${slide.key}:full`, script, { audioUrl });
         }
       })();
     },
-    [analytics, isRecording, ttsSpeak],
+    [analytics, isRecording, listenVoice, ttsSpeak],
   );
 
   const submitRecording = useCallback(

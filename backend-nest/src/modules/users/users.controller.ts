@@ -4,6 +4,7 @@ import { ClerkGuard } from '../auth/clerk.guard';
 import { TasksService } from '../tasks/tasks.service';
 import { DeviceTokenDto } from './dto/device-token.dto';
 import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
+import { UpdateListenVoiceDto } from './dto/listen-voice.dto';
 import { NotificationService } from '../notifications/notification.service';
 
 @Controller('users')
@@ -26,6 +27,19 @@ export class UsersController {
         @Body() dto: UpdateNotificationPreferencesDto,
     ) {
         return this.usersService.updateNotificationPreferences(req.user.id, dto);
+    }
+
+    @Get('me/listen-voice')
+    async getListenVoice(@Request() req) {
+        return this.usersService.getListenVoicePreference(req.user.id);
+    }
+
+    @Patch('me/listen-voice')
+    async updateListenVoice(
+        @Request() req,
+        @Body() dto: UpdateListenVoiceDto,
+    ) {
+        return this.usersService.updateListenVoicePreference(req.user.id, dto);
     }
 
     @Get('me/stats')
