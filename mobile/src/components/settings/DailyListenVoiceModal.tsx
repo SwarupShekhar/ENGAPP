@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Modal,
   View,
   Text,
@@ -15,6 +16,7 @@ import type { DailyListenVoice } from '../../types/dailyListenVoice';
 type Props = {
   visible: boolean;
   onComplete: (voice: DailyListenVoice) => void;
+  onSkip?: () => void;
 };
 
 const VOICES: { id: DailyListenVoice; label: string; subtitle: string }[] = [
@@ -22,21 +24,36 @@ const VOICES: { id: DailyListenVoice; label: string; subtitle: string }[] = [
   { id: 'Jasper', label: 'Jasper', subtitle: 'Clear and steady' },
 ];
 
-export function DailyListenVoiceModal({ visible, onComplete }: Props) {
+export function DailyListenVoiceModal({ visible, onComplete, onSkip }: Props) {
   const theme = useAppTheme();
   const [saving, setSaving] = useState<DailyListenVoice | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const choose = async (voice: DailyListenVoice) => {
     if (saving) return;
     setSaving(voice);
+    setErrorMessage(null);
     try {
       await userApi.updateListenVoice({ voice, chosen: true });
       onComplete(voice);
     } catch (e) {
+      const message = 'Could not save your voice choice. Try again or choose Maybe later.';
+      setErrorMessage(message);
       if (__DEV__) console.warn('[DailyListenVoice] save failed:', e);
+      Alert.alert('Could not save', message);
     } finally {
       setSaving(null);
     }
+  };
+
+  const handleSkip = () => {
+    if (saving) return;
+    setErrorMessage(null);
+    if (onSkip) {
+      onSkip();
+      return;
+    }
+    onComplete('Kiki');
   };
 
   return (
@@ -50,6 +67,12 @@ export function DailyListenVoiceModal({ visible, onComplete }: Props) {
           <Text style={[styles.subtitle, { color: theme.colors.text.secondary }]}>
             Used for phrase of the day, word of the day, and short Maya replies.
           </Text>
+
+          {errorMessage ? (
+            <Text style={[styles.errorText, { color: theme.colors.error ?? '#FF6B6B' }]}>
+              {errorMessage}
+            </Text>
+          ) : null}
 
           {VOICES.map((v) => {
             const busy = saving === v.id;
@@ -77,6 +100,16 @@ export function DailyListenVoiceModal({ visible, onComplete }: Props) {
               </TouchableOpacity>
             );
           })}
+
+          <TouchableOpacity
+            style={styles.skipButton}
+            onPress={handleSkip}
+            disabled={!!saving}
+          >
+            <Text style={[styles.skipLabel, { color: theme.colors.text.secondary }]}>
+              Maybe later
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -106,6 +139,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -121,5 +158,14 @@ const styles = StyleSheet.create({
   optionSub: {
     fontSize: 13,
     marginTop: 2,
+  },
+  skipButton: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  skipLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -174,7 +174,16 @@ async def kitten_speak(request: Request, body: KittenSpeakRequest):
         return KittenSpeakResponse(audio_base64="", text=clean, voice=voice)
 
     start = time.time()
-    audio_bytes = await kitten_tts_service.synthesize_async(clean, voice=voice)
+    try:
+        audio_bytes = await kitten_tts_service.synthesize_async(clean, voice=voice)
+    except Exception as exc:
+        log.error(
+            "kitten_speak_exception text_len=%s voice=%s error=%s",
+            len(clean),
+            voice,
+            exc,
+        )
+        return KittenSpeakResponse(audio_base64="", text=clean, voice=voice)
     if not audio_bytes:
         log.error("kitten_speak_failed text_len=%s voice=%s", len(clean), voice)
         return KittenSpeakResponse(audio_base64="", text=clean, voice=voice)

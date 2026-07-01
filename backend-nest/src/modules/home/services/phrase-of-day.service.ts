@@ -51,13 +51,20 @@ export class PhraseOfDayService {
       contentJustResolved = true;
     }
 
-    const listenAudio = await this.dailyTts.resolveListenAudio(
-      'phrase',
-      dateKey,
-      value,
-      { blockOnMissing: contentJustResolved },
-    );
-    return listenAudio ? { ...value, listenAudio } : value;
+    try {
+      const listenAudio = await this.dailyTts.resolveListenAudio(
+        'phrase',
+        dateKey,
+        value,
+        { blockOnMissing: contentJustResolved },
+      );
+      return listenAudio ? { ...value, listenAudio } : value;
+    } catch (error) {
+      this.logger.warn(
+        `[PhraseOfDay] listen audio unavailable for ${dateKey}: ${(error as Error).message}`,
+      );
+      return value;
+    }
   }
 
   private getForDay(date: Date): PhraseOfDay {

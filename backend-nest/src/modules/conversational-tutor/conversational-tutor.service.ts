@@ -201,8 +201,8 @@ export class ConversationalTutorService implements OnModuleInit {
 
   private async warmKittenTtsCache(): Promise<void> {
     const maxAttempts = 3;
+    const expectedSize = TTS_CACHE_PHRASES.length * DAILY_LISTEN_VOICES.length;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      let warmed = 0;
       for (const voice of DAILY_LISTEN_VOICES) {
         for (const phrase of TTS_CACHE_PHRASES) {
           const cacheKey = `${voice}:${phrase.trim()}`;
@@ -212,13 +212,12 @@ export class ConversationalTutorService implements OnModuleInit {
               this.httpService.post(
                 `${this.aiBackendUrl}/api/tts/kitten/speak`,
                 { text: phrase, voice },
-                this.withAiAuth(),
+                this.withAiAuth({ timeout: 30_000 }),
               ),
             );
             const base64 = response.data?.audio_base64;
             if (base64) {
               this.ttsCache.set(cacheKey, base64);
-              warmed += 1;
             }
           } catch (e) {
             this.logger.warn(
@@ -227,7 +226,7 @@ export class ConversationalTutorService implements OnModuleInit {
           }
         }
       }
-      if (warmed === 0 || this.ttsCache.size >= TTS_CACHE_PHRASES.length * DAILY_LISTEN_VOICES.length) {
+      if (this.ttsCache.size >= expectedSize) {
         return;
       }
       if (attempt < maxAttempts) {

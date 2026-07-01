@@ -94,13 +94,20 @@ export class WordOfDayService {
       contentJustResolved = true;
     }
 
-    const listenAudio = await this.dailyTts.resolveListenAudio(
-      'word',
-      dateKey,
-      value,
-      { blockOnMissing: contentJustResolved },
-    );
-    return listenAudio ? { ...value, listenAudio } : value;
+    try {
+      const listenAudio = await this.dailyTts.resolveListenAudio(
+        'word',
+        dateKey,
+        value,
+        { blockOnMissing: contentJustResolved },
+      );
+      return listenAudio ? { ...value, listenAudio } : value;
+    } catch (error) {
+      this.logger.warn(
+        `[WordOfDay] listen audio unavailable for ${dateKey}: ${(error as Error).message}`,
+      );
+      return value;
+    }
   }
 
   private async fetchFromWordnik(date: Date): Promise<WordOfTheDay | null> {

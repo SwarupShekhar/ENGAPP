@@ -1157,6 +1157,10 @@ export default function HomeScreen() {
 
       <DailyListenVoiceModal
         visible={showVoicePicker}
+        onSkip={() => {
+          setListenVoice('Kiki');
+          setShowVoicePicker(false);
+        }}
         onComplete={(voice) => {
           setListenVoice(voice);
           setShowVoicePicker(false);

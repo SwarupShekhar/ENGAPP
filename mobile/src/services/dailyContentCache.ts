@@ -47,6 +47,29 @@ function emit(content: DailyContent): void {
   listeners.forEach((listener) => listener(content));
 }
 
+function mergeListenAudioMaps(
+  cached?: DailyListenAudioMap,
+  fresh?: DailyListenAudioMap,
+): DailyListenAudioMap | undefined {
+  if (!cached && !fresh) return undefined;
+  return { ...cached, ...fresh };
+}
+
+function hasNewListenAudio(
+  existing?: DailyListenAudioMap,
+  incoming?: DailyListenAudioMap,
+): boolean {
+  if (!incoming) return false;
+  for (const [voice, url] of Object.entries(incoming)) {
+    if (!url) continue;
+    const key = voice as keyof DailyListenAudioMap;
+    if (!existing?.[key] || existing[key] !== url) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function mergeListenAudio<T extends { listenAudio?: DailyListenAudioMap }>(
   cached: T | null | undefined,
   fresh: T | null | undefined,
@@ -57,7 +80,7 @@ function mergeListenAudio<T extends { listenAudio?: DailyListenAudioMap }>(
   return {
     ...cached,
     ...fresh,
-    listenAudio: fresh.listenAudio ?? cached.listenAudio,
+    listenAudio: mergeListenAudioMaps(cached.listenAudio, fresh.listenAudio),
   };
 }
 
@@ -171,9 +194,10 @@ export async function setDailyContentForToday(
       existing?.phraseOfTheDay,
       patch.phraseOfTheDay,
     );
-    const audioArrived =
-      patch.phraseOfTheDay.listenAudio &&
-      !existing?.phraseOfTheDay?.listenAudio;
+    const audioArrived = hasNewListenAudio(
+      existing?.phraseOfTheDay?.listenAudio,
+      patch.phraseOfTheDay.listenAudio,
+    );
     if (!existing?.phraseOfTheDay || audioArrived) {
       toPatch.phraseOfTheDay = merged ?? patch.phraseOfTheDay;
     }
@@ -181,8 +205,10 @@ export async function setDailyContentForToday(
 
   if (patch.wordOfTheDay) {
     const merged = mergeDailyWordFields(existing?.wordOfTheDay, patch.wordOfTheDay);
-    const audioArrived =
-      patch.wordOfTheDay.listenAudio && !existing?.wordOfTheDay?.listenAudio;
+    const audioArrived = hasNewListenAudio(
+      existing?.wordOfTheDay?.listenAudio,
+      patch.wordOfTheDay.listenAudio,
+    );
     if (!existing?.wordOfTheDay || audioArrived) {
       toPatch.wordOfTheDay = merged ?? patch.wordOfTheDay;
     }
