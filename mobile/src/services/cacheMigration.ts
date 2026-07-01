@@ -4,7 +4,6 @@ import {
   APP_CACHE_SCHEMA_KEY,
   APP_CACHE_SCHEMA_VERSION,
   DAILY_CONTENT_CACHE_PREFIX,
-  HOME_DATA_CACHE_KEY,
   LEGACY_CACHE_KEYS,
 } from "./cacheKeys";
 
@@ -24,11 +23,7 @@ export async function migrateAppCaches(): Promise<void> {
     const dailyKeys = allKeys.filter((k) =>
       k.startsWith(DAILY_CONTENT_CACHE_PREFIX),
     );
-    await AsyncStorage.multiRemove([
-      ...LEGACY_CACHE_KEYS,
-      HOME_DATA_CACHE_KEY,
-      ...dailyKeys,
-    ]);
+    await AsyncStorage.multiRemove([...LEGACY_CACHE_KEYS, ...dailyKeys]);
     FeedPrefetchService.getInstance().invalidate();
     await AsyncStorage.setItem(
       APP_CACHE_SCHEMA_KEY,

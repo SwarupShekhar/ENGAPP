@@ -53,6 +53,8 @@ import {
   setDailyContentForToday,
 } from '../../../services/dailyContentCache';
 import { HOME_DATA_CACHE_KEY, utcTodayKey } from '../../../services/cacheKeys';
+import HomeCacheService from '../../../services/homeCacheService';
+import { getNestAuthToken } from '../../../api/client';
 import { tasksApi, type LearningTask } from '../../../api/tasks';
 import { DailyListenVoiceModal } from '../../../components/settings/DailyListenVoiceModal';
 import type { DailyListenVoice } from '../../../types/dailyListenVoice';
@@ -712,9 +714,13 @@ export default function HomeScreen() {
   const socketService = useRef(SocketService.getInstance()).current;
   const carouselRef = useRef<PulseHomeCarouselHandle>(null);
 
-  const [homeData, setHomeData]       = useState<HomeData | null>(null);
+  const [homeData, setHomeData]       = useState<HomeData | null>(() =>
+    HomeCacheService.getInstance().getSnapshot(),
+  );
   const [bridgeHeader, setBridgeHeader] = useState<{ level?: string; streak?: number }>({});
-  const [loadingHome, setLoadingHome] = useState(true);
+  const [loadingHome, setLoadingHome] = useState(
+    () => !HomeCacheService.getInstance().hasSnapshot(),
+  );
   const [refreshingHome, setRefreshingHome] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [skillSheet, setSkillSheet] = useState<SkillSheetStateV1>(null);
@@ -761,7 +767,7 @@ export default function HomeScreen() {
 
   const loadHome = useCallback(async (options?: { forceFresh?: boolean }) => {
     const forceFresh = options?.forceFresh === true;
-    const today = utcTodayKey();
+    const homeCache = HomeCacheService.getInstance();
     let datedDaily = await getDailyContentForToday();
 
     const mergeDailyFields = (data: HomeData): HomeData => ({
@@ -775,41 +781,50 @@ export default function HomeScreen() {
     });
 
     if (!forceFresh) {
-      try {
-        const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached) as HomeData & { _cachedUtcDate?: string };
-          const { phraseOfTheDay: _hp, wordOfTheDay: _hw, ...parsedRest } = parsed;
-          const merged = mergeHomeWithDailyContent(
-            parsedRest as unknown as Record<string, unknown>,
-            parsed._cachedUtcDate,
-            datedDaily,
-          ) as unknown as HomeData;
-          setHomeData(mergeDailyFields(merged));
-          setLoadingHome(false);
-        } else {
-          setLoadingHome(true);
+      const memory = homeCache.getSnapshot() ?? (await homeCache.hydrateFromDisk());
+      if (memory) {
+        setHomeData(mergeDailyFields(memory));
+        setLoadingHome(false);
+      } else {
+        try {
+          const cached = await AsyncStorage.getItem(HOME_DATA_CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached) as HomeData & { _cachedUtcDate?: string };
+            const { phraseOfTheDay: _hp, wordOfTheDay: _hw, ...parsedRest } = parsed;
+            const merged = mergeHomeWithDailyContent(
+              parsedRest as unknown as Record<string, unknown>,
+              parsed._cachedUtcDate,
+              datedDaily,
+            ) as unknown as HomeData;
+            const withDaily = mergeDailyFields(merged);
+            homeCache.setSnapshot(withDaily);
+            setHomeData(withDaily);
+            setLoadingHome(false);
+          } else if (!homeCache.hasSnapshot()) {
+            setLoadingHome(true);
+          }
+        } catch {
+          if (!homeCache.hasSnapshot()) setLoadingHome(true);
         }
-      } catch {
-        setLoadingHome(true);
       }
     }
     // Pull-to-refresh: keep showing cached content; only the RefreshControl spinner.
 
     try {
+      let token = await getNestAuthToken();
+      for (let i = 0; i < 4 && !token; i += 1) {
+        await new Promise((r) => setTimeout(r, 350));
+        token = await getNestAuthToken();
+      }
+      if (!token) {
+        console.warn('[HomeV1] home fetch skipped — no auth token yet');
+        return;
+      }
+
       const fresh = await getHomeData();
       datedDaily = await getDailyContentForToday();
-      const withDaily = mergeDailyFields(fresh);
-      setHomeData(withDaily);
-      await setDailyContentForToday({
-        phraseOfTheDay: fresh.phraseOfTheDay ?? null,
-        wordOfTheDay: fresh.wordOfTheDay ?? null,
-      });
-      const { phraseOfTheDay: _p, wordOfTheDay: _w, ...homeWithoutDaily } = fresh;
-      await AsyncStorage.setItem(
-        HOME_DATA_CACHE_KEY,
-        JSON.stringify({ ...homeWithoutDaily, _cachedUtcDate: today }),
-      );
+      const withDaily = await homeCache.persistFresh(fresh);
+      setHomeData(mergeDailyFields(withDaily));
       if (forceFresh) {
         void tasksApi.loadPracticeCarouselTasks().catch(() => {});
       }
@@ -942,7 +957,9 @@ export default function HomeScreen() {
     Boolean(latestId) ||
     hasMeaningfulLevel ||
     Boolean(lastSessionDate) ||
-    hasSkillScores;
+    hasSkillScores ||
+    (homeData?.stage ?? 0) > 1 ||
+    Boolean(bridgeLevel);
   const levelForUi   = level || '—';
   const initials     = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`.toUpperCase() || '?';
 

@@ -29,6 +29,7 @@ import * as Updates from "expo-updates";
 import SocketService from "./features/call/services/socketService";
 import FeedPrefetchService from "./services/feedPrefetchService";
 import { onAfterFirstInteractiveFrame } from "./utils/deferredStartup";
+import HomeCacheService from "./services/homeCacheService";
 import { migrateAppCaches } from "./services/cacheMigration";
 import PushNotificationService from "./services/pushNotificationService";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -163,6 +164,7 @@ function AuthTokenInjector({ children }: { children: React.ReactNode }) {
 function scheduleDeferredFeedPrefetch(): void {
   onAfterFirstInteractiveFrame(() => {
     FeedPrefetchService.getInstance().prefetch();
+    void HomeCacheService.getInstance().prefetch();
   });
 }
 
@@ -634,7 +636,9 @@ export default function App() {
   );
 
   useEffect(() => {
-    void migrateAppCaches();
+    void migrateAppCaches().then(() => {
+      void HomeCacheService.getInstance().hydrateFromDisk();
+    });
   }, []);
 
   useEffect(() => {

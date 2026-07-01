@@ -59,6 +59,8 @@ export class HeaderBuilder {
       if (latestAssessment) {
         score = score || Math.round(latestAssessment.overallScore || 0);
         level = level === 'A2' ? latestAssessment.overallLevel || level : level;
+      } else if (user.assessmentScore) {
+        score = Math.round(user.assessmentScore);
       }
     }
 
