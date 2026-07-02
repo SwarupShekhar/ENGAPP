@@ -5,8 +5,23 @@ import re
 from collections.abc import AsyncIterator, Iterator
 from typing import Callable
 
-SENTENCE_END = re.compile(r"[.!?]\s*")
-DEFAULT_SANITIZE = lambda t: t  # noqa: E731
+# Boundary: ellipsis or single . ! ? followed by whitespace or end-of-buffer.
+_BOUNDARY_RE = re.compile(r"(?:\.{3}|[.!?])(?=\s|$)")
+_ABBREV_TAILS = frozenset(
+    {
+        "mr",
+        "mrs",
+        "ms",
+        "dr",
+        "prof",
+        "sr",
+        "jr",
+        "vs",
+        "etc",
+        "i.e",
+        "e.g",
+    }
+)
 
 
 def sanitize_maya_sentence(text: str) -> str:
@@ -15,6 +30,28 @@ def sanitize_maya_sentence(text: str) -> str:
     text = re.sub(r"[*_`#]+", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def _period_is_abbreviation(buffer: str, period_index: int) -> bool:
+    before = buffer[:period_index].rstrip()
+    if not before:
+        return False
+    if before.lower().endswith(("i.e", "e.g")):
+        return True
+    last_token = before.split()[-1].lower().rstrip(".")
+    return last_token in _ABBREV_TAILS
+
+
+def find_sentence_boundary(buffer: str) -> re.Match[str] | None:
+    """First valid sentence end in buffer, skipping abbreviation periods."""
+    for match in _BOUNDARY_RE.finditer(buffer):
+        token = match.group()
+        if token == "..." or token.startswith("..."):
+            return match
+        if token == "." and _period_is_abbreviation(buffer, match.start()):
+            continue
+        return match
+    return None
 
 
 def iter_sentences_from_buffer(
@@ -27,7 +64,7 @@ def iter_sentences_from_buffer(
     """Split buffer into complete sentences; return (sentences, remainder)."""
     emitted: list[str] = []
     while buffer and len(emitted) < max_sentences:
-        match = SENTENCE_END.search(buffer)
+        match = find_sentence_boundary(buffer)
         if not match:
             break
         sentence = sanitize(buffer[: match.end()].strip())

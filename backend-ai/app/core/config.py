@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     coaching_llm_provider: str = "auto"
     coaching_cerebras_model: str = "gemma-4-31b"
     coaching_llm_max_tokens: int = 32
+    coaching_llm_timeout_sec: float = 12.0
     
     # Azure
     azure_speech_key: Optional[str] = None

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import Literal
 
 from app.core.config import settings
@@ -10,6 +11,9 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 ProviderName = Literal["gemini", "cerebras"]
+
+_gemini_configured = False
+_gemini_configure_lock = threading.Lock()
 
 
 def resolve_coaching_llm_provider() -> ProviderName:
@@ -23,11 +27,33 @@ def resolve_coaching_llm_provider() -> ProviderName:
     return "gemini"
 
 
+def _coaching_llm_timeout_sec() -> float:
+    raw = getattr(settings, "coaching_llm_timeout_sec", None)
+    if raw is not None:
+        return max(1.0, float(raw))
+    # Stay inside the parallel hint budget when no explicit timeout is set.
+    budget_ms = float(getattr(settings, "coaching_hint_budget_ms", 900) or 900)
+    return max(1.0, budget_ms / 1000.0)
+
+
 def _normalize_yes_no(text: str) -> str:
     return (text or "").strip().upper()
 
 
-def _cerebras_yes_no_sync(prompt: str) -> str:
+def _ensure_gemini_configured(api_key: str) -> None:
+    global _gemini_configured
+    if _gemini_configured:
+        return
+    with _gemini_configure_lock:
+        if _gemini_configured:
+            return
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+        _gemini_configured = True
+
+
+def _cerebras_yes_no_sync(prompt: str, *, timeout_sec: float) -> str:
     from cerebras.cloud.sdk import Cerebras
 
     api_key = (settings.cerebras_api_key or "").strip()
@@ -35,7 +61,7 @@ def _cerebras_yes_no_sync(prompt: str) -> str:
         raise RuntimeError("CEREBRAS_API_KEY not configured")
 
     model = (settings.coaching_cerebras_model or "gemma-4-31b").strip()
-    client = Cerebras(api_key=api_key)
+    client = Cerebras(api_key=api_key, timeout=timeout_sec)
     completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
         model=model,
@@ -43,6 +69,7 @@ def _cerebras_yes_no_sync(prompt: str) -> str:
         temperature=0.1,
         top_p=1.0,
         stream=False,
+        timeout=timeout_sec,
     )
     content = completion.choices[0].message.content or ""
     if not content.strip():
@@ -53,22 +80,25 @@ def _cerebras_yes_no_sync(prompt: str) -> str:
     return _normalize_yes_no(content)
 
 
-async def _gemini_yes_no(prompt: str) -> str:
+async def _gemini_yes_no(prompt: str, *, timeout_sec: float) -> str:
     import google.generativeai as genai
 
     api_key = settings.google_api_key
     if not api_key:
         raise RuntimeError("GOOGLE_API_KEY not configured")
 
-    genai.configure(api_key=api_key)
+    _ensure_gemini_configured(api_key)
     chat_model = (settings.google_gemini_chat_model or "gemini-2.5-flash").strip()
     model = genai.GenerativeModel(chat_model)
-    response = await model.generate_content_async(
-        prompt,
-        generation_config={
-            "temperature": 0.1,
-            "max_output_tokens": int(settings.coaching_llm_max_tokens or 32),
-        },
+    response = await asyncio.wait_for(
+        model.generate_content_async(
+            prompt,
+            generation_config={
+                "temperature": 0.1,
+                "max_output_tokens": int(settings.coaching_llm_max_tokens or 32),
+            },
+        ),
+        timeout=timeout_sec,
     )
     return _normalize_yes_no(response.text or "")
 
@@ -76,7 +106,8 @@ async def _gemini_yes_no(prompt: str) -> str:
 async def classify_yes_no(prompt: str) -> str | None:
     """
     Return normalized model text (e.g. YES / NO) or None if all providers fail.
-  """
+    """
+    timeout_sec = _coaching_llm_timeout_sec()
     primary = resolve_coaching_llm_provider()
     order: list[ProviderName] = [primary]
     if (
@@ -92,11 +123,18 @@ async def classify_yes_no(prompt: str) -> str | None:
             if provider == "cerebras":
                 if not (settings.cerebras_api_key or "").strip():
                     continue
-                answer = await asyncio.to_thread(_cerebras_yes_no_sync, prompt)
+                answer = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        _cerebras_yes_no_sync,
+                        prompt,
+                        timeout_sec=timeout_sec,
+                    ),
+                    timeout=timeout_sec + 1.0,
+                )
             else:
-                answer = await _gemini_yes_no(prompt)
+                answer = await _gemini_yes_no(prompt, timeout_sec=timeout_sec)
             if answer:
-                logger.debug("coaching_llm provider=%s answer=%r", provider, answer[:20])
+                logger.debug("coaching_llm provider=%s answered", provider)
                 return answer
         except Exception as e:
             last_error = e
