@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     # Maya streaming tutor + analysis (gemini-2.0-* shut down 2026-06-01 → use 2.5+)
     google_gemini_chat_model: str = "gemini-2.5-flash"
     anthropic_api_key: Optional[str] = None
+
+    # Cerebras Inference (Maya tutor fast path — feat/cerebras-maya-llm)
+    cerebras_api_key: Optional[str] = None
+    cerebras_chat_model: str = "gpt-oss-120b"
+    cerebras_max_completion_tokens: int = 220
+    cerebras_temperature: float = 0.55
+    cerebras_top_p: float = 0.9
+    # gemini | cerebras | auto (text→Cerebras when configured, audio→Gemini)
+    maya_llm_provider: str = "auto"
+    maya_llm_fallback_to_gemini: bool = True
+    # Coaching missed-opportunity hints: gemini | cerebras | auto
+    coaching_llm_provider: str = "auto"
+    coaching_cerebras_model: str = "gemma-4-31b"
+    coaching_llm_max_tokens: int = 32
     
     # Azure
     azure_speech_key: Optional[str] = None
@@ -124,8 +138,9 @@ class Settings(BaseSettings):
     pa_enrich_max_concurrent: int = 8
     # Seconds before in-call coaching hints fire (lower = faster first hints in Maya).
     coaching_warmup_seconds: int = 5
-    # Max ms to wait for coaching hint LLM (0 = fire hint fetch in background only).
-    coaching_hint_budget_ms: int = 150
+    # Max ms to wait for coaching hint LLM after STT (parallel with PA).
+    # Cerebras YES/NO is ~800–1000ms; lower = faster turns, fewer missed-opportunity hints.
+    coaching_hint_budget_ms: int = 900
     
     # Monitoring
     sentry_dsn: Optional[str] = None
