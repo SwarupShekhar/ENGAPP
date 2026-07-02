@@ -3,7 +3,14 @@
 Phase 0: Cerebras smoke test for Maya tutor prompts.
 
 Usage (from repo root):
-  cd backend-ai && pip install cerebras-cloud-sdk && python scripts/smoke_cerebras_maya.py
+  git checkout feat/cerebras-maya-llm
+  cd backend-ai
+
+  # If `pip install` fails in .venv (broken pip shim), use:
+  pip3 --python ../.venv/bin/python3 install cerebras-cloud-sdk python-dotenv
+
+  ../.venv/bin/python3 scripts/smoke_cerebras_maya.py --stream-only
+  ../.venv/bin/python3 scripts/smoke_cerebras_maya.py --list-models
 
 Requires CEREBRAS_API_KEY in backend-ai/.env (or environment).
 Does not touch production code paths — standalone benchmark only.
