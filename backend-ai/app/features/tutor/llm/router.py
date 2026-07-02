@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator
+from contextvars import ContextVar
 from typing import Literal
 
 from app.core.config import settings
@@ -11,6 +12,13 @@ from app.features.tutor.llm.streaming_gemini import StreamingGeminiService
 logger = logging.getLogger(__name__)
 
 ProviderName = Literal["gemini", "cerebras"]
+
+_turn_llm_provider: ContextVar[str | None] = ContextVar("maya_turn_llm_provider", default=None)
+
+
+def get_turn_llm_provider() -> str | None:
+    """Provider for the current asyncio task's Maya turn (safe under concurrency)."""
+    return _turn_llm_provider.get()
 
 
 def resolve_tutor_llm_provider(
@@ -39,7 +47,8 @@ class TutorLLMRouter:
 
     @property
     def last_provider(self) -> str | None:
-        return getattr(self, "_last_provider", None)
+        """Deprecated for telemetry — prefer get_turn_llm_provider()."""
+        return get_turn_llm_provider()
 
     async def stream_response(
         self,
@@ -72,6 +81,7 @@ class TutorLLMRouter:
                     raise ValueError("Cerebras cannot handle audio turns")
 
                 self._last_provider = provider
+                _turn_llm_provider.set(provider)
                 logger.info("Maya LLM provider=%s", provider)
                 async for sentence in svc.stream_response(
                     prompt,

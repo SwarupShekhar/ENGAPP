@@ -56,8 +56,8 @@ class StreamingGeminiService:
             prompt, conversation_history, phonetic_context, cefr_level
         )
         logger.info(
-            "GEMINI prompt utterance=%r context=%s audio=%s model=%s",
-            prompt[:50],
+            "GEMINI tutor stream utterance_len=%s context=%s audio=%s model=%s",
+            len(prompt),
             bool(phonetic_context),
             bool(audio_base64),
             self.model_name,

@@ -101,8 +101,8 @@ class StreamingCerebrasService:
             prompt, conversation_history, phonetic_context, cefr_level
         )
         logger.info(
-            "CEREBRAS prompt utterance=%r context=%s model=%s max_tokens=%s",
-            prompt[:50],
+            "CEREBRAS tutor stream utterance_len=%s context=%s model=%s max_tokens=%s",
+            len(prompt),
             bool(phonetic_context),
             self.model_name,
             self._max_completion_tokens(),

@@ -12,5 +12,17 @@ def test_sentence_chunker_emits_two_sentences():
     assert sentences[1] == "How are you today?"
 
 
+def test_sentence_chunker_ellipsis_single_boundary():
+    tokens = ["Wait... ", "Then we go."]
+    sentences = list(iter_sentences_from_sync_tokens(iter(tokens)))
+    assert sentences == ["Wait...", "Then we go."]
+
+
+def test_sentence_chunker_skips_abbreviation_period():
+    tokens = ["Mr. Smith went home. ", "He was tired."]
+    sentences = list(iter_sentences_from_sync_tokens(iter(tokens)))
+    assert sentences == ["Mr. Smith went home.", "He was tired."]
+
+
 def test_sanitize_strips_markdown():
     assert sanitize_maya_sentence("**Hello** _world_") == "Hello world"
