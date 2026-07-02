@@ -313,7 +313,11 @@ async def _generate_stream_response(
 
     timings.mark("done")
     timings.log_summary("maya_sse")
-    yield {"type": "done", "timings": timings.to_dict()}
+    done_event: dict = {"type": "done", "timings": timings.to_dict()}
+    llm_provider = streaming_tutor_service.llm_router.last_provider
+    if llm_provider:
+        done_event["llm_provider"] = llm_provider
+    yield done_event
 
 
 @router.post("/stream-response")
@@ -618,10 +622,11 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
 
                 ws_timings.mark("done")
                 ws_timings.log_summary("maya_ws")
-                await websocket.send_json({
-                    "type": "done",
-                    "timings": ws_timings.to_dict(),
-                })
+                ws_done: dict = {"type": "done", "timings": ws_timings.to_dict()}
+                ws_llm = streaming_tutor_service.llm_router.last_provider
+                if ws_llm:
+                    ws_done["llm_provider"] = ws_llm
+                await websocket.send_json(ws_done)
 
                 # Persist coaching hint state to Redis (hintCount + lastHintAt only —
                 # markField is set only on confirmed phrase usage in the feedback loop above)

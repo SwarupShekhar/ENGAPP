@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # gemini | cerebras | auto (text→Cerebras when configured, audio→Gemini)
     maya_llm_provider: str = "auto"
     maya_llm_fallback_to_gemini: bool = True
+    # Coaching missed-opportunity hints: gemini | cerebras | auto
+    coaching_llm_provider: str = "auto"
+    coaching_cerebras_model: str = "gemma-4-31b"
+    coaching_llm_max_tokens: int = 32
     
     # Azure
     azure_speech_key: Optional[str] = None
@@ -134,8 +138,8 @@ class Settings(BaseSettings):
     pa_enrich_max_concurrent: int = 8
     # Seconds before in-call coaching hints fire (lower = faster first hints in Maya).
     coaching_warmup_seconds: int = 5
-    # Max ms to wait for coaching hint LLM (0 = fire hint fetch in background only).
-    coaching_hint_budget_ms: int = 150
+    # Max ms to wait for coaching hint LLM (parallel with STT; Cerebras usually fits in 300ms).
+    coaching_hint_budget_ms: int = 300
     
     # Monitoring
     sentry_dsn: Optional[str] = None

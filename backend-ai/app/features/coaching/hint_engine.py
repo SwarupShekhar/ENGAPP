@@ -93,7 +93,7 @@ def check_mistake_recurrence(transcript: str, ctx: dict[str, Any]) -> dict[str, 
 async def check_missed_opportunity(
     transcript: str, ctx: dict[str, Any]
 ) -> dict[str, Any] | None:
-    """Use Gemini Flash to detect if phrase/word could fit. Low-cost call."""
+    """Use a fast LLM (Cerebras or Gemini) to detect if phrase/word could fit."""
     phrase_obj = ctx.get("phraseOfDay")
     word_obj = ctx.get("wordOfDay")
 
@@ -113,20 +113,15 @@ async def check_missed_opportunity(
         return None
 
     try:
-        import google.generativeai as genai
-        from app.core.config import settings
+        from app.features.coaching.coaching_llm import classify_yes_no
 
-        genai.configure(api_key=settings.google_api_key)
-        chat_model = (settings.google_gemini_chat_model or "gemini-2.5-flash").strip()
-        model = genai.GenerativeModel(chat_model)
         prompt = (
             f'The user said: "{transcript}"\n'
             f'They are learning the {"phrase" if kind == "phrase" else "word"}: "{candidate}"\n'
             f'Could they have naturally used "{candidate}" in what they said? Reply YES or NO only.'
         )
-        response = await model.generate_content_async(prompt)
-        answer = (response.text or "").strip().upper()
-        if answer.startswith("YES"):
+        answer = await classify_yes_no(prompt)
+        if answer and answer.startswith("YES"):
             field = "usedPhraseOfDay" if kind == "phrase" else "usedWordOfDay"
             return {
                 "trigger": "missed_opportunity",
@@ -136,7 +131,7 @@ async def check_missed_opportunity(
                 "watchPhrase": candidate.lower(),
             }
     except Exception as e:
-        logger.warning("missed_opportunity Gemini call failed: %s", e)
+        logger.warning("missed_opportunity LLM call failed: %s", e)
     return None
 
 
