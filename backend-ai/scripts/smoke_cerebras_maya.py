@@ -261,7 +261,7 @@ def main() -> int:
         "--models",
         default=os.environ.get(
             "CEREBRAS_SMOKE_MODELS",
-            "gemma-4-31b,gpt-oss-120b",
+            "gpt-oss-120b",
         ),
         help="Comma-separated Cerebras model ids",
     )
