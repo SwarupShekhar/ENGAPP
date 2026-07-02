@@ -95,8 +95,7 @@ class StreamingCerebrasService:
             raise ValueError("Cerebras does not support multimodal audio turns")
 
         if not self.enabled or self._client is None:
-            yield NOT_CONFIGURED_REPLY
-            return
+            raise RuntimeError("Cerebras is not configured or SDK unavailable")
 
         full_prompt = build_conversation_prompt(
             prompt, conversation_history, phonetic_context, cefr_level
@@ -156,4 +155,4 @@ class StreamingCerebrasService:
         except Exception as e:
             logger.error("Cerebras stream failed: %s", e)
             if emitted == 0:
-                yield FALLBACK_REPLY
+                raise
