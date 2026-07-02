@@ -4,7 +4,7 @@ import io
 from typing import AsyncGenerator
 import logging
 import os
-from .streaming_gemini_service import StreamingGeminiService
+from .llm.router import TutorLLMRouter
 from .pronunciation_capture import strip_pron_tags_for_mobile
 from app.core.config import settings
 
@@ -31,7 +31,7 @@ class StreamingTutorService:
         self.speech_region = os.getenv('AZURE_SPEECH_REGION')
 
         # Initialize sub-services
-        self.gemini_service = StreamingGeminiService()
+        self.llm_router = TutorLLMRouter()
 
         # Maya tutor (Pulse) MUST use Inworld TTS. Azure is only for prosody / PA / STT.
         # Order: honor settings.tts_provider first; legacy USE_INWORLD_TTS env kept as override.
@@ -191,7 +191,7 @@ class StreamingTutorService:
 
         # Stream Gemini text first; overlap TTS so sentence 2 synth runs during sentence 1 playback prep.
         pending_tts: asyncio.Task | None = None
-        async for sentence in self.gemini_service.stream_response(
+        async for sentence in self.llm_router.stream_response(
             user_utterance,
             conversation_history,
             phonetic_context,

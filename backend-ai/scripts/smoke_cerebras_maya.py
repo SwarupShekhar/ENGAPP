@@ -36,7 +36,7 @@ try:
 except ImportError:
     load_dotenv = None  # type: ignore
 
-from app.features.tutor.streaming_gemini_service import StreamingGeminiService
+from app.features.tutor.prompt_builder import build_conversation_prompt
 from app.features.tutor.pronunciation_capture import strip_pron_tags_for_mobile
 
 
@@ -113,8 +113,7 @@ def build_maya_prompt(
     phonetic_context: dict | None,
     cefr_level: str | None,
 ) -> str:
-    svc = StreamingGeminiService()
-    return svc._build_conversation_prompt(
+    return build_conversation_prompt(
         utterance,
         history,
         phonetic_context=phonetic_context,
