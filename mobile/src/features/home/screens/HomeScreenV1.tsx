@@ -319,7 +319,10 @@ async function fetchProgressHomePatch(): Promise<Partial<HomeData> | null> {
 function mergeHomeWithProgress(
   base: HomeData | null | undefined,
   patch: Partial<HomeData>,
-): HomeData {
+): HomeData | null {
+  const primaryCTA = base?.primaryCTA ?? patch.primaryCTA;
+  if (!primaryCTA) return null;
+
   const baseHeader = base?.header;
   const patchHeader = patch.header;
   const baseSkills = base?.skills;
@@ -327,7 +330,7 @@ function mergeHomeWithProgress(
   return {
     stage: base?.stage ?? 1,
     header: { ...baseHeader, ...patchHeader } as HomeData['header'],
-    primaryCTA: base?.primaryCTA ?? patch.primaryCTA!,
+    primaryCTA,
     skills: {
       ...(baseSkills ?? {}),
       ...(patchSkills ?? {}),
@@ -882,6 +885,7 @@ export default function HomeScreen() {
       const patch = await fetchProgressHomePatch();
       if (!patch) return current ?? null;
       const merged = mergeHomeWithProgress(current, patch);
+      if (!merged) return current ?? null;
       HomeCacheService.getInstance().setSnapshot(merged);
       return merged;
     },
@@ -1132,8 +1136,7 @@ export default function HomeScreen() {
     Boolean(lastSessionDate) ||
     hasSkillScores ||
     (homeData?.stage ?? 0) > 1 ||
-    Boolean(bridgeLevel) ||
-    clerkAssessed;
+    Boolean(bridgeLevel);
   const levelForUi   = level || '—';
   const initials     = `${user?.firstName?.charAt(0) ?? ''}${user?.lastName?.charAt(0) ?? ''}`.toUpperCase() || '?';
 
