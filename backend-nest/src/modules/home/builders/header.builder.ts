@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+import { ProgressService } from '../../progress/progress.service';
 import { UserStage } from '../services/stage-resolver.service';
 
 @Injectable()
 export class HeaderBuilder {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private progressService: ProgressService,
+  ) {}
 
   async buildHeaderData(userId: string, stage: UserStage) {
     const user = await this.prisma.user.findUnique({
@@ -19,50 +23,17 @@ export class HeaderBuilder {
     const streak = user.currentStreak || user.profile?.streak || 0;
     let level = user.assessmentLevel || user.overallLevel || user.level || 'A2';
 
-    // Read score directly from UserTopicScore (same source as Progress screen)
-    const topicScores = await this.prisma.userTopicScore.findMany({
-      where: {
-        userId,
-        topicTag: { in: ['pillar_pronunciation', 'pillar_fluency', 'pillar_grammar', 'pillar_vocabulary', 'pillar_comprehension'] },
-      },
-    });
-
-    const pillarMap: Record<string, number> = {};
-    for (const ts of topicScores) {
-      const key = ts.topicTag.replace('pillar_', '');
-      pillarMap[key] = Math.round(Number(ts.score) || 0);
-    }
-    const pillarSum = Object.values(pillarMap).reduce((a, b) => a + b, 0);
-    const hasUsefulPillarData = topicScores.length > 0 && pillarSum > 0;
-
-    let score: number;
-    if (!hasUsefulPillarData) {
-      score = 0;
-    } else {
-      // Match Progress screen weighted overall (0–100)
-      score = Math.round(
-        (pillarMap.fluency || 0) * 0.25 +
-          (pillarMap.grammar || 0) * 0.22 +
-          (pillarMap.pronunciation || 0) * 0.22 +
-          (pillarMap.vocabulary || 0) * 0.18 +
-          (pillarMap.comprehension || 0) * 0.13,
-      );
+    // Same overall score + CEFR as Progress (/progress/detailed-metrics).
+    const metrics = await this.progressService.getDetailedMetrics(userId);
+    let score = Math.round(Number(metrics.current?.overallScore ?? 0));
+    const metricsLevel = (metrics.current?.cefrLevel ?? '').trim();
+    if (metricsLevel) {
+      level = metricsLevel;
+    } else if (score <= 0 && user.assessmentScore) {
+      score = Math.round(user.assessmentScore);
     }
 
-    // Fallback for score/level if no UserTopicScore rows exist
-    if (!hasUsefulPillarData) {
-      const latestAssessment = await this.prisma.assessmentSession.findFirst({
-        where: { userId, status: 'COMPLETED' },
-        orderBy: { completedAt: 'desc' },
-      });
-
-      if (latestAssessment) {
-        score = score || Math.round(latestAssessment.overallScore || 0);
-        level = level === 'A2' ? latestAssessment.overallLevel || level : level;
-      } else if (user.assessmentScore) {
-        score = Math.round(user.assessmentScore);
-      }
-    }
+    const latestAssessmentId = metrics.latestAssessmentId ?? null;
 
     // Calculate percentile
     const percentile = await this.calculatePercentile(userId);
@@ -102,13 +73,6 @@ export class HeaderBuilder {
     const goalTarget = goalTargets[nextLevel];
     const goalLabel = `Reach ${nextLevel}`;
 
-    // Fetch latest assessment ID for results button
-    const latestAssessment = await this.prisma.assessmentSession.findFirst({
-      where: { userId, status: 'COMPLETED' },
-      orderBy: { completedAt: 'desc' },
-      select: { id: true },
-    });
-
     return {
       greeting,
       userName: user.fname,
@@ -123,7 +87,7 @@ export class HeaderBuilder {
       goalLabel,
       lastSessionDate:
         stage === UserStage.INACTIVE_USER ? user.lastSessionAt || null : null,
-      latestAssessmentId: latestAssessment?.id || null,
+      latestAssessmentId,
     };
   }
 

@@ -296,6 +296,7 @@ export class ProgressService {
         // FIX: read from User model — session-handler.service writes currentStreak + totalSessions here
         streak: user?.currentStreak || 0,
         totalSessions: user?.totalSessions || 0,
+        latestAssessmentId: lastAssessment?.id ?? null,
       };
     } catch (e) {
       console.error('FATAL ERROR in getDetailedMetrics:', e);
@@ -520,6 +521,7 @@ export class ProgressService {
       weaknesses: [],
       streak: 0,
       totalSessions: 0,
+      latestAssessmentId: null as string | null,
     };
   }
 }

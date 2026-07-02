@@ -29,7 +29,10 @@ export class PhraseOfDayService {
     private readonly dailyTts: DailyTtsService,
   ) {}
 
-  async getPhraseOfTheDay(date = new Date()): Promise<PhraseOfDay> {
+  async getPhraseOfTheDay(
+    date = new Date(),
+    options?: { blockOnMissing?: boolean },
+  ): Promise<PhraseOfDay> {
     const dateKey = this.toUtcDateString(date);
     const cacheKey = `engr:potd:${dateKey}`;
     const cached = await this.redis.get(cacheKey);
@@ -56,7 +59,7 @@ export class PhraseOfDayService {
         'phrase',
         dateKey,
         value,
-        { blockOnMissing: contentJustResolved },
+        { blockOnMissing: options?.blockOnMissing ?? contentJustResolved },
       );
       return listenAudio ? { ...value, listenAudio } : value;
     } catch (error) {

@@ -13,6 +13,6 @@ export interface WordOfTheDay {
   definition: string;
   example: string;
   partOfSpeech: string | null;
-  source: 'wordnik' | 'fallback';
+  source: 'curated' | 'wordnik';
   listenAudio?: DailyListenAudioMap;
 }

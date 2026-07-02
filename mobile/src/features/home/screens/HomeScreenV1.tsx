@@ -261,8 +261,22 @@ function homeNeedsProgressFallback(data: HomeData | null | undefined): boolean {
   const score = Number(data.header.score ?? 0);
   const latestId = data.header.latestAssessmentId;
   const level = (data.header.level ?? '').trim();
-  return score <= 0 && !latestId && !level;
+  const placeholderLevel = !level || level === '—' || level === '--' || level === 'A2';
+  return score <= 0 && !latestId && placeholderLevel;
 }
+
+const FALLBACK_PRIMARY_CTA: HomeData['primaryCTA'] = {
+  type: 'match_practice',
+  title: 'Find a Partner',
+  description: 'Match with someone new for a live conversation',
+  buttonText: 'Find a Partner',
+  action: 'navigate_to_practice',
+  accentColor: '#10B981',
+  mayaChip: {
+    label: 'Chat with Maya',
+    action: 'navigate_to_maya',
+  },
+};
 
 async function fetchProgressHomePatch(): Promise<Partial<HomeData> | null> {
   try {
@@ -276,6 +290,7 @@ async function fetchProgressHomePatch(): Promise<Partial<HomeData> | null> {
         vocabulary?: number;
       };
       streak?: number;
+      latestAssessmentId?: string | null;
     }>('/progress/detailed-metrics');
     const current = data?.current;
     if (!current) return null;
@@ -299,7 +314,7 @@ async function fetchProgressHomePatch(): Promise<Partial<HomeData> | null> {
         goalTarget: 70,
         goalLabel: level ? `Reach ${level}` : 'Next Level',
         lastSessionDate: null,
-        latestAssessmentId: null,
+        latestAssessmentId: data?.latestAssessmentId ?? null,
       },
       skills: {
         scores: {
@@ -320,15 +335,15 @@ function mergeHomeWithProgress(
   base: HomeData | null | undefined,
   patch: Partial<HomeData>,
 ): HomeData | null {
-  const primaryCTA = base?.primaryCTA ?? patch.primaryCTA;
-  if (!primaryCTA) return null;
+  if (!patch.header && !base?.header) return null;
 
+  const primaryCTA = base?.primaryCTA ?? patch.primaryCTA ?? FALLBACK_PRIMARY_CTA;
   const baseHeader = base?.header;
   const patchHeader = patch.header;
   const baseSkills = base?.skills;
   const patchSkills = patch.skills;
   return {
-    stage: base?.stage ?? 1,
+    stage: base?.stage ?? patch.stage ?? 1,
     header: { ...baseHeader, ...patchHeader } as HomeData['header'],
     primaryCTA,
     skills: {
@@ -1006,6 +1021,35 @@ export default function HomeScreen() {
       }
     }
   }, [applyProgressFallbackIfNeeded, clerkAssessed]);
+
+  // Recover score card when Nest /home is empty but Clerk says assessment is done.
+  useEffect(() => {
+    if (!clerkAssessed || loadingHome) return;
+    const score = Number(homeData?.header?.score ?? 0);
+    const latestId = homeData?.header?.latestAssessmentId;
+    const level = (homeData?.header?.level ?? '').trim();
+    const bridgeLevel = (bridgeHeader.level ?? '').trim();
+    const missing =
+      score <= 0 &&
+      !latestId &&
+      (!level || level === '—' || level === '--') &&
+      !bridgeLevel;
+    if (!missing) return;
+
+    let cancelled = false;
+    void (async () => {
+      const patch = await fetchProgressHomePatch();
+      if (cancelled || !patch) return;
+      const merged = mergeHomeWithProgress(homeData, patch);
+      if (!merged) return;
+      HomeCacheService.getInstance().setSnapshot(merged);
+      setHomeData(merged);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clerkAssessed, loadingHome, homeData, bridgeHeader.level]);
 
   useEffect(() => {
     if (!isLoaded || !user?.id) return;

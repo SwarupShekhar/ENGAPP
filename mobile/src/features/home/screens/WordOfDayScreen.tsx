@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -13,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { useHomePracticeTts } from "../voice/useHomePracticeTts";
+import { lookupWord, type WordLookupResult } from "../services/vocabularyApi";
 
 export type WordOfDayParams = {
   word?: string;
@@ -24,31 +27,77 @@ export type WordOfDayParams = {
 
 type WordOfDayRoute = RouteProp<{ WordOfDay: WordOfDayParams }, "WordOfDay">;
 
+function buildListenScript(
+  word: string,
+  definition: string,
+  example?: string,
+): string {
+  const parts = [`Today's word is ${word}.`];
+  if (definition) parts.push(`It means ${definition.replace(/\.$/, "")}.`);
+  if (example) parts.push(`For example: ${example.replace(/\.$/, "")}.`);
+  return parts.join(" ");
+}
+
 export default function WordOfDayScreen() {
   const theme = useAppTheme();
   const styles = getStyles(theme);
   const navigation = useNavigation();
   const route = useRoute<WordOfDayRoute>();
-  const { word, definition, example, partOfSpeech, listenAudioUrl } = route.params ?? {};
+  const { word, definition, example, partOfSpeech, listenAudioUrl } =
+    route.params ?? {};
 
   const displayWord = word?.trim() || "Word of the day";
   const displayDef =
     definition?.trim() || "Open the home tab to see today's vocabulary pick.";
   const displayExample = example?.trim();
-  const listenScript = useMemo(() => {
-    const pos = partOfSpeech ? `${partOfSpeech}. ` : "";
-    return [
-      `${displayWord}. ${pos}`.trim(),
-      displayDef && `Meaning - ${displayDef}`,
-      displayExample && `For example - ${displayExample}`,
-    ]
-      .filter(Boolean)
-      .join(". ");
-  }, [displayWord, displayDef, displayExample, partOfSpeech]);
+  const listenScript = useMemo(
+    () => buildListenScript(displayWord, displayDef, displayExample),
+    [displayWord, displayDef, displayExample],
+  );
 
   const { speak, playingKey, stop } = useHomePracticeTts();
   const listenKey = "word-of-day-screen:full";
   const listenPlaying = playingKey === listenKey;
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupResult, setLookupResult] = useState<WordLookupResult | null>(
+    null,
+  );
+  const lookupListenKey = "word-of-day-screen:lookup";
+  const lookupPlaying = playingKey === lookupListenKey;
+
+  const lookupListenScript = useMemo(() => {
+    if (!lookupResult) return "";
+    return buildListenScript(
+      lookupResult.word,
+      lookupResult.definition,
+      lookupResult.example,
+    );
+  }, [lookupResult]);
+
+  const handleLookup = useCallback(async () => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setLookupError("Enter at least 2 letters.");
+      return;
+    }
+    setLookupLoading(true);
+    setLookupError(null);
+    setLookupResult(null);
+    try {
+      const result = await lookupWord(q);
+      setLookupResult(result);
+    } catch (e: unknown) {
+      const msg =
+        (e as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Could not find that word. Try another spelling.";
+      setLookupError(msg);
+    } finally {
+      setLookupLoading(false);
+    }
+  }, [searchQuery]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -71,6 +120,7 @@ export default function WordOfDayScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <LinearGradient
           colors={theme.colors.gradients.primary as [string, string]}
@@ -105,7 +155,9 @@ export default function WordOfDayScreen() {
               backgroundColor: listenPlaying
                 ? `${theme.colors.primary}22`
                 : `${theme.colors.primary}12`,
-              borderColor: listenPlaying ? theme.colors.primary : theme.colors.border,
+              borderColor: listenPlaying
+                ? theme.colors.primary
+                : theme.colors.border,
               opacity: pressed ? 0.85 : 1,
             },
           ]}
@@ -121,6 +173,82 @@ export default function WordOfDayScreen() {
             {listenPlaying ? "Playing… tap to stop" : "Listen"}
           </Text>
         </Pressable>
+
+        <View style={styles.lookupSection}>
+          <Text style={styles.lookupTitle}>Look up a word</Text>
+          <Text style={styles.lookupHint}>
+            Don't know a word? Search for a simple definition and example.
+          </Text>
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="e.g. overwhelmed"
+              placeholderTextColor={theme.colors.text.light}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => void handleLookup()}
+            />
+            <TouchableOpacity
+              style={styles.searchBtn}
+              onPress={() => void handleLookup()}
+              disabled={lookupLoading}
+            >
+              {lookupLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons name="search" size={20} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          {lookupError ? (
+            <Text style={styles.lookupError}>{lookupError}</Text>
+          ) : null}
+          {lookupResult ? (
+            <View style={styles.lookupCard}>
+              <Text style={styles.lookupWord}>{lookupResult.word}</Text>
+              {lookupResult.partOfSpeech ? (
+                <Text style={styles.lookupPos}>{lookupResult.partOfSpeech}</Text>
+              ) : null}
+              <Text style={styles.body}>{lookupResult.definition}</Text>
+              {lookupResult.example ? (
+                <Text style={styles.example}>"{lookupResult.example}"</Text>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  if (lookupPlaying) void stop();
+                  else void speak(lookupListenKey, lookupListenScript);
+                }}
+                style={({ pressed }) => [
+                  styles.listenBtn,
+                  {
+                    marginTop: 12,
+                    backgroundColor: lookupPlaying
+                      ? `${theme.colors.primary}22`
+                      : `${theme.colors.primary}12`,
+                    borderColor: lookupPlaying
+                      ? theme.colors.primary
+                      : theme.colors.border,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={lookupPlaying ? "stop-circle" : "volume-high"}
+                  size={18}
+                  color={theme.colors.primary}
+                />
+                <Text
+                  style={[styles.listenText, { color: theme.colors.primary }]}
+                >
+                  {lookupPlaying ? "Playing…" : "Listen"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
 
         <TouchableOpacity
           style={styles.homeBtn}
@@ -214,6 +342,7 @@ function getStyles(theme: ReturnType<typeof useAppTheme>) {
       lineHeight: 22,
       fontStyle: "italic",
       color: theme.colors.text.secondary,
+      marginTop: 8,
     },
     listenBtn: {
       flexDirection: "row",
@@ -228,6 +357,67 @@ function getStyles(theme: ReturnType<typeof useAppTheme>) {
     listenText: {
       fontSize: 14,
       fontWeight: "700",
+    },
+    lookupSection: {
+      marginTop: 8,
+      gap: 10,
+    },
+    lookupTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.colors.text.primary,
+    },
+    lookupHint: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.text.secondary,
+    },
+    searchRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.l,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: theme.colors.text.primary,
+      backgroundColor: theme.colors.surface,
+    },
+    searchBtn: {
+      width: 48,
+      height: 48,
+      borderRadius: theme.borderRadius.l,
+      backgroundColor: theme.colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    lookupError: {
+      color: theme.colors.error ?? "#f87171",
+      fontSize: 14,
+    },
+    lookupCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.l,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 6,
+    },
+    lookupWord: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: theme.colors.text.primary,
+      textTransform: "capitalize",
+    },
+    lookupPos: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: theme.colors.text.light,
+      textTransform: "uppercase",
     },
     homeBtn: {
       marginTop: 8,

@@ -1,13 +1,18 @@
 /** Bump APP_CACHE_SCHEMA_VERSION when invalidating on-disk caches. */
-export const APP_CACHE_SCHEMA_VERSION = 4;
+export const APP_CACHE_SCHEMA_VERSION = 6;
 export const APP_CACHE_SCHEMA_KEY = "@app_cache_schema_version";
 
-export const HOME_DATA_CACHE_KEY = "@home_data_cache_v3";
+export const HOME_DATA_CACHE_KEY = "@home_data_cache_v5";
+export const LEGACY_HOME_CACHE_KEYS = [
+  "@home_data_cache",
+  "@home_data_cache_v2",
+  "@home_data_cache_v3",
+  "@home_data_cache_v4",
+];
 export const EBITES_FEED_CACHE_KEY = "@ebites_feed_cache_v3";
 
 export const LEGACY_CACHE_KEYS = [
-  "@home_data_cache",
-  "@home_data_cache_v2",
+  ...LEGACY_HOME_CACHE_KEYS,
   "@ebites_feed_cache",
   "@ebites_feed_cache_v2",
 ];

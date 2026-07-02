@@ -1,19 +1,27 @@
-/** Matches Kitten TTS voice ids exposed in the app. */
+/** Daily listen voice ids (mapped to Inworld voices at synth time). */
 export const DAILY_LISTEN_VOICES = ['Kiki', 'Jasper'] as const;
 export type DailyListenVoice = (typeof DAILY_LISTEN_VOICES)[number];
 
 export type DailyListenAudioMap = Partial<Record<DailyListenVoice, string>>;
+
+/** Inworld voice ids for daily bake (Kiki/Jasper are app labels only). */
+export const INWORLD_VOICE_BY_DAILY_LABEL: Record<DailyListenVoice, string> = {
+  Kiki: 'Olivia',
+  Jasper: 'Dennis',
+};
 
 export function buildPhraseListenScript(phrase: {
   phrase: string;
   definition: string;
   example: string;
 }): string {
+  const text = (phrase.phrase || '').trim();
   const def = (phrase.definition || '').trim();
   const ex = (phrase.example || '').trim();
-  return [phrase.phrase, def && `Meaning - ${def}`, ex && `For example - ${ex}`]
-    .filter(Boolean)
-    .join('. ');
+  const parts = [`Today's phrase is ${text.toLowerCase()}.`];
+  if (def) parts.push(`It means ${def.replace(/\.$/, '')}.`);
+  if (ex) parts.push(`For example: ${ex.replace(/\.$/, '')}.`);
+  return parts.join(' ');
 }
 
 export function buildWordListenScript(word: {
@@ -22,12 +30,13 @@ export function buildWordListenScript(word: {
   example: string;
   partOfSpeech: string | null;
 }): string {
-  const pos = word.partOfSpeech ? `${word.partOfSpeech}. ` : '';
+  const text = (word.word || '').trim();
   const def = (word.definition || '').trim();
   const ex = (word.example || '').trim();
-  return [`${word.word}. ${pos}`.trim(), def && `Meaning - ${def}`, ex && `For example - ${ex}`]
-    .filter(Boolean)
-    .join('. ');
+  const parts = [`Today's word is ${text}.`];
+  if (def) parts.push(`It means ${def.replace(/\.$/, '')}.`);
+  if (ex) parts.push(`For example: ${ex.replace(/\.$/, '')}.`);
+  return parts.join(' ');
 }
 
 export function isDailyListenVoice(value: string): value is DailyListenVoice {

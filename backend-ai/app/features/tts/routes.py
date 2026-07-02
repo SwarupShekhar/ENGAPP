@@ -123,6 +123,7 @@ async def full_feedback_narration(request: Request, body: FullFeedbackNarrationR
 class SpeakRequest(BaseModel):
     text: str
     speaking_rate: float = 0.65  # Only used by Inworld fallback path
+    voice_id: Optional[str] = None
 
 @router.post("/speak", response_model=FeedbackNarrationResponse)
 async def speak(request: Request, body: SpeakRequest):
@@ -133,7 +134,9 @@ async def speak(request: Request, body: SpeakRequest):
 
     # Inworld is faster and already used for feedback narration; Gemini TTS is the fallback.
     audio_bytes = await inworld_tts_service.synthesize_async(
-        clean, speaking_rate=body.speaking_rate
+        clean,
+        speaking_rate=body.speaking_rate,
+        voice_id=(body.voice_id or "").strip() or None,
     )
     if not audio_bytes and google_gemini_tts_service.is_configured():
         audio_bytes = await google_gemini_tts_service.synthesize_async(clean)

@@ -36,10 +36,15 @@ class InworldTTSService:
         text = re.sub(r'[^\w\s,!.?\'":\-]', '', text)
         return text
 
-    def _build_payload(self, text: str, speaking_rate: float = 0.78) -> dict:
+    def _build_payload(
+        self,
+        text: str,
+        speaking_rate: float = 0.78,
+        voice_id: Optional[str] = None,
+    ) -> dict:
         return {
             "text": self._clean_text(text),
-            "voiceId": settings.inworld_character_id or "Olivia",
+            "voiceId": voice_id or settings.inworld_character_id or "Olivia",
             "modelId": "inworld-tts-1",
             "timestampType": "WORD",
             "speakingRate": speaking_rate,
@@ -72,7 +77,13 @@ class InworldTTSService:
             logger.error(f"Inworld TTS error: {e}")
             return b""
 
-    async def synthesize_async(self, text: str, gender: str = 'female', speaking_rate: float = 0.78) -> bytes:
+    async def synthesize_async(
+        self,
+        text: str,
+        gender: str = 'female',
+        speaking_rate: float = 0.78,
+        voice_id: Optional[str] = None,
+    ) -> bytes:
         """Async synthesis using httpx.AsyncClient — non-blocking, lower latency."""
         if not self.auth_header:
             logger.error("Inworld TTS service is not configured.")
@@ -82,7 +93,7 @@ class InworldTTSService:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     self.endpoint,
-                    json=self._build_payload(text, speaking_rate),
+                    json=self._build_payload(text, speaking_rate, voice_id),
                     headers=headers,
                     timeout=30.0,
                 )

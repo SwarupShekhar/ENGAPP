@@ -12,11 +12,13 @@ import {
   DAILY_LISTEN_VOICES,
   DailyListenAudioMap,
   DailyListenVoice,
+  INWORLD_VOICE_BY_DAILY_LABEL,
 } from '../utils/daily-listen-script';
 import { PhraseOfDay } from '../types/daily-content.types';
 import { WordOfTheDay } from '../types/daily-content.types';
 
 type DailyKind = 'phrase' | 'word';
+type DailyTtsProvider = 'inworld' | 'kitten';
 
 @Injectable()
 export class DailyTtsService {
@@ -24,6 +26,7 @@ export class DailyTtsService {
   private readonly aiBackendUrl: string;
   private readonly aiHeaders: Record<string, string>;
   private readonly enabled: boolean;
+  private readonly provider: DailyTtsProvider;
   private readonly inFlight = new Map<string, Promise<DailyListenAudioMap | undefined>>();
 
   constructor(
@@ -35,7 +38,16 @@ export class DailyTtsService {
     this.aiBackendUrl =
       this.config.get<string>('AI_ENGINE_URL') || 'http://localhost:8001';
     this.aiHeaders = aiEngineAuthHeaders(this.config);
-    this.enabled = this.config.get<string>('KITTEN_TTS_ENABLED') !== 'false';
+    const provider = (this.config.get<string>('DAILY_TTS_PROVIDER') || 'inworld')
+      .trim()
+      .toLowerCase();
+    this.provider = provider === 'kitten' ? 'kitten' : 'inworld';
+    const dailyEnabled = this.config.get<string>('DAILY_TTS_ENABLED');
+    const legacyKitten = this.config.get<string>('KITTEN_TTS_ENABLED');
+    this.enabled =
+      dailyEnabled != null
+        ? dailyEnabled !== 'false'
+        : legacyKitten !== 'false';
   }
 
   /**
@@ -145,7 +157,7 @@ export class DailyTtsService {
       }
     }
 
-    const mp3 = await this.synthesizeKitten(script, voice);
+    const mp3 = await this.synthesizeDaily(script, voice);
     if (!mp3.length) {
       this.logger.warn(`Daily TTS bake failed kind=${kind} date=${dateKey} voice=${voice}`);
       return undefined;
@@ -158,8 +170,64 @@ export class DailyTtsService {
       JSON.stringify({ blobKey, scriptHash, voice, kind, dateKey }),
       ttl,
     );
-    this.logger.log(`Daily TTS baked kind=${kind} date=${dateKey} voice=${voice}`);
+    this.logger.log(
+      `Daily TTS baked provider=${this.provider} kind=${kind} date=${dateKey} voice=${voice}`,
+    );
     return { voice, url: uploadedUrl };
+  }
+
+  private async synthesizeDaily(text: string, voice: DailyListenVoice): Promise<Buffer> {
+    if (this.provider === 'kitten') {
+      return this.synthesizeKitten(text, voice);
+    }
+    return this.synthesizeInworld(text, voice);
+  }
+
+  private async synthesizeInworld(text: string, voice: DailyListenVoice): Promise<Buffer> {
+    const voiceId = INWORLD_VOICE_BY_DAILY_LABEL[voice];
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.aiBackendUrl}/api/tts/speak`,
+          { text, speaking_rate: 0.78, voice_id: voiceId },
+          {
+            headers: this.aiHeaders,
+            timeout: 30_000,
+          },
+        ),
+      );
+      const b64 = (response.data?.audio_base64 as string | undefined) ?? '';
+      if (!b64) return Buffer.alloc(0);
+      return Buffer.from(b64, 'base64');
+    } catch (error) {
+      this.logger.warn(
+        `Inworld daily synth failed voice=${voice}: ${(error as Error).message}`,
+      );
+      return Buffer.alloc(0);
+    }
+  }
+
+  private async synthesizeKitten(text: string, voice: DailyListenVoice): Promise<Buffer> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.aiBackendUrl}/api/tts/kitten/speak`,
+          { text, voice },
+          {
+            headers: this.aiHeaders,
+            timeout: 90_000,
+          },
+        ),
+      );
+      const b64 = (response.data?.audio_base64 as string | undefined) ?? '';
+      if (!b64) return Buffer.alloc(0);
+      return Buffer.from(b64, 'base64');
+    } catch (error) {
+      this.logger.warn(
+        `Kitten synth failed voice=${voice}: ${(error as Error).message}`,
+      );
+      return Buffer.alloc(0);
+    }
   }
 
   private async readUrlsFromMeta(
@@ -194,29 +262,6 @@ export class DailyTtsService {
   private isComplete(map?: DailyListenAudioMap): boolean {
     if (!map) return false;
     return DAILY_LISTEN_VOICES.every((voice) => Boolean(map[voice]));
-  }
-
-  private async synthesizeKitten(text: string, voice: DailyListenVoice): Promise<Buffer> {
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.aiBackendUrl}/api/tts/kitten/speak`,
-          { text, voice },
-          {
-            headers: this.aiHeaders,
-            timeout: 90_000,
-          },
-        ),
-      );
-      const b64 = (response.data?.audio_base64 as string | undefined) ?? '';
-      if (!b64) return Buffer.alloc(0);
-      return Buffer.from(b64, 'base64');
-    } catch (error) {
-      this.logger.warn(
-        `Kitten synth failed voice=${voice}: ${(error as Error).message}`,
-      );
-      return Buffer.alloc(0);
-    }
   }
 
   private async purgePreviousDayIfNeeded(dateKey: string): Promise<void> {
