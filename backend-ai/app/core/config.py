@@ -138,8 +138,9 @@ class Settings(BaseSettings):
     pa_enrich_max_concurrent: int = 8
     # Seconds before in-call coaching hints fire (lower = faster first hints in Maya).
     coaching_warmup_seconds: int = 5
-    # Max ms to wait for coaching hint LLM (parallel with STT; Cerebras usually fits in 300ms).
-    coaching_hint_budget_ms: int = 300
+    # Max ms to wait for coaching hint LLM after STT (parallel with PA).
+    # Cerebras YES/NO is ~800–1000ms; lower = faster turns, fewer missed-opportunity hints.
+    coaching_hint_budget_ms: int = 900
     
     # Monitoring
     sentry_dsn: Optional[str] = None
