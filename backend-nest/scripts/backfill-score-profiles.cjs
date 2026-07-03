@@ -1,9 +1,11 @@
 /**
- * Production backfill — uses compiled dist formulas (works inside Docker image).
+ * Production backfill — uses compiled dist formulas + Prisma pg adapter (Prisma 7).
  *
  *   node scripts/backfill-score-profiles.cjs
  */
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
 const {
   applyAssessmentGating,
   clampScore,
@@ -12,9 +14,27 @@ const {
   flattenSkillBreakdown,
 } = require('../dist/modules/score-authority/score-authority.formulas');
 
-const prisma = new PrismaClient();
+function createPrisma() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      'DATABASE_URL is not set. Run inside the backend-nest container or export DATABASE_URL.',
+    );
+  }
+  const pool = new Pool({
+    connectionString,
+    max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+    ssl: connectionString.includes('sslmode=require')
+      ? { rejectUnauthorized: false }
+      : undefined,
+  });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
+  return { prisma, pool };
+}
 
 async function upsertProfile(
+  prisma,
   userId,
   assessmentId,
   skillBreakdown,
@@ -91,37 +111,42 @@ async function upsertProfile(
 }
 
 async function main() {
-  const sessions = await prisma.assessmentSession.findMany({
-    where: { status: 'COMPLETED' },
-    orderBy: { completedAt: 'desc' },
-    distinct: ['userId'],
-    select: {
-      id: true,
-      userId: true,
-      skillBreakdown: true,
-      phase3Data: true,
-      phase4Data: true,
-    },
-  });
+  const { prisma, pool } = createPrisma();
+  try {
+    const sessions = await prisma.assessmentSession.findMany({
+      where: { status: 'COMPLETED' },
+      orderBy: { completedAt: 'desc' },
+      distinct: ['userId'],
+      select: {
+        id: true,
+        userId: true,
+        skillBreakdown: true,
+        phase3Data: true,
+        phase4Data: true,
+      },
+    });
 
-  let ok = 0;
-  for (const s of sessions) {
-    await upsertProfile(
-      s.userId,
-      s.id,
-      s.skillBreakdown,
-      s.phase3Data,
-      s.phase4Data,
-    );
-    ok += 1;
-    console.log(`backfilled user=${s.userId} assessment=${s.id}`);
+    let ok = 0;
+    for (const s of sessions) {
+      await upsertProfile(
+        prisma,
+        s.userId,
+        s.id,
+        s.skillBreakdown,
+        s.phase3Data,
+        s.phase4Data,
+      );
+      ok += 1;
+      console.log(`backfilled user=${s.userId} assessment=${s.id}`);
+    }
+    console.log(`Done. ${ok} profiles.`);
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
   }
-  console.log(`Done. ${ok} profiles.`);
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
