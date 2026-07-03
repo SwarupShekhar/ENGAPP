@@ -18,6 +18,7 @@ import { TasksService } from '../tasks/tasks.service';
 import { BenchmarkingService } from './benchmarking.service';
 import { ErrorPatternService } from './error-pattern.service';
 import { ReadinessService } from './readiness.service';
+import { ScoreAuthorityService } from '../score-authority/score-authority.service';
 
 const ELICITED_SENTENCES: Record<string, string> = {
   A1: 'I like to eat apples.',
@@ -58,6 +59,7 @@ export class AssessmentService {
     private readonly benchmarkingService: BenchmarkingService,
     private readonly errorPatternService: ErrorPatternService,
     private readonly readinessService: ReadinessService,
+    private readonly scoreAuthority: ScoreAuthorityService,
   ) {}
 
   private readonly COMPONENT_WEIGHTS = {
@@ -864,6 +866,21 @@ export class AssessmentService {
         },
       }),
     ]);
+
+    try {
+      if (this.scoreAuthority.isEnabledForUser(session.userId)) {
+        await this.scoreAuthority.seedFromAssessment({
+          userId: session.userId,
+          assessmentId: session.id,
+          skillBreakdown,
+          comprehensionScore: comp,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `[ASSESSMENT] Score authority seed skipped/failed: ${(err as Error).message}`,
+      );
+    }
 
     // Aggregate Detailed Feedback
     const detailedReport = {

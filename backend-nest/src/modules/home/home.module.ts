@@ -15,6 +15,7 @@ import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../redis/redis.module';
 import { BrainModule } from '../brain/brain.module';
 import { ProgressModule } from '../progress/progress.module';
+import { ScoreAuthorityModule } from '../score-authority/score-authority.module';
 import { WordOfDayService } from './services/word-of-day.service';
 import { PhraseOfDayService } from './services/phrase-of-day.service';
 import { DailyTtsService } from './services/daily-tts.service';
@@ -22,7 +23,7 @@ import { VocabularyService } from './services/vocabulary.service';
 import { DailyTtsScheduler } from './daily-tts.scheduler';
 
 @Module({
-  imports: [PrismaModule, RedisModule, BrainModule, ProgressModule, HttpModule],
+  imports: [PrismaModule, RedisModule, BrainModule, ProgressModule, ScoreAuthorityModule, HttpModule],
   controllers: [HomeController, VocabularyController],
   providers: [
     HomeService,

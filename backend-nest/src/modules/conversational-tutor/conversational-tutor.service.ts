@@ -14,6 +14,7 @@ import { RedisService } from '../../redis/redis.service';
 import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { NotificationService } from '../notifications/notification.service';
+import { ScoringService } from '../scoring/scoring.service';
 import { SESSIONS_MAYA_QUEUE } from '../../queues/sessions-queue.constants';
 import { MayaSessionStore } from './maya-session.store';
 import { MayaConversationSession, MayaConversationTurn } from './maya-session.types';
@@ -97,6 +98,7 @@ export class ConversationalTutorService implements OnModuleInit {
     private azureStorage: AzureStorageService,
     private pronunciation: PronunciationService,
     private notificationService: NotificationService,
+    private scoringService: ScoringService,
     private sessionStore: MayaSessionStore,
     @InjectQueue(SESSIONS_MAYA_QUEUE) private sessionsQueue: Queue,
   ) {
@@ -775,6 +777,27 @@ export class ConversationalTutorService implements OnModuleInit {
           sessionId,
           score: overall != null ? Math.round(overall) : null,
         });
+      }
+
+      if (participant && userId && transcript.trim()) {
+        const userTurnCount = session.history.filter((h) => h.speaker === 'user').length;
+        const userSpokeSeconds = Math.max(userTurnCount * 15, 30);
+        try {
+          await this.scoringService.processCallQualityScore(
+            sessionId,
+            userId,
+            participant.id,
+            transcript,
+            [],
+            durationSec,
+            userSpokeSeconds,
+            'maya',
+          );
+        } catch (scoreErr) {
+          this.logger.warn(
+            `Maya score authority update failed session=${sessionId}: ${(scoreErr as Error).message}`,
+          );
+        }
       }
 
       await this.redis.del(`maya:turns:${sessionId}`);

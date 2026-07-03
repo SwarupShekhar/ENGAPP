@@ -25,7 +25,8 @@
     "load:verify-clerk-token": "node scripts/load/verify-clerk-token.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "backfill:scores": "node scripts/backfill-score-profiles.cjs"
   },
   "keywords": [],
   "author": "",

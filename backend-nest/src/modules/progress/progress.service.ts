@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { ScoreAuthorityService } from '../score-authority/score-authority.service';
 
 export interface PillarDeltas {
   pronunciation: number;
@@ -11,7 +12,10 @@ export interface PillarDeltas {
 
 @Injectable()
 export class ProgressService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly scoreAuthority: ScoreAuthorityService,
+  ) {}
   
   /**
    * Authoritative implementation of applyPillarDeltas for Phase 1.
@@ -19,6 +23,34 @@ export class ProgressService {
    * Runs gating rules and computes the final weighted overall score.
    */
   async applyPillarDeltas(userId: string, deltas: PillarDeltas) {
+    if (this.scoreAuthority.isEnabledForUser(userId)) {
+      const result = await this.scoreAuthority.applySessionDeltas(
+        userId,
+        deltas,
+        'call_delta',
+        'legacy-apply-pillar-deltas',
+      );
+      if (!result) {
+        return {
+          success: false,
+          userId,
+          oldScores: {},
+          newScores: { overallScore: 0 },
+          isGatingActive: false,
+          appliedAt: new Date(),
+        };
+      }
+      return {
+        success: true,
+        userId,
+        oldScores: result.oldScores,
+        newScores: result.newScores,
+        isGatingActive: false,
+        appliedAt: new Date(),
+      };
+    }
+
+    // Legacy path (0–1000 scale) when authority flag is off
     // 1. Fetch current pillar scores from the database
     const { current } = await this.getDetailedMetrics(userId);
 
@@ -115,6 +147,10 @@ export class ProgressService {
 
   async getDetailedMetrics(userId: string) {
     try {
+      if (this.scoreAuthority.isEnabledForUser(userId)) {
+        return this.getDetailedMetricsFromAuthority(userId);
+      }
+
       const PILLAR_TAGS = ['pronunciation', 'fluency', 'grammar', 'vocabulary', 'comprehension'];
 
       // 1. Fetch all data sources in parallel
@@ -496,6 +532,71 @@ export class ProgressService {
     });
 
     return activity;
+  }
+
+  private async getDetailedMetricsFromAuthority(userId: string) {
+    const profile = await this.scoreAuthority.getProfile(userId);
+    const current = await this.scoreAuthority.toDetailedMetricsCurrent(userId);
+
+    const [user, lastAssessment, weeklyActivity] = await Promise.all([
+      this.prisma.user
+        .findUnique({
+          where: { id: userId },
+          select: { currentStreak: true, totalSessions: true },
+        })
+        .catch(() => null),
+      this.prisma.assessmentSession
+        .findFirst({
+          where: { userId, status: 'COMPLETED' },
+          orderBy: { completedAt: 'desc' },
+        })
+        .catch(() => null),
+      this.getWeeklyActivity(userId).catch(() => [0, 0, 0, 0, 0, 0, 0]),
+    ]);
+
+    const pillarDeltas = profile.deltas?.pillars ?? {};
+    const deltas = {
+      pronunciation: pillarDeltas.pronunciation ?? 0,
+      fluency: pillarDeltas.fluency ?? 0,
+      grammar: pillarDeltas.grammar ?? 0,
+      vocabulary: pillarDeltas.vocabulary ?? 0,
+      comprehension: pillarDeltas.comprehension ?? 0,
+      overallScore: profile.deltas?.overall ?? 0,
+    };
+
+    let weaknesses: any[] = [];
+    try {
+      if (lastAssessment) {
+        let weaknessMap = (lastAssessment as any).weaknessMap;
+        if (typeof weaknessMap === 'string') {
+          try {
+            weaknessMap = JSON.parse(weaknessMap);
+          } catch {
+            weaknessMap = {};
+          }
+        }
+        weaknessMap = weaknessMap || {};
+        weaknesses = Object.entries(weaknessMap).map(([skill, details]: [string, any]) => ({
+          skill,
+          severity: details?.severity || 'MEDIUM',
+          recommendation: details?.recommendation || `Practice more ${skill} exercises`,
+        }));
+      }
+    } catch {
+      weaknesses = [];
+    }
+
+    return {
+      current,
+      deltas,
+      weeklyActivity,
+      weaknesses: weaknesses.slice(0, 3),
+      streak: user?.currentStreak || 0,
+      totalSessions: user?.totalSessions || 0,
+      latestAssessmentId: profile.baselineAssessmentId ?? lastAssessment?.id ?? null,
+      vocabularyMeasured: profile.vocabularyMeasured,
+      goal: profile.goal,
+    };
   }
 
   private getEmptyMetrics() {

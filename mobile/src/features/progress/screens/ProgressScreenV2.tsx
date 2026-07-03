@@ -18,6 +18,7 @@ import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from "react-na
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { tokensV2_603010 as tokensV2 } from "../../../theme/tokensV2_603010";
 import { client } from "../../../api/client";
+import { getScoreProfile } from "../../../api/scores";
 import { tasksApi, type LearningTask } from "../../../api/tasks";
 
 interface ProgressMetricsV2 {
@@ -239,11 +240,29 @@ export default function ProgressScreenV2() {
   const fetchMetrics = useCallback(async () => {
     try {
       setError(false);
-      const [response, mastered] = await Promise.all([
+      const [response, mastered, profile] = await Promise.all([
         client.get("/progress/detailed-metrics"),
         tasksApi.getMasteredCount().catch(() => 0),
+        getScoreProfile(),
       ]);
-      setMetrics(response.data);
+      const base = response.data as ProgressMetricsV2;
+      if (profile) {
+        setMetrics({
+          ...base,
+          current: {
+            ...base.current,
+            overallScore: profile.overall,
+            cefrLevel: profile.cefrLevel,
+            fluency: profile.pillars.fluency,
+            grammar: profile.pillars.grammar,
+            pronunciation: profile.pillars.pronunciation,
+            vocabulary: profile.pillars.vocabulary,
+            comprehension: profile.pillars.comprehension,
+          },
+        });
+      } else {
+        setMetrics(base);
+      }
       setMasteredCount(mastered);
     } catch (err) {
       console.error("[ProgressV2] Failed to fetch progress metrics:", err);

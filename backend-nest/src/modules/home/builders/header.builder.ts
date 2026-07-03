@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { ProgressService } from '../../progress/progress.service';
+import { ScoreAuthorityService } from '../../score-authority/score-authority.service';
 import { UserStage } from '../services/stage-resolver.service';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class HeaderBuilder {
   constructor(
     private prisma: PrismaService,
     private progressService: ProgressService,
+    private scoreAuthority: ScoreAuthorityService,
   ) {}
 
   async buildHeaderData(userId: string, stage: UserStage) {
@@ -23,19 +25,40 @@ export class HeaderBuilder {
     const streak = user.currentStreak || user.profile?.streak || 0;
     let level = user.assessmentLevel || user.overallLevel || user.level || 'A2';
 
-    // Same overall score + CEFR as Progress (/progress/detailed-metrics).
-    const metrics = await this.progressService.getDetailedMetrics(userId);
-    let score = Math.round(Number(metrics.current?.overallScore ?? 0));
-    const metricsLevel = (metrics.current?.cefrLevel ?? '').trim();
-    if (metricsLevel) {
-      level = metricsLevel;
-    } else if (score <= 0 && user.assessmentScore) {
-      score = Math.round(user.assessmentScore);
+    let score = Math.round(Number(user.assessmentScore ?? 0));
+    let latestAssessmentId: string | null = null;
+    let goalTarget = 70;
+    let goalLabel = 'Next Level';
+
+    if (this.scoreAuthority.isEnabledForUser(userId)) {
+      const profile = await this.scoreAuthority.getProfile(userId);
+      score = profile.overall;
+      level = profile.cefrLevel;
+      latestAssessmentId = profile.baselineAssessmentId;
+      goalTarget = profile.goal.targetScore;
+      goalLabel = profile.goal.label;
+    } else {
+      const metrics = await this.progressService.getDetailedMetrics(userId);
+      score = Math.round(Number(metrics.current?.overallScore ?? 0));
+      const metricsLevel = (metrics.current?.cefrLevel ?? '').trim();
+      if (metricsLevel) {
+        level = metricsLevel;
+      } else if (score <= 0 && user.assessmentScore) {
+        score = Math.round(user.assessmentScore);
+      }
+      latestAssessmentId = metrics.latestAssessmentId ?? null;
+      const goalTargets: Record<string, number> = {
+        A1: 35,
+        A2: 55,
+        B1: 70,
+        B2: 80,
+        C1: 90,
+        C2: 97,
+      };
+      const nextLevel = this.getNextLevel(level);
+      goalTarget = goalTargets[nextLevel];
+      goalLabel = `Reach ${nextLevel}`;
     }
-
-    const latestAssessmentId = metrics.latestAssessmentId ?? null;
-
-    // Calculate percentile
     const percentile = await this.calculatePercentile(userId);
 
     // Determine greeting based on stage and streak
@@ -59,19 +82,6 @@ export class HeaderBuilder {
     // Calculate delta from start
     const initialScore = user.initialAssessmentScore || score;
     const scoreDelta = score - initialScore;
-
-    // Next goal calculation
-    const goalTargets: Record<string, number> = {
-      A1: 35,
-      A2: 55,
-      B1: 70,
-      B2: 80,
-      C1: 90,
-      C2: 97,
-    };
-    const nextLevel = this.getNextLevel(level);
-    const goalTarget = goalTargets[nextLevel];
-    const goalLabel = `Reach ${nextLevel}`;
 
     return {
       greeting,

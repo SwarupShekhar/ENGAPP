@@ -68,8 +68,48 @@ model User {
   reliability            UserReliability?
   topicScores            UserTopicScore[]
   dailyPracticeCompletions UserDailyPracticeCompletion[]
+  scoreProfile           UserScoreProfile?
+  scoreChangeLogs        ScoreChangeLog[]
 
   @@index([clerkId])
+}
+
+model UserScoreProfile {
+  userId                 String   @id
+  overallScore           Int      @default(0)
+  cefrLevel              String   @default("A1")
+  pronunciation          Int      @default(0)
+  fluency                Int      @default(0)
+  grammar                Int      @default(0)
+  vocabulary             Int      @default(0)
+  comprehension          Int      @default(0)
+  vocabularyMeasured     Boolean  @default(false)
+  baselineAssessmentId   String?
+  lastEventType          String?
+  lastSessionId          String?
+  pendingCefrLevel       String?
+  cefrStableCount        Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([cefrLevel])
+  @@index([overallScore])
+}
+
+model ScoreChangeLog {
+  id             String   @id @default(cuid())
+  userId         String
+  eventType      String
+  assessmentId   String?
+  sessionId      String?
+  before         Json?
+  after          Json
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([eventType])
 }
 
 model DeviceToken {

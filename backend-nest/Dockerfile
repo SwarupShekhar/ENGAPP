@@ -32,6 +32,7 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/prisma.config.ts ./
 COPY --from=builder /app/src/database/prisma ./src/database/prisma
 # Copy generated Prisma client runtime artifacts from builder.

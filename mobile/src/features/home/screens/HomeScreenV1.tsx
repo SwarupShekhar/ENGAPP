@@ -43,6 +43,7 @@ import { homeTheme } from '../theme/homeTheme';
 import ConnectHeroCard from '../components/ConnectHeroCard';
 import MistakesCard from '../components/MistakesCard';
 import { getHomeData, HomeData } from '../services/homeApi';
+import { getScoreProfile, type ScoreProfile } from '../../../api/scores';
 import { getBridgeUser } from '../../../api/bridgeClient';
 import {
   getDailyContentForToday,
@@ -331,6 +332,34 @@ async function fetchProgressHomePatch(): Promise<Partial<HomeData> | null> {
   }
 }
 
+function mergeScoreProfileIntoHome(
+  base: HomeData | null | undefined,
+  profile: ScoreProfile,
+): HomeData | null {
+  if (!base?.header) return base ?? null;
+  return {
+    ...base,
+    header: {
+      ...base.header,
+      score: profile.overall,
+      level: profile.cefrLevel,
+      goalTarget: profile.goal.targetScore,
+      goalLabel: profile.goal.label,
+      latestAssessmentId: profile.baselineAssessmentId ?? base.header.latestAssessmentId,
+    },
+    skills: {
+      ...(base.skills ?? {}),
+      scores: {
+        grammar: profile.pillars.grammar,
+        pronunciation: profile.pillars.pronunciation,
+        fluency: profile.pillars.fluency,
+        vocabulary: profile.pillars.vocabulary,
+      },
+      vocabularyMeasured: profile.vocabularyMeasured,
+    } as HomeData['skills'],
+  };
+}
+
 function mergeHomeWithProgress(
   base: HomeData | null | undefined,
   patch: Partial<HomeData>,
@@ -566,17 +595,19 @@ function SkillChip({
   score,
   color,
   onPress,
+  notMeasured,
 }: {
   label: string;
   score: number;
   color: string;
   onPress?: () => void;
+  notMeasured?: boolean;
 }) {
   const content = (
     <>
       <View style={[st.skillDot, { backgroundColor: color }]} />
       <Text style={[st.skillLabel, { color }]}>{label}</Text>
-      <Text style={[st.skillScore, { color }]}>{score}</Text>
+      <Text style={[st.skillScore, { color }]}>{notMeasured ? '—' : score}</Text>
       {onPress ? (
         <Ionicons name="information-circle-outline" size={12} color={color} style={{ opacity: 0.7, marginLeft: 2 }} />
       ) : null}
@@ -617,6 +648,7 @@ function ScoreCard({
   onRetake,
   onPressOverall,
   onPressSkill,
+  vocabularyMeasured = true,
 }: {
   score: number;
   level: string;
@@ -628,6 +660,7 @@ function ScoreCard({
   onRetake: () => void;
   onPressOverall?: () => void;
   onPressSkill?: (detailKey: SkillDetailKeyV1, label: string) => void;
+  vocabularyMeasured?: boolean;
 }) {
   const c = theme.colors;
   const sk = theme.tokens.skill as any;
@@ -715,6 +748,7 @@ function ScoreCard({
             key={ch.key}
             label={ch.label}
             score={skills[ch.key] ?? 0}
+            notMeasured={ch.key === 'vocabulary' && !vocabularyMeasured && (skills[ch.key] ?? 0) <= 0}
             color={ch.color}
             onPress={
               onPressSkill
@@ -997,8 +1031,14 @@ export default function HomeScreen() {
       const fresh = await getHomeData();
       datedDaily = await getDailyContentForToday();
       let withDaily = await homeCache.persistFresh(fresh);
+      const scoreProfile = await getScoreProfile();
+      if (scoreProfile) {
+        withDaily = mergeScoreProfileIntoHome(withDaily, scoreProfile) ?? withDaily;
+      }
       withDaily =
-        (await applyProgressFallbackIfNeeded(withDaily, clerkAssessed)) ?? withDaily;
+        scoreProfile
+          ? withDaily
+          : (await applyProgressFallbackIfNeeded(withDaily, clerkAssessed)) ?? withDaily;
       setHomeData(mergeDailyFields(withDaily));
       if (forceFresh) {
         void tasksApi.loadPracticeCarouselTasks().catch(() => {});
@@ -1168,6 +1208,7 @@ export default function HomeScreen() {
   const latestId  = homeData?.header.latestAssessmentId ?? null;
   const lastSessionDate = homeData?.header.lastSessionDate ?? null;
   const skills    = homeData?.skills?.scores ?? {};
+  const vocabularyMeasured = (homeData?.skills as { vocabularyMeasured?: boolean } | undefined)?.vocabularyMeasured !== false;
   const avgSkillScore = Number(homeData?.skills?.avgScore ?? 0);
 
   const progress     = goalTgt > 0 ? Math.min(Math.round((score / goalTgt) * 100), 99) : 0;
@@ -1409,6 +1450,7 @@ export default function HomeScreen() {
               onRetake={goRetake}
               onPressOverall={() => setSkillSheet({ type: 'overall' })}
               onPressSkill={(detailKey, label) => setSkillSheet({ type: 'skill', detailKey, label })}
+              vocabularyMeasured={vocabularyMeasured}
             />
           </Animated.View>
         ) : (

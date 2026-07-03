@@ -16,6 +16,7 @@ import { BrainModule } from '../brain/brain.module';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 import { TasksModule } from '../tasks/tasks.module';
+import { ScoreAuthorityModule } from '../score-authority/score-authority.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { TasksModule } from '../tasks/tasks.module';
     PrismaModule,
     AuthModule,
     TasksModule,
+    ScoreAuthorityModule,
   ],
   controllers: [AssessmentController],
   providers: [

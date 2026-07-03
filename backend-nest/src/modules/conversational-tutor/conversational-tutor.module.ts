@@ -13,6 +13,7 @@ import { RedisModule } from '../../redis/redis.module';
 import { PronunciationModule } from '../pronunciation/pronunciation.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SessionsQueuesModule } from '../../queues/sessions-queues.module';
+import { ScoringModule } from '../scoring/scoring.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SessionsQueuesModule } from '../../queues/sessions-queues.module';
     PronunciationModule,
     NotificationsModule,
     SessionsQueuesModule,
+    ScoringModule,
   ],
   controllers: [ConversationalTutorController],
   providers: [

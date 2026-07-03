@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { UserStage } from '../services/stage-resolver.service';
+import { ScoreAuthorityService } from '../../score-authority/score-authority.service';
 
 @Injectable()
 export class SkillsBuilder {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private scoreAuthority: ScoreAuthorityService,
+  ) {}
 
   async buildSkillsData(userId: string, stage: UserStage) {
     const user = await this.prisma.user.findUnique({
@@ -12,6 +16,63 @@ export class SkillsBuilder {
     });
 
     if (!user) return null;
+
+    if (this.scoreAuthority.isEnabledForUser(userId)) {
+      const profile = await this.scoreAuthority.getProfile(userId);
+      const currentScores = {
+        pronunciation: profile.pillars.pronunciation,
+        fluency: profile.pillars.fluency,
+        grammar: profile.pillars.grammar,
+        vocabulary: profile.pillars.vocabulary,
+      };
+      const deltas = {
+        pronunciation: profile.deltas?.pillars?.pronunciation ?? 0,
+        fluency: profile.deltas?.pillars?.fluency ?? 0,
+        grammar: profile.deltas?.pillars?.grammar ?? 0,
+        vocabulary: profile.deltas?.pillars?.vocabulary ?? 0,
+      };
+      const skillValues = Object.values(currentScores);
+      const avgScore =
+        skillValues.length > 0
+          ? Math.round(skillValues.reduce((a, b) => a + b, 0) / skillValues.length)
+          : 0;
+      const deltaValues = Object.values(deltas);
+      const avgDelta =
+        deltaValues.length > 0
+          ? Math.round(deltaValues.reduce((a, b) => a + b, 0) / deltaValues.length)
+          : 0;
+      const hottestSkill =
+        Object.entries(deltas).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0] ??
+        'fluency';
+
+      const latestAnalysis = await this.prisma.analysis.findFirst({
+        where: { participant: { userId } },
+        orderBy: { createdAt: 'desc' },
+        include: { mistakes: true, pronunciationIssues: true },
+      });
+      const skillDetails = this.formatSkillDetails(latestAnalysis, currentScores);
+
+      return {
+        scores: currentScores,
+        deltas,
+        deltaLabel: profile.deltas?.since === 'last_session' ? 'Since last session' : '',
+        avgScore,
+        avgDelta,
+        hottestSkill,
+        masteryFlags:
+          profile.overall >= 80
+            ? {
+                fluency: currentScores.fluency >= 85,
+                grammar: currentScores.grammar >= 85,
+                vocabulary: currentScores.vocabulary >= 85,
+                pronunciation: currentScores.pronunciation >= 85,
+              }
+            : null,
+        trends: null,
+        details: skillDetails,
+        vocabularyMeasured: profile.vocabularyMeasured,
+      };
+    }
 
     const totalSessions = user.totalSessions || 0;
 

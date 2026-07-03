@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { BrainService } from '../brain/brain.service';
 import { ProgressService } from '../progress/progress.service';
+import { ScoreAuthorityService } from '../score-authority/score-authority.service';
 
 @Injectable()
 export class ScoringService {
@@ -11,6 +12,7 @@ export class ScoringService {
     private readonly prisma: PrismaService,
     private readonly brain: BrainService,
     private readonly progress: ProgressService,
+    private readonly scoreAuthority: ScoreAuthorityService,
   ) {}
 
   /**
@@ -28,6 +30,7 @@ export class ScoringService {
     azureResults: any[],
     callDurationSeconds: number,
     userSpokeSeconds: number,
+    source: 'call' | 'maya' = 'call',
   ) {
     this.logger.log(`[PHASE 2] Processing CQS for userId=${userId} sessionId=${sessionId}`);
 
@@ -132,14 +135,29 @@ export class ScoringService {
         );
       }
 
-      // Step 9 — Apply all deltas
-      await this.progress.applyPillarDeltas(userId, {
-        pronunciation: pronunciationDelta,
-        fluency: fluencyDelta,
-        grammar: grammarDelta,
-        vocabulary: vocabularyDelta,
-        comprehension: comprehensionDelta,
-      });
+      // Step 9 — Apply all deltas through score authority (or legacy progress path)
+      if (this.scoreAuthority.isEnabledForUser(userId)) {
+        await this.scoreAuthority.applySessionDeltas(
+          userId,
+          {
+            pronunciation: pronunciationDelta,
+            fluency: fluencyDelta,
+            grammar: grammarDelta,
+            vocabulary: vocabularyDelta,
+            comprehension: comprehensionDelta,
+          },
+          source === 'maya' ? 'maya_delta' : 'call_delta',
+          sessionId,
+        );
+      } else {
+        await this.progress.applyPillarDeltas(userId, {
+          pronunciation: pronunciationDelta,
+          fluency: fluencyDelta,
+          grammar: grammarDelta,
+          vocabulary: vocabularyDelta,
+          comprehension: comprehensionDelta,
+        });
+      }
 
       this.logger.log(
         `[CQS SUCCESS] cqs=${cqs} pqs=${pqs.toFixed(1)} ` +

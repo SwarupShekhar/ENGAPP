@@ -10,17 +10,22 @@ import {
   Pressable,
   Image,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Alert,
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  KeyboardStickyView,
+  useKeyboardHandler,
+} from "react-native-keyboard-controller";
+import { runOnJS } from "react-native-reanimated";
 import { engagementApi, ReelComment } from "../../../api/engagement";
 import { formatRelativeTime } from "../../../utils/formatRelativeTime";
 
 const SHEET_HEIGHT = Math.round(Dimensions.get("window").height * 0.56);
+const COMPOSER_ROW_HEIGHT = 56;
 
 interface Props {
   visible: boolean;
@@ -49,6 +54,32 @@ export default function ReelCommentsModal({
 
   const busy = posting || deletingId !== null;
 
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  const scrollToBottom = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated });
+    });
+  }, []);
+
+  const listBottomPad =
+    8 + keyboardInset + (keyboardInset > 0 ? COMPOSER_ROW_HEIGHT : 0);
+
+  useKeyboardHandler(
+    {
+      onMove: (e) => {
+        "worklet";
+        runOnJS(setKeyboardInset)(e.height);
+      },
+      onEnd: (e) => {
+        "worklet";
+        runOnJS(setKeyboardInset)(e.height);
+        runOnJS(scrollToBottom)();
+      },
+    },
+    [scrollToBottom],
+  );
+
   const syncCommentCount = useCallback(async () => {
     try {
       const engagement = await engagementApi.getReelEngagement(strapiReelId);
@@ -60,11 +91,11 @@ export default function ReelCommentsModal({
     }
   }, [strapiReelId, onCommentCountChange]);
 
-  const scrollToBottom = useCallback((animated = true) => {
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated });
-    });
-  }, []);
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardInset(0);
+    }
+  }, [visible]);
 
   const loadComments = useCallback(
     async (cursor?: string) => {
@@ -219,6 +250,7 @@ export default function ReelCommentsModal({
       transparent
       animationType="slide"
       onRequestClose={requestClose}
+      statusBarTranslucent
     >
       <View style={styles.root}>
         <Pressable
@@ -227,94 +259,93 @@ export default function ReelCommentsModal({
           accessibilityLabel="Close comments"
         />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
-          style={styles.keyboardWrap}
-        >
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handle} />
-            <Text style={styles.title} numberOfLines={1}>
-              {reelTitle ? `Comments · ${reelTitle}` : "Comments"}
-            </Text>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.handle} />
+          <Text style={styles.title} numberOfLines={1}>
+            {reelTitle ? `Comments · ${reelTitle}` : "Comments"}
+          </Text>
 
-            {loading ? (
-              <ActivityIndicator style={styles.loader} color="#FFF" />
-            ) : (
-              <FlatList
-                ref={listRef}
-                data={comments}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                style={styles.list}
-                contentContainerStyle={
-                  comments.length === 0 ? styles.listEmptyContainer : undefined
-                }
-                keyboardShouldPersistTaps="handled"
-                onContentSizeChange={() => {
-                  if (comments.length > 0 && !loadingMore) scrollToBottom(false);
-                }}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>
-                    No comments yet — be the first to share what you learned.
-                  </Text>
-                }
-                ListFooterComponent={
-                  loadingMore ? (
-                    <ActivityIndicator
-                      style={{ marginVertical: 12 }}
-                      color="#FFF"
-                    />
-                  ) : nextCursor ? (
-                    <TouchableOpacity
-                      style={styles.loadMoreBtn}
-                      onPress={() => void loadComments(nextCursor)}
-                    >
-                      <Text style={styles.loadMoreText}>Load more comments</Text>
-                    </TouchableOpacity>
-                  ) : null
-                }
-              />
-            )}
-
-            <View
-              style={[
-                styles.composer,
-                { paddingBottom: Math.max(insets.bottom, 8) },
+          {loading ? (
+            <ActivityIndicator style={styles.loader} color="#FFF" />
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={comments}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              style={styles.list}
+              contentContainerStyle={[
+                comments.length === 0 ? styles.listEmptyContainer : undefined,
+                { paddingBottom: listBottomPad },
               ]}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              onContentSizeChange={() => {
+                if (comments.length > 0 && !loadingMore) scrollToBottom(false);
+              }}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>
+                  No comments yet — be the first to share what you learned.
+                </Text>
+              }
+              ListFooterComponent={
+                loadingMore ? (
+                  <ActivityIndicator
+                    style={{ marginVertical: 12 }}
+                    color="#FFF"
+                  />
+                ) : nextCursor ? (
+                  <TouchableOpacity
+                    style={styles.loadMoreBtn}
+                    onPress={() => void loadComments(nextCursor)}
+                  >
+                    <Text style={styles.loadMoreText}>Load more comments</Text>
+                  </TouchableOpacity>
+                ) : null
+              }
+            />
+          )}
+        </Pressable>
+
+        <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
+          <View
+            style={[
+              styles.composer,
+              { paddingBottom: Math.max(insets.bottom, 8) },
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="Add a comment..."
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              value={draft}
+              onChangeText={setDraft}
+              onFocus={() => scrollToBottom()}
+              multiline
+              maxLength={500}
+              editable={!posting}
+              returnKeyType="default"
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendBtn,
+                (!draft.trim() || posting) && styles.sendBtnDisabled,
+              ]}
+              disabled={!draft.trim() || posting}
+              onPress={() => void handleSend()}
             >
-              <TextInput
-                style={styles.input}
-                placeholder="Add a comment..."
-                placeholderTextColor="rgba(255,255,255,0.45)"
-                value={draft}
-                onChangeText={setDraft}
-                multiline
-                maxLength={500}
-                editable={!posting}
-                returnKeyType="default"
-                blurOnSubmit={false}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.sendBtn,
-                  (!draft.trim() || posting) && styles.sendBtnDisabled,
-                ]}
-                disabled={!draft.trim() || posting}
-                onPress={() => void handleSend()}
-              >
-                {posting ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <Text style={styles.sendLabel}>Send</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-            {draft.length > 400 && (
-              <Text style={styles.charCount}>{draft.length}/500</Text>
-            )}
-          </Pressable>
-        </KeyboardAvoidingView>
+              {posting ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <Text style={styles.sendLabel}>Send</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          {draft.length > 400 && (
+            <Text style={styles.charCount}>{draft.length}/500</Text>
+          )}
+        </KeyboardStickyView>
       </View>
     </Modal>
   );
@@ -329,11 +360,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.28)",
   },
-  keyboardWrap: {
-    justifyContent: "flex-end",
-  },
   sheet: {
-    height: SHEET_HEIGHT,
+    height: SHEET_HEIGHT - COMPOSER_ROW_HEIGHT,
     backgroundColor: "#111827",
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
@@ -434,7 +462,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "rgba(255,255,255,0.12)",
     paddingTop: 10,
-    marginTop: 4,
+    paddingHorizontal: 16,
+    backgroundColor: "#111827",
   },
   input: {
     flex: 1,
@@ -469,5 +498,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: "right",
     marginBottom: 4,
+    paddingHorizontal: 16,
+    backgroundColor: "#111827",
   },
 });

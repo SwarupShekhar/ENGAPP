@@ -31,6 +31,7 @@ import { ReelsModule } from './modules/reels/reels.module';
 import { EngagementModule } from './modules/engagement/engagement.module';
 import { PronunciationModule } from './modules/pronunciation/pronunciation.module';
 import { ProgressModule } from './modules/progress/progress.module';
+import { ScoreAuthorityModule } from './modules/score-authority/score-authority.module';
 import { HomeModule } from './modules/home/home.module';
 import { BrainModule } from './modules/brain/brain.module';
 import { InternalModule } from './modules/internal/internal.module';
@@ -101,6 +102,7 @@ import { AppThrottlerGuard } from './guards/app-throttler.guard';
     EngagementModule,
     PronunciationModule,
     ProgressModule,
+    ScoreAuthorityModule,
     HomeModule,
     BrainModule,
     InternalModule,

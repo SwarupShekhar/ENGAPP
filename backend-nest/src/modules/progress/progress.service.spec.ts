@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProgressService, PillarDeltas } from './progress.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { ScoreAuthorityService } from '../score-authority/score-authority.service';
 
 describe('ProgressService', () => {
   let service: ProgressService;
@@ -18,6 +19,15 @@ describe('ProgressService', () => {
             sessionParticipant: { findMany: jest.fn() },
             userReliability: { findUnique: jest.fn() },
             profile: { findUnique: jest.fn() },
+          },
+        },
+        {
+          provide: ScoreAuthorityService,
+          useValue: {
+            isEnabledForUser: jest.fn().mockReturnValue(false),
+            applySessionDeltas: jest.fn(),
+            getProfile: jest.fn(),
+            toDetailedMetricsCurrent: jest.fn(),
           },
         },
       ],
@@ -48,19 +58,23 @@ describe('ProgressService', () => {
       };
 
       const result = await service.applyPillarDeltas('user-123', deltas);
+      const newScores = result.newScores as {
+        pronunciation: number;
+        fluency: number;
+        grammar: number;
+        vocabulary: number;
+        comprehension: number;
+        overallScore: number;
+      };
       
-      expect(result.newScores.pronunciation).toBe(52);
-      expect(result.newScores.fluency).toBe(52); // Math.round handles clamp output, but wait clamp takes ints? Math.round(51.5) = 52
-      expect(result.newScores.grammar).toBe(50);
-      expect(result.newScores.vocabulary).toBe(51);
-      expect(result.newScores.comprehension).toBe(51); // 50.5 rounds to 51
+      expect(newScores.pronunciation).toBe(52);
+      expect(newScores.fluency).toBe(52);
+      expect(newScores.grammar).toBe(50);
+      expect(newScores.vocabulary).toBe(51);
+      expect(newScores.comprehension).toBe(51);
       
       expect(result.isGatingActive).toBe(false);
-
-      // weights applied on clamped (rounded) integers:
-      // fluency*0.25(52 -> 13) + grammar*0.22(50 -> 11) + pron*0.22(52 -> 11.44) + vocab*0.18(51 -> 9.18) + comp*0.13(51 -> 6.63)
-      // 13 + 11 + 11.44 + 9.18 + 6.63 = 51.25 * 10 = 512.5 -> 513
-      expect(result.newScores.overallScore).toBe(513);
+      expect(newScores.overallScore).toBe(513);
     });
 
     it('Test case 2: User with pronunciation at 32, apply +1 (still < 35)', async () => {
@@ -72,9 +86,9 @@ describe('ProgressService', () => {
         pronunciation: 1, fluency: 0, grammar: 0, vocabulary: 0, comprehension: 0
       });
 
-      expect(result.newScores.pronunciation).toBe(33);
+      expect((result.newScores as any).pronunciation).toBe(33);
       expect(result.isGatingActive).toBe(true);
-      expect(result.newScores.overallScore).toBe(370); // Capped at 370
+      expect(result.newScores.overallScore).toBe(370);
     });
 
     it('Test case 3: User with pronunciation at 34, apply +2 (now >= 35)', async () => {
@@ -86,11 +100,8 @@ describe('ProgressService', () => {
         pronunciation: 2, fluency: 0, grammar: 0, vocabulary: 0, comprehension: 0
       });
 
-      expect(result.newScores.pronunciation).toBe(36);
+      expect((result.newScores as any).pronunciation).toBe(36);
       expect(result.isGatingActive).toBe(false);
-      // Not capped. Calculate overall expected:
-      // fluency(50)*0.25 (12.5) + grammar(50)*0.22 (11) + pron(36)*0.22 (7.92) + vocab(50)*0.18 (9) + comp(50)*0.13 (6.5)
-      // sum = 46.92 * 10 = 469.2 -> 469
       expect(result.newScores.overallScore).toBe(469);
     });
 
@@ -103,7 +114,7 @@ describe('ProgressService', () => {
         pronunciation: 100, fluency: 0, grammar: 0, vocabulary: 0, comprehension: 0
       });
 
-      expect(result.newScores.pronunciation).toBe(100); // 80 + 100 clamped to 100
+      expect((result.newScores as any).pronunciation).toBe(100);
     });
   });
 });
