@@ -16,9 +16,31 @@ import {
 import {
   assertAllowedReactionEmoji,
   assertConversationId,
+  assertReelCommentBody,
+  DEFAULT_REEL_COMMENTS_PAGE_SIZE,
+  MAX_REEL_COMMENT_LENGTH,
 } from './engagement.constants';
 
 export type { AggregatedReaction };
+
+export type ReelCommentAuthor = {
+  id: string;
+  fname: string;
+  profileImage: string | null;
+};
+
+export type ReelCommentDto = {
+  id: string;
+  body: string;
+  createdAt: Date;
+  author: ReelCommentAuthor;
+  isMine: boolean;
+};
+
+export type ReelCommentsPage = {
+  items: ReelCommentDto[];
+  nextCursor: string | null;
+};
 
 @Injectable()
 export class EngagementService {
@@ -59,19 +81,186 @@ export class EngagementService {
   }
 
   async getReelEngagement(userId: string, strapiReelId: number) {
-    const [existingLike, totalLikes] = await Promise.all([
+    const [existingLike, totalLikes, commentCount] = await Promise.all([
       this.prisma.reelLike.findUnique({
         where: {
           userId_strapiReelId: { userId, strapiReelId },
         },
       }),
       this.prisma.reelLike.count({ where: { strapiReelId } }),
+      this.prisma.reelComment.count({
+        where: {
+          strapiReelId,
+          deletedAt: null,
+          parentId: null,
+        },
+      }),
     ]);
 
     return {
       likedByMe: !!existingLike,
       totalLikes,
+      commentCount,
     };
+  }
+
+  async getReelComments(
+    userId: string,
+    strapiReelId: number,
+    cursor?: string,
+    limit = DEFAULT_REEL_COMMENTS_PAGE_SIZE,
+  ): Promise<ReelCommentsPage> {
+    const pageSize = Math.min(Math.max(limit, 1), 50);
+    const cursorDate = cursor ? this.cursorDateFromComposite(cursor) : null;
+    const cursorId = cursor ? this.cursorIdFromComposite(cursor) : null;
+
+    const rows = await this.prisma.reelComment.findMany({
+      where: {
+        strapiReelId,
+        deletedAt: null,
+        parentId: null,
+        ...(cursorDate && cursorId
+          ? {
+              OR: [
+                { createdAt: { gt: cursorDate } },
+                { createdAt: cursorDate, id: { gt: cursorId } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: pageSize + 1,
+      include: {
+        user: {
+          select: {
+            id: true,
+            fname: true,
+            profile: { select: { avatarUrl: true } },
+          },
+        },
+      },
+    });
+
+    const hasMore = rows.length > pageSize;
+    const page = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = page[page.length - 1];
+    const nextCursor =
+      hasMore && last
+        ? this.toCommentCursor(last.createdAt, last.id)
+        : null;
+
+    return {
+      items: page.map((row) => this.formatReelComment(row, userId)),
+      nextCursor,
+    };
+  }
+
+  async createReelComment(
+    userId: string,
+    strapiReelId: number,
+    body: string,
+  ): Promise<ReelCommentDto> {
+    let normalizedBody: string;
+    try {
+      normalizedBody = assertReelCommentBody(body);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'INVALID_BODY';
+      if (message === 'BODY_TOO_LONG') {
+        throw new BadRequestException(
+          `Comment must be at most ${MAX_REEL_COMMENT_LENGTH} characters`,
+        );
+      }
+      throw new BadRequestException('Comment cannot be empty');
+    }
+
+    const created = await this.prisma.reelComment.create({
+      data: {
+        userId,
+        strapiReelId,
+        body: normalizedBody,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fname: true,
+            profile: { select: { avatarUrl: true } },
+          },
+        },
+      },
+    });
+
+    return this.formatReelComment(created, userId);
+  }
+
+  async deleteReelComment(
+    userId: string,
+    strapiReelId: number,
+    commentId: string,
+  ): Promise<{ deleted: true }> {
+    const comment = await this.prisma.reelComment.findFirst({
+      where: { id: commentId, strapiReelId, deletedAt: null },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    if (comment.userId !== userId) {
+      throw new ForbiddenException('You can only delete your own comments');
+    }
+
+    await this.prisma.reelComment.update({
+      where: { id: commentId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { deleted: true };
+  }
+
+  private formatReelComment(
+    row: {
+      id: string;
+      body: string;
+      createdAt: Date;
+      userId: string;
+      user: {
+        id: string;
+        fname: string;
+        profile: { avatarUrl: string | null } | null;
+      };
+    },
+    viewerUserId: string,
+  ): ReelCommentDto {
+    return {
+      id: row.id,
+      body: row.body,
+      createdAt: row.createdAt,
+      author: {
+        id: row.user.id,
+        fname: row.user.fname,
+        profileImage: row.user.profile?.avatarUrl ?? null,
+      },
+      isMine: row.userId === viewerUserId,
+    };
+  }
+
+  /** Cursor encodes ISO timestamp + id for stable ascending pagination. */
+  private toCommentCursor(createdAt: Date, id: string): string {
+    return `${createdAt.toISOString()}|${id}`;
+  }
+
+  private cursorIdFromComposite(cursor: string): string | null {
+    const sep = cursor.indexOf('|');
+    if (sep === -1) return null;
+    return cursor.slice(sep + 1) || null;
+  }
+
+  private cursorDateFromComposite(cursor: string): Date | null {
+    const sep = cursor.indexOf('|');
+    const raw = sep === -1 ? cursor : cursor.slice(0, sep);
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   async setMessageReaction(userId: string, messageId: string, emoji: string) {

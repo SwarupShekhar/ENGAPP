@@ -21,9 +21,11 @@ import { engagementApi } from "../../api/engagement";
 import {
   getCachedEngagement,
   setCachedEngagement,
+  setCachedCommentCount,
   patchCachedLike,
 } from "../../api/engagementCache";
 import ShareReelModal from "../../features/chat/components/ShareReelModal";
+import ReelCommentsModal from "../../features/reels/components/ReelCommentsModal";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -46,7 +48,10 @@ export default function EBiteVideoCard({
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
   const [shareVisible, setShareVisible] = useState(false);
+  const [commentsVisible, setCommentsVisible] = useState(false);
+  const [wasPausedBeforeComments, setWasPausedBeforeComments] = useState(false);
   const [showFireBurst, setShowFireBurst] = useState(false);
   const hasReportedUnlock = useRef(false);
   const lastTapRef = useRef(0);
@@ -75,26 +80,62 @@ export default function EBiteVideoCard({
     if (cached) {
       setLiked(cached.likedByMe);
       setLikeCount(cached.totalLikes);
-      return;
+      setCommentCount(cached.commentCount ?? 0);
     }
     engagementApi
       .getReelEngagement(reelId)
       .then((data) => {
         setLiked(data.likedByMe);
         setLikeCount(data.totalLikes);
-        setCachedEngagement(reelId, data.likedByMe, data.totalLikes);
+        setCommentCount(data.commentCount ?? 0);
+        setCachedEngagement(
+          reelId,
+          data.likedByMe,
+          data.totalLikes,
+          data.commentCount ?? 0,
+        );
       })
       .catch(() => {});
   }, [reelId]);
 
+  const handleCommentCountChange = useCallback(
+    (count: number) => {
+      setCommentCount(count);
+      if (!Number.isNaN(reelId)) {
+        setCachedCommentCount(reelId, count);
+      }
+    },
+    [reelId],
+  );
+
+  const openComments = useCallback(() => {
+    setWasPausedBeforeComments(isPausedByUser);
+    setIsPausedByUser(true);
+    setCommentsVisible(true);
+  }, [isPausedByUser]);
+
+  const closeComments = useCallback(() => {
+    setCommentsVisible(false);
+    if (!wasPausedBeforeComments) {
+      setIsPausedByUser(false);
+    }
+  }, [wasPausedBeforeComments]);
+
+  useEffect(() => {
+    if (!isActive && commentsVisible) {
+      closeComments();
+    }
+  }, [isActive, commentsVisible, closeComments]);
+
   useEffect(() => {
     if (!videoRef.current) return;
-    if (isActive && !isPausedByUser) {
+    const shouldPlay = isActive && !isPausedByUser && !commentsVisible;
+    if (shouldPlay) {
       videoRef.current.playAsync();
     } else {
       videoRef.current.pauseAsync();
     }
-  }, [isActive, isPausedByUser]);
+  }, [isActive, isPausedByUser, commentsVisible]);
 
   useEffect(() => {
     return () => {
@@ -141,11 +182,11 @@ export default function EBiteVideoCard({
       const result = await engagementApi.toggleReelLike(reelId);
       setLiked(result.liked);
       setLikeCount(result.totalLikes);
-      setCachedEngagement(reelId, result.liked, result.totalLikes);
+      setCachedEngagement(reelId, result.liked, result.totalLikes, commentCount);
     } catch {
       setLiked(prevLiked);
       setLikeCount(prevCount);
-      setCachedEngagement(reelId, prevLiked, prevCount);
+      setCachedEngagement(reelId, prevLiked, prevCount, commentCount);
     }
   }, [reelId, liked, likeCount]);
 
@@ -190,7 +231,7 @@ export default function EBiteVideoCard({
             resizeMode={ResizeMode.COVER}
             isLooping
             onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-            shouldPlay={isActive && !isPausedByUser}
+            shouldPlay={isActive && !isPausedByUser && !commentsVisible}
           />
 
           {showFireBurst && (
@@ -237,6 +278,12 @@ export default function EBiteVideoCard({
             <Text style={styles.actionCount}>{likeCount}</Text>
           )}
         </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={openComments}>
+          <Ionicons name="chatbubble-outline" size={28} color="#FFF" />
+          {commentCount > 0 && (
+            <Text style={styles.actionCount}>{commentCount}</Text>
+          )}
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => setShareVisible(true)}
@@ -244,6 +291,16 @@ export default function EBiteVideoCard({
           <Ionicons name="paper-plane-outline" size={28} color="#FFF" />
         </TouchableOpacity>
       </View>
+
+      {!Number.isNaN(reelId) && (
+        <ReelCommentsModal
+          visible={commentsVisible}
+          strapiReelId={reelId}
+          reelTitle={String(item.title || "eBite")}
+          onClose={closeComments}
+          onCommentCountChange={handleCommentCountChange}
+        />
+      )}
 
       {!Number.isNaN(reelId) && (
         <ShareReelModal

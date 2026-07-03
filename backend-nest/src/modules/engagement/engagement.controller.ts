@@ -3,11 +3,14 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Param,
   Body,
   Request,
   UseGuards,
   ParseIntPipe,
+  Query,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { ClerkGuard } from '../auth/clerk.guard';
 import { EngagementService } from './engagement.service';
@@ -31,6 +34,47 @@ export class EngagementController {
     @Param('strapiReelId', ParseIntPipe) strapiReelId: number,
   ) {
     return this.engagementService.getReelEngagement(req.user.id, strapiReelId);
+  }
+
+  @Get('reels/:strapiReelId/comments')
+  getReelComments(
+    @Request() req,
+    @Param('strapiReelId', ParseIntPipe) strapiReelId: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.engagementService.getReelComments(
+      req.user.id,
+      strapiReelId,
+      cursor,
+      limit,
+    );
+  }
+
+  @Post('reels/:strapiReelId/comments')
+  createReelComment(
+    @Request() req,
+    @Param('strapiReelId', ParseIntPipe) strapiReelId: number,
+    @Body('body') body: string,
+  ) {
+    return this.engagementService.createReelComment(
+      req.user.id,
+      strapiReelId,
+      body,
+    );
+  }
+
+  @Delete('reels/:strapiReelId/comments/:commentId')
+  deleteReelComment(
+    @Request() req,
+    @Param('strapiReelId', ParseIntPipe) strapiReelId: number,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.engagementService.deleteReelComment(
+      req.user.id,
+      strapiReelId,
+      commentId,
+    );
   }
 
   @Put('messages/:messageId/reaction')

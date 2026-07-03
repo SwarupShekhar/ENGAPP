@@ -20,6 +20,13 @@ describe('EngagementService', () => {
       create: jest.fn(),
       count: jest.fn(),
     },
+    reelComment: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn(),
+    },
     message: {
       findUnique: jest.fn(),
     },
@@ -88,6 +95,95 @@ describe('EngagementService', () => {
       expect(prisma.reelLike.delete).toHaveBeenCalledWith({
         where: { id: 'like-1' },
       });
+    });
+  });
+
+  describe('getReelEngagement', () => {
+    it('returns likes and comment count', async () => {
+      prisma.reelLike.findUnique.mockResolvedValue({ id: 'like-1' });
+      prisma.reelLike.count.mockResolvedValue(2);
+      prisma.reelComment.count.mockResolvedValue(4);
+
+      const result = await service.getReelEngagement('user-1', 12);
+
+      expect(result).toEqual({
+        likedByMe: true,
+        totalLikes: 2,
+        commentCount: 4,
+      });
+    });
+  });
+
+  describe('createReelComment', () => {
+    it('rejects empty body', async () => {
+      await expect(
+        service.createReelComment('user-1', 12, '   '),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('creates a comment', async () => {
+      const createdAt = new Date('2026-07-03T10:00:00.000Z');
+      prisma.reelComment.create.mockResolvedValue({
+        id: 'comment-1',
+        body: 'Nice tip!',
+        createdAt,
+        userId: 'user-1',
+        user: {
+          id: 'user-1',
+          fname: 'Roberto',
+          profile: { avatarUrl: null },
+        },
+      });
+
+      const result = await service.createReelComment(
+        'user-1',
+        12,
+        '  Nice tip!  ',
+      );
+
+      expect(prisma.reelComment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            userId: 'user-1',
+            strapiReelId: 12,
+            body: 'Nice tip!',
+          },
+        }),
+      );
+      expect(result.body).toBe('Nice tip!');
+      expect(result.isMine).toBe(true);
+      expect(result.author.fname).toBe('Roberto');
+    });
+  });
+
+  describe('deleteReelComment', () => {
+    it('soft-deletes own comment', async () => {
+      prisma.reelComment.findFirst.mockResolvedValue({
+        id: 'comment-1',
+        userId: 'user-1',
+        strapiReelId: 12,
+      });
+      prisma.reelComment.update.mockResolvedValue({});
+
+      const result = await service.deleteReelComment('user-1', 12, 'comment-1');
+
+      expect(result).toEqual({ deleted: true });
+      expect(prisma.reelComment.update).toHaveBeenCalledWith({
+        where: { id: 'comment-1' },
+        data: { deletedAt: expect.any(Date) },
+      });
+    });
+
+    it('forbids deleting another users comment', async () => {
+      prisma.reelComment.findFirst.mockResolvedValue({
+        id: 'comment-1',
+        userId: 'user-2',
+        strapiReelId: 12,
+      });
+
+      await expect(
+        service.deleteReelComment('user-1', 12, 'comment-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 
