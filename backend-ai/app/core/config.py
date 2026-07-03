@@ -3,7 +3,7 @@ Application configuration using Pydantic Settings.
 Loads from environment variables and .env file.
 """
 from typing import List, Optional, Any
-from pydantic import field_validator, model_validator, ConfigDict
+from pydantic import field_validator, model_validator, ConfigDict, Field, AliasChoices
 from pydantic_settings import BaseSettings
 
 
@@ -82,6 +82,18 @@ class Settings(BaseSettings):
     inworld_jwt_key: Optional[str] = None
     inworld_jwt_secret: Optional[str] = None
     inworld_enabled: bool = False
+
+    # Fish Audio TTS (primary for /api/tts/speak when configured; Inworld fallback)
+    fish_audio_api_key: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("FISH_AUDIO_API_KEY", "FISH_API_KEY"),
+    )
+    fish_tts_enabled: bool = True
+    fish_tts_model: str = "s2.1-pro-free"
+    fish_tts_timeout_sec: float = 12.0
+    fish_tts_reference_id: Optional[str] = None
+    fish_tts_reference_id_kiki: Optional[str] = None
+    fish_tts_reference_id_jasper: Optional[str] = None
     
     # Database
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/englivo"

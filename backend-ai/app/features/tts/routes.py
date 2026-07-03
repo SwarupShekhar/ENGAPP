@@ -5,7 +5,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from app.features.tts.narration_service import build_narration_script, build_full_feedback_script
+from app.features.tts.speak_fallback import synthesize_speak_with_fallback
 from app.features.transcription.inworld_tts_service import inworld_tts_service
+from app.features.transcription.fish_tts_service import fish_tts_service
 from app.features.transcription.google_gemini_tts_service import google_gemini_tts_service
 from app.features.transcription.kitten_tts_service import kitten_tts_service
 from app.api.deps import get_logger
@@ -132,21 +134,25 @@ async def speak(request: Request, body: SpeakRequest):
     if not clean:
         return FeedbackNarrationResponse(audio_base64="", text="")
 
-    # Inworld is faster and already used for feedback narration; Gemini TTS is the fallback.
-    audio_bytes = await inworld_tts_service.synthesize_async(
+    start = time.time()
+    audio_bytes, provider = await synthesize_speak_with_fallback(
         clean,
         speaking_rate=body.speaking_rate,
         voice_id=(body.voice_id or "").strip() or None,
     )
-    if not audio_bytes and google_gemini_tts_service.is_configured():
-        audio_bytes = await google_gemini_tts_service.synthesize_async(clean)
 
     if not audio_bytes:
-        log.error("speak_tts_failed text_len=%s inworld=%s gemini=%s",
-                  len(clean), inworld_tts_service.is_configured(),
-                  google_gemini_tts_service.is_configured())
+        log.error(
+            "speak_tts_failed text_len=%s fish=%s inworld=%s gemini=%s",
+            len(clean),
+            fish_tts_service.is_configured(),
+            inworld_tts_service.is_configured(),
+            google_gemini_tts_service.is_configured(),
+        )
         return FeedbackNarrationResponse(audio_base64="", text=clean)
 
+    ms = int((time.time() - start) * 1000)
+    log.info("speak_tts_completed provider=%s ms=%s text_len=%s", provider, ms, len(clean))
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     return FeedbackNarrationResponse(audio_base64=audio_b64, text=clean)
 

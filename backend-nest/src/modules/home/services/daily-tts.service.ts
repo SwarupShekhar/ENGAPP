@@ -20,6 +20,9 @@ import { WordOfTheDay } from '../types/daily-content.types';
 type DailyKind = 'phrase' | 'word';
 type DailyTtsProvider = 'inworld' | 'kitten';
 
+/** Bump when backend-ai speak chain changes (e.g. Fish primary) to re-bake Azure blobs. */
+const DAILY_TTS_BAKE_VERSION = 'fish-v1';
+
 @Injectable()
 export class DailyTtsService {
   private readonly logger = new Logger(DailyTtsService.name);
@@ -66,7 +69,10 @@ export class DailyTtsService {
       kind === 'phrase'
         ? buildPhraseListenScript(content as PhraseOfDay)
         : buildWordListenScript(content as WordOfTheDay);
-    const scriptHash = createHash('sha256').update(script).digest('hex').slice(0, 16);
+    const scriptHash = createHash('sha256')
+      .update(`${DAILY_TTS_BAKE_VERSION}:${script}`)
+      .digest('hex')
+      .slice(0, 16);
     const existing = await this.readUrlsFromMeta(kind, dateKey, scriptHash);
 
     if (this.isComplete(existing)) {
@@ -87,7 +93,7 @@ export class DailyTtsService {
     dateKey: string,
     script: string,
   ): void {
-    const flightKey = `${kind}:${dateKey}:${createHash('sha256').update(script).digest('hex').slice(0, 16)}`;
+    const flightKey = `${kind}:${dateKey}:${createHash('sha256').update(`${DAILY_TTS_BAKE_VERSION}:${script}`).digest('hex').slice(0, 16)}`;
     if (this.inFlight.has(flightKey)) return;
 
     const job = this.ensureAudioForScript(kind, dateKey, script)
@@ -109,7 +115,10 @@ export class DailyTtsService {
     dateKey: string,
     script: string,
   ): Promise<DailyListenAudioMap | undefined> {
-    const scriptHash = createHash('sha256').update(script).digest('hex').slice(0, 16);
+    const scriptHash = createHash('sha256')
+      .update(`${DAILY_TTS_BAKE_VERSION}:${script}`)
+      .digest('hex')
+      .slice(0, 16);
     const existing = await this.readUrlsFromMeta(kind, dateKey, scriptHash);
     if (this.isComplete(existing)) {
       return existing;
@@ -183,7 +192,7 @@ export class DailyTtsService {
     return this.synthesizeInworld(text, voice);
   }
 
-  private async synthesizeInworld(text: string, voice: DailyListenVoice): Promise<Buffer> {
+    private async synthesizeInworld(text: string, voice: DailyListenVoice): Promise<Buffer> {
     const voiceId = INWORLD_VOICE_BY_DAILY_LABEL[voice];
     try {
       const response = await firstValueFrom(
@@ -192,7 +201,7 @@ export class DailyTtsService {
           { text, speaking_rate: 0.78, voice_id: voiceId },
           {
             headers: this.aiHeaders,
-            timeout: 30_000,
+            timeout: 50_000,
           },
         ),
       );
@@ -201,7 +210,7 @@ export class DailyTtsService {
       return Buffer.from(b64, 'base64');
     } catch (error) {
       this.logger.warn(
-        `Inworld daily synth failed voice=${voice}: ${(error as Error).message}`,
+        `Daily speak TTS failed voice=${voice}: ${(error as Error).message}`,
       );
       return Buffer.alloc(0);
     }
