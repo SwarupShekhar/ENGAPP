@@ -293,6 +293,16 @@ export class SessionsProcessor {
         segments,
       );
 
+      // Unblock Call Feedback UI immediately — scores are ready.
+      // Tasks / notifications below are best-effort and must not leave status=PROCESSING.
+      await this.prisma.conversationSession.update({
+        where: { id: sessionId },
+        data: { status: 'COMPLETED' },
+      });
+      this.logger.log(
+        `Session ${sessionId} marked COMPLETED after authoritative scores.`,
+      );
+
       const sessionDataForBridge = await this.prisma.conversationSession.findUnique(
         {
           where: { id: sessionId },
@@ -482,8 +492,14 @@ export class SessionsProcessor {
       }
 
       let azureResults: any[] = [];
+      // Skip slow Azure PA if webhook already computed CQS for this user.
+      const existingCqs = await this.prisma.callQualityScore.findFirst({
+        where: { sessionId, userId: participant.userId },
+        select: { id: true },
+      });
       const recordingUrl = participant.participantRecordingUrl;
       if (
+        !existingCqs &&
         recordingUrl &&
         !recordingUrl.startsWith('pending_') &&
         recordingUrl.startsWith('http')
@@ -509,6 +525,10 @@ export class SessionsProcessor {
             `[SessionsProcessor] PA failed user=${participant.userId}: ${e?.message ?? e}`,
           );
         }
+      } else if (existingCqs) {
+        this.logger.log(
+          `[SessionsProcessor] CQS already present for user=${participant.userId} — skip PA re-run`,
+        );
       }
 
       const userSpokeSeconds =

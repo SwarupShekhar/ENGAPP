@@ -24,10 +24,18 @@ export interface WordTimestamp {
   endMs: number;
 }
 
+export interface NarrationClip {
+  role: 'coaching' | 'slow_word' | string;
+  text: string;
+  audio_base64: string;
+}
+
 export interface FeedbackNarrationResponse {
   audio_base64: string;
   text: string;
   word_timestamps?: WordTimestamp[];
+  /** Stitched playlist: coaching then slow correct words (pronunciation). */
+  clips?: NarrationClip[];
 }
 
 /**
@@ -80,10 +88,18 @@ export async function fetchFullFeedbackNarration(
   return res.data;
 }
 
-export async function fetchErrorSpeak(text: string): Promise<FeedbackNarrationResponse> {
+export async function fetchErrorSpeak(
+  text: string,
+  options?: { speakingRate?: number },
+): Promise<FeedbackNarrationResponse> {
   const res = await aiClient.post<FeedbackNarrationResponse>(
     '/api/tts/speak',
-    { text },
+    {
+      text,
+      ...(options?.speakingRate != null
+        ? { speaking_rate: options.speakingRate }
+        : {}),
+    },
     { timeout: 10000 },
   );
   return res.data;

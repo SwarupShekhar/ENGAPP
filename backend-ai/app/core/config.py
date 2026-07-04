@@ -70,9 +70,10 @@ class Settings(BaseSettings):
     deepgram_language: str = "en-IN"
     # Optional second transcript for display only; Azure stays authoritative for STT/PA.
     deepgram_secondary_transcript: bool = False
-    # When true, use Deepgram Nova-3 as primary STT (bypasses Azure ~2000ms → ~300ms).
-    # Azure is still used for pronunciation assessment (PA) — only plain transcription is rerouted.
-    deepgram_primary_stt: bool = False
+    # When true and DEEPGRAM_API_KEY is set, use Deepgram Nova-3 as primary STT
+    # (~300ms vs Azure ~1–2s). Azure remains for pronunciation assessment (PA).
+    # Falls back to Azure automatically when Deepgram is not configured.
+    deepgram_primary_stt: bool = True
     
     # Inworld AI
     inworld_api_key: Optional[str] = None
@@ -151,9 +152,9 @@ class Settings(BaseSettings):
     pa_enrich_max_concurrent: int = 8
     # Seconds before in-call coaching hints fire (lower = faster first hints in Maya).
     coaching_warmup_seconds: int = 5
-    # Max ms to wait for coaching hint LLM after STT (parallel with PA).
-    # Cerebras YES/NO is ~800–1000ms; lower = faster turns, fewer missed-opportunity hints.
-    coaching_hint_budget_ms: int = 900
+    # Legacy: coaching hints are injected on the *next* turn (never block LLM).
+    # Kept for coaching_llm internal timeouts; 0 disables any residual wait paths.
+    coaching_hint_budget_ms: int = 0
     
     # Monitoring
     sentry_dsn: Optional[str] = None

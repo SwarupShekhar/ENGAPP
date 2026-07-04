@@ -41,17 +41,22 @@ def get_context(user_id: str, session_id: str) -> dict[str, Any] | None:
 
 
 def update_context(user_id: str, session_id: str, updates: dict[str, Any]) -> None:
-    """Patch specific fields in the context. Fire-and-forget — never raises."""
+    """Patch specific fields in the context. Fire-and-forget — never raises.
+
+    Upserts when the key is missing so next-turn fields like pendingCoachingHint
+    are not silently dropped when Nest has not prebuilt coaching context yet.
+    """
     try:
         r = _get_redis()
         key = cache_key(user_id, session_id)
         raw = r.get(key)
         if not raw:
-            return
-        ctx = json.loads(raw)
+            ctx: dict[str, Any] = {"userId": user_id, "sessionId": session_id}
+        else:
+            ctx = json.loads(raw)
         ctx.update(updates)
         ttl = r.ttl(key)
-        r.set(key, json.dumps(ctx), ex=max(ttl, 60) if ttl > 0 else 4 * 3600)
+        r.set(key, json.dumps(ctx), ex=max(ttl, 60) if ttl and ttl > 0 else 4 * 3600)
     except Exception as e:
         logger.warning("coaching_context.update_context failed: %s", e)
 

@@ -224,6 +224,41 @@ export class SessionsService {
       (session as any).status = 'PROCESSING';
     }
 
+    // Recovery: scores already written (CQS) but status never flipped to COMPLETED
+    // (e.g. processor hung on slow PA). Unblock Call Feedback immediately.
+    if (
+      session.status === 'PROCESSING' &&
+      session.analyses &&
+      session.analyses.length >= session.participants.length
+    ) {
+      const allHaveRealScores = session.analyses.every((a) => {
+        const s = (a.scores ?? {}) as Record<string, unknown>;
+        if (s.source === 'cqs') return true;
+        const overall = Number(s.overall_score ?? s.overall ?? 0);
+        const pillars = [
+          Number(s.grammar_score ?? s.grammar ?? 0),
+          Number(s.fluency_score ?? s.fluency ?? 0),
+          Number(s.vocabulary_score ?? s.vocabulary ?? 0),
+        ];
+        // Reject neutral placeholder cluster (all ~50) and empty scores.
+        const isPlaceholder =
+          overall >= 48 &&
+          overall <= 52 &&
+          pillars.every((n) => n >= 48 && n <= 52);
+        return overall > 0 && !isPlaceholder;
+      });
+      if (allHaveRealScores) {
+        this.logger.log(
+          `[SessionsService] Session ${sessionId} has CQS scores but status=PROCESSING — marking COMPLETED`,
+        );
+        await this.prisma.conversationSession.update({
+          where: { id: sessionId },
+          data: { status: 'COMPLETED' },
+        });
+        (session as any).status = 'COMPLETED';
+      }
+    }
+
     // Recovery: if stuck in PROCESSING for >45s with no real Analysis records, re-queue
     if (
       session.status === 'PROCESSING' &&

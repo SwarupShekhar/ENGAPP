@@ -48,3 +48,42 @@ export function getPronFix(ruleCategory: string) {
   if (cat === "r_rolling") return "Curl tongue back slightly, don't trill.";
   return "Listen to a native speaker and repeat slowly.";
 }
+
+/**
+ * Coaching line for TTS — matches backend narration_service.coaching_line.
+ * Never drops when spoken === correct (ASR may match the target while sound is wrong).
+ * Tips are usually spoken once on segment intro, not per issue (includeTip=false).
+ */
+export function buildPronCoachingLine({
+  spoken,
+  correct,
+  ruleCategory,
+  firstName,
+  includeTip = false,
+}: {
+  spoken?: string | null;
+  correct: string;
+  ruleCategory?: string | null;
+  firstName?: string;
+  includeTip?: boolean;
+}): string {
+  const tip = getPronFix(ruleCategory ?? "");
+  const name = firstName ? `${firstName}, ` : "";
+  const spokenTrimmed = (spoken ?? "").trim();
+  const correctTrimmed = (correct ?? "").trim();
+  const spokenW =
+    spokenTrimmed && spokenTrimmed !== "—" ? spokenTrimmed : "";
+  const target = correctTrimmed || spokenW || "the right word";
+  const hasContrast =
+    !!spokenW && spokenW.toLowerCase() !== target.toLowerCase();
+
+  const line = hasContrast
+    ? `${name}You said "${spokenW}". Try saying "${target}".`
+    : `${name}Your word "${target}" wasn't clear. Say "${target}" like this.`;
+  return includeTip ? `${line} ${tip}` : line;
+}
+
+/** Correct word for slow-model TTS (never the wrong word). */
+export function slowCorrectWord(correct: string): string {
+  return (correct ?? "").trim();
+}

@@ -39,25 +39,84 @@ def _pron_tip(rule_category: str) -> str:
     return _PRON_TIPS.get(rule_category, "Practice this sound slowly.")
 
 
+def coaching_line(
+    spoken: Optional[str],
+    correct: Optional[str],
+    rule_category: Optional[str] = None,
+    *,
+    include_tip: bool = False,
+) -> Optional[str]:
+    """
+    One pronunciation coaching sentence for TTS (word-only, no sentence context).
+
+    Never drops an error when spoken == correct (ASR may match the target
+    word while the sound is still wrong). Never invents phonetic spellings.
+    Tips are usually appended once at the end of the segment script (include_tip=False).
+    """
+    spoken_w = (spoken or "").strip()
+    correct_w = (correct or "").strip()
+    if not spoken_w and not correct_w:
+        return None
+    target = correct_w or spoken_w
+    has_contrast = (
+        bool(spoken_w)
+        and spoken_w != "—"
+        and spoken_w.lower() != target.lower()
+    )
+    if has_contrast:
+        line = f"You said '{spoken_w}'. Try saying '{target}'."
+    else:
+        line = f"Your word '{target}' wasn't clear. Say '{target}' like this."
+    if include_tip:
+        line = f"{line} {_pron_tip((rule_category or '').strip())}"
+    return line
+
+
+def slow_words_from_errors(errors: Optional[List[dict]], limit: int = 2) -> List[str]:
+    """Unique correct words for slow-model clips (order preserved)."""
+    words: List[str] = []
+    seen: set[str] = set()
+    for err in errors or []:
+        if len(words) >= limit:
+            break
+        correct = (err.get("correct") or "").strip()
+        if not correct:
+            continue
+        key = correct.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        words.append(correct)
+    return words
+
+
 def build_pronunciation_script(
     score: int,
     justification: Optional[str],
     errors: Optional[List[dict]],
 ) -> str:
+    """
+    Coaching block only (no slow words). Up to 2 issues; one dominant-pattern tip at end.
+    """
     parts = [f"Your pronunciation score is {score} out of 100."]
-    if justification:
+    error_list = list(errors or [])[:2]
+    if justification and not error_list:
         j = justification.strip()[:180]
-        parts.append(j)
-    if errors:
-        for err in errors[:2]:
-            spoken = (err.get("spoken") or "").strip()
-            correct = (err.get("correct") or "").strip()
-            rule = (err.get("rule_category") or "").strip()
-            if spoken and correct and spoken.lower() != correct.lower():
-                tip = _pron_tip(rule)
-                parts.append(
-                    f"You said '{spoken}' — try to say '{correct}' instead. {tip}"
-                )
+        if j:
+            parts.append(j)
+    for err in error_list:
+        line = coaching_line(
+            err.get("spoken"),
+            err.get("correct"),
+            err.get("rule_category"),
+            include_tip=False,
+        )
+        if line:
+            parts.append(line)
+    if error_list:
+        dominant_rule = (error_list[0].get("rule_category") or "").strip()
+        if dominant_rule:
+            parts.append(_pron_tip(dominant_rule))
     parts.append(_closing(score))
     return " ".join(parts)
 
@@ -76,7 +135,7 @@ def build_grammar_script(
             corrected = (err.get("corrected_text") or err.get("corrected") or "").strip()
             if original and corrected and original.lower() != corrected.lower():
                 parts.append(
-                    f"You said '{original}' — the correct form is '{corrected}'."
+                    f"You said '{original}'. The correct form is '{corrected}'."
                 )
     parts.append(_closing(score))
     return " ".join(parts)
@@ -166,14 +225,18 @@ def build_full_feedback_script(
             parts.append(f"For pronunciation, you scored {pron_score} out of 100. Let us focus on a few key sounds.")
 
         for err in pron_issues[:4]:
-            spoken = (err.get("spoken") or err.get("word") or "").strip()
-            correct = (err.get("correct") or "").strip()
-            rule = (err.get("rule_category") or "").strip()
-            if spoken and correct and spoken.lower() != correct.lower():
-                tip = _pron_tip(rule)
-                parts.append(
-                    f"I noticed you said '{spoken}'. The correct word is '{correct}'. {tip}"
-                )
+            line = coaching_line(
+                err.get("spoken") or err.get("word"),
+                err.get("correct"),
+                err.get("rule_category"),
+                include_tip=False,
+            )
+            if line:
+                parts.append(line)
+        if pron_issues:
+            dominant_rule = (pron_issues[0].get("rule_category") or "").strip()
+            if dominant_rule:
+                parts.append(_pron_tip(dominant_rule))
         jus = (justifications.get("pronunciation") or "").strip()
         if jus and len(pron_issues) == 0:
             parts.append(jus[:160])
@@ -191,7 +254,9 @@ def build_full_feedback_script(
             original = (err.get("original_text") or err.get("original") or "").strip()
             corrected = (err.get("corrected_text") or err.get("corrected") or "").strip()
             if original and corrected and original.lower() != corrected.lower():
-                parts.append(f"Instead of '{original}', say '{corrected}'.")
+                parts.append(
+                    f"You said '{original}'. The correct form is '{corrected}'."
+                )
         jus = (justifications.get("grammar") or "").strip()
         if jus and len(grammar_errors) == 0:
             parts.append(jus[:160])

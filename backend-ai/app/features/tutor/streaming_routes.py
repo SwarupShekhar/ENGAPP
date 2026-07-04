@@ -54,6 +54,98 @@ router = APIRouter()
 streaming_tutor_service = StreamingTutorService()
 
 
+def _resolve_coaching_ctx(
+    user_id: str,
+    session_id: str,
+    learner_context: dict | None = None,
+) -> dict | None:
+    """Sync Redis read — never blocks on an LLM."""
+    if not _COACHING_ENABLED:
+        return None
+    try:
+        ctx = coaching_get_context(user_id, session_id)
+        if not ctx and learner_context:
+            ctx = {
+                "userId": user_id,
+                "sessionId": session_id,
+                "activeTasks": learner_context.get("activeTasks") or [],
+                "phraseOfDay": learner_context.get("phraseOfDay"),
+                "wordOfDay": learner_context.get("wordOfDay"),
+            }
+        return ctx
+    except Exception as exc:
+        logger.warning("coaching context load failed: %s", exc)
+        return None
+
+
+def _consume_pending_coaching_hint(
+    user_id: str,
+    session_id: str,
+    ctx: dict | None,
+) -> tuple[dict | None, str | None]:
+    """Use last turn's prefetched hint for this turn; clear it from Redis."""
+    if not ctx:
+        logger.info("[coaching] no context — cannot inject pending hint session=%s", session_id)
+        return None, None
+    pending = ctx.get("pendingCoachingHint")
+    if not isinstance(pending, dict):
+        logger.info("[coaching] no pendingCoachingHint to inject session=%s", session_id)
+        return None, None
+    hint_text = (pending.get("text") or "").strip() or None
+    if not hint_text:
+        logger.info("[coaching] pendingCoachingHint empty session=%s", session_id)
+        return None, None
+    try:
+        coaching_update_context(user_id, session_id, {"pendingCoachingHint": None})
+    except Exception as exc:
+        logger.warning("clear pendingCoachingHint failed: %s", exc)
+    logger.info(
+        "[coaching] pendingCoachingHint injected session=%s trigger=%s",
+        session_id,
+        pending.get("trigger", "unknown"),
+    )
+    return pending, hint_text
+
+
+def _schedule_next_turn_coaching_hint(
+    user_id: str,
+    session_id: str,
+    user_utterance: str,
+    ctx: dict | None,
+    call_elapsed_seconds: float = 999.0,
+) -> None:
+    """Prefetch coaching hint for the *next* turn — never awaited on the hot path."""
+    if not _COACHING_ENABLED:
+        return
+    if not ctx:
+        # Still prefetch using a minimal shell so Redis upsert can store the hint.
+        ctx = {"userId": user_id, "sessionId": session_id}
+
+    async def _prefetch() -> None:
+        try:
+            payload = await coaching_get_hint(user_utterance, ctx, call_elapsed_seconds)
+            if payload and (payload.get("text") or "").strip():
+                coaching_update_context(
+                    user_id,
+                    session_id,
+                    {"pendingCoachingHint": payload},
+                )
+                logger.info(
+                    "[coaching] pendingCoachingHint stored for next turn session=%s trigger=%s",
+                    session_id,
+                    payload.get("trigger", "unknown"),
+                )
+            else:
+                logger.info(
+                    "[coaching] no hint to store for next turn session=%s",
+                    session_id,
+                )
+        except Exception as exc:
+            logger.warning("next-turn coaching hint prefetch failed: %s", exc)
+
+    asyncio.create_task(_prefetch())
+
+
 async def _generate_stream_response(
     audio_bytes: bytes,
     session_id: str,
@@ -71,6 +163,8 @@ async def _generate_stream_response(
         hinglish_stt_service.transcribe_hinglish, audio_bytes
     )
     timings.mark("stt_done")
+    stt_provider = (transcription.get("provider") or "azure").strip().lower()
+    timings.set_meta(stt_provider=stt_provider)
     user_utterance = (transcription.get("text") or "").strip() or "(no speech detected)"
 
     yield {"type": "transcript", "text": user_utterance}
@@ -111,48 +205,15 @@ async def _generate_stream_response(
     except Exception as _e:
         logger.warning("[coaching] feedback loop check failed (SSE): %s", _e)
 
-    # Coaching hint + PA enrichment in parallel (don't stack latencies).
-    _coaching_hint_text: str | None = None
-    _coaching_hint_payload: dict | None = None
-    _coaching_ctx: dict | None = None
+    # Coaching: inject previous turn's pending hint only (never wait on hint LLM).
+    _coaching_ctx = _resolve_coaching_ctx(user_id, session_id, learner_context)
+    _coaching_hint_payload, _coaching_hint_text = _consume_pending_coaching_hint(
+        user_id, session_id, _coaching_ctx
+    )
+    _schedule_next_turn_coaching_hint(
+        user_id, session_id, user_utterance, _coaching_ctx
+    )
 
-    async def _fetch_coaching() -> tuple[dict | None, dict | None, str | None]:
-        if not _COACHING_ENABLED:
-            return None, None, None
-        try:
-            ctx = coaching_get_context(user_id, session_id)
-            if not ctx and learner_context:
-                ctx = {
-                    "userId": user_id,
-                    "sessionId": session_id,
-                    "activeTasks": learner_context.get("activeTasks") or [],
-                    "phraseOfDay": learner_context.get("phraseOfDay"),
-                    "wordOfDay": learner_context.get("wordOfDay"),
-                }
-            if not ctx:
-                return None, None, None
-            payload = None
-            hint_text = None
-            budget_s = max(0.0, settings.coaching_hint_budget_ms) / 1000.0
-            if budget_s > 0:
-                try:
-                    payload = await asyncio.wait_for(
-                        coaching_get_hint(user_utterance, ctx),
-                        timeout=budget_s,
-                    )
-                except asyncio.TimeoutError:
-                    logger.info(
-                        "coaching hint skipped (%.0fms budget) — starting LLM without hint",
-                        settings.coaching_hint_budget_ms,
-                    )
-            if payload:
-                hint_text = payload.get("text")
-            return ctx, payload, hint_text
-        except Exception as _ce:
-            logger.warning("coaching hint fetch failed (SSE): %s", _ce)
-            return None, None, None
-
-    coaching_task = asyncio.create_task(_fetch_coaching())
     if settings.tutor_defer_pronunciation:
         pa_task = None
         phonetic_context = {}
@@ -164,7 +225,6 @@ async def _generate_stream_response(
         phonetic_context, pa_in_prompt = await phonetic_context_for_stream(
             pa_task, timings=timings
         )
-    _coaching_ctx, _coaching_hint_payload, _coaching_hint_text = await coaching_task
 
     # Opportunity prompt: append once per call so Maya creates a natural usage moment
     try:
@@ -187,7 +247,7 @@ async def _generate_stream_response(
     except Exception as _oe:
         logger.warning("[coaching] opportunity prompt failed (SSE): %s", _oe)
 
-    # set_pending_hint_check after hint fires
+    # set_pending_hint_check when we inject a hint this turn
     try:
         if _coaching_hint_payload and _COACHING_ENABLED:
             from app.features.coaching.coaching_context import set_pending_hint_check
@@ -203,14 +263,14 @@ async def _generate_stream_response(
     if pa_in_prompt:
         yield {"type": "phonetic_ready"}
 
-    # Learner profile + coaching metadata for Gemini
+    # Learner profile only when the user asks (avoids inventing past mistakes).
     if phonetic_context is None:
         phonetic_context = {}
-    profile_block = build_learner_profile_block(_coaching_ctx)
-    if profile_block:
-        phonetic_context["learner_profile"] = profile_block
     if user_asks_about_mistakes_or_practice(user_utterance):
         phonetic_context["answer_from_profile"] = True
+        profile_block = build_learner_profile_block(_coaching_ctx)
+        if profile_block:
+            phonetic_context["learner_profile"] = profile_block
 
     # Attach coaching hint and opportunity directive to phonetic_context
     if _coaching_hint_text or (_coaching_ctx and _coaching_ctx.get("opportunityDirective")):
@@ -312,10 +372,14 @@ async def _generate_stream_response(
         except Exception as _me:
             logger.warning("[coaching] consecutive misses update failed (SSE): %s", _me)
 
+    llm_provider = get_turn_llm_provider()
+    timings.set_meta(
+        llm_provider=llm_provider or "none",
+        coaching_hint_injected=bool(_coaching_hint_text),
+    )
     timings.mark("done")
     timings.log_summary("maya_sse")
     done_event: dict = {"type": "done", "timings": timings.to_dict()}
-    llm_provider = get_turn_llm_provider()
     if llm_provider:
         done_event["llm_provider"] = llm_provider
     yield done_event
@@ -517,29 +581,18 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                 except Exception as _wfe:
                     logger.warning("[coaching] feedback loop check failed (WS): %s", _wfe)
 
-                # Coaching hint injection (fire-and-forget — never blocks the call)
-                _ws_hint_text: str | None = None
-                _ws_hint_payload: dict | None = None
-                _ws_coaching_ctx: dict | None = None
-                if _COACHING_ENABLED:
-                    try:
-                        _ws_coaching_ctx = coaching_get_context(user_id, session_id)
-                        if _ws_coaching_ctx:
-                            _ws_elapsed = time.time() - ws_session_start
-                            try:
-                                _ws_hint_payload = await asyncio.wait_for(
-                                    coaching_get_hint(
-                                        user_utterance, _ws_coaching_ctx, _ws_elapsed
-                                    ),
-                                    timeout=0.25,
-                                )
-                            except asyncio.TimeoutError:
-                                logger.info("coaching hint skipped (WS, 250ms budget)")
-                                _ws_hint_payload = None
-                            if _ws_hint_payload:
-                                _ws_hint_text = _ws_hint_payload.get("text")
-                    except Exception as _wce:
-                        logger.warning("coaching hint fetch failed (WS): %s", _wce)
+                # Coaching: previous-turn pending hint only (never wait on hint LLM).
+                _ws_coaching_ctx = _resolve_coaching_ctx(user_id, session_id)
+                _ws_hint_payload, _ws_hint_text = _consume_pending_coaching_hint(
+                    user_id, session_id, _ws_coaching_ctx
+                )
+                _schedule_next_turn_coaching_hint(
+                    user_id,
+                    session_id,
+                    user_utterance,
+                    _ws_coaching_ctx,
+                    call_elapsed_seconds=time.time() - ws_session_start,
+                )
 
                 # Opportunity prompt: append once per call
                 try:
@@ -562,7 +615,7 @@ async def websocket_tutor_session(websocket: WebSocket, session_id: str):
                 except Exception as _woe:
                     logger.warning("[coaching] opportunity prompt failed (WS): %s", _woe)
 
-                # set_pending_hint_check after hint fires
+                # set_pending_hint_check when we inject a hint this turn
                 try:
                     if _ws_hint_payload and _COACHING_ENABLED:
                         from app.features.coaching.coaching_context import set_pending_hint_check

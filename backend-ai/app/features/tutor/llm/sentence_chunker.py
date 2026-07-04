@@ -82,11 +82,17 @@ def finalize_tail(
     sanitize: Callable[[str], str] = sanitize_maya_sentence,
     min_words_tail: int = 6,
 ) -> str | None:
+    """Emit a trailing fragment only when it is a complete spoken sentence.
+
+    Incomplete tails (e.g. "Hello Roberto, I") must never reach the UI — they
+    look like stuck/truncated replies. Word-count alone is not enough.
+    ``min_words_tail`` is retained for API compatibility but ignored.
+    """
+    del min_words_tail  # complete punctuation is the only safe gate
     if not buffer.strip() or emitted_count >= max_sentences:
         return None
     tail = sanitize(buffer.strip())
-    word_count = len(tail.split())
-    if tail and (tail[-1] in ".!?" or word_count >= min_words_tail):
+    if tail and tail[-1] in ".!?":
         return tail
     return None
 
@@ -94,7 +100,7 @@ def finalize_tail(
 async def stream_sentences_from_async_tokens(
     token_stream: AsyncIterator[str],
     *,
-    max_sentences: int = 2,
+    max_sentences: int = 4,
     sanitize: Callable[[str], str] = sanitize_maya_sentence,
 ) -> AsyncIterator[str]:
     buffer = ""
@@ -125,7 +131,7 @@ async def stream_sentences_from_async_tokens(
 def iter_sentences_from_sync_tokens(
     token_iter: Iterator[str],
     *,
-    max_sentences: int = 2,
+    max_sentences: int = 4,
     sanitize: Callable[[str], str] = sanitize_maya_sentence,
 ) -> Iterator[str]:
     buffer = ""

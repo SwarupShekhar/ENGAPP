@@ -234,6 +234,18 @@ function TranscriptBubble({ item, index }: { item: any; index: number }) {
 let _msgSeq = 0;
 const nextMsgId = () => `msg-${++_msgSeq}`;
 
+/** Hard cap so Thinking never hangs forever. */
+const MAYA_TURN_TIMEOUT_MS = 10_000;
+const MAYA_RECOVERY_UTTERANCE =
+  "I didn't quite catch that. Could you say it again?";
+
+/** Complete spoken reply: ends with sentence punctuation (optional closing quote). */
+function isCompleteSpokenUtterance(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  return /[.!?…]["']?\s*$/.test(t);
+}
+
 // ─── Main Screen ──────────────────────────────────────────
 export default function AITutorScreen({ navigation, route }: any) {
   const theme = useAppTheme();
@@ -280,6 +292,8 @@ export default function AITutorScreen({ navigation, route }: any) {
   const sseAbortRef = useRef<AbortController | null>(null);
   const turnStartMsRef = useRef<number | null>(null);
   const firstChunkSeenRef = useRef<boolean>(false);
+  /** Awaited before the next recording so history cannot race the next turn. */
+  const historyPersistRef = useRef<Promise<void>>(Promise.resolve());
 
   const syncCefrLevelOnce = async () => {
     if (cefrSyncTriggeredRef.current) return;
@@ -495,13 +509,73 @@ export default function AITutorScreen({ navigation, route }: any) {
     };
   }, []);
 
-  const applyBlockingTutorTurn = (
+  const persistTurnHistory = async (
+    sid: string,
+    userText: string,
+    aiText: string,
+  ) => {
+    const persist = tutorApi
+      .appendTurn(sid, userText, aiText)
+      .catch((e) => {
+        if (__DEV__) console.warn("[AITutor] appendTurn failed:", e);
+      });
+    historyPersistRef.current = persist;
+    await persist;
+  };
+
+  const applyRecoveryUtterance = (userText?: string) => {
+    const cleanUser = userText?.trim();
+    setTranscript((prev) => {
+      let next = [...prev];
+      const tempIndex = next.findIndex(
+        (p) => p.speaker === "user" && p.tempId,
+      );
+      if (tempIndex >= 0 && cleanUser) {
+        next[tempIndex] = {
+          ...next[tempIndex],
+          text: cleanUser,
+          tempId: false,
+        };
+      }
+      const last = next[next.length - 1];
+      if (last?.speaker === "ai" && last.isStreaming) {
+        next[next.length - 1] = {
+          ...last,
+          text: MAYA_RECOVERY_UTTERANCE,
+          isStreaming: false,
+        };
+      } else if (!last || last.speaker !== "ai") {
+        next = [
+          ...next,
+          {
+            id: nextMsgId(),
+            speaker: "ai",
+            text: MAYA_RECOVERY_UTTERANCE,
+          },
+        ];
+      } else if (last.speaker === "ai" && !isCompleteSpokenUtterance(last.text)) {
+        next[next.length - 1] = {
+          ...last,
+          text: MAYA_RECOVERY_UTTERANCE,
+          isStreaming: false,
+        };
+      }
+      return next;
+    });
+    setIsStreaming(false);
+    turnHadResponseRef.current = true;
+  };
+
+  const applyBlockingTutorTurn = async (
     userText: string,
     aiText: string,
     audioBase64?: string | null,
   ) => {
     const cleanUser = userText?.trim() || "(no speech detected)";
-    const cleanAi = aiText?.trim() || "";
+    let cleanAi = aiText?.trim() || "";
+    if (cleanAi && !isCompleteSpokenUtterance(cleanAi)) {
+      cleanAi = MAYA_RECOVERY_UTTERANCE;
+    }
     setTranscript((prev) => {
       const tempIndex = prev.findIndex(
         (p) => p.speaker === "user" && p.tempId,
@@ -528,12 +602,12 @@ export default function AITutorScreen({ navigation, route }: any) {
       return next;
     });
     turnHadResponseRef.current = true;
-    if (audioBase64) {
+    if (audioBase64 && isCompleteSpokenUtterance(aiText?.trim() || "")) {
       queueAudio(audioBase64);
     }
     const sid = sessionIdRef.current;
-    if (sid && cleanUser && cleanAi) {
-      tutorApi.appendTurn(sid, cleanUser, cleanAi).catch(() => {});
+    if (sid && cleanUser && cleanAi && isCompleteSpokenUtterance(cleanAi)) {
+      await persistTurnHistory(sid, cleanUser, cleanAi);
     }
   };
 
@@ -557,7 +631,7 @@ export default function AITutorScreen({ navigation, route }: any) {
       const audioB64 =
         (res as { audioBase64?: string })?.audioBase64 || null;
       if (!transcription && !aiResponse) return { status: "fail" };
-      applyBlockingTutorTurn(transcription, aiResponse, audioB64);
+      await applyBlockingTutorTurn(transcription, aiResponse, audioB64);
       setStreamPath("ws-fallback");
       setStreamDebugReason("process_speech_https");
       return {
@@ -591,17 +665,21 @@ export default function AITutorScreen({ navigation, route }: any) {
       setLatencyTrace(activeLatencyTimeline.getSnapshot());
     }
 
+    // Transcript alone is not a completed turn — only sentence/audio count.
+    const isAiChunk =
+      (chunk.type === "sentence" && Boolean(chunk.text)) ||
+      (chunk.type === "audio" && Boolean(chunk.audio));
+    if (isAiChunk) {
+      turnHadResponseRef.current = true;
+    }
+
     // First meaningful chunk latency marker for this turn.
     if (!firstChunkSeenRef.current) {
-      const isMeaningfulChunk =
-        (chunk.type === "transcript" || chunk.type === "transcription") &&
-          Boolean(chunk.text) ||
-        (chunk.type === "sentence" && Boolean(chunk.text)) ||
-        (chunk.type === "audio" && Boolean(chunk.audio));
-      if (isMeaningfulChunk) {
-        turnHadResponseRef.current = true;
-      }
-      if (isMeaningfulChunk && turnStartMsRef.current) {
+      const isLatencyChunk =
+        isAiChunk ||
+        ((chunk.type === "transcript" || chunk.type === "transcription") &&
+          Boolean(chunk.text));
+      if (isLatencyChunk && turnStartMsRef.current) {
         firstChunkSeenRef.current = true;
         setFirstChunkLatencyMs(Date.now() - turnStartMsRef.current);
         activeLatencyTimeline.endSpan("sse_request");
@@ -792,6 +870,12 @@ export default function AITutorScreen({ navigation, route }: any) {
   // ─── Recording ──────────────────────────────────────────
   const startRecording = async () => {
     if (isProcessing || isStreaming || isRecording) return; // Block while streaming/recording
+    // Ensure prior turn history is persisted before accepting new audio.
+    try {
+      await historyPersistRef.current;
+    } catch (_) {
+      /* already logged in persistTurnHistory */
+    }
     setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
@@ -942,121 +1026,162 @@ export default function AITutorScreen({ navigation, route }: any) {
               sseAbortRef.current?.abort();
               const abortController = new AbortController();
               sseAbortRef.current = abortController;
+              // Covers fetch + full stream read so Thinking cannot hang forever.
+              const turnTimeoutId = setTimeout(() => {
+                abortController.abort();
+              }, MAYA_TURN_TIMEOUT_MS);
               activeLatencyTimeline.startSpan("sse_request");
-              const response = await tutorApi.streamSpeech(formData, {
-                Authorization: `Bearer ${token}`,
-              }, abortController.signal);
-              if (!response.ok) {
-                const errText = await response.text().catch(() => "");
-                console.warn(
-                  `[Tutor SSE] ${response.status} ${response.statusText}`,
-                  errText.slice(0, 500),
-                );
-                if (response.status === 429) {
-                  turnRateLimited = true;
-                  setError(MAYA_RATE_LIMIT_MESSAGE);
-                  setStreamPath("idle");
-                  setStreamDebugReason("rate_limited_429");
-                } else if (__DEV__) {
-                  console.log("[Tutor SSE] Falling back to WS due to non-2xx response");
-                  setStreamPath("ws-fallback");
-                  setStreamDebugReason(`sse_non_2xx_${response.status}`);
-                } else {
-                  setStreamPath("ws-fallback");
-                  setStreamDebugReason(`sse_non_2xx_${response.status}`);
+              let userTranscript = "";
+              let aiText = "";
+              let sseTimedOut = false;
+              try {
+                const response = await tutorApi.streamSpeech(formData, {
+                  Authorization: `Bearer ${token}`,
+                }, abortController.signal);
+                if (!response.ok) {
+                  const errText = await response.text().catch(() => "");
+                  console.warn(
+                    `[Tutor SSE] ${response.status} ${response.statusText}`,
+                    errText.slice(0, 500),
+                  );
+                  if (response.status === 429) {
+                    turnRateLimited = true;
+                    setError(MAYA_RATE_LIMIT_MESSAGE);
+                    setStreamPath("idle");
+                    setStreamDebugReason("rate_limited_429");
+                  } else if (__DEV__) {
+                    console.log("[Tutor SSE] Falling back to WS due to non-2xx response");
+                    setStreamPath("ws-fallback");
+                    setStreamDebugReason(`sse_non_2xx_${response.status}`);
+                  } else {
+                    setStreamPath("ws-fallback");
+                    setStreamDebugReason(`sse_non_2xx_${response.status}`);
+                  }
                 }
-              }
-              if (response.ok && response.body) {
-                usedSSE = true;
-                setStreamPath("sse");
-                setStreamDebugReason("ok");
-                let userTranscript = "";
-                let aiText = "";
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  buffer += decoder.decode(value, { stream: true });
-                  // Parse SSE: each event is a line "data: {...}\n"
-                  const lines = buffer.split("\n");
-                  buffer = lines.pop() ?? "";
-                  for (const line of lines) {
-                    if (!line.startsWith("data: ")) continue;
-                    try {
-                      const chunk = JSON.parse(line.slice(6).trim());
-                      if (chunk.type === "transcript" && chunk.text) userTranscript = chunk.text;
-                      if (chunk.type === "sentence" && chunk.text) aiText += (aiText ? " " : "") + chunk.text;
-                      if (chunk.type === "done" && chunk.timings?.ms) {
-                        activeLatencyTimeline.mergeServerTimings(chunk.timings.ms);
+                if (response.ok && response.body) {
+                  usedSSE = true;
+                  setStreamPath("sse");
+                  setStreamDebugReason("ok");
+                  const reader = response.body.getReader();
+                  const decoder = new TextDecoder();
+                  let buffer = "";
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    // Parse SSE: each event is a line "data: {...}\n"
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop() ?? "";
+                    for (const line of lines) {
+                      if (!line.startsWith("data: ")) continue;
+                      try {
+                        const chunk = JSON.parse(line.slice(6).trim());
+                        if (chunk.type === "transcript" && chunk.text) userTranscript = chunk.text;
+                        if (chunk.type === "sentence" && chunk.text) aiText += (aiText ? " " : "") + chunk.text;
+                        if (chunk.type === "done" && chunk.timings?.ms) {
+                          activeLatencyTimeline.mergeServerTimings(chunk.timings.ms);
+                        }
+                        handleStreamMessage(chunk);
+                      } catch (_) {
+                        /* incomplete or invalid chunk */
                       }
-                      handleStreamMessage(chunk);
-                    } catch (_) {
-                      /* incomplete or invalid chunk */
                     }
                   }
-                }
-                if (buffer.trim().startsWith("data: ")) {
-                  try {
-                    const chunk = JSON.parse(buffer.slice(6).trim());
-                    if (chunk.type === "transcript" && chunk.text)
-                      userTranscript = chunk.text;
-                    if (chunk.type === "sentence" && chunk.text)
-                      aiText += (aiText ? " " : "") + chunk.text;
-                    handleStreamMessage(chunk);
-                  } catch (_) {
-                    /* trailing incomplete JSON */
+                  if (buffer.trim().startsWith("data: ")) {
+                    try {
+                      const chunk = JSON.parse(buffer.slice(6).trim());
+                      if (chunk.type === "transcript" && chunk.text)
+                        userTranscript = chunk.text;
+                      if (chunk.type === "sentence" && chunk.text)
+                        aiText += (aiText ? " " : "") + chunk.text;
+                      handleStreamMessage(chunk);
+                    } catch (_) {
+                      /* trailing incomplete JSON */
+                    }
+                  }
+                  const completeAi = aiText.trim();
+                  if (completeAi && isCompleteSpokenUtterance(completeAi)) {
+                    const ref = extractReferenceForPronunciation(completeAi);
+                    if (ref) {
+                      if (__DEV__)
+                        console.log("[Pronunciation] From SSE aggregate:", ref);
+                      setReferenceTextForNextTurn(ref);
+                    }
+                    if (userTranscript) {
+                      await persistTurnHistory(
+                        activeSessionId,
+                        userTranscript,
+                        completeAi,
+                      );
+                    }
+                  } else if (userTranscript || completeAi) {
+                    // Partial / empty AI reply — never persist fragments like "Hello Roberto, I".
+                    applyRecoveryUtterance(userTranscript || undefined);
+                    usedSSE = true;
+                    turnHadResponseRef.current = true;
+                  }
+                  if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+                    setIsStreaming(false);
+                  }
+                  if (activeSessionId && uri) {
+                    void tutorApi
+                      .uploadTurnAudio(
+                        activeSessionId,
+                        turnIndexForUpload,
+                        uri,
+                        uploadMime,
+                        uploadName,
+                        userTranscript || undefined,
+                      )
+                      .catch((e) => {
+                        if (__DEV__) {
+                          console.warn("[AITutor] turn audio upload failed:", e);
+                        }
+                      });
+                  }
+                  if (sseAbortRef.current === abortController) {
+                    sseAbortRef.current = null;
                   }
                 }
-                if (aiText.trim()) {
-                  const ref = extractReferenceForPronunciation(aiText.trim());
-                  if (ref) {
-                    if (__DEV__)
-                      console.log("[Pronunciation] From SSE aggregate:", ref);
-                    setReferenceTextForNextTurn(ref);
+              } catch (err: any) {
+                if (err?.name === "AbortError") {
+                  sseTimedOut = true;
+                  if (__DEV__) console.log("[Tutor SSE] aborted (timeout or cancel)");
+                  setStreamDebugReason("sse_timeout");
+                  const partialAi = aiText.trim();
+                  if (partialAi && isCompleteSpokenUtterance(partialAi)) {
+                    usedSSE = true;
+                    turnHadResponseRef.current = true;
+                    setIsStreaming(false);
+                    if (userTranscript) {
+                      await persistTurnHistory(
+                        activeSessionId,
+                        userTranscript,
+                        partialAi,
+                      );
+                    }
+                  } else if (userTranscript || partialAi) {
+                    applyRecoveryUtterance(userTranscript || undefined);
+                    usedSSE = true;
+                    turnHadResponseRef.current = true;
+                  } else {
+                    usedSSE = false;
                   }
+                } else {
+                  console.warn("[Tutor SSE] request failed, falling back to WS:", err?.message || err);
+                  setStreamPath("ws-fallback");
+                  setStreamDebugReason("sse_request_error");
+                  usedSSE = false;
                 }
-                if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
-                  setIsStreaming(false);
-                }
-                if (userTranscript && aiText.trim()) {
-                  tutorApi
-                    .appendTurn(activeSessionId, userTranscript, aiText.trim())
-                    .catch(() => {});
-                }
-                if (activeSessionId && uri) {
-                  void tutorApi
-                    .uploadTurnAudio(
-                      activeSessionId,
-                      turnIndexForUpload,
-                      uri,
-                      uploadMime,
-                      uploadName,
-                      userTranscript || undefined,
-                    )
-                    .catch((e) => {
-                      if (__DEV__) {
-                        console.warn("[AITutor] turn audio upload failed:", e);
-                      }
-                    });
-                }
-                if (sseAbortRef.current === abortController) {
-                  sseAbortRef.current = null;
+              } finally {
+                clearTimeout(turnTimeoutId);
+                sseAbortRef.current = null;
+                if (sseTimedOut && !turnHadResponseRef.current) {
+                  applyRecoveryUtterance();
+                  turnHadResponseRef.current = true;
+                  usedSSE = true;
                 }
               }
-            } catch (err: any) {
-              if (err?.name === "AbortError") {
-                if (__DEV__) console.log("[Tutor SSE] aborted");
-              } else {
-                console.warn("[Tutor SSE] request failed, falling back to WS:", err?.message || err);
-                setStreamPath("ws-fallback");
-                setStreamDebugReason("sse_request_error");
-              }
-              usedSSE = false;
-            } finally {
-              sseAbortRef.current = null;
-            }
           } else if (__DEV__) {
             console.warn(
               "[Tutor SSE] skipped (missing auth token or sessionId), using WS fallback",

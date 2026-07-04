@@ -44,7 +44,7 @@ export class TtsController {
         this.httpService.post(
           `${this.aiEngineUrl}/api/tts/feedback-narration`,
           body,
-          this.withAiAuth({ timeout: 15000 }),
+          this.withAiAuth({ timeout: 25000 }),
         ),
       );
       return response.data;
@@ -53,7 +53,12 @@ export class TtsController {
         `TTS feedback-narration proxy failed: ${error?.message}`,
       );
       throw new HttpException(
-        { message: 'TTS service unavailable', audio_base64: '', text: '' },
+        {
+          message: 'TTS service unavailable',
+          audio_base64: '',
+          text: '',
+          clips: [],
+        },
         HttpStatus.BAD_GATEWAY,
       );
     }
@@ -82,7 +87,7 @@ export class TtsController {
   }
 
   @Post('speak')
-  async speak(@Body() body: { text: string }) {
+  async speak(@Body() body: { text: string; speaking_rate?: number }) {
     try {
       const response = await lastValueFrom(
         this.httpService.post(

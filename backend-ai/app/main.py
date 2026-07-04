@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI):
         if settings.deepgram_primary_stt and deepgram_transcription_service.configured
         else "azure"
     )
+    cerebras_configured = bool((settings.cerebras_api_key or "").strip())
     logger.info(
         "stt_configuration",
         stt_primary=stt_primary,
@@ -54,6 +55,19 @@ async def lifespan(app: FastAPI):
         deepgram_secondary_transcript=settings.deepgram_secondary_transcript,
         azure_speech_configured=bool(settings.azure_speech_key and settings.azure_speech_region),
         deepgram_configured=deepgram_transcription_service.configured,
+    )
+    logger.info(
+        "maya_llm_configuration",
+        maya_llm_provider=settings.maya_llm_provider,
+        cerebras_configured=cerebras_configured,
+        text_llm_expected=(
+            "cerebras"
+            if cerebras_configured
+            and (settings.maya_llm_provider or "auto").strip().lower() in ("auto", "cerebras")
+            else "gemini"
+        ),
+        coaching_hint_budget_ms=settings.coaching_hint_budget_ms,
+        coaching_next_turn_only=True,
     )
 
     await cache.initialize()

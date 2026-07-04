@@ -50,9 +50,11 @@ services:
       PRON_DEBUG: ""
       TTS_PROVIDER: inworld
       DISABLE_AZURE_TTS: "true"
-      # Tutor + calls use Azure Speech STT; Deepgram is opt-in only.
-      DEEPGRAM_PRIMARY_STT: "false"
+      # Deepgram primary STT when DEEPGRAM_API_KEY is set (~300ms); Azure fallback otherwise.
+      DEEPGRAM_PRIMARY_STT: "true"
       DEEPGRAM_SECONDARY_TRANSCRIPT: "false"
+      # Coaching hints inject on the next turn — never block Maya's reply.
+      COACHING_HINT_BUDGET_MS: "0"
       # Coaching context (Maya tutor) reads REDIS_URL — must point at the same Redis as backend-nest.
       # Set REDIS_URL in backend-ai/.env on the server (not localhost inside Docker).
     ports:

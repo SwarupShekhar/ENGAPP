@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Speech from 'expo-speech';
+import { buildPronCoachingLine } from '../utils/pronUtils';
 
 export type FlaggedPronunciation = {
   spoken: string;
@@ -21,9 +22,11 @@ type Segment =
   | { type: 'error'; error: FlaggedPronunciation };
 
 function coachingLine(err: FlaggedPronunciation): string {
-  const spoken = (err.spoken || '').trim() || 'that';
-  const correct = (err.correct || '').trim() || 'the right word';
-  return `You said ${spoken}, but you should say ${correct}.`;
+  return buildPronCoachingLine({
+    spoken: err.spoken,
+    correct: err.correct,
+    ruleCategory: err.rule_category,
+  });
 }
 
 function buildTranscriptSegments(

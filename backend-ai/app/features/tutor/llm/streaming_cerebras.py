@@ -24,7 +24,8 @@ NOT_CONFIGURED_REPLY = (
     "I'm not fully configured yet. Please set CEREBRAS_API_KEY and restart the AI service."
 )
 
-_MAX_SENTENCES = 2
+# Soft cap for spoken turns; max_tokens is the real length backstop.
+_MAX_SENTENCES = 4
 _SENTINEL = object()
 
 

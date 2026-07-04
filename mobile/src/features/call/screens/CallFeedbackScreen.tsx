@@ -14,7 +14,7 @@ import type {
   NarrationError,
   WordTimestamp,
 } from "../../../api/tts";
-import { PronIssueNormalized, getPronUI, getPronLabel, getPronFix } from "../utils/pronUtils";
+import { PronIssueNormalized, getPronUI, getPronLabel, getPronFix, buildPronCoachingLine } from "../utils/pronUtils";
 import { usePulseTTS } from "../hooks/usePulseTTS";
 import {
   View,
@@ -989,6 +989,29 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         // Point 1: Handle different session statuses
         if (data.status === "PROCESSING") {
+          // Scores may already be written (CQS) while status lags — show them.
+          const analysis = data.analyses?.[0];
+          const scores = (analysis?.scores ?? {}) as Record<string, unknown>;
+          const overall = Number(scores.overall_score ?? scores.overall ?? 0);
+          const hasRealScores =
+            scores.source === "cqs" ||
+            (overall > 0 && !(overall >= 48 && overall <= 52));
+          if (hasRealScores && data.analyses && data.analyses.length > 0) {
+            if (isMounted) {
+              feedbackTimelineRef.current.markInstant("analysis_ready");
+              setSessionData(data);
+              setLoading(false);
+              feedbackTimelineRef.current.finish({ status: data.status });
+              setFeedbackLatencyTrace(feedbackTimelineRef.current.getSnapshot());
+              void getCQSScore(sessionId)
+                .then((cqs) => {
+                  if (isMounted) setCqsData(cqs);
+                })
+                .catch((err) => console.warn("[CallFeedback] CQS fetch:", err));
+            }
+            return;
+          }
+
           const participantCount = data.participants?.length ?? 0;
           const feedbackCount = data.feedbacks?.length ?? 0;
           const waitingForPartner = participantCount > 0 && feedbackCount < participantCount;
@@ -1000,11 +1023,16 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               ? "Ask your partner to end the call so we can analyze the conversation."
               : "The AI is finalizing your speech metrics.",
           );
-          // Keep polling until analysis is ready (was missing: we never re-fetched on PROCESSING)
-          if (isMounted && retryCount < 12) {
+          // Poll up to ~2 min (was 12 → stuck at 54% forever)
+          if (isMounted && retryCount < 40) {
             setTimeout(() => {
               if (isMounted) setRetryCount((prev) => prev + 1);
-            }, 3000); // Poll every 3s while processing (~36s max)
+            }, 3000);
+          } else if (isMounted) {
+            setIsFailed(true);
+            setLoading(false);
+            setErrorHeader("Taking longer than usual");
+            setErrorDetail("Tap Check again — your scores may already be ready.");
           }
           return;
         } else if (data.status === "ANALYSIS_FAILED") {
@@ -1363,7 +1391,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           {retryCount > 0 && (
             <Text style={{ color: theme.colors.text.secondary, fontSize: 12 }}>
               Progress:{" "}
-              {Math.min(100, Math.round(((retryCount + 1) / 24) * 100))}%
+              {Math.min(99, Math.round(((retryCount + 1) / 40) * 100))}%
             </Text>
           )}
 
@@ -1634,22 +1662,24 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
     // Pronunciation — sort ascending by confidence (lower = more severe)
     const sortedPron = [...(data.pronunciationIssues as any[])]
-      .filter((p) => {
-        const spoken = (p.spoken ?? p.word ?? '').trim();
-        const correct = (p.correct ?? '').trim();
-        return spoken && correct && spoken.toLowerCase() !== correct.toLowerCase();
-      })
+      .filter((p) => (p.correct ?? '').trim())
       .sort((a, b) => (a.confidence ?? 100) - (b.confidence ?? 100));
     for (const p of sortedPron.slice(0, PER_CAT)) {
       const spoken = (p.spoken ?? p.word ?? '').trim();
       const correct = (p.correct ?? '').trim();
+      const ruleCategory = p.rule_category ?? p.issueType ?? '';
       steps.push({
         id: `pron_${steps.length}`,
         category: 'pronunciation',
-        youSaid: spoken,
+        youSaid: spoken || correct,
         correct,
         correctionLabel: 'Correct:',
-        ttsText: `You said "${spoken}". The correct pronunciation is "${correct}".`,
+        ttsText: buildPronCoachingLine({
+          spoken,
+          correct,
+          ruleCategory,
+          firstName: user?.firstName ?? undefined,
+        }),
       });
     }
 
@@ -1700,19 +1730,17 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     const segments: FeedbackSegment[] = [];
 
     const sortedPron = [...(data.pronunciationIssues as any[])]
-      .filter((p) => {
-        const spoken = (p.spoken ?? p.word ?? '').trim();
-        const correct = (p.correct ?? '').trim();
-        return spoken && correct && spoken.toLowerCase() !== correct.toLowerCase();
-      })
+      .filter((p) => (p.correct ?? '').trim())
       .sort((a, b) => (a.confidence ?? 100) - (b.confidence ?? 100));
     if (sortedPron.length) {
       const p = sortedPron[0];
+      const spoken = (p.spoken ?? p.word ?? '').trim();
+      const correct = (p.correct ?? '').trim();
       segments.push({
         id: 'pronunciation',
         category: 'pronunciation',
-        youSaid: (p.spoken ?? p.word ?? '').trim(),
-        correct: (p.correct ?? '').trim(),
+        youSaid: spoken || correct,
+        correct,
         correctionLabel: 'Correct:',
         hasCorrectionCards: true,
       });
@@ -1780,11 +1808,21 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       vocabulary: Math.min(100, summary?.vocabulary_score ?? scores?.vocabulary ?? data.scores.vocabulary ?? 0),
       fluency: Math.min(100, summary?.fluency_score ?? scores?.fluency ?? data.scores.fluency ?? 0),
     };
-    const pronErrors = (data.pronunciationIssues as any[]).slice(0, 2).map((p) => ({
-      spoken: p.spoken ?? p.word,
-      correct: p.correct ?? p.word,
-      rule_category: p.rule_category ?? p.issueType,
-    }));
+    const pronErrors = (data.pronunciationIssues as any[])
+      .filter((p) => (p.correct ?? '').trim())
+      .slice(0, 2)
+      .map((p) => {
+        const correct = (p.correct ?? '').trim();
+        const spokenRaw = (p.spoken ?? p.word ?? '').trim();
+        // Prefer real spoken when different; if missing/equal still send both for coaching.
+        const spoken =
+          spokenRaw && spokenRaw !== '—' ? spokenRaw : correct;
+        return {
+          spoken,
+          correct,
+          rule_category: p.rule_category ?? p.issueType,
+        };
+      });
     const grammarErrors = (data.mistakes as any[]).slice(0, 2).map((m) => ({
       original_text: m.original_text ?? m.original,
       corrected_text: m.corrected_text ?? m.corrected,
@@ -1870,11 +1908,84 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
   const prefetchSegmentNarration = (segment: FeedbackSegment) => {
     const payload = buildSegmentNarrationPayload(segment);
-    const key = JSON.stringify(payload);
-    prefetchTtsFileUri(key, async () => {
+    const key = `clips:${JSON.stringify(payload)}`;
+    prefetchTtsFileUri(`${key}:0`, async () => {
       const result = await fetchFeedbackNarration(payload);
-      return result.audio_base64 ?? '';
+      return result.clips?.[0]?.audio_base64 || result.audio_base64 || '';
     });
+  };
+
+  /** Play stitched clips (coaching → slow words) or a single fallback URI. */
+  const playSegmentClipPlaylist = async (
+    uris: string[],
+    segment: FeedbackSegment,
+    options?: { transitionFromIntro?: boolean },
+  ) => {
+    const seqToken = segmentSeqRef.current;
+    const hasCards = segment.hasCorrectionCards;
+    let index = 0;
+
+    const playNext = async () => {
+      if (segmentSeqRef.current !== seqToken) return;
+      if (index >= uris.length) {
+        if (hasCards) setCardReveal('both');
+        segmentProgress.value = withTiming(1, { duration: 180 });
+        stepSoundRef.current = null;
+        setStepAudioPlaying(false);
+        stopWordTracking();
+        return;
+      }
+      const ratioBase = index / Math.max(1, uris.length);
+      segmentProgress.value = ratioBase;
+      if (hasCards && index === 0) {
+        setCardReveal('youSaid');
+      } else if (hasCards && index >= 1) {
+        setCardReveal('both');
+      } else if (!hasCards) {
+        setCardReveal('both');
+      }
+
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: uris[index] },
+        {
+          shouldPlay: true,
+          rate: index === 0 ? 0.92 : 1.0,
+          shouldCorrectPitch: true,
+        },
+      );
+      if (segmentSeqRef.current !== seqToken) {
+        await sound.unloadAsync().catch(() => {});
+        return;
+      }
+      stepSoundRef.current = sound;
+      if (options?.transitionFromIntro && index === 0) {
+        introAudioStartedRef.current = true;
+        setFeedbackPhase('step');
+      }
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (segmentSeqRef.current !== seqToken) return;
+        const duration = status.durationMillis ?? 0;
+        const position = status.positionMillis ?? 0;
+        if (duration > 0) {
+          const local = position / duration;
+          segmentProgress.value = Math.min(
+            1,
+            ratioBase + local / Math.max(1, uris.length),
+          );
+        }
+        if (status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          if (stepSoundRef.current === sound) stepSoundRef.current = null;
+          index += 1;
+          void playNext();
+        }
+      });
+    };
+
+    setStepAudioPlaying(true);
+    await playNext();
   };
 
   const startSegmentAudio = async (
@@ -1889,12 +2000,23 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     if (options?.transitionFromIntro) introAudioStartedRef.current = false;
     try {
       const payload = buildSegmentNarrationPayload(segment);
-      const cacheKey = JSON.stringify(payload);
-      const tmpUri = await getOrFetchTtsFileUri(cacheKey, async () => {
-        const result = await fetchFeedbackNarration(payload);
-        return result.audio_base64 ?? '';
-      });
-      if (!tmpUri) {
+      const result = await fetchFeedbackNarration(payload);
+      const clipList =
+        result.clips && result.clips.length > 0
+          ? result.clips.filter((c) => c.audio_base64)
+          : result.audio_base64
+            ? [{ role: 'coaching', text: result.text, audio_base64: result.audio_base64 }]
+            : [];
+
+      const uris: string[] = [];
+      for (let i = 0; i < clipList.length; i++) {
+        const clip = clipList[i];
+        const cacheKey = `narration:${payload.section}:${clip.role}:${clip.text}`;
+        const uri = await getOrFetchTtsFileUri(cacheKey, async () => clip.audio_base64);
+        if (uri) uris.push(uri);
+      }
+
+      if (uris.length === 0) {
         setStepAudioLoading(false);
         if (options?.transitionFromIntro) setFeedbackPhase('step');
         if (!segment.hasCorrectionCards) {
@@ -1906,15 +2028,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       const nextSeg = segIdx >= 0 ? feedbackSegments[segIdx + 1] : undefined;
       if (nextSeg) prefetchSegmentNarration(nextSeg);
 
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: tmpUri },
-        { shouldPlay: true, rate: 0.92, shouldCorrectPitch: true },
-      );
-      stepSoundRef.current = sound;
       setStepAudioLoading(false);
-      setStepAudioPlaying(true);
-      attachSegmentPlaybackHandlers(sound, segment, options);
+      await playSegmentClipPlaylist(uris, segment, options);
     } catch {
       setStepAudioLoading(false);
       setStepAudioPlaying(false);
@@ -1938,35 +2053,63 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     await startSegmentAudio(segment);
   };
 
-  /** Summary list: replay one correction clip (not the full segment narration). */
+  /** Summary list: coaching line + slow correct word (stitched). */
   const playFeedbackStepSnippet = async (step: FeedbackStep) => {
     if (stepAudioPlaying) {
       await stopStepAudio();
       return;
     }
     setStepAudioLoading(true);
+    segmentSeqRef.current += 1;
+    const seqToken = segmentSeqRef.current;
     try {
-      const cacheKey = `snippet:${step.ttsText}`;
-      const tmpUri = await getOrFetchTtsFileUri(cacheKey, async () => {
+      const slowWord = (step.correct ?? '').trim();
+      const coachUri = await getOrFetchTtsFileUri(`snippet:${step.ttsText}`, async () => {
         const result = await fetchErrorSpeak(step.ttsText);
         return result.audio_base64 ?? '';
       });
-      if (!tmpUri) {
+      if (!coachUri) {
         setStepAudioLoading(false);
         return;
       }
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync({ uri: tmpUri }, { shouldPlay: true });
-      stepSoundRef.current = sound;
+      const uris = [coachUri];
+      if (slowWord) {
+        const slowUri = await getOrFetchTtsFileUri(`snippet-slow:${slowWord}`, async () => {
+          const result = await fetchErrorSpeak(slowWord, { speakingRate: 0.42 });
+          return result.audio_base64 ?? '';
+        });
+        if (slowUri) uris.push(slowUri);
+      }
       setStepAudioLoading(false);
       setStepAudioPlaying(true);
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
+      let index = 0;
+      const playNext = async () => {
+        if (segmentSeqRef.current !== seqToken) return;
+        if (index >= uris.length) {
           stepSoundRef.current = null;
           setStepAudioPlaying(false);
+          return;
         }
-      });
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: uris[index] },
+          { shouldPlay: true },
+        );
+        if (segmentSeqRef.current !== seqToken) {
+          await sound.unloadAsync().catch(() => {});
+          return;
+        }
+        stepSoundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            sound.unloadAsync().catch(() => {});
+            if (stepSoundRef.current === sound) stepSoundRef.current = null;
+            index += 1;
+            void playNext();
+          }
+        });
+      };
+      await playNext();
     } catch {
       setStepAudioLoading(false);
       setStepAudioPlaying(false);
