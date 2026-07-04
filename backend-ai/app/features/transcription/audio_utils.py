@@ -6,9 +6,18 @@ from typing import Tuple
 import tempfile
 import asyncio
 from azure.storage.blob import BlobServiceClient
-from azure.core.exceptions import ResourceNotFoundError, ClientAuthenticationError
+from azure.core.exceptions import (
+    ResourceNotFoundError,
+    ClientAuthenticationError,
+    HttpResponseError,
+    ServiceRequestError,
+)
 from app.core.config import settings
 from app.core.logger import logger
+
+# LiveKit egress_ended often fires before Azure finishes committing the blob (409 lease / not ready).
+_AZURE_DOWNLOAD_RETRIES = 8
+_AZURE_DOWNLOAD_BASE_DELAY_SEC = 1.5
 
 
 def _is_azure_blob_url(url: str) -> bool:
@@ -56,12 +65,70 @@ def _get_azure_blob_client(url: str):
     return bsc.get_blob_client(container=container, blob=blob_path)
 
 
+def _azure_download_error_retryable(exc: BaseException) -> bool:
+    """409 lease/conflict, 404 not-yet-visible, transient network — retry."""
+    if isinstance(exc, ResourceNotFoundError):
+        return True
+    if isinstance(exc, ServiceRequestError):
+        return True
+    if isinstance(exc, HttpResponseError):
+        status = getattr(exc, "status_code", None)
+        if status in (404, 408, 409, 412, 429, 500, 502, 503, 504):
+            return True
+        message = (getattr(exc, "message", None) or str(exc)).lower()
+        if any(
+            token in message
+            for token in ("lease", "conflict", "pending", "not found", "being")
+        ):
+            return True
+    message = str(exc).lower()
+    return any(token in message for token in ("409", "lease", "conflict", "404"))
+
+
 def _azure_download_to_path_sync(url: str, target_path: str) -> None:
     blob = _get_azure_blob_client(url)
-    downloader = blob.download_blob()
-    with open(target_path, "wb") as f:
-        for chunk in downloader.chunks():
-            f.write(chunk)
+    last_error: BaseException | None = None
+    for attempt in range(1, _AZURE_DOWNLOAD_RETRIES + 1):
+        try:
+            # Wait until blob exists and is readable (egress may still be finalizing).
+            if not blob.exists():
+                raise ResourceNotFoundError(message="Blob not found yet")
+            props = blob.get_blob_properties()
+            size = int(getattr(props, "size", 0) or 0)
+            if size <= 0:
+                raise HttpResponseError(message="Blob size is 0 (still writing)")
+            downloader = blob.download_blob()
+            with open(target_path, "wb") as f:
+                for chunk in downloader.chunks():
+                    f.write(chunk)
+            if attempt > 1:
+                logger.info(
+                    "azure_blob_download_ok_after_retry",
+                    attempt=attempt,
+                    url=url[:200],
+                    size=size,
+                )
+            return
+        except (ResourceNotFoundError, ClientAuthenticationError, HttpResponseError, ServiceRequestError, OSError) as e:
+            last_error = e
+            if isinstance(e, ClientAuthenticationError) or not _azure_download_error_retryable(e):
+                raise
+            if attempt >= _AZURE_DOWNLOAD_RETRIES:
+                break
+            delay = _AZURE_DOWNLOAD_BASE_DELAY_SEC * (2 ** (attempt - 1))
+            delay = min(delay, 20.0)
+            logger.warning(
+                "azure_blob_download_retry",
+                attempt=attempt,
+                delay_sec=delay,
+                error=str(e)[:200],
+                url=url[:200],
+            )
+            import time as _time
+
+            _time.sleep(delay)
+    assert last_error is not None
+    raise last_error
 
 
 async def _azure_download_to_path(url: str, target_path: str) -> None:

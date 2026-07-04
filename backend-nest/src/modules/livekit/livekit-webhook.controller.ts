@@ -202,6 +202,10 @@ export class LiveKitWebhookController {
         data: { participantRecordingUrl: effectiveFileLocation } as any,
       });
 
+      // Egress webhook often arrives before Azure finishes committing the blob (HTTP 409).
+      // Brief settle delay + retries inside download helpers.
+      await new Promise((r) => setTimeout(r, 2500));
+
       try {
         const transcript = await this.transcription.transcribeFromUrl(
           effectiveFileLocation,
@@ -259,11 +263,20 @@ export class LiveKitWebhookController {
             `Empty transcript for participant=${participant.userId} — PA saved, PQS skipped`,
           );
         }
+      } catch (e) {
+        this.logger.error(
+          `Pronunciation assessment failed participant=${participant.userId}`,
+          e,
+        );
+        // Recording URL is still saved — SessionsProcessor CQS finalize will retry PA
+        // from participantRecordingUrl using in-call transcript as fallback.
+      }
 
-        // Redis tracking: egress PA pipeline complete for this participant
+      // Always mark participant done so joint analysis is not blocked for 120s on PA failure.
+      try {
         const completedKey = `session:${participant.sessionId}:participants_done`;
         const count = await this.redis.incr(completedKey);
-        await this.redis.expire(completedKey, 3600); // 1 hour TTL
+        await this.redis.expire(completedKey, 3600);
 
         this.logger.log(
           `[RACE FIX] Participant ${participant.userId} done. Count=${count}/2`,
@@ -285,10 +298,9 @@ export class LiveKitWebhookController {
             await this.triggerJointAnalysis(participant.sessionId);
           }
         }
-      } catch (e) {
-        this.logger.error(
-          `Pronunciation assessment failed participant=${participant.userId}`,
-          e,
+      } catch (redisErr: any) {
+        this.logger.warn(
+          `Failed to mark participant done in Redis: ${redisErr?.message ?? redisErr}`,
         );
       }
 

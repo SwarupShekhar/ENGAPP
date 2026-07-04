@@ -14,7 +14,10 @@ from app.models.base import Word
 from app.models.request import TranscriptionRequest
 from app.models.response import TranscriptionResponse
 from app.cache.manager import cached
-from app.features.transcription.audio_utils import validate_audio_url
+from app.features.transcription.audio_utils import (
+    validate_audio_url,
+    download_audio_streamed,
+)
 from app.features.transcription.deepgram_service import deepgram_transcription_service
 
 class TranscriptionService:
@@ -270,17 +273,28 @@ class TranscriptionService:
             audio_bytes = base64.b64decode(request.audio_base64)
             audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
         else:
-            import httpx
+            # Private Azure blobs reject anonymous GET (409 Public access is not permitted).
+            # Always use authenticated download for blob URLs.
+            import os
+            import tempfile
 
             audio_url = str(request.audio_url)
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(audio_url)
-                resp.raise_for_status()
-                audio_data = resp.content
-            logger.info(f"Downloaded audio from URL: {len(audio_data)} bytes")
-            audio_segment = await asyncio.to_thread(
-                AudioSegment.from_file, io.BytesIO(audio_data)
-            )
+            ext = os.path.splitext(audio_url.split("?")[0])[-1] or ".mp4"
+            fd, tmp_path = tempfile.mkstemp(suffix=ext)
+            os.close(fd)
+            try:
+                await download_audio_streamed(audio_url, tmp_path)
+                size = os.path.getsize(tmp_path)
+                logger.info("Downloaded audio from URL: %s bytes", size)
+                audio_segment = await asyncio.to_thread(
+                    AudioSegment.from_file, tmp_path
+                )
+            finally:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except OSError:
+                    pass
 
         audio_segment = audio_segment.set_frame_rate(16000).set_channels(1).set_sample_width(2)
         pcm_audio = audio_segment.raw_data

@@ -60,10 +60,11 @@ class AnalysisMetrics(BaseModel):
     wpm: float
     unique_words: int
     grammar_score: float
-    pronunciation_score: float = 50.0
-    fluency_score: float = 50.0
+    # Defaults are 0 (unknown), never neutral 50 — that was shown as a fake real score.
+    pronunciation_score: float = 0.0
+    fluency_score: float = 0.0
     vocabulary_score: float
-    overall_score: float = 50.0
+    overall_score: float = 0.0
     # New Breakdowns
     grammar_breakdown: Optional[Dict[str, float]] = None
     vocab_breakdown: Optional[Dict[str, float]] = None

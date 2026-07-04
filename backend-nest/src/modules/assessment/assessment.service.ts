@@ -1345,8 +1345,17 @@ export class AssessmentService {
     for (const participant of session.participants) {
       if (participantsWithAnalysis.has(participant.id)) continue;
       this.logger.warn(
-        `Joint analysis missing participant ${participant.userId}; creating placeholder (Session: ${sessionId})`,
+        `Joint analysis missing participant ${participant.userId}; creating provisional row (Session: ${sessionId}). CQS will overwrite scores.`,
       );
+      // Do NOT write neutral 50s — those look like real scores on Call Feedback.
+      // SessionsProcessor.finalizeAuthoritativeScores overwrites with CQS.
+      const speakerWords =
+        segments
+          .filter((s) => s.speaker_id === participant.userId)
+          .map((s) => s.text || '')
+          .join(' ')
+          .match(/\b[a-zA-Z]+\b/g)?.length ?? 0;
+      const provisional = speakerWords === 0 ? 0 : Math.min(15, speakerWords);
       await this.prisma.analysis.upsert({
         where: {
           sessionId_participantId: {
@@ -1365,25 +1374,29 @@ export class AssessmentService {
             aiFeedback: 'Analysis based on shared conversation.',
             strengths: [],
             improvementAreas: [],
+            scoresProvisional: true,
           } as any,
-          cefrLevel: 'B1',
+          cefrLevel: speakerWords < 10 ? 'A1' : 'A2',
           scores: {
-            grammar_score: 50,
-            pronunciation_score: 50,
-            fluency_score: 50,
-            vocabulary_score: 50,
-            overall_score: 50,
+            grammar_score: provisional,
+            pronunciation_score: 0,
+            fluency_score: provisional,
+            vocabulary_score: provisional,
+            overall_score: provisional,
+            overall: provisional,
+            source: 'provisional',
           } as any,
         },
         update: {},
       });
     }
 
-    // 6. Store Interaction Metrics & Peer Comparison + transcript, then mark session completed
+    // 6. Store interaction metrics + transcript. Leave status PROCESSING —
+    // SessionsProcessor finalizes authoritative CQS scores, then marks COMPLETED.
     await this.prisma.conversationSession.update({
       where: { id: sessionId },
       data: {
-        status: 'COMPLETED',
+        status: 'PROCESSING',
         interactionMetrics: jointResult.interaction_metrics,
         peerComparison: jointResult.peer_comparison,
         summaryJson: {
@@ -1392,6 +1405,6 @@ export class AssessmentService {
       },
     });
 
-    return { status: 'COMPLETED', sessionId };
+    return { status: 'PROCESSING', sessionId };
   }
 }

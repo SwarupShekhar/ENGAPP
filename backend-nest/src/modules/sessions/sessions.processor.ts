@@ -17,6 +17,7 @@ import { SessionHandlerService } from '../home/services/session-handler.service'
 import { BrainService } from '../brain/brain.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { PronunciationScorerService } from '../pronunciation/pronunciation-scorer.service';
+import { ScoringService } from '../scoring/scoring.service';
 import {
   SESSIONS_P2P_QUEUE,
   sessionsP2pConcurrency,
@@ -36,6 +37,7 @@ export class SessionsProcessor {
     private brainService: BrainService,
     private pronunciationService: PronunciationService,
     private pronunciationScorerService: PronunciationScorerService,
+    private scoringService: ScoringService,
     @InjectQueue(SESSIONS_P2P_QUEUE) private sessionsQueue: Queue,
   ) {}
 
@@ -278,6 +280,19 @@ export class SessionsProcessor {
         segments,
       );
 
+      // Authoritative session scores (CQS + PA). Overwrites LLM placeholder 50s.
+      // Must run even when LiveKit egress webhook never fired.
+      // Re-fetch participants so participantRecordingUrl from egress webhook is present.
+      const sessionForScores = await this.prisma.conversationSession.findUnique({
+        where: { id: sessionId },
+        include: { participants: true },
+      });
+      await this.finalizeAuthoritativeScores(
+        sessionId,
+        sessionForScores ?? session,
+        segments,
+      );
+
       const sessionDataForBridge = await this.prisma.conversationSession.findUnique(
         {
           where: { id: sessionId },
@@ -383,10 +398,15 @@ export class SessionsProcessor {
         await Promise.all(
           sessionData.participants.map((sp) => {
             const scores = (sp.analysis?.scores as Record<string, number> | null) ?? {};
-            const overall = scores.overall_score ?? scores.fluency ?? null;
+            const overall =
+              scores.overall_score ??
+              scores.overall ??
+              scores.fluency_score ??
+              scores.fluency ??
+              null;
             return this.notificationService.notify(sp.userId, 'session_ready', {
               sessionId,
-              score: overall != null ? Math.round(overall) : null,
+              score: overall != null ? Math.round(Number(overall)) : null,
             });
           }),
         );
@@ -413,6 +433,123 @@ export class SessionsProcessor {
         .catch(() => {});
 
       throw error; // Let Bull handle the retry
+    }
+  }
+
+  /**
+   * Compute real per-participant scores from transcript (+ Azure PA when available).
+   * Overwrites joint-analysis placeholder 50s so Call Feedback never shows fake neutrals.
+   */
+  private async finalizeAuthoritativeScores(
+    sessionId: string,
+    session: {
+      duration: number | null;
+      participants: Array<{
+        id: string;
+        userId: string;
+        speakingTime: number | null;
+        participantRecordingUrl?: string | null;
+      }>;
+    },
+    segments: Array<{ speaker_id: string; text: string }>,
+  ): Promise<void> {
+    const callDurationSeconds = Math.max(30, session.duration || 600);
+
+    for (const participant of session.participants) {
+      const userSegments = segments.filter(
+        (s) => s.speaker_id === participant.userId,
+      );
+      const transcript = userSegments
+        .map((s) => (s.text || '').trim())
+        .filter(Boolean)
+        .join(' ');
+
+      if (!transcript) {
+        this.logger.warn(
+          `[SessionsProcessor] No transcript for user=${participant.userId} session=${sessionId} — writing zero scores`,
+        );
+        await this.scoringService.processCallQualityScore(
+          sessionId,
+          participant.userId,
+          participant.id,
+          '',
+          [],
+          callDurationSeconds,
+          0,
+          'call',
+        );
+        continue;
+      }
+
+      let azureResults: any[] = [];
+      const recordingUrl = participant.participantRecordingUrl;
+      if (
+        recordingUrl &&
+        !recordingUrl.startsWith('pending_') &&
+        recordingUrl.startsWith('http')
+      ) {
+        try {
+          const { pronunciation_score } =
+            await this.pronunciationService.assessFromRecordingUrl(
+              participant.userId,
+              recordingUrl,
+              undefined,
+            );
+          const azure =
+            (pronunciation_score as any)?.azure_result ??
+            pronunciation_score;
+          if (azure && typeof azure === 'object') {
+            azureResults = [azure];
+            this.logger.log(
+              `[SessionsProcessor] PA loaded for user=${participant.userId} session=${sessionId}`,
+            );
+          }
+        } catch (e: any) {
+          this.logger.warn(
+            `[SessionsProcessor] PA failed user=${participant.userId}: ${e?.message ?? e}`,
+          );
+        }
+      }
+
+      const userSpokeSeconds =
+        participant.speakingTime && participant.speakingTime > 0
+          ? participant.speakingTime
+          : Math.max(
+              5,
+              Math.round(
+                (transcript.split(/\s+/).filter(Boolean).length || 0) * 0.5,
+              ),
+            );
+
+      try {
+        await this.scoringService.processCallQualityScore(
+          sessionId,
+          participant.userId,
+          participant.id,
+          transcript,
+          azureResults,
+          callDurationSeconds,
+          userSpokeSeconds,
+          'call',
+        );
+      } catch (e: any) {
+        this.logger.error(
+          `[SessionsProcessor] CQS finalize failed user=${participant.userId}: ${e?.message ?? e}`,
+        );
+      }
+    }
+
+    // Verify no participant still has placeholder scores
+    const analyses = await this.prisma.analysis.findMany({
+      where: { sessionId },
+      select: { participantId: true, scores: true },
+    });
+    for (const a of analyses) {
+      if (ScoringService.isPlaceholderScores(a.scores as any)) {
+        this.logger.error(
+          `[SessionsProcessor] PLACEHOLDER SCORES STILL PRESENT participant=${a.participantId} session=${sessionId}`,
+        );
+      }
     }
   }
 

@@ -14,6 +14,7 @@ import { PronunciationModule } from '../pronunciation/pronunciation.module';
 import { LivekitModule } from '../livekit/livekit.module';
 import { InCallCoachingModule } from '../in-call-coaching/in-call-coaching.module';
 import { SessionsQueuesModule } from '../../queues/sessions-queues.module';
+import { ScoringModule } from '../scoring/scoring.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SessionsQueuesModule } from '../../queues/sessions-queues.module';
     HomeModule,
     BrainModule,
     PronunciationModule,
+    ScoringModule,
     forwardRef(() => LivekitModule),
     InCallCoachingModule,
   ],

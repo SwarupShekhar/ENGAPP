@@ -173,7 +173,12 @@ class CallQualityService:
         """
         if not nlp:
             logger.warning("Complexity score fallback due to missing Spacy model.")
-            return 50.0  # Fallback
+            # Length/diversity proxy — never neutral 50.
+            words = re.findall(r'\b[a-zA-Z]+\b', (full_transcript or "").lower())
+            if not words:
+                return 0.0
+            unique = len(set(words))
+            return round(float(min(70.0, 10.0 + unique * 1.5 + len(words) * 0.2)), 2)
 
         doc = nlp(full_transcript)
         sentences = list(doc.sents)
@@ -320,6 +325,8 @@ class CallQualityService:
     def compute_fluency_signal(self, pqs_result: Dict[str, Any], user_turns: List[str]) -> float:
         """
         Fluency signal = mean Azure FluencyScore - filler word penalty.
+        When Azure fluency is missing, estimate from transcript length / fillers
+        (never invent a neutral 50).
         pqs_result: dict returned by compute_pronunciation_quality_score()
         Returns 0-100.
         """
@@ -327,14 +334,31 @@ class CallQualityService:
 
         filler_words = ["um", "uh", "like", "you know", "basically", "literally"]
         full_text = " ".join(user_turns).lower()
-        word_count = len(re.findall(r'\b[a-zA-Z]+\b', full_text))
+        words = re.findall(r'\b[a-zA-Z]+\b', full_text)
+        word_count = len(words)
 
         filler_count = sum(full_text.count(fw) for fw in filler_words)
         # Penalty: 1.5 points per filler, capped at 20
         filler_penalty = min(20.0, float(filler_count) * 1.5)
 
-        fluency_signal = max(0.0, mean_azure_fluency - filler_penalty)
-        return round(float(fluency_signal), 2)
+        if mean_azure_fluency > 0:
+            fluency_signal = max(0.0, mean_azure_fluency - filler_penalty)
+            return round(float(fluency_signal), 2)
+
+        # Text-only fallback (no Azure PA)
+        if word_count == 0:
+            return 0.0
+        turns_with_words = max(1, sum(1 for t in user_turns if re.search(r'\b[a-zA-Z]+\b', t)))
+        avg_words = float(word_count) / float(turns_with_words)
+        score = min(85.0, 25.0 + avg_words * 2.5)
+        score -= filler_penalty
+        if word_count < 10:
+            score = min(score, 20.0)
+        elif word_count < 25:
+            score = min(score, 40.0)
+        elif word_count < 50:
+            score = min(score, 60.0)
+        return round(float(max(0.0, score)), 2)
 
     def compute_call_quality_score(self, pqs: float, ds: float, cs: float, es: float) -> float:
         """Final CQS combination."""

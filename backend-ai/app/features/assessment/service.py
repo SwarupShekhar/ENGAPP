@@ -1431,12 +1431,22 @@ Analyze the following multi-speaker transcript of an English practice session.
             _pa_flagged = list(_seg.pa_flagged_errors or []) if _seg and _seg.pa_flagged_errors else []
             _unified = _build_unified_errors({}, _pa_flagged) if _pa_flagged else None
 
+            # Never invent neutral 50s — Nest CQS overwrites; missing keys stay 0.
+            def _score(key: str) -> float:
+                val = ai_scores.get(key)
+                if val is None:
+                    return 0.0
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    return 0.0
+
             participant_analyses.append(ParticipantAnalysis(
                 participant_id=pa["participant_id"],
                 analysis=AnalysisResponse(
                     cefr_assessment=CEFRAssessment(
                         level=cefr_level,
-                        score=ai_scores.get("overall_score", 50),
+                        score=_score("overall_score"),
                         confidence=0.9,
                         strengths=ad.get("strengths", []),
                         weaknesses=ad.get("improvement_areas", []),
@@ -1446,11 +1456,11 @@ Analyze the following multi-speaker transcript of an English practice session.
                     metrics=AnalysisMetrics(
                         wpm=0, # Placeholder
                         unique_words=0, # Placeholder
-                        grammar_score=ai_scores.get("grammar_score", 50),
-                        pronunciation_score=ai_scores.get("pronunciation_score", 50),
-                        fluency_score=ai_scores.get("fluency_score", 50),
-                        vocabulary_score=ai_scores.get("vocabulary_score", 50),
-                        overall_score=ai_scores.get("overall_score", 50),
+                        grammar_score=_score("grammar_score"),
+                        pronunciation_score=_score("pronunciation_score"),
+                        fluency_score=_score("fluency_score"),
+                        vocabulary_score=_score("vocabulary_score"),
+                        overall_score=_score("overall_score"),
                     ),
                     feedback=ad.get("feedback", ""),
                     strengths=ad.get("strengths", []),
@@ -1479,8 +1489,8 @@ Analyze the following multi-speaker transcript of an English practice session.
                 participant_id=speaker_id,
                 analysis=AnalysisResponse(
                     cefr_assessment=CEFRAssessment(
-                        level=CEFRLevel("B1"),
-                        score=50,
+                        level=CEFRLevel("A1"),
+                        score=0,
                         confidence=0.5,
                         strengths=[],
                         weaknesses=[],
@@ -1490,11 +1500,11 @@ Analyze the following multi-speaker transcript of an English practice session.
                     metrics=AnalysisMetrics(
                         wpm=0,
                         unique_words=0,
-                        grammar_score=50,
-                        pronunciation_score=50,
-                        fluency_score=50,
-                        vocabulary_score=50,
-                        overall_score=50,
+                        grammar_score=0,
+                        pronunciation_score=0,
+                        fluency_score=0,
+                        vocabulary_score=0,
+                        overall_score=0,
                     ),
                     feedback="Analysis based on shared conversation.",
                     strengths=[],
