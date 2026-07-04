@@ -12,12 +12,13 @@ from app.models.response import TranscriptionResponse
 
 
 class DeepgramTranscriptionService:
-    """Deepgram Nova-3 transcription client — used as secondary/display STT when enabled."""
+    """Deepgram transcription client (primary STT when enabled)."""
 
     def __init__(self) -> None:
         self.api_key = settings.deepgram_api_key
         self.model = settings.deepgram_model or "nova-3"
-        self.language = settings.deepgram_language or "en-IN"
+        # nova-3 does not accept all regional codes (en-IN → 400). Prefer en.
+        self.language = settings.deepgram_language or "en"
         if not self.api_key:
             logger.warning("Deepgram API key not configured; Deepgram STT disabled.")
 
@@ -25,14 +26,35 @@ class DeepgramTranscriptionService:
     def configured(self) -> bool:
         return bool(self.api_key)
 
-    def _request_params(self, language: str | None = None) -> dict[str, str]:
-        return {
-            "model": self.model,
-            "language": language or self.language,
-            "smart_format": "false",  # Keep grammar errors literal — don't normalize
-            "punctuate": "true",
-            "alternatives": "3",      # Word-level phonetic alternatives for pronunciation mining
-        }
+    def _param_attempts(self, language: str | None = None) -> list[dict[str, str]]:
+        """
+        Build param sets to try. Deepgram returns 400 for invalid model/language
+        combinations (e.g. nova-3 + en-IN) or unsupported query flags.
+        """
+        primary_lang = (language or self.language or "en").strip()
+        langs: list[str] = []
+        for lang in (primary_lang, "en", "en-US"):
+            if lang and lang not in langs:
+                langs.append(lang)
+
+        models: list[str] = []
+        for model in (self.model, "nova-2"):
+            if model and model not in models:
+                models.append(model)
+
+        attempts: list[dict[str, str]] = []
+        for model in models:
+            for lang in langs:
+                attempts.append(
+                    {
+                        "model": model,
+                        "language": lang,
+                        # Keep grammar errors literal — don't over-normalize learner speech.
+                        "smart_format": "false",
+                        "punctuate": "true",
+                    }
+                )
+        return attempts
 
     def _parse_response(self, payload: dict[str, Any], processing_time: float) -> TranscriptionResponse:
         alternatives = (
@@ -70,6 +92,30 @@ class DeepgramTranscriptionService:
             processing_time=processing_time,
         )
 
+    def _post_listen(
+        self,
+        client: httpx.Client | httpx.AsyncClient,
+        audio_bytes: bytes,
+        headers: dict[str, str],
+        params: dict[str, str],
+    ):
+        return client.post(
+            "https://api.deepgram.com/v1/listen",
+            params=params,
+            headers=headers,
+            content=audio_bytes,
+        )
+
+    def _raise_with_body(self, response: httpx.Response, params: dict[str, str]) -> None:
+        body = (response.text or "")[:400]
+        logger.warning(
+            "Deepgram listen failed status=%s params=%s body=%s",
+            response.status_code,
+            params,
+            body,
+        )
+        response.raise_for_status()
+
     async def transcribe_bytes(
         self,
         audio_bytes: bytes,
@@ -85,15 +131,37 @@ class DeepgramTranscriptionService:
             "Authorization": f"Token {self.api_key}",
             "Content-Type": mime_type,
         }
+        attempts = self._param_attempts(language)
+        last_error: Exception | None = None
+
         async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.post(
-                "https://api.deepgram.com/v1/listen",
-                params=self._request_params(language),
-                headers=headers,
-                content=audio_bytes,
-            )
-            response.raise_for_status()
-        return self._parse_response(response.json(), time.time() - start_time)
+            for params in attempts:
+                response = await self._post_listen(client, audio_bytes, headers, params)
+                if response.status_code == 400:
+                    body = (response.text or "")[:400]
+                    logger.warning(
+                        "Deepgram 400 for params=%s body=%s — trying next",
+                        params,
+                        body,
+                    )
+                    last_error = httpx.HTTPStatusError(
+                        f"Deepgram 400: {body}",
+                        request=response.request,
+                        response=response,
+                    )
+                    continue
+                if response.status_code >= 400:
+                    self._raise_with_body(response, params)
+                logger.info(
+                    "Deepgram STT ok model=%s language=%s",
+                    params.get("model"),
+                    params.get("language"),
+                )
+                return self._parse_response(response.json(), time.time() - start_time)
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("Deepgram transcription failed with no attempts")
 
     def transcribe_bytes_sync(
         self,
@@ -110,15 +178,37 @@ class DeepgramTranscriptionService:
             "Authorization": f"Token {self.api_key}",
             "Content-Type": mime_type,
         }
+        attempts = self._param_attempts(language)
+        last_error: Exception | None = None
+
         with httpx.Client(timeout=45.0) as client:
-            response = client.post(
-                "https://api.deepgram.com/v1/listen",
-                params=self._request_params(language),
-                headers=headers,
-                content=audio_bytes,
-            )
-            response.raise_for_status()
-        return self._parse_response(response.json(), time.time() - start_time)
+            for params in attempts:
+                response = self._post_listen(client, audio_bytes, headers, params)
+                if response.status_code == 400:
+                    body = (response.text or "")[:400]
+                    logger.warning(
+                        "Deepgram 400 for params=%s body=%s — trying next",
+                        params,
+                        body,
+                    )
+                    last_error = httpx.HTTPStatusError(
+                        f"Deepgram 400: {body}",
+                        request=response.request,
+                        response=response,
+                    )
+                    continue
+                if response.status_code >= 400:
+                    self._raise_with_body(response, params)
+                logger.info(
+                    "Deepgram STT ok model=%s language=%s",
+                    params.get("model"),
+                    params.get("language"),
+                )
+                return self._parse_response(response.json(), time.time() - start_time)
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("Deepgram transcription failed with no attempts")
 
 
 deepgram_transcription_service = DeepgramTranscriptionService()

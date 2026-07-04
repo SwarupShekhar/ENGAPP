@@ -67,7 +67,8 @@ class Settings(BaseSettings):
     # Deepgram
     deepgram_api_key: Optional[str] = None
     deepgram_model: str = "nova-3"
-    deepgram_language: str = "en-IN"
+    # nova-3 rejects some regional codes (en-IN → HTTP 400). Use en; falls back in client.
+    deepgram_language: str = "en"
     # Optional second transcript for display only; Azure stays authoritative for STT/PA.
     deepgram_secondary_transcript: bool = False
     # When true and DEEPGRAM_API_KEY is set, use Deepgram Nova-3 as primary STT

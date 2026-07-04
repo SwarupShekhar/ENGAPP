@@ -1022,7 +1022,6 @@ export default function AITutorScreen({ navigation, route }: any) {
         let sseSkipped = false;
         let turnRateLimited = false;
         if (token && activeSessionId) {
-            try {
               sseAbortRef.current?.abort();
               const abortController = new AbortController();
               sseAbortRef.current = abortController;
