@@ -98,5 +98,9 @@ jobs:
               exit 1
             fi
 
-            docker compose -f docker-compose.prod.yml up -d caddy prometheus tester-portal
+            docker compose -f docker-compose.prod.yml up -d caddy prometheus
+
+            # Tester portal: static files on /opt/engr-apk (port 4003 already in use on host).
+            bash scripts/deploy-internal-test-portal.sh || true
+
             docker compose -f docker-compose.prod.yml ps

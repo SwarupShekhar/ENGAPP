@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploy internal tester page on appapk.englivo.com (host port 4003).
-# APK lives at /opt/engr-apk/app-release.apk on the VPS (existing upload path).
+# Deploy internal tester page for appapk.englivo.com (existing host service on :4003).
+# Copies index.html into /opt/engr-apk next to app-release.apk — does NOT bind port 4003.
 #
 # Usage (on VPS as root):
 #   cd /opt/engr-app
@@ -13,11 +13,19 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/engr-app}"
 APK_DIR="/opt/engr-apk"
 APK_DEST="$APK_DIR/app-release.apk"
-COMPOSE_FILE="$APP_DIR/docker-compose.prod.yml"
+PORTAL_HTML="$APP_DIR/config/internal-test-portal/index.html"
 
 cd "$APP_DIR"
 
+if [[ ! -f "$PORTAL_HTML" ]]; then
+  echo "Missing portal page: $PORTAL_HTML"
+  exit 1
+fi
+
 mkdir -p "$APK_DIR"
+cp "$PORTAL_HTML" "$APK_DIR/index.html"
+chmod 644 "$APK_DIR/index.html"
+echo "Deployed portal → $APK_DIR/index.html"
 
 if [[ -n "${1:-}" ]]; then
   if [[ ! -f "$1" ]]; then
@@ -27,19 +35,15 @@ if [[ -n "${1:-}" ]]; then
   cp "$1" "$APK_DEST"
   chmod 644 "$APK_DEST"
   echo "Copied APK → $APK_DEST ($(du -h "$APK_DEST" | cut -f1))"
-elif [[ ! -f "$APK_DEST" ]]; then
-  echo "No APK at $APK_DEST"
-  echo "Upload APK first, e.g.: bash scripts/deploy-internal-test-portal.sh /path/to/app-release.apk"
-  exit 1
+elif [[ -f "$APK_DEST" ]]; then
+  echo "APK unchanged: $APK_DEST ($(du -h "$APK_DEST" | cut -f1))"
+else
+  echo "Warning: no APK at $APK_DEST — download button will show 'not uploaded' until you add one."
 fi
 
-echo "Starting tester portal on host port 4003…"
-docker compose -f "$COMPOSE_FILE" up -d tester-portal
-
 echo
-echo "APK: $APK_DEST"
-echo "Test on VPS:"
+echo "Test on VPS (existing :4003 static server):"
 echo "  curl -sI http://127.0.0.1:4003/ | head"
 echo "  curl -sI http://127.0.0.1:4003/app-release.apk | head"
 echo
-echo "Public: https://appapk.englivo.com/ (DNS → VPS :4003)"
+echo "Public: https://appapk.englivo.com/"

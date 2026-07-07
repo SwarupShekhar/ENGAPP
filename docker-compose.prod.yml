@@ -135,22 +135,6 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # Internal testers: appapk.englivo.com → host :4003 (APK in /opt/engr-apk on VPS).
-  tester-portal:
-    image: caddy:2.8
-    restart: unless-stopped
-    ports:
-      - "0.0.0.0:4003:80"
-    volumes:
-      - ./config/internal-test-portal/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./config/internal-test-portal:/srv/site:ro
-      - /opt/engr-apk:/srv/apk:ro
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-
 networks:
   internal:
     driver: bridge
