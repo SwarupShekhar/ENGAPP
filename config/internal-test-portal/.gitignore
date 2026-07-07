@@ -1,0 +1,2 @@
+# Upload APK on the VPS only — never commit release binaries.
+*.apk

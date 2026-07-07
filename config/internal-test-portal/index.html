@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Englivo — Internal test</title>
+    <meta
+      name="description"
+      content="Download the Englivo internal Android build and report bugs or suggestions."
+    />
+    <style>
+      :root {
+        --bg: #0d1b3d;
+        --surface: #1a1035;
+        --card: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --accent: #818cf8;
+        --accent-2: #a855f7;
+        --ok: #22c55e;
+        --warn: #fbbf24;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: var(--text);
+        background: linear-gradient(160deg, var(--bg), var(--surface) 55%, #0f172a);
+        line-height: 1.5;
+      }
+      .wrap {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 3rem;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--warn);
+        background: rgba(251, 191, 36, 0.12);
+        border: 1px solid rgba(251, 191, 36, 0.35);
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        margin-bottom: 0.75rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 0.5rem;
+        letter-spacing: -0.02em;
+      }
+      .lead {
+        color: var(--muted);
+        margin: 0 0 1.5rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1.25rem;
+      }
+      .card h2 {
+        font-size: 1.05rem;
+        margin: 0 0 0.75rem;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.9rem 1.25rem;
+        border: none;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .note {
+        font-size: 0.875rem;
+        color: var(--muted);
+        margin-top: 0.75rem;
+      }
+      .build {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.5rem;
+      }
+      label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin: 0.75rem 0 0.35rem;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 0.65rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(15, 23, 42, 0.65);
+        color: var(--text);
+        font: inherit;
+      }
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+      .row {
+        display: grid;
+        gap: 0.75rem;
+      }
+      @media (min-width: 520px) {
+        .row.two {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .success {
+        display: none;
+        padding: 0.85rem 1rem;
+        border-radius: 10px;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        color: #bbf7d0;
+        margin-bottom: 1rem;
+      }
+      .success.show {
+        display: block;
+      }
+      ul.known {
+        margin: 0.5rem 0 0;
+        padding-left: 1.2rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      footer {
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <span class="badge">Internal testers only</span>
+      <h1>Englivo Android build</h1>
+      <p class="lead">
+        Download the latest test APK, try Maya and practice flows, then report
+        anything broken or confusing below.
+      </p>
+
+      <section class="card" aria-labelledby="download-heading">
+        <h2 id="download-heading">1. Download app</h2>
+        <a class="btn" id="download-btn" href="/app-release.apk" download="englivo-internal.apk">
+          Download APK
+        </a>
+        <p class="note">
+          On Android: allow install from unknown sources if prompted. Uninstall
+          any older Englivo test build first if install fails.
+        </p>
+        <p class="build" id="build-label">Build: internal-2026-07-07</p>
+      </section>
+
+      <section class="card" aria-labelledby="try-heading">
+        <h2 id="try-heading">2. What to try</h2>
+        <ul class="known">
+          <li>Sign in → Home → daily phrase/word listen</li>
+          <li>Maya tutor — speak naturally for 3–5 minutes</li>
+          <li>Optional: one P2P call with another tester</li>
+        </ul>
+        <p class="note" style="margin-top: 0.75rem">
+          Known rough edges: Maya can be slow on first turn; call scores may take
+          1–2 minutes after a call ends.
+        </p>
+      </section>
+
+      <section class="card" aria-labelledby="report-heading">
+        <h2 id="report-heading">3. Report issue or suggestion</h2>
+        <div class="success" id="form-success" role="status">
+          Thanks — your report was sent. We’ll follow up if we need more detail.
+        </div>
+
+        <!-- Formsubmit.co → swarup.shekhar@vaidikedu.com (confirm link on first submission) -->
+        <form
+          id="feedback-form"
+          action="https://formsubmit.co/swarup.shekhar@vaidikedu.com"
+          method="POST"
+        >
+          <input type="hidden" name="_subject" value="Englivo internal test feedback" />
+          <input type="hidden" name="_template" value="table" />
+          <input type="hidden" name="_captcha" value="false" />
+          <input type="text" name="_honey" style="display: none" tabindex="-1" autocomplete="off" />
+          <input type="hidden" name="build" id="build-field" value="internal-2026-07-07" />
+
+          <div class="row two">
+            <div>
+              <label for="name">Your name</label>
+              <input id="name" name="name" required autocomplete="name" />
+            </div>
+            <div>
+              <label for="device">Phone model &amp; Android version</label>
+              <input
+                id="device"
+                name="device"
+                required
+                placeholder="e.g. Pixel 7, Android 14"
+              />
+            </div>
+          </div>
+
+          <div class="row two">
+            <div>
+              <label for="area">Area</label>
+              <select id="area" name="area" required>
+                <option value="">Select…</option>
+                <option>Login / onboarding</option>
+                <option>Home / daily content</option>
+                <option>Maya tutor</option>
+                <option>P2P call</option>
+                <option>Call feedback / scores</option>
+                <option>Reels</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="type">Type</label>
+              <select id="type" name="type" required>
+                <option value="">Select…</option>
+                <option>Bug (broken)</option>
+                <option>Confusing UX</option>
+                <option>Idea / suggestion</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="expected">What were you trying to do?</label>
+          <textarea id="expected" name="expected" required></textarea>
+
+          <label for="happened">What happened instead?</label>
+          <textarea id="happened" name="happened" required></textarea>
+
+          <div class="row two">
+            <div>
+              <label for="repro">Can you reproduce it?</label>
+              <select id="repro" name="repro" required>
+                <option value="">Select…</option>
+                <option>Yes</option>
+                <option>No</option>
+                <option>Sometimes</option>
+              </select>
+            </div>
+            <div>
+              <label for="severity">Severity</label>
+              <select id="severity" name="severity" required>
+                <option value="">Select…</option>
+                <option>Blocker — cannot continue</option>
+                <option>Annoying</option>
+                <option>Minor</option>
+                <option>Just an idea</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="extra">Extra details (optional)</label>
+          <textarea id="extra" name="extra" placeholder="Steps, time of day, other notes…"></textarea>
+
+          <p class="note" style="margin-top: 1rem">
+            Screenshots: attach in a reply to the confirmation email, or send on
+            the tester WhatsApp group.
+          </p>
+
+          <button class="btn" type="submit" style="margin-top: 1rem">Send report</button>
+        </form>
+      </section>
+
+      <footer>Englivo internal testing · not for public distribution</footer>
+    </div>
+
+    <script>
+      (function () {
+        var BUILD = "internal-2026-07-07";
+        document.getElementById("build-label").textContent = "Build: " + BUILD;
+        document.getElementById("build-field").value = BUILD;
+
+        if (window.location.search.indexOf("sent=1") !== -1) {
+          document.getElementById("form-success").classList.add("show");
+          document.getElementById("feedback-form").style.display = "none";
+        }
+
+        var form = document.getElementById("feedback-form");
+        form.addEventListener("submit", function () {
+          form.action =
+            "https://formsubmit.co/swarup.shekhar@vaidikedu.com?next=" +
+            encodeURIComponent(window.location.origin + window.location.pathname + "?sent=1");
+        });
+
+        fetch("/app-release.apk", { method: "HEAD" })
+          .then(function (r) {
+            if (!r.ok) {
+              var btn = document.getElementById("download-btn");
+              btn.textContent = "APK not uploaded yet";
+              btn.removeAttribute("href");
+              btn.style.pointerEvents = "none";
+            }
+          })
+          .catch(function () {});
+      })();
+    </script>
+  </body>
+</html>

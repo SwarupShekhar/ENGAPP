@@ -8,6 +8,7 @@ on:
       - "backend-ai/**"
       - "docker-compose.prod.yml"
       - "config/caddy/**"
+      - "config/internal-test-portal/**"
       - "config/systemd/**"
       - ".github/workflows/deploy-vultr.yml"
   workflow_dispatch:
@@ -97,5 +98,5 @@ jobs:
               exit 1
             fi
 
-            docker compose -f docker-compose.prod.yml up -d caddy prometheus
+            docker compose -f docker-compose.prod.yml up -d caddy prometheus tester-portal
             docker compose -f docker-compose.prod.yml ps

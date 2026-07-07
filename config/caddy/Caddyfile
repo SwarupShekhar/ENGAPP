@@ -4,6 +4,7 @@
 }
 
 # Listens on container port 80; docker-compose.prod.yml maps host :4008 -> :80.
+# appapk.englivo.com → host :4003 (tester-portal service), not this Caddy.
 # Public: http://<vultr-ip>:4008  (or proxy api.englivo.com -> 127.0.0.1:4008)
 # For TLS on a domain, use a host reverse proxy or map 443 and set the site block to your domain.
 :80 {
