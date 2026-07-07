@@ -139,7 +139,7 @@ function ActiveTabs() {
 }
 
 // Pulse (ENGR) Maya tutor and Core (Englivo) AI tutor are separate routes.
-// `MayaTutor` → AITutorScreen (Inworld TTS, English+CEFR adaptive, Silero VAD).
+// `MayaTutor` → AITutorScreen (Inworld TTS, hands-free VAD, English+CEFR adaptive).
 // `AITutor` remains mode-aware for shared call/practice flows that don't yet know which mode they're in.
 function AITutorByMode(props: any) {
   const { mode } = useSuperApp();

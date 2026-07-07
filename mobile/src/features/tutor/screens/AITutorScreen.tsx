@@ -314,6 +314,14 @@ export default function AITutorScreen({ navigation, route }: any) {
   const lastUserTranscriptRef = useRef<string>("");
   /** Set when SSE/WS delivers transcript, sentence, audio, or blocking fallback completes. */
   const turnHadResponseRef = useRef(false);
+  /** Hands-free: mic listens automatically after Maya finishes; tap mic to pause/resume. */
+  const handsFreePausedRef = useRef(false);
+  const [handsFreePaused, setHandsFreePaused] = useState(false);
+  const autoListenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRecordingRef = useRef(false);
+  const isProcessingRef = useRef(false);
+  const isStreamingRef = useRef(false);
+  const HANDS_FREE_LISTEN_DELAY_MS = 700;
   /** Learner CEFR level (A1..C2). Set after startSession; piped into WS fallback so backend-ai
    *  can adapt vocabulary when the SSE → Nest CEFR injection is skipped. */
   const cefrLevelRef = useRef<string | null>(null);
@@ -326,6 +334,64 @@ export default function AITutorScreen({ navigation, route }: any) {
     (route?.params?.topic as string | undefined) ?? null,
   );
   const tutorOpenTrackedRef = useRef(false);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+  useEffect(() => {
+    isProcessingRef.current = isProcessing;
+  }, [isProcessing]);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  const clearAutoListenTimer = () => {
+    if (autoListenTimerRef.current) {
+      clearTimeout(autoListenTimerRef.current);
+      autoListenTimerRef.current = null;
+    }
+  };
+
+  const scheduleAutoListen = (reason?: string) => {
+    clearAutoListenTimer();
+    autoListenTimerRef.current = setTimeout(() => {
+      autoListenTimerRef.current = null;
+      if (
+        !sessionIdRef.current ||
+        handsFreePausedRef.current ||
+        isRecordingRef.current ||
+        isProcessingRef.current ||
+        isStreamingRef.current ||
+        isPlayingRef.current ||
+        audioQueueRef.current.length > 0 ||
+        captureHandleRef.current
+      ) {
+        return;
+      }
+      if (__DEV__) console.log("[AITutor] hands-free auto-listen", reason);
+      void startRecording();
+    }, HANDS_FREE_LISTEN_DELAY_MS);
+  };
+
+  const toggleHandsFreeMic = async () => {
+    if (isProcessing || isStreaming) return;
+    if (handsFreePausedRef.current) {
+      handsFreePausedRef.current = false;
+      setHandsFreePaused(false);
+      scheduleAutoListen("unmute");
+      return;
+    }
+    handsFreePausedRef.current = true;
+    setHandsFreePaused(true);
+    clearAutoListenTimer();
+    if (captureHandleRef.current) {
+      try {
+        await captureHandleRef.current.cancel();
+      } catch (_) {}
+      captureHandleRef.current = null;
+      setIsRecording(false);
+    }
+  };
 
   useEffect(() => {
     if (tutorOpenTrackedRef.current) return;
@@ -468,6 +534,8 @@ export default function AITutorScreen({ navigation, route }: any) {
 
         if (res.audioBase64) {
           queueAudio(res.audioBase64);
+        } else {
+          scheduleAutoListen("session_ready");
         }
       } catch (e) {
         console.error("Init error:", e);
@@ -477,6 +545,7 @@ export default function AITutorScreen({ navigation, route }: any) {
     init();
 
     return () => {
+      clearAutoListenTimer();
       sseAbortRef.current?.abort();
       streamingTutor.disconnect();
       if (soundRef.current) soundRef.current.unloadAsync();
@@ -564,6 +633,7 @@ export default function AITutorScreen({ navigation, route }: any) {
     });
     setIsStreaming(false);
     turnHadResponseRef.current = true;
+    scheduleAutoListen("recovery");
   };
 
   const applyBlockingTutorTurn = async (
@@ -766,6 +836,9 @@ export default function AITutorScreen({ navigation, route }: any) {
         return prev;
       });
       setTimeout(() => evaluateLastMessageForPronunciation(), 0);
+      if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+        scheduleAutoListen("stream_done");
+      }
     }
 
     // Coaching hint from backend-ai SSE/WS stream
@@ -842,6 +915,7 @@ export default function AITutorScreen({ navigation, route }: any) {
           if (audioQueueRef.current.length === 0) {
             setIsStreaming(false);
             evaluateLastMessageForPronunciation();
+            scheduleAutoListen("playback_done");
           }
         }
       });
@@ -853,19 +927,6 @@ export default function AITutorScreen({ navigation, route }: any) {
       playNext();
     }
   };
-
-  // Auto-start recording logic disabled to prevent echo loops
-  /*
-    useEffect(() => {
-        if (!isPlayingRef.current && audioQueueRef.current.length === 0 && !isProcessing && !isRecording && turnCount > 0) {
-             // AI finished speaking (or processing error occurred), start listening (VAD)
-             // Check if we are still on this screen/session valid
-             if (sessionId) {
-                setTimeout(() => startRecording(), 500);
-             }
-        }
-    }, [turnCount, isPlayingRef.current, isProcessing]); 
-    */
 
   // ─── Recording ──────────────────────────────────────────
   const startRecording = async () => {
@@ -962,6 +1023,7 @@ export default function AITutorScreen({ navigation, route }: any) {
             console.log("[AITutor] Ignoring short recording tap", recordedDurationMs, "ms");
           }
           setIsProcessing(false);
+          scheduleAutoListen("short_utterance");
           return;
         }
       }
@@ -969,6 +1031,7 @@ export default function AITutorScreen({ navigation, route }: any) {
       if (!uri) {
         console.warn("[AITutor] No audio URI after stopping capture");
         setIsProcessing(false);
+        scheduleAutoListen("no_audio_uri");
         return;
       }
 
@@ -1121,6 +1184,7 @@ export default function AITutorScreen({ navigation, route }: any) {
                   }
                   if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
                     setIsStreaming(false);
+                    scheduleAutoListen("sse_complete");
                   }
                   if (activeSessionId && uri) {
                     void tutorApi
@@ -1279,7 +1343,7 @@ export default function AITutorScreen({ navigation, route }: any) {
                   m.tempId
                     ? {
                         ...m,
-                        text: "Couldn't reach Maya. Hold the mic and try again.",
+                        text: "Couldn't reach Maya. Try speaking again.",
                         tempId: false,
                       }
                     : m,
@@ -1295,6 +1359,13 @@ export default function AITutorScreen({ navigation, route }: any) {
       setError(tutorErrorMessage(e, "Could not process speech."));
     } finally {
       setIsProcessing(false);
+      if (
+        !isPlayingRef.current &&
+        audioQueueRef.current.length === 0 &&
+        !isStreamingRef.current
+      ) {
+        scheduleAutoListen("turn_finished");
+      }
       // setIsStreaming(true) happens on first chunk
     }
   };
@@ -1440,13 +1511,16 @@ export default function AITutorScreen({ navigation, route }: any) {
             </View>
           ) : null}
           <TouchableOpacity
-            onPressIn={startRecording}
-            onPressOut={stopRecording}
+            onPress={() => void toggleHandsFreeMic()}
             activeOpacity={0.8}
             disabled={isProcessing || isStreaming}
             accessibilityRole="button"
             accessibilityLabel={
-              isRecording ? "Stop recording" : "Hold to speak with Maya"
+              handsFreePaused
+                ? "Resume listening"
+                : isRecording
+                  ? "Pause listening"
+                  : "Pause Maya listening"
             }
             accessibilityState={{
               disabled: isProcessing || isStreaming,
@@ -1459,7 +1533,7 @@ export default function AITutorScreen({ navigation, route }: any) {
                 (isProcessing || isStreaming) && { opacity: 0.5 },
               ]}
             >
-              {isRecording && (
+              {isRecording && !handsFreePaused && (
                 <>
                   <Animated.View style={[styles.pulse, animatedPulseStyle1]} />
                   <Animated.View style={[styles.pulse, animatedPulseStyle2]} />
@@ -1467,15 +1541,25 @@ export default function AITutorScreen({ navigation, route }: any) {
               )}
               <LinearGradient
                 colors={
-                  isRecording ? ["#ef4444", "#dc2626"] : ["#6366f1", "#a855f7"]
+                  handsFreePaused
+                    ? ["#64748b", "#475569"]
+                    : isRecording
+                      ? ["#22c55e", "#16a34a"]
+                      : ["#6366f1", "#a855f7"]
                 }
                 style={[
                   styles.micButton,
-                  isRecording && styles.micButtonRecording,
+                  isRecording && !handsFreePaused && styles.micButtonRecording,
                 ]}
               >
                 <Ionicons
-                  name={isRecording ? "stop" : "mic"}
+                  name={
+                    handsFreePaused
+                      ? "mic-off"
+                      : isRecording
+                        ? "ear"
+                        : "mic"
+                  }
                   size={28}
                   color="white"
                 />
@@ -1487,9 +1571,11 @@ export default function AITutorScreen({ navigation, route }: any) {
               ? "Thinking..."
               : isStreaming
                 ? "Maya is speaking..."
-                : isRecording
-                  ? "Listening..."
-                  : "Hold to Speak"}
+                : handsFreePaused
+                  ? "Mic paused — tap to resume"
+                  : isRecording
+                    ? "Listening — speak naturally"
+                    : "Starting listener…"}
           </Text>
           <View style={styles.statePillsRow}>
             <View style={[styles.statePill, isRecording && styles.statePillActive]}>
