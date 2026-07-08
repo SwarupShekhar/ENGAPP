@@ -61,6 +61,13 @@ import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
 import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
 import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
 import { CoachingCallSummaryToast } from "../components/CoachingCallSummaryToast";
+import { FeedbackAnalysisChecklist } from "../components/FeedbackAnalysisChecklist";
+import { PartnerWaitPanel } from "../components/PartnerWaitPanel";
+import { useFeedbackAnalysisProgress } from "../hooks/useFeedbackAnalysisProgress";
+import {
+  MAX_PRON_POLLS,
+  PRON_POLL_INTERVAL_MS,
+} from "../utils/feedbackAnalysisSignals";
 import { getCQSScore, CQSResults } from "../../../api/scoring";
 import { useAnalytics } from "../../../analytics/useAnalytics";
 import { AnalyticsEvents } from "../../../analytics/events";
@@ -860,6 +867,14 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   const [cqsData, setCqsData] = useState<CQSResults | null>(null);
   const [pronPollCount, setPronPollCount] = useState(0);
   const insets = useSafeAreaInsets();
+
+  const loadingProgress = useFeedbackAnalysisProgress({
+    sessionData,
+    cqsData,
+    retryCount,
+    loading,
+    aboutToExitLoading: false,
+  });
   const [playingSection, setPlayingSection] = useState<string | null>(null);
   const [loadingSection, setLoadingSection] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -1012,6 +1027,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             return;
           }
 
+          // Keep session payload so partner-wait / checklist can read real fields
+          if (isMounted) {
+            setSessionData(data);
+          }
           const participantCount = data.participants?.length ?? 0;
           const feedbackCount = data.feedbacks?.length ?? 0;
           const waitingForPartner = participantCount > 0 && feedbackCount < participantCount;
@@ -1061,7 +1080,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
               .catch((err) => console.warn('[CallFeedback] CQS fetch:', err));
           }
         } else if (retryCount < 20) {
-          // ~60s total at 3s per poll
+          // ~60s total at 3s per poll — keep partial session for checklist
+          if (isMounted) {
+            setSessionData(data);
+          }
           if (retryCount === 5) {
             setErrorHeader("Still working...");
             setErrorDetail(
@@ -1099,13 +1121,11 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   }, [sessionId, retryCount]);
 
   // Background re-fetch: pronunciation issues arrive after the main analysis
-  // (LiveKit egress → transcribe → PA is async and slower). Keep polling
-  // for ~90s after initial load to pick up late-arriving pronunciation data.
+  // (LiveKit egress → transcribe → PA is async and slower). Spec §8.2: 8 * 5s.
   useEffect(() => {
     if (loading || !sessionData || !sessionId) return;
     const hasPronIssues =
       (sessionData.analyses?.[0]?.pronunciationIssues?.length ?? 0) > 0;
-    const MAX_PRON_POLLS = 8; // 8 * 5s = 40s background refresh
     if (hasPronIssues || pronPollCount >= MAX_PRON_POLLS) return;
 
     const timer = setTimeout(async () => {
@@ -1118,7 +1138,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         // silent — main data is already showing
       }
       setPronPollCount((c) => c + 1);
-    }, 5000);
+    }, PRON_POLL_INTERVAL_MS);
 
     return () => clearTimeout(timer);
   }, [loading, sessionData, sessionId, pronPollCount]);
@@ -1359,6 +1379,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   }, [sessionData, isPlayingFullFeedback]);
 
   if (loading) {
+    const isPartnerWait = loadingProgress.mode === "partner_wait";
     return (
       <SafeAreaView
         edges={["top", "bottom"]}
@@ -1368,36 +1389,37 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         ]}
       >
         <StatusBar barStyle="dark-content" />
-        <View style={{ alignItems: "center", gap: 20, paddingHorizontal: 40 }}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              color: theme.colors.text.primary,
-              textAlign: "center",
-            }}
-          >
-            {errorHeader}
-          </Text>
-          <Text
-            style={{
-              color: theme.colors.text.secondary,
-              textAlign: "center",
-            }}
-          >
-            {errorDetail}
-          </Text>
-          {retryCount > 0 && (
-            <Text style={{ color: theme.colors.text.secondary, fontSize: 12 }}>
-              Progress:{" "}
-              {Math.min(99, Math.round(((retryCount + 1) / 40) * 100))}%
-            </Text>
+        <View
+          style={{
+            alignItems: "center",
+            gap: 20,
+            paddingHorizontal: 28,
+            width: "100%",
+            maxWidth: 420,
+          }}
+        >
+          {isPartnerWait ? (
+            <PartnerWaitPanel
+              title={loadingProgress.headerTitle}
+              body={loadingProgress.headerSubtitle}
+            />
+          ) : (
+            <>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <FeedbackAnalysisChecklist
+                items={loadingProgress.checklistItems}
+                headerTitle={loadingProgress.headerTitle}
+                headerSubtitle={loadingProgress.headerSubtitle}
+                hintText={loadingProgress.hintText}
+              />
+            </>
           )}
 
           <TouchableOpacity
-            style={{ marginTop: 20 }}
+            style={{ marginTop: 8 }}
             onPress={() => navigation.navigate("MainTabs")}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel and go home"
           >
             <Text style={{ color: theme.colors.primary, fontWeight: "600" }}>
               Cancel and Go Home
@@ -1439,15 +1461,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   };
 
   // Point 7: Handle failure UI (no analyses: ANALYSIS_FAILED, fetch error, or timed out)
+  // Prefer poll-path errorHeader/errorDetail so Spec §7.3 timeout copy
+  // ("Taking longer than usual") is not overwritten by a generic title.
   const hasTranscript =
     typeof sessionData?.feedback?.transcript === "string" &&
     sessionData.feedback.transcript.trim().length > 0;
-  const failureTitle =
-    sessionData?.status === "ANALYSIS_FAILED" ? errorHeader : "Analysis Unavailable";
+  const failureTitle = errorHeader || "Analysis Unavailable";
   const failureMessage =
-    sessionData?.status === "ANALYSIS_FAILED"
-      ? errorDetail
-      : "We were unable to generate a full analysis for this call. Tap Check again to retry, or go back home.";
+    errorDetail ||
+    "We were unable to generate a full analysis for this call. Tap Check again to retry, or go back home.";
 
   if (
     isFailed &&
@@ -2950,7 +2972,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             pronunciationProcessing={
               data.scores.pronunciation === 50 &&
               (data.pronunciationIssues?.length ?? 0) === 0 &&
-              pronPollCount < 18
+              pronPollCount < MAX_PRON_POLLS
             }
             justifications={{
               pronunciation: data.aiFeedback?.pronunciation?.justification,
@@ -2962,6 +2984,20 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             loadingSection={loadingSection}
             onPlay={handlePlay}
           />
+          {data.scores.pronunciation === 50 &&
+          (data.pronunciationIssues?.length ?? 0) === 0 &&
+          pronPollCount < MAX_PRON_POLLS ? (
+            <Text
+              style={{
+                marginTop: 8,
+                marginHorizontal: 4,
+                fontSize: 13,
+                color: theme.colors.text.secondary,
+              }}
+            >
+              Refining pronunciation analysis…
+            </Text>
+          ) : null}
         </Animated.View>
 
         {/* Full conversation transcript (grammar + pronunciation highlighted) */}
@@ -3249,7 +3285,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           // While the pipeline is still finishing, show the tabs with zero issues and transcript.
           const shouldShow =
             normalized.length > 0 ||
-            (!!sessionData?.analyses?.length && pronPollCount < 18) ||
+            (!!sessionData?.analyses?.length && pronPollCount < MAX_PRON_POLLS) ||
             !!(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript);
           if (!shouldShow) return null;
 
