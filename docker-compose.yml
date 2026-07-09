@@ -1,53 +1,12 @@
-version: '3.8'
+# EngR Docker Compose — production by default (Vultr-safe).
+#
+# Host ports MUST stay in 4000–5000 on the VPS. Never bind :3000 or :8001 on the host.
+# Containers still listen on 3000 (Nest) and 8001 (AI) internally; prod maps:
+#   4001 → Nest, 4010 → AI, 4008 → Caddy, 4003 → tester portal (nginx on host).
+#
+# Always prefer:  docker compose -f docker-compose.prod.yml ...
+# If you run plain `docker compose up` by mistake, this file includes prod so you
+# do not hit "Bind for 0.0.0.0:3000 failed".
 
-services:
-  # Core Backend (NestJS) — connects to Neon + external Redis
-  backend-nest:
-    build:
-      context: ./backend-nest
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./backend-nest/.env
-    environment:
-      AI_ENGINE_URL: http://backend-ai:8001
-      PORT: 3000
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { if (r.statusCode !== 200) process.exit(1) })"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
-
-  # AI Backend (Python) — connects to same Redis
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    depends_on:
-      - backend-nest
-      - backend-ai
-
-  backend-ai:
-    build:
-      context: ./backend-ai
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    environment:
-      PORT: 8001
-      ENVIRONMENT: production
-    env_file:
-      - ./backend-ai/.env
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
+include:
+  - docker-compose.prod.yml

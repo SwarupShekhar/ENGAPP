@@ -7,6 +7,8 @@ on:
       - "backend-nest/**"
       - "backend-ai/**"
       - "docker-compose.prod.yml"
+      - "docker-compose.yml"
+      - "scripts/vps-deploy.sh"
       - "config/caddy/**"
       - "config/internal-test-portal/**"
       - "config/systemd/**"
@@ -72,33 +74,7 @@ jobs:
               exit 1
             fi
 
-            docker compose -f docker-compose.prod.yml build backend-nest backend-ai
-
-            # Apply DB migrations before boot (image CMD also runs migrate on start).
-            docker compose -f docker-compose.prod.yml run --rm --no-deps backend-nest \
-              npx prisma migrate deploy
-
-            # Start backends only (caddy/prometheus depend on healthy nest — would fail compose up).
-            docker compose -f docker-compose.prod.yml up -d --no-deps backend-nest backend-ai
-
-            echo "Waiting for backend-nest health (up to 120s)..."
-            healthy=0
-            i=0
-            while [ "$i" -lt 24 ]; do
-              i=$((i + 1))
-              if docker compose -f docker-compose.prod.yml exec -T backend-nest \
-                node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
-                healthy=1
-                break
-              fi
-              sleep 5
-            done
-            if [ "$healthy" -ne 1 ]; then
-              docker compose -f docker-compose.prod.yml logs backend-nest --tail 80
-              exit 1
-            fi
-
-            docker compose -f docker-compose.prod.yml up -d caddy prometheus
+            bash scripts/vps-deploy.sh
 
             # Tester portal: static files on /opt/engr-apk (port 4003 already in use on host).
             bash scripts/deploy-internal-test-portal.sh || true
