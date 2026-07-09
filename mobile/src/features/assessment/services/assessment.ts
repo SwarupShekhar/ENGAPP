@@ -1,4 +1,5 @@
 import { client, aiClient } from "../../../api/client";
+import type { FluencyBreakdown } from "../../../types/fluency";
 
 export interface AssessmentResult {
   assessmentId: string;
@@ -7,7 +8,8 @@ export interface AssessmentResult {
   overallScore: number;
   confidence: number;
   skillBreakdown: any;
-  fluencyBreakdown: any;
+  fluencyBreakdown?: FluencyBreakdown | null;
+  rawAzureMetrics?: { fluency?: number; prosody?: number };
   weaknessMap: any[];
   improvementDelta: any;
   personalizedPlan: any;

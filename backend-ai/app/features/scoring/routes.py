@@ -67,6 +67,10 @@ async def compute_cqs(
 
     grammar_signal = call_quality_service.compute_grammar_score(body.user_turns)
     fluency_signal = call_quality_service.compute_fluency_signal(pqs, body.user_turns)
+    fluency_breakdown = call_quality_service.compute_fluency_breakdown(
+        body.azure_results,
+        body.user_turns,
+    )
 
     return CQSResponse(
         cqs=cqs,
@@ -77,6 +81,7 @@ async def compute_cqs(
             "es": es,
             "grammar_signal": grammar_signal,
             "fluency_signal": fluency_signal,
+            "fluency_breakdown": fluency_breakdown,
         }
     )
 

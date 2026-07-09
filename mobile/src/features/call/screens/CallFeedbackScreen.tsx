@@ -59,6 +59,9 @@ import { WordLevelBreakdown } from "../components/WordLevelBreakdown";
 import { PracticeTips } from "../components/PracticeTips";
 import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
 import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
+import { FluencyMetricsSection } from "../../../components/FluencyMetricsSection";
+import type { FluencyBreakdown } from "../../../types/fluency";
+import { paceLabel } from "../../../types/fluency";
 import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
 import { CoachingCallSummaryToast } from "../components/CoachingCallSummaryToast";
 import { FeedbackAnalysisChecklist } from "../components/FeedbackAnalysisChecklist";
@@ -1614,6 +1617,13 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     dominantPronunciationErrors:
       (sessionData?.summaryJson?.dominant_pronunciation_errors as string[]) ||
       [],
+    fluencyBreakdown:
+      ((rawData as Record<string, unknown> | undefined)?.fluencyBreakdown as
+        | FluencyBreakdown
+        | undefined) ||
+      ((rawData as Record<string, unknown> | undefined)?.azureEvidence as
+        | Record<string, unknown>
+        | undefined)?.fluencyBreakdown as FluencyBreakdown | undefined,
   };
 
   // MAYA Summary: derive weak spots (lowest 2 dimensions) and words to learn from real data
@@ -1804,7 +1814,17 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
     }
 
     const fluencyJust = aiDetailedFeedback?.fluency?.justification as string | undefined;
-    if (fluencyJust?.trim() || data.scores.fluency > 0) {
+    const fb = data.fluencyBreakdown;
+    const fluencyMetricsNote = fb
+      ? `You spoke at ${Math.round(fb.wpm)} WPM (${paceLabel(fb.wpm)}).${
+          (fb.fillerCount ?? 0) > 0
+            ? ` ${fb.fillerCount} filler word${fb.fillerCount === 1 ? "" : "s"} detected${
+                fb.topFillers?.length ? ` — try reducing "${fb.topFillers.slice(0, 2).join('", "')}"` : ""
+              }.`
+            : " Smooth pace with few fillers."
+        }`
+      : undefined;
+    if (fluencyJust?.trim() || fluencyMetricsNote || data.scores.fluency > 0) {
       segments.push({
         id: 'fluency',
         category: 'fluency',
@@ -1812,6 +1832,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
         hasCorrectionCards: false,
         fluencyNote:
           fluencyJust?.trim() ||
+          fluencyMetricsNote ||
           'Focus on speaking at a steady pace with natural pauses between ideas.',
       });
     }
@@ -2479,6 +2500,14 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                     }}
                   >
                     <Text style={{ fontSize: 15, color: theme.colors.text.primary, lineHeight: 22 }}>{currentSegment.fluencyNote}</Text>
+                    {currentSegment.category === 'fluency' && data.fluencyBreakdown ? (
+                      <View style={{ marginTop: 14 }}>
+                        <FluencyMetricsSection
+                          breakdown={data.fluencyBreakdown}
+                          compact
+                        />
+                      </View>
+                    ) : null}
                   </Animated.View>
                 )
               )}
@@ -2999,6 +3028,16 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             </Text>
           ) : null}
         </Animated.View>
+
+        {data.fluencyBreakdown && (
+          <Animated.View entering={FadeInDown.delay(350).springify()}>
+            <FluencyMetricsSection
+              breakdown={data.fluencyBreakdown}
+              rawAzureFluency={data.fluencyBreakdown.azure_raw_fluency}
+              compact={false}
+            />
+          </Animated.View>
+        )}
 
         {/* Full conversation transcript (grammar + pronunciation highlighted) */}
         {(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (

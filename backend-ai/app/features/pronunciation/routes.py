@@ -16,6 +16,30 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Request
 
 from app.features.pronunciation.pronunciation_detector import detect_from_azure_result
 from app.features.pronunciation.pronunciation_scorer import calculate_pronunciation_score
+from app.features.scoring.fluency_breakdown import build_fluency_breakdown
+
+
+def _attach_fluency_metrics(
+    azure_result: dict[str, Any],
+    reference_text: str | None,
+) -> dict[str, Any]:
+    """Compute recalibrated fluency breakdown and top-level fluency fields."""
+    transcript = (reference_text or "").strip()
+    words = _extract_words(azure_result)
+    if not transcript and words:
+        transcript = " ".join(
+            w.get("Word") or w.get("word") or "" for w in words
+        ).strip()
+    breakdown = build_fluency_breakdown(azure_result, transcript)
+    return {
+        "fluency_breakdown": breakdown,
+        "fluency_score": breakdown["overall_fluency"],
+        "wpm": breakdown["wpm"],
+        "filler_count": breakdown["fillerCount"],
+        "top_fillers": breakdown["topFillers"],
+        "azure_raw_fluency": breakdown["azure_raw_fluency"],
+        "azure_raw_prosody": breakdown["azure_raw_prosody"],
+    }
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +349,12 @@ async def assess_pronunciation(
         score_result = calculate_pronunciation_score(
             errors, azure_avg, fluency_score=fluency, prosody_score=prosody,
         )
-        return {"flagged_errors": errors, "pronunciation_score": score_result}
+        fluency_metrics = _attach_fluency_metrics(raw, _reference_text)
+        return {
+            "flagged_errors": errors,
+            "pronunciation_score": score_result,
+            **fluency_metrics,
+        }
 
     MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -449,10 +478,15 @@ async def assess_pronunciation(
                 fluency_score=fluency,
                 prosody_score=prosody,
             )
+            fluency_metrics = _attach_fluency_metrics(
+                pass_2_result,
+                pass_1_transcript or None,
+            )
             return {
                 "flagged_errors": errors,
                 "pronunciation_score": score_result,
                 "azure_result": pass_2_result,
+                **fluency_metrics,
             }
         except HTTPException:
             raise

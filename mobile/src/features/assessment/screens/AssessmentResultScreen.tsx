@@ -17,6 +17,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { BenchmarkCard } from "../components/BenchmarkCard";
 import { RecurringErrorsCard } from "../components/RecurringErrorsCard";
 import { ReadinessCard } from "../components/ReadinessCard";
+import { FluencyMetricsSection } from "../../../components/FluencyMetricsSection";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { assessmentApi } from "../services/assessment";
 import {
@@ -262,99 +263,14 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        {/* Fluency Recalibration Data (Optional Section if available) */}
         {result?.fluencyBreakdown && (
           <View style={styles.section}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.sectionTitle}>Fluency Breakdown</Text>
-              <View style={styles.recalibratedBadge}>
-                <Text style={styles.recalibratedText}>Recalibrated</Text>
-              </View>
-            </View>
             <View style={styles.planCard}>
-              <View style={styles.breakdownGrid}>
-                <View style={styles.breakdownItem}>
-                  <Text style={styles.breakdownLabel}>Speech Flow</Text>
-                  <Text style={styles.breakdownValue}>
-                    {Math.round(result.fluencyBreakdown.speech_flow)}%
-                  </Text>
-                </View>
-                <View style={styles.breakdownItem}>
-                  <Text style={styles.breakdownLabel}>Connected Speech</Text>
-                  <Text style={styles.breakdownValue}>
-                    {Math.round(
-                      result.fluencyBreakdown.connected_speech ||
-                        result.fluencyBreakdown.naturalness,
-                    )}
-                    %
-                  </Text>
-                </View>
-                <View style={styles.breakdownItem}>
-                  <Text style={styles.breakdownLabel}>Prosody</Text>
-                  <Text style={styles.breakdownValue}>
-                    {Math.round(result.fluencyBreakdown.prosody)}%
-                  </Text>
-                </View>
-                <View style={styles.breakdownItem}>
-                  <Text style={styles.breakdownLabel}>Pace Control</Text>
-                  <Text style={styles.breakdownValue}>
-                    {Math.round(result.fluencyBreakdown.pace_control)}%
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              <View style={styles.azureComparison}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={16}
-                  color={theme.colors.text.secondary}
-                />
-                <Text style={styles.azureComparisonText}>
-                  Adjusted from Azure's raw fluency of{" "}
-                  {Math.round(result.rawAzureMetrics?.fluency || 0)}% for
-                  realism.
-                </Text>
-              </View>
-
-              {/* Connected Speech Examples */}
-              {(result.fluencyBreakdown.examples?.linking_detected?.length >
-                0 ||
-                result.fluencyBreakdown.examples?.reductions_detected?.length >
-                  0) && (
-                <View style={styles.examplesContainer}>
-                  <Text style={styles.examplesTitle}>
-                    Connected Speech Patterns
-                  </Text>
-
-                  {result.fluencyBreakdown.examples?.linking_detected?.map(
-                    (ex: string, i: number) => (
-                      <View key={`link-${i}`} style={styles.exampleRow}>
-                        <Ionicons
-                          name="link-outline"
-                          size={14}
-                          color={theme.colors.success}
-                        />
-                        <Text style={styles.exampleText}>Linking: {ex}</Text>
-                      </View>
-                    ),
-                  )}
-
-                  {result.fluencyBreakdown.examples?.reductions_detected?.map(
-                    (ex: string, i: number) => (
-                      <View key={`red-${i}`} style={styles.exampleRow}>
-                        <Ionicons
-                          name="trending-down-outline"
-                          size={14}
-                          color={theme.colors.primary}
-                        />
-                        <Text style={styles.exampleText}>Reduction: {ex}</Text>
-                      </View>
-                    ),
-                  )}
-                </View>
-              )}
+              <FluencyMetricsSection
+                breakdown={result.fluencyBreakdown}
+                rawAzureFluency={result.rawAzureMetrics?.fluency}
+                showRecalibratedBadge
+              />
             </View>
           </View>
         )}

@@ -1,4 +1,5 @@
 import { client } from "./client";
+import type { FluencyBreakdown } from "../types/fluency";
 
 // ─── Types ─────────────────────────────────────────────────
 export interface SessionParticipant {
@@ -37,7 +38,11 @@ export interface SessionAnalysis {
     improvementAreas?: string[];
     accentNotes?: string;
     pronunciationTip?: string;
-    azureEvidence?: any;
+    fluencyBreakdown?: FluencyBreakdown;
+    azureEvidence?: {
+      wpm?: number;
+      fluencyBreakdown?: FluencyBreakdown;
+    };
   };
 }
 

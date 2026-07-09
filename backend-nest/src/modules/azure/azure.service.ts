@@ -40,6 +40,8 @@ export class AzureService {
     prosodyScore?: number;
     completenessScore?: number;
     wordCount?: number;
+    duration?: number;
+    wpm?: number | null;
     snr?: number;
     fluencyBreakdown?: any;
     azureRawFluency?: number;
@@ -140,10 +142,12 @@ export class AzureService {
         transcript: transcript,
         pronunciationEvidence: Array.isArray(words) ? words : [],
         accuracyScore: score,
-        fluencyScore: body?.fluency_score ?? Math.max(50, score - 10),
+        fluencyScore: body?.fluency_score ?? body?.fluency_breakdown?.overall_fluency ?? Math.max(50, score - 10),
         prosodyScore: body?.prosody_score ?? score,
         completenessScore: body?.completeness_score ?? 100,
         wordCount,
+        duration: body?.wpm && wordCount > 0 ? (wordCount / body.wpm) * 60 : 0,
+        wpm: body?.wpm ?? body?.fluency_breakdown?.wpm ?? null,
         snr: 20,
         fluencyBreakdown: body?.fluency_breakdown ?? null,
         azureRawFluency: body?.azure_raw_fluency ?? score,

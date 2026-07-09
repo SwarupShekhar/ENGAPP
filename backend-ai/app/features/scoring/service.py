@@ -360,6 +360,22 @@ class CallQualityService:
             score = min(score, 60.0)
         return round(float(max(0.0, score)), 2)
 
+    def compute_fluency_breakdown(
+        self,
+        utterances: List[Dict[str, Any]],
+        user_turns: List[str],
+    ) -> Dict[str, Any]:
+        """Unified pace + filler + component breakdown for CQS / call feedback."""
+        from app.features.scoring.fluency_breakdown import (
+            build_fluency_breakdown,
+            hesitation_markers_from_breakdown,
+        )
+
+        transcript = " ".join(user_turns)
+        breakdown = build_fluency_breakdown(utterances, transcript)
+        breakdown["hesitation_markers"] = hesitation_markers_from_breakdown(breakdown)
+        return breakdown
+
     def compute_call_quality_score(self, pqs: float, ds: float, cs: float, es: float) -> float:
         """Final CQS combination."""
         cqs = (

@@ -174,7 +174,32 @@
           On Android: allow install from unknown sources if prompted. Uninstall
           any older Englivo test build first if install fails.
         </p>
-        <p class="build" id="build-label">Build: internal-2026-07-07</p>
+        <p class="build" id="build-label">Build: internal-2026-07-08</p>
+      </section>
+
+      <section class="card" aria-labelledby="whats-new-heading">
+        <h2 id="whats-new-heading">What’s new (2026-07-08)</h2>
+        <ul class="known">
+          <li>
+            <strong>Honest post-call wait:</strong> after ending a call you’ll see a
+            checklist (Speech quality → Grammar → Vocabulary → Pronunciation → Final
+            report) instead of a fake progress %. Items light up when the server
+            actually finishes each piece.
+          </li>
+          <li>
+            <strong>Partner still on the call?</strong> You’ll get a clear “Waiting
+            for your partner” screen — not fake AI progress.
+          </li>
+          <li>
+            Pronunciation can keep refining for a short time <em>after</em> scores
+            appear — that’s normal (async audio analysis).
+          </li>
+        </ul>
+        <p class="note" style="margin-top: 0.75rem">
+          Why we changed this: the old % climbed while nothing finished, so
+          people thought the app froze. Full notes for testers:
+          <code>RELEASE-NOTES-2026-07-08-feedback-loading.md</code> on the deploy.
+        </p>
       </section>
 
       <section class="card" aria-labelledby="try-heading">
@@ -183,10 +208,15 @@
           <li>Sign in → Home → daily phrase/word listen</li>
           <li>Maya tutor — speak naturally for 3–5 minutes</li>
           <li>Optional: one P2P call with another tester</li>
+          <li>
+            After any call: watch the <strong>feedback loading checklist</strong>
+            (and try leaving partner on the call once to see partner-wait)
+          </li>
         </ul>
         <p class="note" style="margin-top: 0.75rem">
-          Known rough edges: Maya can be slow on first turn; call scores may take
-          1–2 minutes after a call ends.
+          Known rough edges: Maya can be slow on first turn; full analysis may
+          still take up to ~2 minutes. You should <em>not</em> see a Progress %
+          on feedback loading anymore — if you do, report it as a bug.
         </p>
       </section>
 
@@ -206,7 +236,7 @@
           <input type="hidden" name="_template" value="table" />
           <input type="hidden" name="_captcha" value="false" />
           <input type="text" name="_honey" style="display: none" tabindex="-1" autocomplete="off" />
-          <input type="hidden" name="build" id="build-field" value="internal-2026-07-07" />
+          <input type="hidden" name="build" id="build-field" value="internal-2026-07-08" />
 
           <div class="row two">
             <div>
@@ -294,7 +324,7 @@
 
     <script>
       (function () {
-        var BUILD = "internal-2026-07-07";
+        var BUILD = "internal-2026-07-08";
         document.getElementById("build-label").textContent = "Build: " + BUILD;
         document.getElementById("build-field").value = BUILD;
 

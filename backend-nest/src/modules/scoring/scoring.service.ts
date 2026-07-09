@@ -189,18 +189,61 @@ export class ScoringService {
     };
   }
 
+  private fluencyMetaFromBreakdown(breakdown: Record<string, unknown> | undefined) {
+    const fb = breakdown?.fluency_breakdown as Record<string, unknown> | undefined;
+    if (!fb) return undefined;
+    return {
+      fluencyBreakdown: fb,
+      hesitationMarkers: (fb.hesitation_markers as Record<string, unknown>) ?? {
+        filler_words_count: fb.fillerCount ?? 0,
+        pauses_count: fb.pause_count ?? 0,
+        top_fillers: fb.topFillers ?? [],
+        wpm: fb.wpm ?? 0,
+      },
+      wpm: Number(fb.wpm ?? 0),
+    };
+  }
+
   private async writeAnalysisScores(
     participantId: string,
     scores: SessionScorePayload,
     cefrLevel: string,
+    fluencyMeta?: {
+      fluencyBreakdown?: Record<string, unknown>;
+      hesitationMarkers?: Record<string, unknown>;
+      wpm?: number;
+    },
   ): Promise<void> {
     try {
+      const data: Record<string, unknown> = {
+        scores: scores as any,
+        cefrLevel,
+      };
+
+      if (fluencyMeta?.fluencyBreakdown || fluencyMeta?.hesitationMarkers || fluencyMeta?.wpm != null) {
+        const existing = await this.prisma.analysis.findUnique({
+          where: { participantId },
+          select: { rawData: true },
+        });
+        const raw = (existing?.rawData as Record<string, unknown>) || {};
+        const azureEvidence = {
+          ...((raw.azureEvidence as Record<string, unknown>) || {}),
+          wpm: fluencyMeta.wpm ?? (fluencyMeta.fluencyBreakdown as any)?.wpm,
+          fluencyBreakdown: fluencyMeta.fluencyBreakdown,
+        };
+        data.rawData = {
+          ...raw,
+          azureEvidence,
+          fluencyBreakdown: fluencyMeta.fluencyBreakdown,
+        } as any;
+        if (fluencyMeta.hesitationMarkers) {
+          data.hesitationMarkers = fluencyMeta.hesitationMarkers as any;
+        }
+      }
+
       await this.prisma.analysis.update({
         where: { participantId },
-        data: {
-          scores: scores as any,
-          cefrLevel,
-        },
+        data: data as any,
       });
     } catch (e: any) {
       this.logger.warn(
@@ -266,7 +309,12 @@ export class ScoringService {
               turns,
             );
         const cefr = deriveCefrFromOverall(refreshed.overall_score);
-        await this.writeAnalysisScores(participantId, refreshed, cefr);
+        await this.writeAnalysisScores(
+          participantId,
+          refreshed,
+          cefr,
+          this.fluencyMetaFromBreakdown(cqsData?.breakdown),
+        );
         this.logger.log(
           `[CQS IDEMPOTENT] session=${sessionId} user=${userId} overall=${refreshed.overall_score} source=cqs`,
         );
@@ -405,7 +453,12 @@ export class ScoringService {
       });
 
       const cefr = deriveCefrFromOverall(sessionScores.overall_score);
-      await this.writeAnalysisScores(participantId, sessionScores, cefr);
+      await this.writeAnalysisScores(
+        participantId,
+        sessionScores,
+        cefr,
+        this.fluencyMetaFromBreakdown(breakdown),
+      );
 
       if (this.scoreAuthority.isEnabledForUser(userId)) {
         await this.scoreAuthority.applySessionDeltas(

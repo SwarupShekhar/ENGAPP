@@ -353,24 +353,42 @@ export class SkillsBuilder {
       details.pronunciation.subtext = 'Clear delivery';
     }
 
-    // 3. Fluency from hesitationMarkers or rawData
-    const hesitations = analysis.hesitationMarkers as any;
-    if (
-      hesitations &&
-      (hesitations.filler_words_count > 3 || hesitations.pauses_count > 2)
-    ) {
+    // 3. Fluency from hesitationMarkers, fluencyBreakdown, or rawData
+    const raw = analysis.rawData as Record<string, unknown> | null;
+    const fluencyBd =
+      (raw?.fluencyBreakdown as Record<string, unknown> | undefined) ||
+      ((raw?.azureEvidence as Record<string, unknown> | undefined)?.fluencyBreakdown as
+        | Record<string, unknown>
+        | undefined);
+    const hesitations = analysis.hesitationMarkers as Record<string, unknown> | null;
+    const fillerCount =
+      Number(fluencyBd?.fillerCount ?? hesitations?.filler_words_count ?? 0);
+    const pauseCount = Number(fluencyBd?.pause_count ?? hesitations?.pauses_count ?? 0);
+
+    if (fillerCount > 3 || pauseCount > 2) {
       const fillers =
-        hesitations.top_fillers?.slice(0, 1).join(', ') || 'fillers';
+        ((fluencyBd?.topFillers as string[] | undefined) ||
+          (hesitations?.top_fillers as string[] | undefined))?.slice(0, 2).join(', ') ||
+        'fillers';
       details.fluency.items = [
         `Reduce "${fillers}" usage`,
-        'Minimize long pauses',
+        pauseCount > 2 ? 'Minimize long pauses' : 'Keep a steady pace',
       ];
       details.fluency.subtext = 'Work on flow';
     } else {
-      const wpm = (analysis.rawData as any)?.azureEvidence?.wpm || 130;
+      const wpm = Math.round(
+        Number(
+          fluencyBd?.wpm ??
+            hesitations?.wpm ??
+            (raw?.azureEvidence as Record<string, unknown> | undefined)?.wpm ??
+            130,
+        ),
+      );
+      const paceLabel =
+        wpm >= 130 && wpm <= 170 ? 'Ideal' : wpm < 100 ? 'Slow' : wpm > 180 ? 'Fast' : 'OK';
       details.fluency.items = [
-        `Speed: ${Math.round(wpm)} WPM (Ideal)`,
-        'Few interruptions',
+        `Speed: ${wpm} WPM (${paceLabel})`,
+        fillerCount > 0 ? `${fillerCount} filler word${fillerCount === 1 ? '' : 's'}` : 'Few interruptions',
       ];
       details.fluency.subtext = 'Smooth delivery';
     }
