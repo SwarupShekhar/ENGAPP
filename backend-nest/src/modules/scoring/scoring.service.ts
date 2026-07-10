@@ -9,6 +9,13 @@ import {
   deriveCefrFromOverall,
   type PillarScores,
 } from '../score-authority/score-authority.formulas';
+import {
+  type DeliveryInsightDto,
+  type SessionEnrichment,
+  hasDeliveryInsights,
+} from '../../common/types/delivery-insight.types';
+
+export type { DeliveryInsightDto, SessionEnrichment };
 
 export type SessionScorePayload = {
   pronunciation: number;
@@ -189,18 +196,70 @@ export class ScoringService {
     };
   }
 
-  private fluencyMetaFromBreakdown(breakdown: Record<string, unknown> | undefined) {
+  /** True when analysis has no delivery coaching bullets yet. */
+  async analysisMissingDeliveryInsights(participantId: string): Promise<boolean> {
+    const analysis = await this.prisma.analysis.findUnique({
+      where: { participantId },
+      select: { rawData: true },
+    });
+    const insights = (analysis?.rawData as Record<string, unknown> | undefined)
+      ?.deliveryInsights;
+    return !Array.isArray(insights) || insights.length === 0;
+  }
+
+  /** Patch delivery insights onto analysis without touching scores or CQS. */
+  async persistSessionEnrichment(
+    participantId: string,
+    enrichment: SessionEnrichment,
+  ): Promise<void> {
+    if (!hasDeliveryInsights(enrichment)) return;
+    try {
+      const existing = await this.prisma.analysis.findUnique({
+        where: { participantId },
+        select: { rawData: true },
+      });
+      if (!existing) {
+        this.logger.warn(
+          `persistSessionEnrichment: no analysis for participantId=${participantId}`,
+        );
+        return;
+      }
+      const raw = (existing.rawData as Record<string, unknown>) || {};
+      await this.prisma.analysis.update({
+        where: { participantId },
+        data: {
+          rawData: {
+            ...raw,
+            deliveryInsights: enrichment.deliveryInsights,
+          } as any,
+        },
+      });
+    } catch (e: any) {
+      this.logger.warn(
+        `persistSessionEnrichment failed participantId=${participantId}: ${e.message}`,
+      );
+    }
+  }
+
+  private fluencyMetaFromBreakdown(
+    breakdown: Record<string, unknown> | undefined,
+    sessionEnrichment?: SessionEnrichment,
+  ) {
     const fb = breakdown?.fluency_breakdown as Record<string, unknown> | undefined;
-    if (!fb) return undefined;
+    const deliveryInsights = sessionEnrichment?.deliveryInsights ?? undefined;
+    if (!fb && !deliveryInsights?.length) return undefined;
     return {
       fluencyBreakdown: fb,
-      hesitationMarkers: (fb.hesitation_markers as Record<string, unknown>) ?? {
-        filler_words_count: fb.fillerCount ?? 0,
-        pauses_count: fb.pause_count ?? 0,
-        top_fillers: fb.topFillers ?? [],
-        wpm: fb.wpm ?? 0,
-      },
-      wpm: Number(fb.wpm ?? 0),
+      hesitationMarkers: fb
+        ? ((fb.hesitation_markers as Record<string, unknown>) ?? {
+            filler_words_count: fb.fillerCount ?? 0,
+            pauses_count: fb.pause_count ?? 0,
+            top_fillers: fb.topFillers ?? [],
+            wpm: fb.wpm ?? 0,
+          })
+        : undefined,
+      wpm: fb ? Number(fb.wpm ?? 0) : undefined,
+      deliveryInsights,
     };
   }
 
@@ -212,6 +271,7 @@ export class ScoringService {
       fluencyBreakdown?: Record<string, unknown>;
       hesitationMarkers?: Record<string, unknown>;
       wpm?: number;
+      deliveryInsights?: DeliveryInsightDto[] | null;
     },
   ): Promise<void> {
     try {
@@ -220,25 +280,42 @@ export class ScoringService {
         cefrLevel,
       };
 
-      if (fluencyMeta?.fluencyBreakdown || fluencyMeta?.hesitationMarkers || fluencyMeta?.wpm != null) {
+      const hasFluencyMeta =
+        fluencyMeta?.fluencyBreakdown ||
+        fluencyMeta?.hesitationMarkers ||
+        fluencyMeta?.wpm != null;
+      const hasDeliveryInsights =
+        Array.isArray(fluencyMeta?.deliveryInsights) &&
+        fluencyMeta.deliveryInsights.length > 0;
+
+      if (hasFluencyMeta || hasDeliveryInsights) {
         const existing = await this.prisma.analysis.findUnique({
           where: { participantId },
           select: { rawData: true },
         });
         const raw = (existing?.rawData as Record<string, unknown>) || {};
-        const azureEvidence = {
-          ...((raw.azureEvidence as Record<string, unknown>) || {}),
-          wpm: fluencyMeta.wpm ?? (fluencyMeta.fluencyBreakdown as any)?.wpm,
-          fluencyBreakdown: fluencyMeta.fluencyBreakdown,
-        };
-        data.rawData = {
-          ...raw,
-          azureEvidence,
-          fluencyBreakdown: fluencyMeta.fluencyBreakdown,
-        } as any;
-        if (fluencyMeta.hesitationMarkers) {
-          data.hesitationMarkers = fluencyMeta.hesitationMarkers as any;
+        const nextRaw: Record<string, unknown> = { ...raw };
+
+        if (hasFluencyMeta) {
+          const azureEvidence = {
+            ...((raw.azureEvidence as Record<string, unknown>) || {}),
+            wpm: fluencyMeta!.wpm ?? (fluencyMeta!.fluencyBreakdown as any)?.wpm,
+            fluencyBreakdown: fluencyMeta!.fluencyBreakdown,
+          };
+          nextRaw.azureEvidence = azureEvidence;
+          if (fluencyMeta!.fluencyBreakdown) {
+            nextRaw.fluencyBreakdown = fluencyMeta!.fluencyBreakdown;
+          }
+          if (fluencyMeta!.hesitationMarkers) {
+            data.hesitationMarkers = fluencyMeta!.hesitationMarkers as any;
+          }
         }
+
+        if (hasDeliveryInsights) {
+          nextRaw.deliveryInsights = fluencyMeta!.deliveryInsights;
+        }
+
+        data.rawData = nextRaw as any;
       }
 
       await this.prisma.analysis.update({
@@ -266,6 +343,7 @@ export class ScoringService {
     callDurationSeconds: number,
     userSpokeSeconds: number,
     source: 'call' | 'maya' = 'call',
+    sessionEnrichment?: SessionEnrichment,
   ) {
     this.logger.log(
       `[PHASE 2] Processing CQS for userId=${userId} sessionId=${sessionId}`,
@@ -313,7 +391,7 @@ export class ScoringService {
           participantId,
           refreshed,
           cefr,
-          this.fluencyMetaFromBreakdown(cqsData?.breakdown),
+          this.fluencyMetaFromBreakdown(cqsData?.breakdown, sessionEnrichment),
         );
         this.logger.log(
           `[CQS IDEMPOTENT] session=${sessionId} user=${userId} overall=${refreshed.overall_score} source=cqs`,
@@ -362,6 +440,7 @@ export class ScoringService {
           participantId,
           fallback,
           deriveCefrFromOverall(fallback.overall_score),
+          this.fluencyMetaFromBreakdown(undefined, sessionEnrichment),
         );
         return null;
       }
@@ -457,7 +536,7 @@ export class ScoringService {
         participantId,
         sessionScores,
         cefr,
-        this.fluencyMetaFromBreakdown(breakdown),
+        this.fluencyMetaFromBreakdown(breakdown, sessionEnrichment),
       );
 
       if (this.scoreAuthority.isEnabledForUser(userId)) {

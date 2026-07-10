@@ -19,6 +19,9 @@ import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { PronunciationScorerService } from '../pronunciation/pronunciation-scorer.service';
 import { ScoringService } from '../scoring/scoring.service';
 import {
+  type SessionEnrichment,
+} from '../../common/types/delivery-insight.types';
+import {
   SESSIONS_P2P_QUEUE,
   sessionsP2pConcurrency,
 } from '../../queues/sessions-queue.constants';
@@ -492,43 +495,67 @@ export class SessionsProcessor {
       }
 
       let azureResults: any[] = [];
-      // Skip slow Azure PA if webhook already computed CQS for this user.
+      let sessionEnrichment: SessionEnrichment | undefined;
       const existingCqs = await this.prisma.callQualityScore.findFirst({
         where: { sessionId, userId: participant.userId },
         select: { id: true },
       });
       const recordingUrl = participant.participantRecordingUrl;
-      if (
-        !existingCqs &&
-        recordingUrl &&
+      const hasRecording =
+        !!recordingUrl &&
         !recordingUrl.startsWith('pending_') &&
-        recordingUrl.startsWith('http')
-      ) {
-        try {
-          const { pronunciation_score } =
-            await this.pronunciationService.assessFromRecordingUrl(
-              participant.userId,
-              recordingUrl,
-              undefined,
+        recordingUrl.startsWith('http');
+
+      let shouldRunPa = false;
+      if (hasRecording) {
+        if (!existingCqs) {
+          shouldRunPa = true;
+        } else {
+          const missingDelivery =
+            await this.scoringService.analysisMissingDeliveryInsights(
+              participant.id,
             );
-          const azure =
-            (pronunciation_score as any)?.azure_result ??
-            pronunciation_score;
-          if (azure && typeof azure === 'object') {
-            azureResults = [azure];
+          if (missingDelivery) {
+            shouldRunPa = true;
             this.logger.log(
-              `[SessionsProcessor] PA loaded for user=${participant.userId} session=${sessionId}`,
+              `[SessionsProcessor] Backfilling delivery insights user=${participant.userId} session=${sessionId}`,
             );
+          } else {
+            this.logger.log(
+              `[SessionsProcessor] CQS and delivery insights present user=${participant.userId} — skip PA`,
+            );
+          }
+        }
+      }
+
+      if (shouldRunPa && recordingUrl) {
+        try {
+          const paResult = await this.pronunciationService.assessFromRecordingUrl(
+            participant.userId,
+            recordingUrl,
+            undefined,
+          );
+          const { pronunciation_score } = paResult;
+          if (paResult.deliveryInsights?.length) {
+            sessionEnrichment = {
+              deliveryInsights: paResult.deliveryInsights,
+            };
+          }
+          if (!existingCqs) {
+            const azure =
+              (pronunciation_score as any)?.azure_result ?? pronunciation_score;
+            if (azure && typeof azure === 'object') {
+              azureResults = [azure];
+              this.logger.log(
+                `[SessionsProcessor] PA loaded for user=${participant.userId} session=${sessionId}`,
+              );
+            }
           }
         } catch (e: any) {
           this.logger.warn(
             `[SessionsProcessor] PA failed user=${participant.userId}: ${e?.message ?? e}`,
           );
         }
-      } else if (existingCqs) {
-        this.logger.log(
-          `[SessionsProcessor] CQS already present for user=${participant.userId} — skip PA re-run`,
-        );
       }
 
       const userSpokeSeconds =
@@ -551,6 +578,7 @@ export class SessionsProcessor {
           callDurationSeconds,
           userSpokeSeconds,
           'call',
+          sessionEnrichment,
         );
       } catch (e: any) {
         this.logger.error(

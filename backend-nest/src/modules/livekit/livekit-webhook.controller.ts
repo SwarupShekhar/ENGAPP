@@ -18,6 +18,10 @@ import { PronunciationService } from '../pronunciation/pronunciation.service';
 
 import { ScoringService } from '../scoring/scoring.service';
 import { RedisService } from '../../redis/redis.service';
+import {
+  type SessionEnrichment,
+  hasDeliveryInsights,
+} from '../../common/types/delivery-insight.types';
 
 /**
  * LiveKit webhook: on egress_ended, download recording → Azure Speech → save transcript → AI feedback.
@@ -218,12 +222,16 @@ export class LiveKitWebhookController {
 
         // Free-speech PA on the recording — never pass STT transcript as reference_text
         // (self-reference trap: Azure aligns speech to its own transcript → masked errors).
-        const { flagged_errors, pronunciation_score } =
-          await this.pronunciationService.assessFromRecordingUrl(
-            participant.userId,
-            effectiveFileLocation,
-            undefined,
-          );
+        const paResult = await this.pronunciationService.assessFromRecordingUrl(
+          participant.userId,
+          effectiveFileLocation,
+          undefined,
+        );
+        const { flagged_errors, pronunciation_score } = paResult;
+        const sessionEnrichment: SessionEnrichment | undefined =
+          paResult.deliveryInsights?.length
+            ? { deliveryInsights: paResult.deliveryInsights }
+            : undefined;
         const wordsChecked: number =
           (pronunciation_score as any)?.azure_result?.Words?.length ??
           (pronunciation_score as any)?.azure_result?.Nbests?.[0]?.Words
@@ -257,11 +265,19 @@ export class LiveKitWebhookController {
               : [],
             callDuration,
             userSpokeSeconds,
+            'call',
+            sessionEnrichment,
           );
         } else {
           this.logger.warn(
             `Empty transcript for participant=${participant.userId} — PA saved, PQS skipped`,
           );
+          if (hasDeliveryInsights(sessionEnrichment)) {
+            await this.scoringService.persistSessionEnrichment(
+              participant.id,
+              sessionEnrichment,
+            );
+          }
         }
       } catch (e) {
         this.logger.error(

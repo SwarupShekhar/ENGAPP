@@ -15,6 +15,7 @@ import { AzureStorageService } from '../../integrations/azure-storage.service';
 import { PronunciationService } from '../pronunciation/pronunciation.service';
 import { NotificationService } from '../notifications/notification.service';
 import { ScoringService } from '../scoring/scoring.service';
+import type { SessionEnrichment } from '../../common/types/delivery-insight.types';
 import { SESSIONS_MAYA_QUEUE } from '../../queues/sessions-queue.constants';
 import { MayaSessionStore } from './maya-session.store';
 import { MayaConversationSession, MayaConversationTurn } from './maya-session.types';
@@ -614,6 +615,7 @@ export class ConversationalTutorService implements OnModuleInit {
       })),
     };
 
+    let mayaSessionEnrichment: SessionEnrichment | undefined;
     if (userId) {
       const expectedUploads = session.history.filter(
         (h) => h.speaker === 'user',
@@ -638,6 +640,11 @@ export class ConversationalTutorService implements OnModuleInit {
             meta.url,
             undefined,
           );
+          if (res.deliveryInsights?.length) {
+            mayaSessionEnrichment = {
+              deliveryInsights: res.deliveryInsights,
+            };
+          }
           const score = res.pronunciation_score?.score ?? 0;
           const turnLabel = `Turn ${meta.turnIndex ?? '?'}`;
           session.pronunciationAttempts.push({
@@ -695,6 +702,11 @@ export class ConversationalTutorService implements OnModuleInit {
               strengths: analysisData.strengths,
               improvementAreas: analysisData.weaknesses,
               nextSteps: analysisData.nextSteps,
+              ...(mayaSessionEnrichment?.deliveryInsights?.length
+                ? {
+                    deliveryInsights: mayaSessionEnrichment.deliveryInsights,
+                  }
+                : {}),
             } as any,
             mistakes: {
               create: analysisData.mistakes.map((m: any) => ({
@@ -793,6 +805,7 @@ export class ConversationalTutorService implements OnModuleInit {
             durationSec,
             userSpokeSeconds,
             'maya',
+            mayaSessionEnrichment,
           );
         } catch (scoreErr) {
           this.logger.warn(

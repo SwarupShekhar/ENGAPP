@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { BrainService } from '../brain/brain.service';
 import { WeaknessService } from '../reels/weakness.service';
+import type { DeliveryInsightDto } from '../../common/types/delivery-insight.types';
 
 export type FlaggedPronunciationError = {
   spoken: string;
@@ -149,6 +150,8 @@ export class PronunciationService {
       dominant_errors: string[];
       azure_result?: Record<string, unknown>;
     };
+    deliveryInsights?: DeliveryInsightDto[] | null;
+    fluencyBreakdown?: Record<string, unknown> | null;
   }> {
     const aiEngineUrl = process.env.AI_ENGINE_URL || 'http://localhost:8001';
     const url = `${aiEngineUrl}/api/pronunciation/assess`;
@@ -180,6 +183,8 @@ export class PronunciationService {
           dominant_errors: string[];
         };
         azure_result?: Record<string, unknown>;
+        delivery_insights?: DeliveryInsightDto[] | null;
+        fluency_breakdown?: Record<string, unknown> | null;
       };
       const flagged = Array.isArray(data.flagged_errors)
         ? data.flagged_errors
@@ -193,6 +198,8 @@ export class PronunciationService {
               azure_result: data.azure_result,
             }
           : undefined,
+        deliveryInsights: data.delivery_insights ?? null,
+        fluencyBreakdown: data.fluency_breakdown ?? null,
       };
     } catch (e) {
       this.logger.error('assessFromRecordingUrl', e);

@@ -60,7 +60,9 @@ import { PracticeTips } from "../components/PracticeTips";
 import { GrammarVocabBreakdown } from "../components/GrammarVocabBreakdown";
 import { ScoreBreakdownCard } from "../components/ScoreBreakdownCard";
 import { FluencyMetricsSection } from "../../../components/FluencyMetricsSection";
+import { DeliveryInsightsCard } from "../../../components/DeliveryInsightsCard";
 import type { FluencyBreakdown } from "../../../types/fluency";
+import type { DeliveryInsight } from "../../../types/delivery";
 import { paceLabel } from "../../../types/fluency";
 import { CallQualityScoreCard } from "../components/CallQualityScoreCard";
 import { CoachingCallSummaryToast } from "../components/CoachingCallSummaryToast";
@@ -1624,6 +1626,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
       ((rawData as Record<string, unknown> | undefined)?.azureEvidence as
         | Record<string, unknown>
         | undefined)?.fluencyBreakdown as FluencyBreakdown | undefined,
+    deliveryInsights:
+      ((rawData as Record<string, unknown> | undefined)?.deliveryInsights as
+        | DeliveryInsight[]
+        | undefined) ?? undefined,
   };
 
   // MAYA Summary: derive weak spots (lowest 2 dimensions) and words to learn from real data
@@ -1824,7 +1830,7 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             : " Smooth pace with few fillers."
         }`
       : undefined;
-    if (fluencyJust?.trim() || fluencyMetricsNote || data.scores.fluency > 0) {
+    if (fluencyJust?.trim() || fluencyMetricsNote || data.deliveryInsights?.length || data.scores.fluency > 0) {
       segments.push({
         id: 'fluency',
         category: 'fluency',
@@ -2508,6 +2514,11 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                         />
                       </View>
                     ) : null}
+                    {currentSegment.category === 'fluency' && data.deliveryInsights?.length ? (
+                      <View style={{ marginTop: 14 }}>
+                        <DeliveryInsightsCard insights={data.deliveryInsights} />
+                      </View>
+                    ) : null}
                   </Animated.View>
                 )
               )}
@@ -3037,6 +3048,12 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
             />
           </Animated.View>
         )}
+
+        {data.deliveryInsights?.length ? (
+          <Animated.View entering={FadeInDown.delay(400).springify()}>
+            <DeliveryInsightsCard insights={data.deliveryInsights} />
+          </Animated.View>
+        ) : null}
 
         {/* Full conversation transcript (grammar + pronunciation highlighted) */}
         {(sessionData?.feedback?.transcript ?? sessionData?.summaryJson?.transcript) && (
