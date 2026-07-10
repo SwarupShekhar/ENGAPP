@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     # Falls back to Azure automatically when Deepgram is not configured.
     deepgram_primary_stt: bool = True
     
+    # Phase 1.5: librosa delivery coaching on assessment (insights only, no score change)
+    librosa_delivery_insights: bool = False
+    
     # Inworld AI
     inworld_api_key: Optional[str] = None
     inworld_workspace: Optional[str] = None

@@ -10,17 +10,11 @@ import {
 
 interface FluencyMetricsSectionProps {
   breakdown: FluencyBreakdown;
-  /** Azure raw fluency before recalibration (optional). */
-  rawAzureFluency?: number;
-  /** Show "Recalibrated" badge (assessment). */
-  showRecalibratedBadge?: boolean;
   compact?: boolean;
 }
 
 export const FluencyMetricsSection: React.FC<FluencyMetricsSectionProps> = ({
   breakdown,
-  rawAzureFluency,
-  showRecalibratedBadge = false,
   compact = false,
 }) => {
   const theme = useAppTheme();
@@ -34,16 +28,7 @@ export const FluencyMetricsSection: React.FC<FluencyMetricsSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      {showRecalibratedBadge ? (
-        <View style={styles.headerRow}>
-          <Text style={styles.sectionTitle}>Fluency Breakdown</Text>
-          <View style={styles.recalibratedBadge}>
-            <Text style={styles.recalibratedText}>Recalibrated</Text>
-          </View>
-        </View>
-      ) : (
-        <Text style={styles.sectionTitle}>Fluency Details</Text>
-      )}
+      <Text style={styles.sectionTitle}>Fluency Breakdown</Text>
 
       {/* Pace + fillers row */}
       <View style={styles.metricsRow}>
@@ -115,20 +100,6 @@ export const FluencyMetricsSection: React.FC<FluencyMetricsSectionProps> = ({
         </View>
       </View>
 
-      {rawAzureFluency != null && rawAzureFluency > 0 && (
-        <View style={styles.azureComparison}>
-          <Ionicons
-            name="information-circle-outline"
-            size={16}
-            color={theme.colors.text.secondary}
-          />
-          <Text style={styles.azureComparisonText}>
-            Adjusted from Azure's raw fluency of {Math.round(rawAzureFluency)}%
-            for realism.
-          </Text>
-        </View>
-      )}
-
       {(breakdown.examples?.linking_detected?.length ?? 0) > 0 ||
       (breakdown.examples?.reductions_detected?.length ?? 0) > 0 ? (
         <View style={styles.examplesContainer}>
@@ -168,31 +139,11 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>, compact: boolean) =>
       borderWidth: compact ? 0 : 1,
       borderColor: theme.colors.border,
     },
-    headerRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12,
-    },
     sectionTitle: {
       fontSize: compact ? 15 : 16,
       fontWeight: "700",
       color: theme.colors.text.primary,
       marginBottom: compact ? 8 : 12,
-    },
-    recalibratedBadge: {
-      backgroundColor: "rgba(79, 70, 229, 0.1)",
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 4,
-      borderWidth: 1,
-      borderColor: "rgba(79, 70, 229, 0.2)",
-    },
-    recalibratedText: {
-      fontSize: 10,
-      fontWeight: "700",
-      color: theme.colors.primary,
-      textTransform: "uppercase",
     },
     metricsRow: {
       flexDirection: "row",
@@ -254,18 +205,6 @@ const getStyles = (theme: ReturnType<typeof useAppTheme>, compact: boolean) =>
       fontSize: 18,
       fontWeight: "700",
       color: theme.colors.text.primary,
-    },
-    azureComparison: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      marginTop: 8,
-    },
-    azureComparisonText: {
-      fontSize: 11,
-      color: theme.colors.text.secondary,
-      fontStyle: "italic",
-      flex: 1,
     },
     examplesContainer: {
       marginTop: 12,

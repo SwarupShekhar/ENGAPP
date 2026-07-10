@@ -17,7 +17,9 @@ import { useUser } from "@clerk/clerk-expo";
 import { BenchmarkCard } from "../components/BenchmarkCard";
 import { RecurringErrorsCard } from "../components/RecurringErrorsCard";
 import { ReadinessCard } from "../components/ReadinessCard";
+import type { DeliveryInsight } from "../../../types/delivery";
 import { FluencyMetricsSection } from "../../../components/FluencyMetricsSection";
+import { DeliveryInsightsCard } from "../../../components/DeliveryInsightsCard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { assessmentApi } from "../services/assessment";
 import {
@@ -263,17 +265,18 @@ export default function AssessmentResultScreen({ navigation, route }: any) {
           </View>
         </View>
 
-        {result?.fluencyBreakdown && (
+        {(result?.fluencyBreakdown || result?.deliveryInsights?.length) ? (
           <View style={styles.section}>
             <View style={styles.planCard}>
-              <FluencyMetricsSection
-                breakdown={result.fluencyBreakdown}
-                rawAzureFluency={result.rawAzureMetrics?.fluency}
-                showRecalibratedBadge
-              />
+              {result?.fluencyBreakdown ? (
+                <FluencyMetricsSection breakdown={result.fluencyBreakdown} />
+              ) : null}
+              {result?.deliveryInsights?.length ? (
+                <DeliveryInsightsCard insights={result.deliveryInsights} />
+              ) : null}
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* Phase 4: Intelligence Layer */}
         <View style={styles.section}>

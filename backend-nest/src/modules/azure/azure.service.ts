@@ -44,6 +44,13 @@ export class AzureService {
     wpm?: number | null;
     snr?: number;
     fluencyBreakdown?: any;
+    deliveryInsights?: Array<{
+      id: string;
+      label: string;
+      severity: 'info' | 'tip' | 'focus';
+      message: string;
+      feature_value?: number;
+    }> | null;
     azureRawFluency?: number;
     azureRawProsody?: number;
     detailedFeedback?: {
@@ -150,6 +157,7 @@ export class AzureService {
         wpm: body?.wpm ?? body?.fluency_breakdown?.wpm ?? null,
         snr: 20,
         fluencyBreakdown: body?.fluency_breakdown ?? null,
+        deliveryInsights: body?.delivery_insights ?? null,
         azureRawFluency: body?.azure_raw_fluency ?? score,
         azureRawProsody: body?.azure_raw_prosody ?? score,
         detailedFeedback: {

@@ -366,6 +366,7 @@ export class AssessmentService {
       audioUrl,
       detailedFeedback: result.detailedFeedback,
       fluencyBreakdown: result.fluencyBreakdown,
+      deliveryInsights: result.deliveryInsights,
       azureRawFluency: result.azureRawFluency,
       azureRawProsody: result.azureRawProsody,
     };
@@ -415,6 +416,7 @@ export class AssessmentService {
       detailedFeedback: result.detailedFeedback,
       emotionData: (result as any).emotionData,
       fluencyBreakdown: result.fluencyBreakdown,
+      deliveryInsights: result.deliveryInsights,
       azureRawFluency: result.azureRawFluency,
       azureRawProsody: result.azureRawProsody,
     };
@@ -710,6 +712,11 @@ export class AssessmentService {
     // Recalibrated Fluency Breakdown Synthesis
     const fluencyBreakdown =
       p2.attempt2?.fluencyBreakdown || p2.attempt1?.fluencyBreakdown || null;
+    const deliveryInsights =
+      p2.attempt2?.deliveryInsights ||
+      p2.attempt1?.deliveryInsights ||
+      (session.phase1Data as any)?.deliveryInsights ||
+      null;
     const rawAzureMetrics = {
       fluency:
         (p2.attempt1?.azureRawFluency + p2.attempt2?.azureRawFluency) / 2 ||
@@ -846,6 +853,7 @@ export class AssessmentService {
           confidence,
           skillBreakdown,
           fluencyBreakdown,
+          deliveryInsights,
           rawAzureMetrics,
           weaknessMap: weaknessMap as any,
           improvementDelta: improvementDelta as any,
@@ -902,6 +910,7 @@ export class AssessmentService {
       confidence,
       skillBreakdown,
       fluencyBreakdown,
+      deliveryInsights,
       weaknessMap,
       improvementDelta,
       personalizedPlan,
@@ -993,6 +1002,7 @@ export class AssessmentService {
       confidence: session.confidence,
       skillBreakdown: session.skillBreakdown,
       fluencyBreakdown: session.fluencyBreakdown,
+      deliveryInsights: (session as any).deliveryInsights ?? null,
       weaknessMap: session.weaknessMap,
       improvementDelta: session.improvementDelta,
       personalizedPlan: session.personalizedPlan,

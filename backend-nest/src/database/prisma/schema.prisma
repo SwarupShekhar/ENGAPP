@@ -501,6 +501,7 @@ model AssessmentSession {
   skillBreakdown     Json?
   weaknessMap        Json?
   fluencyBreakdown   Json?
+  deliveryInsights   Json?
   rawAzureMetrics    Json?
   benchmarking       Json?
   confidence_metrics Json?

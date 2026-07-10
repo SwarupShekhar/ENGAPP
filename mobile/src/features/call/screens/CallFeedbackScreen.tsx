@@ -3033,7 +3033,6 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           <Animated.View entering={FadeInDown.delay(350).springify()}>
             <FluencyMetricsSection
               breakdown={data.fluencyBreakdown}
-              rawAzureFluency={data.fluencyBreakdown.azure_raw_fluency}
               compact={false}
             />
           </Animated.View>

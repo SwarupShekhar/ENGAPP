@@ -19,6 +19,24 @@ from app.features.pronunciation.pronunciation_scorer import calculate_pronunciat
 from app.features.scoring.fluency_breakdown import build_fluency_breakdown
 
 
+async def _attach_delivery_insights(
+    wav_path: str,
+    wpm: float | None,
+) -> list[dict[str, Any]]:
+    from app.core.config import settings
+    if not settings.librosa_delivery_insights:
+        return []
+    try:
+        from app.features.pronunciation.librosa_features import extract_librosa_features
+        from app.features.pronunciation.delivery_insights import build_delivery_insights
+
+        features = await extract_librosa_features(wav_path)
+        return build_delivery_insights(features, wpm=wpm)
+    except Exception as e:
+        logger.warning("delivery_insights_failed: %s", e)
+        return []
+
+
 def _attach_fluency_metrics(
     azure_result: dict[str, Any],
     reference_text: str | None,
@@ -482,11 +500,16 @@ async def assess_pronunciation(
                 pass_2_result,
                 pass_1_transcript or None,
             )
+            delivery_insights = await _attach_delivery_insights(
+                tmp_wav,
+                fluency_metrics.get("wpm"),
+            )
             return {
                 "flagged_errors": errors,
                 "pronunciation_score": score_result,
                 "azure_result": pass_2_result,
                 **fluency_metrics,
+                "delivery_insights": delivery_insights,
             }
         except HTTPException:
             raise
