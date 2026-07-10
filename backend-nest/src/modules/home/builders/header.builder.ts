@@ -25,10 +25,10 @@ export class HeaderBuilder {
     const streak = user.currentStreak || user.profile?.streak || 0;
     let level = user.assessmentLevel || user.overallLevel || user.level || 'A2';
 
-    let score = Math.round(Number(user.assessmentScore ?? 0));
-    let latestAssessmentId: string | null = null;
-    let goalTarget = 70;
-    let goalLabel = 'Next Level';
+    let score: number;
+    let latestAssessmentId: string | null;
+    let goalTarget: number;
+    let goalLabel: string;
 
     if (this.scoreAuthority.isEnabledForUser(userId)) {
       const profile = await this.scoreAuthority.getProfile(userId);
