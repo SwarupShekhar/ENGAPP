@@ -12,7 +12,6 @@ import {
   Modal,
   RefreshControl,
   AccessibilityInfo,
-  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useUser } from '@clerk/clerk-expo';
@@ -41,7 +40,6 @@ import PulseHomeCarousel, {
 } from '../../../components/home/PulseHomeCarousel';
 import { homeTheme } from '../theme/homeTheme';
 import ConnectHeroCard from '../components/ConnectHeroCard';
-import MistakesCard from '../components/MistakesCard';
 import { getHomeData, HomeData } from '../services/homeApi';
 import { getScoreProfile, type ScoreProfile } from '../../../api/scores';
 import { getBridgeUser } from '../../../api/bridgeClient';
@@ -56,7 +54,7 @@ import {
 import { HOME_DATA_CACHE_KEY, utcTodayKey } from '../../../services/cacheKeys';
 import HomeCacheService from '../../../services/homeCacheService';
 import { client, getNestAuthToken } from '../../../api/client';
-import { tasksApi, type LearningTask } from '../../../api/tasks';
+import { tasksApi } from '../../../api/tasks';
 import { DailyListenVoiceModal } from '../../../components/settings/DailyListenVoiceModal';
 import type { DailyListenVoice } from '../../../types/dailyListenVoice';
 
@@ -231,10 +229,6 @@ interface Phrase { id?: string; phrase: string; definition: string; example: str
 
 const LEVEL_ORDER = ['a1','a2','b1','b2','c1','c2'];
 type LevelKey = 'a1'|'a2'|'b1'|'b2'|'c1'|'c2';
-
-function taskMatchesPillar(task: LearningTask, pillar: string): boolean {
-  return (task.type || '').toLowerCase() === pillar.toLowerCase();
-}
 
 function cefrKey(l: string): LevelKey {
   const k = l.toLowerCase().replace('-','') as LevelKey;
@@ -853,9 +847,6 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const socketService = useRef(SocketService.getInstance()).current;
   const carouselRef = useRef<PulseHomeCarouselHandle>(null);
-  const homeScrollRef = useRef<ScrollView>(null);
-  /** Y offset of practice carousel within home ScrollView — used for instant Practice now. */
-  const carouselOffsetYRef = useRef(0);
 
   const [homeData, setHomeData]       = useState<HomeData | null>(() =>
     HomeCacheService.getInstance().getSnapshot(),
@@ -1225,22 +1216,6 @@ export default function HomeScreen() {
   const onlineCount = homeData?.community?.onlineCount ?? 0;
   const communityAvatars = homeData?.community?.avatars ?? [];
 
-  // ── Weakest pillar (lowest of the four skill scores; null if all 0 / empty) ─
-  const weakestPillar = (() => {
-    const keys: SkillDetailKeyV1[] = ['grammar', 'pronunciation', 'fluency', 'vocabulary'];
-    const present = keys
-      .map((k) => ({ k, v: Number(skills[k] ?? 0) }))
-      .filter((e) => Number.isFinite(e.v));
-    if (present.length === 0) return null;
-    // New user with no calls: every pillar 0 → hide the card.
-    if (present.every((e) => e.v <= 0)) return null;
-    let lowest = present[0];
-    for (const e of present) {
-      if (e.v < lowest.v) lowest = e;
-    }
-    return lowest.k as string;
-  })();
-
   // ── Handlers ───────────────────────────────────────────────────────────────
   const goResults  = () => latestId ? navigation.navigate('AssessmentResult', { sessionId: latestId }) : navigation.navigate('AssessmentIntro');
   const goRetake   = () => navigation.navigate('AssessmentIntro');
@@ -1253,58 +1228,6 @@ export default function HomeScreen() {
   const goMayaFallback = useCallback(() => {
     navigation.navigate('MayaTutor', { source: 'home_fallback' });
   }, [navigation]);
-
-  // Mistakes card — jump to carousel immediately (no multi-API wait on tap).
-  // Network fallback only if carousel has no matching practice slide.
-  const goMistakesPractice = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const focus = (weakestPillar ?? '').toLowerCase();
-    if (!focus) {
-      Alert.alert(
-        'No practice tasks yet',
-        'Complete a call with Maya or a partner to get personalized fixes.',
-      );
-      return;
-    }
-
-    const y = carouselOffsetYRef.current;
-    if (y > 0) {
-      homeScrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
-    }
-
-    const onCarousel = carouselRef.current?.scrollToPillar(focus);
-    if (onCarousel) return;
-
-    // Soft land on daily practice if no pillar task is loaded yet.
-    if (
-      carouselRef.current?.scrollToSlideKind('word_daily') ||
-      carouselRef.current?.scrollToSlideKind('phrase_daily')
-    ) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const dueTasks = await tasksApi.getDueTasks();
-        const match =
-          dueTasks.find((t) => taskMatchesPillar(t, focus)) ?? dueTasks[0];
-        if (match) {
-          navigation.navigate('PracticeTask', {
-            task: match,
-            source: 'home_mistakes',
-            focus,
-          });
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
-      Alert.alert(
-        'No practice tasks yet',
-        'Complete a call with Maya or a partner — we will turn your mistakes into practice cards.',
-      );
-    })();
-  }, [navigation, weakestPillar]);
 
   // ── Entry choreography (cascade) ───────────────────────────────────────────
   const { cascadeStart, cascadeStagger, cascadeDuration } = homeTheme.entry;
@@ -1320,7 +1243,6 @@ export default function HomeScreen() {
       <StatusBar style="light" backgroundColor={homeTheme.canvas} />
 
       <ScrollView
-        ref={homeScrollRef}
         style={[st.scroll, { backgroundColor: homeTheme.canvas }]}
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 104, paddingHorizontal: HPAD, gap: 14 }}
         showsVerticalScrollIndicator={false}
@@ -1395,20 +1317,13 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {/* ── Mistakes card (hides itself when no weakest pillar) ─────────── */}
-        {!loadingHome && (
-          <Animated.View entering={playEntry ? enterAt(1) : undefined}>
-            <MistakesCard weakestPillar={weakestPillar} onPractice={goMistakesPractice} />
-          </Animated.View>
-        )}
-
         {/* ── Score Card / Nudge (slim) ───────────────────────────────────── */}
         {loadingHome ? (
           <Animated.View entering={FadeIn.delay(60).duration(260)}>
             <ScoreSkeleton theme={theme} />
           </Animated.View>
         ) : hasData ? (
-          <Animated.View entering={playEntry ? enterAt(2) : undefined}>
+          <Animated.View entering={playEntry ? enterAt(1) : undefined}>
             <ScoreCard
               score={score}
               level={levelForUi}
@@ -1424,19 +1339,13 @@ export default function HomeScreen() {
             />
           </Animated.View>
         ) : (
-          <Animated.View entering={playEntry ? enterAt(2) : undefined}>
+          <Animated.View entering={playEntry ? enterAt(1) : undefined}>
             <AssessmentNudge theme={theme} onPress={goAssess} />
           </Animated.View>
         )}
 
-        {/* ── Phrase carousel ─────────────────────────────────────────────── */}
-        <Animated.View
-          entering={playEntry ? enterAt(3) : undefined}
-          style={{ gap: 10 }}
-          onLayout={(e) => {
-            carouselOffsetYRef.current = e.nativeEvent.layout.y;
-          }}
-        >
+        {/* ── Practice carousel (phrase / word / mistake tasks) ───────────── */}
+        <Animated.View entering={playEntry ? enterAt(2) : undefined} style={{ gap: 10 }}>
           <PulseHomeCarousel
             ref={carouselRef}
             phraseOfTheDay={homeData?.phraseOfTheDay ?? null}
