@@ -232,13 +232,6 @@ interface Phrase { id?: string; phrase: string; definition: string; example: str
 const LEVEL_ORDER = ['a1','a2','b1','b2','c1','c2'];
 type LevelKey = 'a1'|'a2'|'b1'|'b2'|'c1'|'c2';
 
-const PILLAR_ALERT_LABEL: Record<string, string> = {
-  pronunciation: 'pronunciation clarity',
-  fluency: 'fluency',
-  grammar: 'grammar',
-  vocabulary: 'vocabulary',
-};
-
 function taskMatchesPillar(task: LearningTask, pillar: string): boolean {
   return (task.type || '').toLowerCase() === pillar.toLowerCase();
 }
@@ -860,6 +853,9 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const socketService = useRef(SocketService.getInstance()).current;
   const carouselRef = useRef<PulseHomeCarouselHandle>(null);
+  const homeScrollRef = useRef<ScrollView>(null);
+  /** Y offset of practice carousel within home ScrollView — used for instant Practice now. */
+  const carouselOffsetYRef = useRef(0);
 
   const [homeData, setHomeData]       = useState<HomeData | null>(() =>
     HomeCacheService.getInstance().getSnapshot(),
@@ -1258,8 +1254,9 @@ export default function HomeScreen() {
     navigation.navigate('MayaTutor', { source: 'home_fallback' });
   }, [navigation]);
 
-  // Mistakes card — practice the weakest pillar; skip tasks already on the carousel.
-  const goMistakesPractice = useCallback(async () => {
+  // Mistakes card — jump to carousel immediately (no multi-API wait on tap).
+  // Network fallback only if carousel has no matching practice slide.
+  const goMistakesPractice = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const focus = (weakestPillar ?? '').toLowerCase();
     if (!focus) {
@@ -1270,71 +1267,43 @@ export default function HomeScreen() {
       return;
     }
 
-    try {
-      const [carouselTasks, dueTasks, pendingTasks] = await Promise.all([
-        tasksApi.loadPracticeCarouselTasks(),
-        tasksApi.getDueTasks(),
-        tasksApi.getPendingTasks().catch(() => [] as LearningTask[]),
-      ]);
-      const carouselIds = new Set(carouselTasks.map((t) => t.id));
-      const offCarousel = dueTasks.find(
-        (t) => taskMatchesPillar(t, focus) && !carouselIds.has(t.id),
-      );
-
-      if (offCarousel) {
-        navigation.navigate('PracticeTask', {
-          task: offCarousel,
-          source: 'home_mistakes',
-          focus,
-        });
-        return;
-      }
-
-      const onCarousel = carouselTasks.find((t) => taskMatchesPillar(t, focus));
-      if (onCarousel) {
-        carouselRef.current?.scrollToPillar(focus);
-        const pillarLabel = PILLAR_ALERT_LABEL[focus] ?? focus;
-        Alert.alert('Practice in carousel', `Your ${pillarLabel} fixes are in the carousel below`);
-        return;
-      }
-
-      const anyDue = dueTasks.find((t) => taskMatchesPillar(t, focus));
-      if (anyDue) {
-        navigation.navigate('PracticeTask', {
-          task: anyDue,
-          source: 'home_mistakes',
-          focus,
-        });
-        return;
-      }
-
-      const pendingMatch = pendingTasks.find((t) => taskMatchesPillar(t, focus));
-      if (pendingMatch) {
-        navigation.navigate('PracticeTask', {
-          task: pendingMatch,
-          source: 'home_mistakes',
-          focus,
-        });
-        return;
-      }
-
-      const anyTask = dueTasks[0] ?? pendingTasks[0] ?? carouselTasks[0];
-      if (anyTask) {
-        navigation.navigate('PracticeTask', {
-          task: anyTask,
-          source: 'home_mistakes',
-          focus,
-        });
-        return;
-      }
-    } catch {
-      /* fall through to user message */
+    const y = carouselOffsetYRef.current;
+    if (y > 0) {
+      homeScrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
     }
 
-    Alert.alert(
-      'No practice tasks yet',
-      'Complete a call with Maya or a partner — we will turn your mistakes into practice cards.',
-    );
+    const onCarousel = carouselRef.current?.scrollToPillar(focus);
+    if (onCarousel) return;
+
+    // Soft land on daily practice if no pillar task is loaded yet.
+    if (
+      carouselRef.current?.scrollToSlideKind('word_daily') ||
+      carouselRef.current?.scrollToSlideKind('phrase_daily')
+    ) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const dueTasks = await tasksApi.getDueTasks();
+        const match =
+          dueTasks.find((t) => taskMatchesPillar(t, focus)) ?? dueTasks[0];
+        if (match) {
+          navigation.navigate('PracticeTask', {
+            task: match,
+            source: 'home_mistakes',
+            focus,
+          });
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      Alert.alert(
+        'No practice tasks yet',
+        'Complete a call with Maya or a partner — we will turn your mistakes into practice cards.',
+      );
+    })();
   }, [navigation, weakestPillar]);
 
   // ── Entry choreography (cascade) ───────────────────────────────────────────
@@ -1351,6 +1320,7 @@ export default function HomeScreen() {
       <StatusBar style="light" backgroundColor={homeTheme.canvas} />
 
       <ScrollView
+        ref={homeScrollRef}
         style={[st.scroll, { backgroundColor: homeTheme.canvas }]}
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: insets.bottom + 104, paddingHorizontal: HPAD, gap: 14 }}
         showsVerticalScrollIndicator={false}
@@ -1460,7 +1430,13 @@ export default function HomeScreen() {
         )}
 
         {/* ── Phrase carousel ─────────────────────────────────────────────── */}
-        <Animated.View entering={playEntry ? enterAt(3) : undefined} style={{ gap: 10 }}>
+        <Animated.View
+          entering={playEntry ? enterAt(3) : undefined}
+          style={{ gap: 10 }}
+          onLayout={(e) => {
+            carouselOffsetYRef.current = e.nativeEvent.layout.y;
+          }}
+        >
           <PulseHomeCarousel
             ref={carouselRef}
             phraseOfTheDay={homeData?.phraseOfTheDay ?? null}
