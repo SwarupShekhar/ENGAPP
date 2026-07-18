@@ -51,6 +51,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Install spaCy English model
+        run: python -m spacy download en_core_web_sm
+
       - name: Run tests
         env:
           # Disk-only cache avoids Redis requirement in CI
