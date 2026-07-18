@@ -20,6 +20,15 @@
 		}
 	}
 
+	# Maya WS fallback over the public HTTPS domain (wss://api.englivo.com/ai/...).
+	# Strip /ai so backend-ai still sees /api/tutor/ws/{sessionId}.
+	# Do NOT expose the rest of backend-ai externally — only this WS path.
+	@aiTutorWs path /ai/api/tutor/ws/*
+	handle @aiTutorWs {
+		uri strip_prefix /ai
+		reverse_proxy backend-ai:8001
+	}
+
 	handle {
 		encode gzip
 
@@ -30,7 +39,7 @@
 			Referrer-Policy no-referrer
 		}
 
-		# All traffic → NestJS; backend-ai is never exposed externally.
+		# Default traffic → NestJS. backend-ai stays internal except @aiTutorWs above.
 		reverse_proxy backend-nest:3000
 	}
 }

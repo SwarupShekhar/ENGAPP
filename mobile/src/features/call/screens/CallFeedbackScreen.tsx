@@ -2219,10 +2219,34 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
   // ── Intro phase ───────────────────────────────────────────
   if (feedbackPhase === 'intro') {
     const introSkills = [
-      { key: 'pronunciation' as const, label: 'Pronunciation', icon: 'mic', score: data.scores.pronunciation },
-      { key: 'grammar' as const, label: 'Grammar', icon: 'document-text', score: data.scores.grammar },
-      { key: 'fluency' as const, label: 'Fluency', icon: 'flash', score: data.scores.fluency },
-      { key: 'vocabulary' as const, label: 'Vocabulary', icon: 'book', score: data.scores.vocabulary },
+      {
+        key: 'pronunciation' as const,
+        label: 'Pronunciation',
+        icon: 'mic',
+        score: data.scores.pronunciation,
+        measured: data.scores.pronunciationMeasured !== false,
+      },
+      {
+        key: 'grammar' as const,
+        label: 'Grammar',
+        icon: 'document-text',
+        score: data.scores.grammar,
+        measured: data.scores.grammarMeasured !== false,
+      },
+      {
+        key: 'fluency' as const,
+        label: 'Fluency',
+        icon: 'flash',
+        score: data.scores.fluency,
+        measured: true,
+      },
+      {
+        key: 'vocabulary' as const,
+        label: 'Vocabulary',
+        icon: 'book',
+        score: data.scores.vocabulary,
+        measured: true,
+      },
     ];
     const skillColor = (key: 'pronunciation' | 'grammar' | 'fluency' | 'vocabulary') =>
       key === 'fluency'
@@ -2294,10 +2318,21 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
                       flex: 1, height: 6, borderRadius: 3,
                       backgroundColor: theme.colors.text.secondary + '20', overflow: 'hidden',
                     }}>
-                      <View style={{ width: `${pct}%`, height: '100%', backgroundColor: c, borderRadius: 3 }} />
+                      {s.measured ? (
+                        <View style={{ width: `${pct}%`, height: '100%', backgroundColor: c, borderRadius: 3 }} />
+                      ) : null}
                     </View>
-                    <Text style={{ width: 40, textAlign: 'right', fontSize: 13, fontWeight: '700', color: c }}>
-                      {pct}%
+                    <Text
+                      style={{
+                        width: s.measured ? 40 : 52,
+                        textAlign: 'right',
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: s.measured ? c : theme.colors.text.secondary,
+                        fontStyle: s.measured ? 'normal' : 'italic',
+                      }}
+                    >
+                      {s.measured ? `${pct}%` : 'N/A'}
                     </Text>
                   </View>
                 );
@@ -2973,7 +3008,8 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
         {/* Cap notification banner: pronunciation is holding score back */}
         {(sessionData?.summaryJson?.pronunciation_cefr_cap ||
-          (data?.scores?.pronunciation != null &&
+          (data?.scores?.grammarMeasured !== false &&
+            data?.scores?.pronunciation != null &&
             data?.scores?.grammar != null &&
             data.scores.pronunciation < data.scores.grammar - 15)) && (
           <Animated.View

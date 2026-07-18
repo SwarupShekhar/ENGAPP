@@ -35,7 +35,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Audio } from "expo-av";
 import { useAppTheme } from "../../../theme/useAppTheme";
 import { tutorApi } from "../services/tutorApi";
-import { streamingTutor, StreamChunk } from "../../call/services/streamingTutorService";
+import { streamingTutor, StreamChunk, mayaHop } from "../../call/services/streamingTutorService";
 import { PronunciationBreakdown } from "../../../components/PronunciationBreakdown";
 import { bridgeApi } from "../../../api/bridgeApi";
 import { getCachedToken } from "../../../api/authToken";
@@ -751,7 +751,9 @@ export default function AITutorScreen({ navigation, route }: any) {
           Boolean(chunk.text));
       if (isLatencyChunk && turnStartMsRef.current) {
         firstChunkSeenRef.current = true;
-        setFirstChunkLatencyMs(Date.now() - turnStartMsRef.current);
+        const ms = Date.now() - turnStartMsRef.current;
+        setFirstChunkLatencyMs(ms);
+        mayaHop("first_chunk", { type: chunk.type, ms });
         activeLatencyTimeline.endSpan("sse_request");
         if (chunk.type === "transcript" || chunk.type === "transcription") {
           activeLatencyTimeline.markInstant("sse_transcript");
@@ -1084,6 +1086,12 @@ export default function AITutorScreen({ navigation, route }: any) {
         let usedSSE = false;
         let sseSkipped = false;
         let turnRateLimited = false;
+        mayaHop("turn_start", {
+          sessionId: activeSessionId,
+          turnIndex: turnIndexForUpload,
+          mime: uploadMime,
+          silero: capture.providerUsed === "silero",
+        });
         if (token && activeSessionId) {
               sseAbortRef.current?.abort();
               const abortController = new AbortController();
@@ -1097,11 +1105,16 @@ export default function AITutorScreen({ navigation, route }: any) {
               let aiText = "";
               let sseTimedOut = false;
               try {
+                mayaHop("sse_request");
                 const response = await tutorApi.streamSpeech(formData, {
                   Authorization: `Bearer ${token}`,
                 }, abortController.signal);
                 if (!response.ok) {
                   const errText = await response.text().catch(() => "");
+                  mayaHop("sse_fail", {
+                    status: response.status,
+                    body: errText.slice(0, 200),
+                  });
                   console.warn(
                     `[Tutor SSE] ${response.status} ${response.statusText}`,
                     errText.slice(0, 500),
@@ -1111,17 +1124,15 @@ export default function AITutorScreen({ navigation, route }: any) {
                     setError(MAYA_RATE_LIMIT_MESSAGE);
                     setStreamPath("idle");
                     setStreamDebugReason("rate_limited_429");
-                  } else if (__DEV__) {
-                    console.log("[Tutor SSE] Falling back to WS due to non-2xx response");
-                    setStreamPath("ws-fallback");
-                    setStreamDebugReason(`sse_non_2xx_${response.status}`);
                   } else {
+                    console.log("[Tutor SSE] Falling back to WS due to non-2xx response");
                     setStreamPath("ws-fallback");
                     setStreamDebugReason(`sse_non_2xx_${response.status}`);
                   }
                 }
                 if (response.ok && response.body) {
                   usedSSE = true;
+                  mayaHop("sse_ok");
                   setStreamPath("sse");
                   setStreamDebugReason("ok");
                   const reader = response.body.getReader();
@@ -1245,7 +1256,11 @@ export default function AITutorScreen({ navigation, route }: any) {
                   usedSSE = true;
                 }
               }
-          } else if (__DEV__) {
+          } else {
+            mayaHop("sse_skipped", {
+              hasToken: Boolean(token),
+              hasSession: Boolean(activeSessionId),
+            });
             console.warn(
               "[Tutor SSE] skipped (missing auth token or sessionId), using WS fallback",
             );
@@ -1256,6 +1271,7 @@ export default function AITutorScreen({ navigation, route }: any) {
           if (turnRateLimited) {
             setTranscript((prev) => prev.filter((m) => !m.tempId));
           } else if (!usedSSE && activeSessionId) {
+            mayaHop("ws_fallback_begin");
             let wsAudioBase64 = prebuiltAudioBase64;
             if (wsAudioBase64 === undefined) {
               wsAudioBase64 = await FileSystem.readAsStringAsync(uri, {

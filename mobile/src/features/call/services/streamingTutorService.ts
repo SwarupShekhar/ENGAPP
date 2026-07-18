@@ -1,27 +1,33 @@
-import Constants from "expo-constants";
 import { API_URL as NEST_API_URL } from "../../../api/client";
 import { API_URL as ENGLIVO_API_URL } from "../../../api/englivoClient";
 import { readExpoExtra } from "../../../api/expoExtra";
 import { tutorApi } from "../../../api/tutor";
 
-/** Vultr host port for backend-ai (docker-compose.prod.yml). Not 8001 — used by vaidik_backend. */
+/** Vultr host port for backend-ai (docker-compose.prod.yml). Dev / emergency only. */
 const VULTR_AI_HOST_PORT = "4010";
-/** Vultr backend-ai WebSocket (host :4010 → container :8001, plain WS — no TLS). */
-const VULTR_AI_WS_ORIGIN = `ws://139.84.163.249:${VULTR_AI_HOST_PORT}`;
 
-/** Raw IP + AI port is HTTP/ws only; wss:// never completes the TLS handshake. */
+/**
+ * Public Maya WS origin for production.
+ * Caddy strips `/ai` and proxies `/api/tutor/ws/*` → backend-ai (see config/caddy/Caddyfile).
+ * Prefer wss via api.englivo.com — never plaintext ws:// to a raw IP (Android cleartext
+ * policies kill that on release builds and it looks like "Maya doesn't work").
+ */
+const PUBLIC_AI_WS_ORIGIN = "wss://api.englivo.com/ai";
+
+/** Emergency plaintext IP path — only when explicitly overridden (never the default). */
+const LEGACY_PLAINTEXT_AI_WS = `ws://139.84.163.249:${VULTR_AI_HOST_PORT}`;
+
 function normalizeTutorWsUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    const isIpv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname);
-    if (isIpv4 && u.port === VULTR_AI_HOST_PORT && u.protocol === "wss:") {
-      u.protocol = "ws:";
-      return u.toString().replace(/\/$/, "");
-    }
-  } catch {
-    /* keep original */
-  }
   return url.replace(/\/$/, "");
+}
+
+/** Structured hop log for Section D repro (shows in release logcat / Metro). */
+export function mayaHop(
+  hop: string,
+  detail?: Record<string, unknown>,
+): void {
+  const payload = detail ? ` ${JSON.stringify(detail)}` : "";
+  console.log(`[MAYA-HOP] ${hop}${payload}`);
 }
 
 export interface StreamChunk {
@@ -89,26 +95,35 @@ class StreamingTutorService {
     const IS_PROD = !__DEV__;
     let wsUrl: string;
 
-    // Explicit override wins (ENGLIVO_WS_URL_OVERRIDE in .env → app.config extra)
+    // Explicit override wins (ENGLIVO_WS_URL_OVERRIDE in .env → app.config extra).
+    // Use only for local debugging — do not bake plaintext IP into release builds.
     const wsOverride = (readExpoExtra("englivoWsUrlOverride") ?? "").trim();
     if (wsOverride) {
       wsUrl = normalizeTutorWsUrl(wsOverride);
+      mayaHop("ws_url_override", { wsUrl });
     } else if (IS_PROD) {
       const nestBase = NEST_API_URL.replace(/\/$/, "");
       try {
-        const u = new URL(nestBase.startsWith("http") ? nestBase : `http://${nestBase}`);
-        const wsScheme = u.protocol === "https:" ? "wss" : "ws";
-        // api.englivo.com only reverse-proxies Nest; backend-ai WS stays on Vultr AI port.
+        const u = new URL(
+          nestBase.startsWith("http") ? nestBase : `http://${nestBase}`,
+        );
         if (u.hostname === "api.englivo.com") {
-          wsUrl = normalizeTutorWsUrl(VULTR_AI_WS_ORIGIN);
+          wsUrl = PUBLIC_AI_WS_ORIGIN;
         } else {
-          wsUrl = normalizeTutorWsUrl(`${wsScheme}://${u.hostname}:${VULTR_AI_HOST_PORT}`);
+          const wsScheme = u.protocol === "https:" ? "wss" : "ws";
+          // Non-prod custom host: prefer same-host AI path under /ai when HTTPS.
+          wsUrl =
+            wsScheme === "wss"
+              ? normalizeTutorWsUrl(`${wsScheme}://${u.hostname}/ai`)
+              : normalizeTutorWsUrl(
+                  `${wsScheme}://${u.hostname}:${VULTR_AI_HOST_PORT}`,
+                );
         }
       } catch {
         const base = ENGLIVO_API_URL.replace(/\/$/, "");
         wsUrl = base.startsWith("https://")
-          ? base.replace("https://", "wss://")
-          : base.replace("http://", "ws://");
+          ? PUBLIC_AI_WS_ORIGIN
+          : base.replace("https://", "wss://").replace("http://", "ws://");
       }
     } else {
       // Dev: derive from API_URL host, backend-ai on 8001
@@ -123,32 +138,55 @@ class StreamingTutorService {
       }
     }
 
+    mayaHop("ws_token_request", { sessionId });
     let wsToken = "";
     try {
       const { token } = await tutorApi.getStreamingWsToken(sessionId);
       wsToken = token;
+      mayaHop("ws_token_ok", { hasToken: Boolean(token) });
     } catch (e) {
+      mayaHop("ws_token_fail", {
+        error: e instanceof Error ? e.message : String(e),
+      });
       console.warn("[StreamingTutor] WS token fetch failed:", e);
     }
 
     const qs = new URLSearchParams({ user_id: userId });
     if (wsToken) qs.set("ws_token", wsToken);
     const fullWs = `${wsUrl}/api/tutor/ws/${sessionId}?${qs.toString()}`;
-    if (__DEV__) {
-      console.log("[StreamingTutor] Connecting", fullWs);
-    } else {
-      console.log(`[EngR] Tutor WS fallback: ${wsUrl}`);
+    mayaHop("ws_connect", {
+      origin: wsUrl,
+      plaintext: wsUrl.startsWith("ws://"),
+      legacyIp: wsUrl.includes("139.84.163.249"),
+    });
+    if (wsUrl === LEGACY_PLAINTEXT_AI_WS || wsUrl.startsWith("ws://")) {
+      console.warn(
+        "[StreamingTutor] Using plaintext ws:// — release Android may block this. Prefer wss://api.englivo.com/ai",
+      );
     }
     this.ws = new WebSocket(fullWs);
 
     this.ws.onopen = () => {
-      if (__DEV__) console.log("[StreamingTutor] Connected");
+      mayaHop("ws_open");
       this.flushPendingSends();
     };
 
     this.ws.onmessage = (event) => {
       try {
         const chunk = JSON.parse(event.data);
+        if (
+          chunk?.type === "transcript" ||
+          chunk?.type === "transcription" ||
+          chunk?.type === "sentence" ||
+          chunk?.type === "audio" ||
+          chunk?.type === "error" ||
+          chunk?.type === "done"
+        ) {
+          mayaHop(`ws_chunk_${chunk.type}`, {
+            hasText: Boolean(chunk.text),
+            hasAudio: Boolean(chunk.audio),
+          });
+        }
         this.notify(chunk);
       } catch (e) {
         console.error("[StreamingTutor] Parse error:", e);
@@ -156,12 +194,13 @@ class StreamingTutorService {
     };
 
     this.ws.onerror = (e) => {
+      mayaHop("ws_error");
       console.error("[StreamingTutor] Error:", e);
       this.notify({ type: "error", message: "Connection error" });
     };
 
     this.ws.onclose = (e) => {
-      if (__DEV__) console.log("[StreamingTutor] Closed:", e.reason);
+      mayaHop("ws_close", { code: e.code, reason: e.reason || "" });
     };
   }
 
@@ -180,6 +219,12 @@ class StreamingTutorService {
     if (cefrLevel) payload.cefr_level = cefrLevel;
     const raw = JSON.stringify(payload);
 
+    mayaHop("ws_send", {
+      hasText: Boolean(text),
+      hasAudio: Boolean(audioBase64),
+      audioChars: audioBase64?.length ?? 0,
+    });
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(raw);
       return;
@@ -189,12 +234,7 @@ class StreamingTutorService {
       this.pendingSends.shift();
     }
     this.pendingSends.push(raw);
-    if (__DEV__) {
-      console.warn(
-        "[StreamingTutor] WS not open — queued send (will flush on connect)",
-        { queueLen: this.pendingSends.length },
-      );
-    }
+    mayaHop("ws_send_queued", { queueLen: this.pendingSends.length });
   }
 
   onMessage(cb: StreamCallback) {
