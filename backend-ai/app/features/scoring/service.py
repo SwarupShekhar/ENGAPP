@@ -23,11 +23,13 @@ class CallQualityService:
     Four dimensions: PQS, DS, CS, ES.
     """
 
+    # Phoneme scores below this count as a pronunciation issue (matches feedback UI).
+    PHONEME_WEAK_THRESHOLD = 70.0
+
     def compute_pronunciation_quality_score(self, utterances: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Dimension 1: PQS (Phase 2 Specification)
-        Formula: pqs = (mean_accuracy * 0.35) + (mean_fluency * 0.30) 
-                     + (prosody * 0.20) + (mispronunciation_score * 0.15)
+        Dimension 1: PQS — penalizes Azure mispronunciations AND weak phoneme scores.
+        Weights: accuracy 25%, fluency 25%, prosody 15%, error penalty 35%.
         """
         if not utterances:
             return {
@@ -36,33 +38,46 @@ class CallQualityService:
                 "mean_fluency": 0.0,
                 "mean_prosody": 0.0,
                 "mispronunciation_rate": 0.0,
+                "phoneme_issue_rate": 0.0,
+                "combined_error_rate": 0.0,
                 "word_count": 0,
             }
 
-        # Signal 1: Mean word accuracy
         all_word_accuracy_scores: List[float] = []
-        # Signal 2: Mean fluency
         fluency_scores: List[float] = []
-        # Signal 3: Prosody (distinct from fluency — do not duplicate into both slots)
         prosody_scores: List[float] = []
-        # Signal 4: Mispronunciation rate
         total_words: int = 0
         mispronounced_words: int = 0
+        phoneme_weak_words: int = 0
+        skipped_proper_nouns: int = 0
+
+        transcript_guess_parts: List[str] = []
+        for utt in utterances:
+            nbests = utt.get("NBest") or utt.get("Nbests") or utt.get("nbest") or [utt]
+            first = nbests[0] if nbests and isinstance(nbests[0], dict) else utt
+            for word in (first.get("Words", []) if isinstance(first, dict) else []) or utt.get("Words", []) or []:
+                tok = word.get("Word") or word.get("word")
+                if tok:
+                    transcript_guess_parts.append(str(tok))
+        try:
+            from app.features.scoring.transcript_quality import proper_noun_skip_set
+
+            skip_names = proper_noun_skip_set(" ".join(transcript_guess_parts))
+        except Exception:
+            skip_names = set()
 
         logger.info(f"Computing PQS for {len(utterances)} utterances")
         for utt in utterances:
-            # Azure JSON structure handling
             nbests = utt.get("NBest") or utt.get("Nbests") or utt.get("nbest") or [utt]
             if not nbests:
                 logger.warning("Empty NBest in utterance")
                 continue
-            
+
             first = nbests[0]
             if not isinstance(first, dict):
                 logger.warning(f"NBest[0] is not a dict: {type(first)}")
                 continue
-            
-            # Fluency / prosody at utterance (segment) level — same layer as Azure JSON
+
             pa_info = first.get("PronunciationAssessment") or {}
             if "FluencyScore" in pa_info:
                 fluency_scores.append(float(pa_info["FluencyScore"]))
@@ -73,45 +88,61 @@ class CallQualityService:
                 prosody_scores.append(float(pa_info["ProsodyScore"]))
             elif utt.get("prosody_score") is not None:
                 prosody_scores.append(float(utt["prosody_score"]))
-            
-            # Word level metrics
-            words = first.get("Words", [])
+
+            words = first.get("Words", []) or utt.get("Words", [])
             for word in words:
-                total_words = total_words + 1
-                
-                # Accuracy
+                token = (word.get("Word") or word.get("word") or "").lower().strip()
+                if token and token in skip_names:
+                    skipped_proper_nouns += 1
+                    continue
+
+                total_words += 1
                 w_pa = word.get("PronunciationAssessment") or {}
                 acc = w_pa.get("AccuracyScore")
                 if acc is not None:
                     all_word_accuracy_scores.append(float(acc))
-                
-                # Mispronunciation
+
                 err_type = w_pa.get("ErrorType") or word.get("ErrorType")
                 if err_type == "Mispronunciation":
-                    mispronounced_words = mispronounced_words + 1
+                    mispronounced_words += 1
+
+                phonemes = word.get("Phonemes") or []
+                weak_phoneme = False
+                for ph in phonemes:
+                    ph_pa = ph.get("PronunciationAssessment") or {}
+                    ph_score = ph_pa.get("AccuracyScore")
+                    if ph_score is None:
+                        ph_score = ph.get("AccuracyScore")
+                    if ph_score is not None and float(ph_score) < self.PHONEME_WEAK_THRESHOLD:
+                        weak_phoneme = True
+                        break
+                if weak_phoneme:
+                    phoneme_weak_words += 1
 
         mean_accuracy = float(mean(all_word_accuracy_scores)) if all_word_accuracy_scores else 0.0
         mean_fluency = float(mean(fluency_scores)) if fluency_scores else 0.0
 
         mispron_rate = float(mispronounced_words) / float(total_words) if total_words > 0 else 0.0
-        mispron_score = float(max(0.0, float(100.0 - (mispron_rate * 200.0))))
+        phoneme_issue_rate = (
+            float(phoneme_weak_words) / float(total_words) if total_words > 0 else 0.0
+        )
+        combined_error_rate = max(mispron_rate, phoneme_issue_rate)
+        mispron_score = float(max(0.0, 100.0 - (combined_error_rate * 250.0)))
 
-        # Prosody: use Azure ProsodyScore when present. If absent, fold the 20% prosody weight
-        # into fluency so we do not count the same fluency signal twice (30% + 20%).
         if prosody_scores:
             mean_prosody = float(mean(prosody_scores))
             pqs = (
-                (mean_accuracy * 0.35)
-                + (mean_fluency * 0.30)
-                + (mean_prosody * 0.20)
-                + (mispron_score * 0.15)
+                (mean_accuracy * 0.25)
+                + (mean_fluency * 0.25)
+                + (mean_prosody * 0.15)
+                + (mispron_score * 0.35)
             )
         else:
             mean_prosody = mean_fluency
             pqs = (
-                (mean_accuracy * 0.35)
-                + (mean_fluency * 0.50)
-                + (mispron_score * 0.15)
+                (mean_accuracy * 0.25)
+                + (mean_fluency * 0.40)
+                + (mispron_score * 0.35)
             )
 
         return {
@@ -120,7 +151,10 @@ class CallQualityService:
             "mean_fluency": round(mean_fluency, 2),
             "mean_prosody": round(mean_prosody, 2),
             "mispronunciation_rate": round(mispron_rate, 4),
+            "phoneme_issue_rate": round(phoneme_issue_rate, 4),
+            "combined_error_rate": round(combined_error_rate, 4),
             "word_count": total_words,
+            "skipped_proper_nouns": skipped_proper_nouns,
         }
 
     def compute_depth_score(self, user_turns: List[str]) -> float:
@@ -270,88 +304,147 @@ class CallQualityService:
 
     def compute_grammar_score(self, user_turns: List[str]) -> float:
         """
-        Lightweight grammar signal using spaCy POS tags.
-        Returns 0-100. Higher = fewer grammar errors detected.
-        Does NOT use Gemini — pure spaCy pass.
+        Grammar 0–100 STRUCTURAL HEURISTIC v1 — NOT a grammatical-error-correction
+        model. It combines spaCy sentence well-formedness (missing finite verbs),
+        pronoun-salad, verb-density, and filtered LanguageTool matches, taking the
+        MIN of the structural score and LanguageTool (only when LT found real
+        grammar matches after casing/spelling filtering). Because it keys off these
+        specific structural signals, it will be inconsistent across learners whose
+        errors don't match them.
         """
-        if not nlp or not user_turns:
-            return 60.0
+        if not user_turns:
+            return 0.0
+
+        full_text = " ".join(user_turns).strip()
+        if not full_text:
+            return 0.0
+
+        from app.features.scoring.transcript_quality import compute_structural_grammar_score
+
+        structural = compute_structural_grammar_score(full_text)
+        structural_score = float(structural.get("score", 40.0))
+
+        lt_score: Optional[float] = None
+        try:
+            from app.features.assessment.grammar_analyzer import analyze_grammar
+
+            lt = analyze_grammar(full_text)
+            # Only trust LT when it found real grammar matches OR structural already low.
+            # If LT finds 0 after filtering casing, don't let it pull score to 100.
+            if int(lt.get("total_errors") or 0) > 0:
+                lt_score = float(lt.get("score", structural_score))
+        except Exception as exc:
+            logger.warning("analyze_grammar failed in CQS path: %s", exc)
+
+        if lt_score is None:
+            score = structural_score
+        else:
+            score = min(structural_score, lt_score)
+
+        return round(float(min(100.0, max(0.0, score))), 2)
+
+    async def compute_grammar_score_llm(self, user_turns: List[str]) -> Dict[str, Any]:
+        """
+        Grammar via LLM grader (real GEC) with the structural heuristic as fallback.
+
+        The structural score is computed first as a guaranteed floor of coverage;
+        if the LLM grader is disabled or every provider fails, we return it. When
+        the LLM succeeds, its score is authoritative (it can see word-order /
+        agreement / tense errors the heuristic is blind to). Returns a dict with
+        the score plus provenance for observability.
+        """
+        from app.features.scoring import grammar_metrics
+        from app.core.config import settings as _settings
+
+        structural_fallback = self.compute_grammar_score(user_turns)
+        llm: Optional[Dict[str, Any]] = None
+        fallback_reason = "llm_unavailable"
+        if not _settings.grammar_llm_enabled:
+            fallback_reason = "disabled"
+        else:
+            try:
+                from app.features.scoring.grammar_llm import grade_grammar_llm
+
+                llm = await grade_grammar_llm(user_turns)
+                if llm is None:
+                    fallback_reason = "provider_failed_or_unparseable"
+            except Exception as exc:  # noqa: BLE001 — never let grading crash scoring
+                logger.warning("grammar_llm invocation failed: %s", exc)
+                llm = None
+                fallback_reason = "exception"
+
+        if llm is None:
+            grammar_metrics.record("structural_fallback", reason=fallback_reason)
+            # Evidence-minimum rule (same as comprehension): do NOT emit a grammar
+            # number from the blind structural heuristic. Report not_measured so the
+            # pillar is excluded from the overall instead of silently reintroducing
+            # the original "blind ~70" bug this audit fixed. structural_score is kept
+            # only as a debug breadcrumb and MUST NOT be used as the grammar value.
+            return {
+                "score": None,
+                "measured": False,
+                "source": "structural_fallback",
+                "fallback_reason": fallback_reason,
+                "debug_structural_score": structural_fallback,
+            }
+        grammar_metrics.record("llm", provider=llm.get("provider"))
+        return {
+            "score": round(float(llm["score"]), 2),
+            "measured": True,
+            "source": "llm",
+            "provider": llm.get("provider"),
+            "error_count": llm.get("error_count"),
+            "examples": llm.get("examples"),
+            "rationale": llm.get("rationale"),
+            "debug_structural_score": structural_fallback,
+        }
+
+    def compute_vocabulary_signal(self, user_turns: List[str], depth_score: float) -> float:
+        """Lexical accuracy + limited range — not raw TTR/depth."""
+        from app.features.scoring.transcript_quality import compute_lexical_accuracy_score
 
         full_text = " ".join(user_turns)
-        doc = nlp(full_text)
-
-        total_verbs = 0
-        errors = 0
-
-        for sent in doc.sents:
-            tokens = list(sent)
-            for i, token in enumerate(tokens):
-                # Subject-verb agreement check
-                if token.dep_ == "nsubj" and token.head.pos_ == "VERB":
-                    subj = token
-                    verb = token.head
-                    # Third-person singular subject with bare verb (he go, she run)
-                    if (subj.tag_ in ("NN", "NNP", "PRP") and
-                        subj.text.lower() in ("he", "she", "it") and
-                        verb.tag_ == "VB"):  # bare form instead of VBZ
-                        errors += 1
-                    total_verbs += 1
-
-                # Article before vowel-starting noun (a apple, a engineer)
-                if token.tag_ == "DT" and token.text.lower() == "a":
-                    if i + 1 < len(tokens):
-                        next_tok = tokens[i + 1]
-                        if next_tok.pos_ in ("NOUN", "ADJ") and next_tok.text and next_tok.text[0].lower() in "aeiou":
-                            errors += 1
-
-                # Missing auxiliary in progressive (He working, She going)
-                if token.tag_ == "VBG":  # present participle
-                    # Check if there's an auxiliary before it in the same sentence
-                    has_aux = any(t.pos_ == "AUX" for t in tokens[:i])
-                    if not has_aux and token.dep_ == "ROOT":
-                        errors += 1
-
-        # Score: start at 100, penalise each detected error
-        # Use word count to normalise
-        word_count = len([t for t in doc if t.is_alpha])
-        if word_count == 0:
-            return 60.0
-
-        # Normalised error rate (errors per 100 words)
-        error_rate = (errors / word_count) * 100
-        score = max(0.0, 100.0 - (error_rate * 8.0))
-        return round(float(min(100.0, score)), 2)
+        result = compute_lexical_accuracy_score(full_text, depth_score=depth_score)
+        return float(result.get("score", 0.0))
 
     def compute_fluency_signal(self, pqs_result: Dict[str, Any], user_turns: List[str]) -> float:
         """
-        Fluency signal = mean Azure FluencyScore - filler word penalty.
-        When Azure fluency is missing, estimate from transcript length / fillers
-        (never invent a neutral 50).
-        pqs_result: dict returned by compute_pronunciation_quality_score()
-        Returns 0-100.
+        Fluency = Azure pace/delivery minus transcript disfluency (fillers, reps,
+        broken clause markers). Everyday "fluency" is not pause-timing alone.
         """
-        mean_azure_fluency = float(pqs_result.get("mean_fluency", 0.0))
+        from app.features.scoring.transcript_quality import compute_disfluency_penalty
 
-        filler_words = ["um", "uh", "like", "you know", "basically", "literally"]
-        full_text = " ".join(user_turns).lower()
-        words = re.findall(r'\b[a-zA-Z]+\b', full_text)
+        mean_azure_fluency = float(pqs_result.get("mean_fluency", 0.0))
+        full_text = " ".join(user_turns)
+        words = re.findall(r'\b[a-zA-Z]+\b', full_text.lower())
         word_count = len(words)
 
-        filler_count = sum(full_text.count(fw) for fw in filler_words)
-        # Penalty: 1.5 points per filler, capped at 20
+        disfluency = compute_disfluency_penalty(full_text)
+        disfluency_penalty = float(disfluency.get("penalty", 0.0))
+
+        filler_words = ["um", "uh", "like", "you know", "basically", "literally"]
+        filler_count = sum(full_text.lower().count(fw) for fw in filler_words)
         filler_penalty = min(20.0, float(filler_count) * 1.5)
 
         if mean_azure_fluency > 0:
-            fluency_signal = max(0.0, mean_azure_fluency - filler_penalty)
-            return round(float(fluency_signal), 2)
+            fluency_signal = max(0.0, mean_azure_fluency - filler_penalty - disfluency_penalty)
+            mean_accuracy = float(pqs_result.get("mean_accuracy", 0.0))
+            combined_error_rate = float(pqs_result.get("combined_error_rate", 0.0))
+            pqs_val = float(pqs_result.get("pqs", 0.0))
+            # Cap pace when pronunciation/errors are weak
+            if mean_accuracy < 60.0 or combined_error_rate > 0.15:
+                fluency_signal = min(fluency_signal, mean_accuracy + 10.0)
+            if pqs_val > 0:
+                fluency_signal = min(fluency_signal, pqs_val + 15.0)
+            return round(float(max(0.0, fluency_signal)), 2)
 
-        # Text-only fallback (no Azure PA)
         if word_count == 0:
             return 0.0
         turns_with_words = max(1, sum(1 for t in user_turns if re.search(r'\b[a-zA-Z]+\b', t)))
         avg_words = float(word_count) / float(turns_with_words)
         score = min(85.0, 25.0 + avg_words * 2.5)
         score -= filler_penalty
+        score -= disfluency_penalty
         if word_count < 10:
             score = min(score, 20.0)
         elif word_count < 25:

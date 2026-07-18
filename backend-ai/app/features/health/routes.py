@@ -5,6 +5,15 @@ from app.cache.manager import cache
 router = APIRouter()
 
 
+def _spacy_model_status() -> str:
+    """Grammar scoring requires en_core_web_sm; missing model falls back to score 60."""
+    try:
+        from app.features.scoring.service import nlp
+        return "loaded" if nlp is not None else "missing"
+    except Exception:
+        return "error"
+
+
 def _maya_runtime_checks() -> dict:
     """Non-secret Maya path flags — use to verify fast path is live after deploy."""
     deepgram_key = bool((settings.deepgram_api_key or "").strip())
@@ -25,6 +34,19 @@ def _maya_runtime_checks() -> dict:
     }
 
 
+def _grammar_grader_status() -> dict:
+    """Grammar grader mode + live fallback rate (silent revert to blind heuristic)."""
+    try:
+        from app.features.scoring import grammar_metrics
+
+        snap = grammar_metrics.snapshot()
+        snap["mode"] = "llm" if settings.grammar_llm_enabled else "structural_only"
+        snap["provider_pref"] = settings.grammar_llm_provider
+        return snap
+    except Exception:
+        return {"error": "unavailable"}
+
+
 @router.get("/health")
 async def health_check():
     checks = {
@@ -32,6 +54,8 @@ async def health_check():
         "redis": "unknown",
         "azure_speech": "configured" if settings.azure_speech_key else "missing",
         "gemini_ai": "configured" if settings.google_api_key else "missing",
+        "spacy_model": _spacy_model_status(),
+        "grammar_grader": _grammar_grader_status(),
         "maya": _maya_runtime_checks(),
     }
     

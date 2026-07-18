@@ -64,12 +64,22 @@ def _get_entity_char_spans(text: str) -> frozenset:
 def _classify_lt_match(match) -> Optional[str]:
     """Map a LanguageTool match to one of 6 categories, or None to skip."""
     rule_id = match.rule_id or ""
-    category = match.category or ""
+    category = (match.category or "").upper()
+    # Spelling / capitalization / typography are NOT grammar (MORFOLOGIK used to
+    # inflate "pluralization" on names like gia/roberto).
+    if (
+        "MORFOLOGIK" in rule_id
+        or category in {"TYPOS", "CASING", "TYPOGRAPHY", "PUNCTUATION", "STYLE", "REDUNDANCY"}
+        or "SPELL" in rule_id
+        or "UPPERCASE" in rule_id
+        or "LOWERCASE" in rule_id
+    ):
+        return None
     if "TENSE" in rule_id or "VERB_TENSE" in rule_id:
         return "tense_error"
     if rule_id in {"EN_A_VS_AN", "DT_JJ_NN", "MISSING_DET", "AN_TENSE"} or "ARTICLE" in rule_id:
         return "article_missing"
-    if "PLURAL" in rule_id or "AGREEMENT" in rule_id or "MORFOLOGIK" in rule_id:
+    if "PLURAL" in rule_id or "AGREEMENT" in rule_id:
         return "pluralization_error"
     if "PREP" in rule_id or "PREPOSITION" in rule_id:
         return "preposition_error"
@@ -77,7 +87,7 @@ def _classify_lt_match(match) -> Optional[str]:
         return "word_order"
     if category in {"GRAMMAR", "SEMANTICS"}:
         return "other_grammar"
-    return None  # skip STYLE, SPELLING, PUNCTUATION, TYPOGRAPHY
+    return None
 
 
 def _run_language_tool(text: str, errors: dict) -> None:

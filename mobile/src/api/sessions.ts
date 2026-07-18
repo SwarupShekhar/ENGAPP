@@ -29,6 +29,12 @@ export interface SessionAnalysis {
     fluency_score?: number;
     vocabulary_score?: number;
     overall_score?: number;
+    /** False when the LLM grammar grader fell back — grammar must render as
+     * "Not measured", never as a 0/100 score. Absent (legacy rows) = treat as
+     * measured for backward compatibility. */
+    grammarMeasured?: boolean;
+    pronunciationMeasured?: boolean;
+    comprehensionMeasured?: boolean;
   };
   mistakes: SessionMistake[];
   pronunciationIssues: SessionPronunciationIssue[];

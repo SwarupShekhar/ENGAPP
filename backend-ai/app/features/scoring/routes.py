@@ -65,8 +65,11 @@ async def compute_cqs(
     pqs_value = float(pqs["pqs"]) if isinstance(pqs, dict) else float(pqs)
     cqs = call_quality_service.compute_call_quality_score(pqs_value, ds, cs, es)
 
-    grammar_signal = call_quality_service.compute_grammar_score(body.user_turns)
+    grammar_meta = await call_quality_service.compute_grammar_score_llm(body.user_turns)
+    grammar_signal = grammar_meta["score"]  # None when not measured (LLM fallback)
+    grammar_measured = bool(grammar_meta.get("measured", False))
     fluency_signal = call_quality_service.compute_fluency_signal(pqs, body.user_turns)
+    vocabulary_signal = call_quality_service.compute_vocabulary_signal(body.user_turns, ds)
     fluency_breakdown = call_quality_service.compute_fluency_breakdown(
         body.azure_results,
         body.user_turns,
@@ -80,7 +83,11 @@ async def compute_cqs(
             "cs": cs,
             "es": es,
             "grammar_signal": grammar_signal,
+            "grammar_measured": grammar_measured,
+            "grammar_meta": grammar_meta,
             "fluency_signal": fluency_signal,
+            "vocabulary_signal": vocabulary_signal,
+            "comprehension_measured": False,
             "fluency_breakdown": fluency_breakdown,
         }
     )

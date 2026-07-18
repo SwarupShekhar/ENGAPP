@@ -1598,6 +1598,10 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
           currentAnalysis?.scores?.vocabulary_score ??
           0,
       ),
+      // Measured flags: absent (legacy rows) => treat as measured.
+      grammarMeasured: currentAnalysis?.scores?.grammarMeasured !== false,
+      pronunciationMeasured:
+        currentAnalysis?.scores?.pronunciationMeasured !== false,
     },
     mistakes: currentAnalysis?.mistakes || [],
     pronunciationIssues: currentAnalysis?.pronunciationIssues || [],
@@ -1634,11 +1638,15 @@ export default function CallFeedbackScreen({ navigation, route }: any) {
 
   // MAYA Summary: derive weak spots (lowest 2 dimensions) and words to learn from real data
   const scoreEntries = [
-    { key: "Grammar", score: data.scores.grammar, icon: "document-text" },
+    // Exclude grammar from weak-spot ranking when it wasn't measured — a
+    // not_measured pillar must not surface as a "0" weak spot.
+    ...(data.scores.grammarMeasured
+      ? [{ key: "Grammar", score: data.scores.grammar, icon: "document-text" }]
+      : []),
     { key: "Pronunciation", score: data.scores.pronunciation, icon: "mic" },
     { key: "Fluency", score: data.scores.fluency, icon: "flash" },
     { key: "Vocabulary", score: data.scores.vocabulary, icon: "book" },
-  ] as const;
+  ];
   const weakSpots = [...scoreEntries]
     .sort((a, b) => a.score - b.score)
     .slice(0, 2)

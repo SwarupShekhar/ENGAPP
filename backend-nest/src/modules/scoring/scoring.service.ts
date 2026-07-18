@@ -5,7 +5,6 @@ import { ProgressService } from '../progress/progress.service';
 import { ScoreAuthorityService } from '../score-authority/score-authority.service';
 import {
   clampScore,
-  computeOverall,
   deriveCefrFromOverall,
   type PillarScores,
 } from '../score-authority/score-authority.formulas';
@@ -31,6 +30,12 @@ export type SessionScorePayload = {
   vocabulary_score: number;
   source: 'cqs';
   pronunciationMeasured: boolean;
+  pronunciationEstimated?: boolean;
+  /** False when the LLM grammar grader failed/was disabled — UI must not show a
+   * grammar % in that case (we do NOT fall back to the blind structural score). */
+  grammarMeasured: boolean;
+  /** Call path does not measure comprehension yet — UI must not show "0%". */
+  comprehensionMeasured: boolean;
 };
 
 @Injectable()
@@ -88,6 +93,11 @@ export class ScoringService {
     return clampScore(score);
   }
 
+  /** Count alphabetic words in user turns for issue-rate denominators. */
+  static countTranscriptWords(userTurns: string[]): number {
+    return (userTurns.join(' ').match(/\b[a-zA-Z]+\b/g) ?? []).length;
+  }
+
   /**
    * Build absolute session pillar scores from CQS breakdown.
    * Never returns the all-50 placeholder pattern.
@@ -96,6 +106,10 @@ export class ScoringService {
     breakdown: Record<string, any>,
     cqs: number,
     userTurns: string[],
+    options?: {
+      pronunciationIssueCount?: number;
+      transcriptWordCount?: number;
+    },
   ): SessionScorePayload {
     const pqsRaw = breakdown?.pqs;
     const pqs =
@@ -106,7 +120,8 @@ export class ScoringService {
       typeof pqsRaw === 'object' && pqsRaw != null
         ? Number(pqsRaw.word_count ?? 0)
         : 0;
-    const pronunciationMeasured = wordCount > 0 && pqs > 0;
+    let pronunciationMeasured = wordCount > 0 && pqs > 0;
+    let pronunciationEstimated = false;
 
     let fluency = Number(
       breakdown.fluency_signal ?? pqsRaw?.mean_fluency ?? 0,
@@ -115,17 +130,28 @@ export class ScoringService {
       fluency = ScoringService.estimateFluencyFromText(userTurns);
     }
 
-    let grammar = Number(breakdown.grammar_signal ?? 0);
-    if (!Number.isFinite(grammar) || grammar <= 0) {
-      // Depth/complexity still reflect language quality when grammar signal is empty.
-      grammar = clampScore(
-        (Number(breakdown.ds ?? 0) * 0.5 + Number(breakdown.cs ?? 0) * 0.5) ||
-          ScoringService.estimateFluencyFromText(userTurns),
-      );
+    // Grammar: LLM grader is authoritative. On fallback the AI service returns
+    // grammar_signal=null and grammar_measured=false. We do NOT fabricate a
+    // grammar number from depth/complexity (that reintroduced the blind ~70 bug):
+    // grammar becomes not_measured and is excluded from the overall (like
+    // comprehension), honoring the evidence-minimum rule.
+    const grammarSignal = breakdown.grammar_signal;
+    const grammarMeasuredRaw = breakdown.grammar_measured;
+    let grammar = 0;
+    let grammarMeasured = false;
+    if (grammarMeasuredRaw !== false && grammarSignal != null) {
+      const g = Number(grammarSignal);
+      if (Number.isFinite(g) && g >= 0) {
+        grammar = clampScore(g);
+        grammarMeasured = true;
+      }
     }
 
     const ds = Number(breakdown.ds ?? 0);
-    let vocabulary = clampScore(ds * 0.8);
+    let vocabulary = Number(breakdown.vocabulary_signal ?? 0);
+    if (!Number.isFinite(vocabulary) || vocabulary <= 0) {
+      vocabulary = clampScore(ds * 0.8);
+    }
     if (vocabulary <= 0) {
       const words = userTurns.join(' ').match(/\b[a-zA-Z]+\b/g) ?? [];
       const unique = new Set(words.map((w) => w.toLowerCase()));
@@ -136,30 +162,61 @@ export class ScoringService {
     }
 
     let pronunciation = pronunciationMeasured ? clampScore(pqs) : 0;
-    // Without PA, do not invent a 50 — leave unmeasured and weight overall from available pillars.
+
+    const issueCount = Number(options?.pronunciationIssueCount ?? 0);
+    const transcriptWordCount =
+      Number(options?.transcriptWordCount ?? 0) ||
+      ScoringService.countTranscriptWords(userTurns);
+    if (
+      !pronunciationMeasured &&
+      issueCount > 0 &&
+      transcriptWordCount > 0
+    ) {
+      const issueRate = issueCount / transcriptWordCount;
+      pronunciation = Math.round(
+        Math.max(5, Math.min(70, 100 - issueRate * 300)),
+      );
+      pronunciationMeasured = true;
+      pronunciationEstimated = true;
+    }
+
     const pillars: PillarScores = {
       pronunciation: pronunciationMeasured ? pronunciation : 0,
       fluency: clampScore(fluency),
-      grammar: clampScore(grammar),
+      grammar: grammarMeasured ? grammar : 0,
       vocabulary: clampScore(vocabulary),
       comprehension: 0,
     };
 
-    let overall: number;
-    if (pronunciationMeasured) {
-      overall = computeOverall(pillars);
-    } else {
-      // Renormalize without pronunciation + comprehension (weights 0.22 + 0.13).
-      const active =
-        pillars.fluency * 0.25 +
-        pillars.grammar * 0.22 +
-        pillars.vocabulary * 0.18;
-      const weightSum = 0.25 + 0.22 + 0.18;
-      overall = Math.round(active / weightSum);
-      // Prefer CQS when it has real text signal and PA was absent.
-      if (cqs > 0) {
-        overall = clampScore(Math.round(overall * 0.55 + cqs * 0.45));
+    // Cross-pillar dependencies live in ONE place only: the Python scoring
+    // service. Pronunciation's influence on fluency is applied there, and
+    // grammar/vocabulary are independent. This TS layer passes pillar scores
+    // through unchanged and only computes the weighted overall below.
+
+    const comprehensionMeasured = false;
+    pillars.comprehension = 0;
+
+    // Overall = weighted sum over MEASURED pillars only, renormalized by the sum
+    // of their weights. Unmeasured pillars (grammar on LLM fallback, pronunciation
+    // when Azure PA is absent, comprehension always) are dropped, never fabricated.
+    const weightDefs: Array<[keyof PillarScores, number, boolean]> = [
+      ['fluency', 0.25, true],
+      ['grammar', 0.22, grammarMeasured],
+      ['pronunciation', 0.22, pronunciationMeasured],
+      ['vocabulary', 0.18, true],
+    ];
+    let active = 0;
+    let weightSum = 0;
+    for (const [key, weight, measured] of weightDefs) {
+      if (measured) {
+        active += pillars[key] * weight;
+        weightSum += weight;
       }
+    }
+    let overall = weightSum > 0 ? Math.round(active / weightSum) : 0;
+    if (!pronunciationMeasured && cqs > 0) {
+      // No Azure PA: blend the transcript-only aggregate with the CQS composite.
+      overall = clampScore(Math.round(overall * 0.55 + cqs * 0.45));
     }
 
     // Guard: never emit the neutral placeholder cluster.
@@ -193,7 +250,40 @@ export class ScoringService {
       vocabulary_score: vocabulary,
       source: 'cqs',
       pronunciationMeasured,
+      grammarMeasured,
+      comprehensionMeasured,
+      ...(pronunciationEstimated ? { pronunciationEstimated: true } : {}),
     };
+  }
+
+  private async countPronunciationIssues(participantId: string): Promise<number> {
+    return this.prisma.pronunciationIssue.count({
+      where: { analysis: { participantId } },
+    });
+  }
+
+  /**
+   * True when a stored CQS row reflects Azure PA (pqs > 0 ≈ breakdown word_count > 0).
+   * Do not treat a bare CallQualityScore row as PA-complete without this.
+   */
+  static cqsRowHasPaWordMeasurement(
+    cqs: { pqs: number } | null | undefined,
+  ): boolean {
+    return !!cqs && Number(cqs.pqs ?? 0) > 0;
+  }
+
+  /**
+   * Skip PA backfill only when CQS already has word-level PA and delivery coaching exists.
+   * A CallQualityScore row alone (pqs = 0) is not enough — webhook may have saved issues first.
+   */
+  async shouldSkipPaBackfill(
+    participantId: string,
+    existingCqs: { pqs: number } | null | undefined,
+  ): Promise<boolean> {
+    if (!ScoringService.cqsRowHasPaWordMeasurement(existingCqs)) {
+      return false;
+    }
+    return !(await this.analysisMissingDeliveryInsights(participantId));
   }
 
   /** True when analysis has no delivery coaching bullets yet. */
@@ -360,32 +450,69 @@ export class ScoringService {
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       const turns = userTurns.length > 0 ? userTurns : [transcript].filter(Boolean);
+      const transcriptWordCount = ScoringService.countTranscriptWords(turns);
+      const pronunciationIssueCount =
+        await this.countPronunciationIssues(participantId);
+      const scoreOptions = { pronunciationIssueCount, transcriptWordCount };
 
       // Idempotent: if CQS already ran, refresh Analysis only (no double profile deltas).
       if (existing) {
-        const cqsData = await this.brain.computeCQS({
-          user_turns: turns.length > 0 ? turns : [transcript || '(no speech)'],
-          full_transcript: transcript || '',
-          azure_results: azureResults ?? [],
-          call_duration_seconds: callDurationSeconds,
-          user_spoke_seconds: userSpokeSeconds,
-        });
-        const refreshed = cqsData
-          ? this.buildSessionScoresFromCqs(
-              cqsData.breakdown ?? {},
-              Number(cqsData.cqs ?? existing.cqs),
-              turns,
-            )
-          : this.buildSessionScoresFromCqs(
-              {
-                pqs: existing.pqs,
-                ds: existing.depthScore,
-                cs: existing.complexityScore,
-                es: existing.engagementScore,
-              },
-              existing.cqs,
-              turns,
-            );
+        const incomingAzure = azureResults ?? [];
+        const preserveExistingPa =
+          incomingAzure.length === 0 &&
+          ScoringService.cqsRowHasPaWordMeasurement(existing);
+        const cqsData = preserveExistingPa
+          ? null
+          : await this.brain.computeCQS({
+              user_turns:
+                turns.length > 0 ? turns : [transcript || '(no speech)'],
+              full_transcript: transcript || '',
+              azure_results: incomingAzure,
+              call_duration_seconds: callDurationSeconds,
+              user_spoke_seconds: userSpokeSeconds,
+            });
+        if (preserveExistingPa) {
+          this.logger.log(
+            `[CQS IDEMPOTENT] Preserving existing PA (pqs=${existing.pqs}) session=${sessionId} user=${userId}`,
+          );
+        }
+        let refreshed: SessionScorePayload;
+        if (cqsData) {
+          refreshed = this.buildSessionScoresFromCqs(
+            cqsData.breakdown ?? {},
+            Number(cqsData.cqs ?? existing.cqs),
+            turns,
+            scoreOptions,
+          );
+        } else {
+          // Rebuilding from the stored CQS row, which does NOT persist the
+          // grammar pillar. Carry forward a previously LLM-measured grammar from
+          // the existing Analysis so an idempotent refresh doesn't silently flip
+          // a real grammar score to not_measured. Only stays not_measured if it
+          // was never measured to begin with.
+          const prior = await this.prisma.analysis.findUnique({
+            where: { participantId },
+            select: { scores: true },
+          });
+          const priorScores = (prior?.scores ?? {}) as Record<string, any>;
+          const priorGrammar = Number(priorScores.grammar);
+          const grammarKnown =
+            priorScores.grammarMeasured === true &&
+            Number.isFinite(priorGrammar);
+          refreshed = this.buildSessionScoresFromCqs(
+            {
+              pqs: existing.pqs,
+              ds: existing.depthScore,
+              cs: existing.complexityScore,
+              es: existing.engagementScore,
+              grammar_signal: grammarKnown ? priorGrammar : null,
+              grammar_measured: grammarKnown,
+            },
+            existing.cqs,
+            turns,
+            scoreOptions,
+          );
+        }
         const cefr = deriveCefrFromOverall(refreshed.overall_score);
         await this.writeAnalysisScores(
           participantId,
@@ -412,28 +539,33 @@ export class ScoringService {
           `Failed to get CQS from AI engine session=${sessionId} user=${userId}`,
         );
         // Last-resort transcript-only scores — still not placeholder 50s.
+        // AI engine is fully down, so grammar CANNOT be graded: mark it
+        // not_measured (grammar_signal=null) rather than fabricating a number.
         const fallback = this.buildSessionScoresFromCqs(
           {
             pqs: 0,
             ds: 0,
             cs: 0,
             es: 0,
-            grammar_signal: 0,
+            grammar_signal: null,
+            grammar_measured: false,
             fluency_signal: 0,
           },
           0,
           turns,
+          scoreOptions,
         );
-        // Force text estimates into fallback path
+        // Force text estimates for the pillars we CAN estimate (delivery/vocab).
         const textFluency = ScoringService.estimateFluencyFromText(turns);
         fallback.fluency = textFluency;
         fallback.fluency_score = textFluency;
-        fallback.grammar = textFluency;
-        fallback.grammar_score = textFluency;
         fallback.vocabulary = clampScore(textFluency * 0.9);
         fallback.vocabulary_score = fallback.vocabulary;
+        // Overall from measured pillars only (grammar excluded).
         fallback.overall_score = clampScore(
-          textFluency * 0.4 + fallback.grammar * 0.35 + fallback.vocabulary * 0.25,
+          Math.round(
+            (textFluency * 0.25 + fallback.vocabulary * 0.18) / (0.25 + 0.18),
+          ),
         );
         fallback.overall = fallback.overall_score;
         await this.writeAnalysisScores(
@@ -451,6 +583,7 @@ export class ScoringService {
         breakdown,
         cqs,
         turns,
+        scoreOptions,
       );
 
       const pqs =

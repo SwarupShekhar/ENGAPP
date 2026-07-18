@@ -498,7 +498,8 @@ export class SessionsProcessor {
       let sessionEnrichment: SessionEnrichment | undefined;
       const existingCqs = await this.prisma.callQualityScore.findFirst({
         where: { sessionId, userId: participant.userId },
-        select: { id: true },
+        select: { id: true, pqs: true },
+        orderBy: { computedAt: 'desc' },
       });
       const recordingUrl = participant.participantRecordingUrl;
       const hasRecording =
@@ -506,25 +507,38 @@ export class SessionsProcessor {
         !recordingUrl.startsWith('pending_') &&
         recordingUrl.startsWith('http');
 
+      const pronunciationIssueCount =
+        await this.prisma.pronunciationIssue.count({
+          where: { analysis: { participantId: participant.id } },
+        });
+      const cqsHasPaWordCount =
+        ScoringService.cqsRowHasPaWordMeasurement(existingCqs);
+
       let shouldRunPa = false;
       if (hasRecording) {
-        if (!existingCqs) {
-          shouldRunPa = true;
+        const skipPa = await this.scoringService.shouldSkipPaBackfill(
+          participant.id,
+          existingCqs,
+        );
+        const issuesWithoutCqsPa =
+          pronunciationIssueCount > 0 && !cqsHasPaWordCount;
+        // Webhook may persist PronunciationIssues before CQS gets azure word_count.
+        shouldRunPa = !skipPa || issuesWithoutCqsPa;
+        if (shouldRunPa) {
+          const reason = issuesWithoutCqsPa
+            ? `issues=${pronunciationIssueCount} without CQS word_count`
+            : !existingCqs
+              ? 'no CQS row'
+              : !cqsHasPaWordCount
+                ? 'CQS missing PA word_count'
+                : 'missing delivery insights';
+          this.logger.log(
+            `[SessionsProcessor] Running PA (${reason}) user=${participant.userId} session=${sessionId}`,
+          );
         } else {
-          const missingDelivery =
-            await this.scoringService.analysisMissingDeliveryInsights(
-              participant.id,
-            );
-          if (missingDelivery) {
-            shouldRunPa = true;
-            this.logger.log(
-              `[SessionsProcessor] Backfilling delivery insights user=${participant.userId} session=${sessionId}`,
-            );
-          } else {
-            this.logger.log(
-              `[SessionsProcessor] CQS and delivery insights present user=${participant.userId} — skip PA`,
-            );
-          }
+          this.logger.log(
+            `[SessionsProcessor] PA + delivery present (CQS pqs=${existingCqs?.pqs}) user=${participant.userId} — skip PA`,
+          );
         }
       }
 
@@ -541,15 +555,13 @@ export class SessionsProcessor {
               deliveryInsights: paResult.deliveryInsights,
             };
           }
-          if (!existingCqs) {
-            const azure =
-              (pronunciation_score as any)?.azure_result ?? pronunciation_score;
-            if (azure && typeof azure === 'object') {
-              azureResults = [azure];
-              this.logger.log(
-                `[SessionsProcessor] PA loaded for user=${participant.userId} session=${sessionId}`,
-              );
-            }
+          const azure =
+            (pronunciation_score as any)?.azure_result ?? pronunciation_score;
+          if (azure && typeof azure === 'object') {
+            azureResults = [azure];
+            this.logger.log(
+              `[SessionsProcessor] PA loaded for user=${participant.userId} session=${sessionId}`,
+            );
           }
         } catch (e: any) {
           this.logger.warn(
@@ -567,6 +579,12 @@ export class SessionsProcessor {
                 (transcript.split(/\s+/).filter(Boolean).length || 0) * 0.5,
               ),
             );
+
+      if (azureResults.length === 0 && pronunciationIssueCount > 0 && !cqsHasPaWordCount) {
+        this.logger.warn(
+          `[SessionsProcessor] Finalizing CQS without azure PA despite issues=${pronunciationIssueCount} user=${participant.userId} session=${sessionId}`,
+        );
+      }
 
       try {
         await this.scoringService.processCallQualityScore(

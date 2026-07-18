@@ -16,6 +16,9 @@ interface ScoreBreakdownCardProps {
     grammar: number;
     vocabulary: number;
     fluency: number;
+    /** False => grammar grader fell back; render "Not measured", not 0/100. */
+    grammarMeasured?: boolean;
+    pronunciationMeasured?: boolean;
   };
   /** Treat pronunciation=50 as "processing" sentinel and show spinner */
   pronunciationProcessing?: boolean;
@@ -93,11 +96,16 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
     );
   };
 
+  // Default to measured for legacy rows that never carried the flag.
+  const grammarMeasured = scores.grammarMeasured !== false;
+  const pronunciationMeasured = scores.pronunciationMeasured !== false;
+
   const metrics = [
     {
       key: "pronunciation",
       label: "Pronunciation",
       score: scores.pronunciation,
+      measured: pronunciationMeasured,
       justification:
         justifications?.pronunciation ||
         "Based on phoneme accuracy and clarity",
@@ -108,9 +116,11 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
       key: "grammar",
       label: "Grammar",
       score: scores.grammar,
-      justification:
-        justifications?.grammar ||
-        "Based on structural accuracy and complexity",
+      measured: grammarMeasured,
+      justification: grammarMeasured
+        ? justifications?.grammar ||
+          "Based on structural accuracy and complexity"
+        : "We couldn't reliably grade grammar for this call, so we've left it unscored rather than show a misleading number.",
       color: theme.tokens.skill.grammar,
       tint: theme.tokens.skill.grammarTint,
     },
@@ -118,6 +128,7 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
       key: "vocabulary",
       label: "Vocabulary",
       score: scores.vocabulary,
+      measured: true,
       justification:
         justifications?.vocabulary ||
         "Based on word variety and appropriateness",
@@ -128,6 +139,7 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
       key: "fluency",
       label: "Fluency",
       score: scores.fluency,
+      measured: true,
       justification:
         justifications?.fluency || "Based on pacing and natural flow",
       color: theme.tokens.skill.fluency,
@@ -148,7 +160,9 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
             <View style={styles.metricRow}>
               <Text style={styles.metricLabel}>{metric.label}</Text>
               <View style={styles.scoreContainer}>
-                {metric.key === "pronunciation" ? (
+                {metric.measured === false ? (
+                  <Text style={styles.notMeasuredText}>Not measured</Text>
+                ) : metric.key === "pronunciation" ? (
                   pronunciationProcessing ? (
                     <View style={styles.processingRow}>
                       <ActivityIndicator size="small" color={metric.color} />
@@ -167,17 +181,19 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
               </View>
             </View>
 
-            {/* Progress bar */}
+            {/* Progress bar (hidden when the pillar wasn't measured) */}
             <View style={styles.progressBarBg}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${Math.min(100, Math.max(0, metric.score))}%`,
-                    backgroundColor: metric.color,
-                  },
-                ]}
-              />
+              {metric.measured !== false && (
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      width: `${Math.min(100, Math.max(0, metric.score))}%`,
+                      backgroundColor: metric.color,
+                    },
+                  ]}
+                />
+              )}
             </View>
 
             <View
@@ -188,7 +204,7 @@ export const ScoreBreakdownCard: React.FC<ScoreBreakdownCardProps> = ({
             >
               <View style={styles.justificationHeader}>
                 <Text style={[styles.justificationLabel, { color: metric.color }]}>
-                  Why this score?
+                  {metric.measured === false ? "Why not scored?" : "Why this score?"}
                 </Text>
                 {onPlay && (
                   <TouchableOpacity
@@ -290,6 +306,12 @@ const getStyles = (theme: any) =>
     score: {
       fontSize: theme.typography.sizes.m,
       fontWeight: "700",
+    },
+    notMeasuredText: {
+      fontSize: theme.typography.sizes.s,
+      fontWeight: "700",
+      color: theme.colors.text.secondary,
+      fontStyle: "italic",
     },
     progressBarBg: {
       height: 6,

@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     coaching_cerebras_model: str = "gemma-4-31b"
     coaching_llm_max_tokens: int = 32
     coaching_llm_timeout_sec: float = 12.0
+    # LLM grammar grader (post-call scoring): gemini | cerebras | auto
+    grammar_llm_provider: str = "auto"
+    grammar_cerebras_model: str = "gpt-oss-120b"
+    # Reasoning models spend tokens before the JSON; keep headroom so it closes.
+    grammar_llm_max_tokens: int = 2048
+    grammar_llm_timeout_sec: float = 20.0
+    # Feature flag: when false, scoring uses the structural heuristic only.
+    grammar_llm_enabled: bool = True
     
     # Azure
     azure_speech_key: Optional[str] = None
