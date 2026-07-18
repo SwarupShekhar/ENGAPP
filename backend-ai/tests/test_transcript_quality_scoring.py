@@ -40,10 +40,15 @@ CLEAN = (
 def test_structural_grammar_syntax_only_on_broken_transcript():
     result = compute_structural_grammar_score(BROKEN)
     assert result["measured"] is True
-    # Grammar is syntax-only now: it flags the run-on's missing finite verbs,
-    # but lexical misuse (odd collocations) is scored by vocabulary, not grammar.
-    assert result["signals"]["missing_finite_verb_rate"] > 0
+    # Grammar is syntax-only: flags missing finite verbs and/or unpunctuated run-ons.
+    # Lexical misuse stays in vocabulary, not grammar.
+    structure = max(
+        result["signals"].get("missing_finite_verb_rate", 0.0),
+        result["signals"].get("unpunctuated_runon_rate", 0.0),
+    )
+    assert structure > 0
     assert result["score"] < 82  # below the unpenalized baseline
+    assert result["score"] >= 5  # never silently zero when measured
 
 
 def test_structural_grammar_higher_on_clean_transcript():
@@ -110,6 +115,8 @@ def test_grammar_broken_below_clean():
     grammar_broken = compute_structural_grammar_score(BROKEN_RAW)["score"]
     grammar_clean = compute_structural_grammar_score(CLEAN_SIMPLE)["score"]
     assert grammar_broken < grammar_clean
+    # Clean must sit near the baseline — not get crushed by verb-density false positives.
+    assert grammar_clean >= 75
 
 
 def test_grammar_signals_have_no_wordchoice_or_delivery_keys():
@@ -117,6 +124,27 @@ def test_grammar_signals_have_no_wordchoice_or_delivery_keys():
     for banned in ("odd_collocation_rate", "repetition_rate", "filler_rate"):
         assert banned not in signals
     assert "missing_finite_verb_rate" in signals
+    assert "unpunctuated_runon_rate" in signals
+
+
+def test_grammar_ranking_holds_without_spacy(monkeypatch):
+    """Regression: without spaCy, clean must not rank below broken via verb-density."""
+    import app.features.scoring.transcript_quality as tq
+
+    monkeypatch.setattr(tq, "missing_finite_verb_rate", lambda _t: 0.0)
+    monkeypatch.setattr(
+        tq,
+        "verb_density",
+        lambda words, text="": (
+            # Simulate the old failure mode: lexical list under-counts clean verbs
+            # and over-counts broken hits — ranking must still hold via run-on.
+            0.20 if "english no speak" in (text or "").lower() else 0.045
+        ),
+    )
+    broken = tq.compute_structural_grammar_score(BROKEN_RAW)["score"]
+    clean = tq.compute_structural_grammar_score(CLEAN_SIMPLE)["score"]
+    assert broken < clean
+    assert clean >= 75
 
 
 def test_disfluency_broken_above_clean_and_delivery_only():

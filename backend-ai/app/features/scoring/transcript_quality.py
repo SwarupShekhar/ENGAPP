@@ -109,9 +109,27 @@ def pronoun_salad_rate(words: List[str], text: str = "") -> float:
     return min(1.0, float(hits) / max(1.0, float(len(words) / 8.0)))
 
 
-def verb_density(words: List[str]) -> float:
+def verb_density(words: List[str], text: str = "") -> float:
+    """
+    Fraction of tokens that look like verbs. Prefer spaCy VERB/AUX when available
+    so clean prose with common verbs (enjoy, help, connect, …) is not under-counted
+    by the closed lexical fallback list.
+    """
     if not words:
         return 0.0
+
+    try:
+        from app.features.assessment.grammar_analyzer import _nlp
+
+        if _nlp is not None and text.strip():
+            doc = _nlp(text)
+            alphas = [t for t in doc if t.is_alpha]
+            if alphas:
+                verbs = sum(1 for t in alphas if t.pos_ in {"VERB", "AUX"})
+                return float(verbs) / float(len(alphas))
+    except Exception:
+        pass
+
     verbs = sum(
         1
         for w in words
@@ -121,6 +139,20 @@ def verb_density(words: List[str]) -> float:
         or w in {"is", "are", "was", "were", "am", "be", "have", "has", "had", "do", "does", "did"}
     )
     return float(verbs) / float(len(words))
+
+
+def unpunctuated_runon_rate(text: str, words: List[str]) -> float:
+    """
+    Fallback structural signal when spaCy is unavailable / blind: a long stretch of
+    speech with no sentence-ending punctuation is almost never well-formed English.
+    Returns 0 for short or properly punctuated text.
+    """
+    if len(words) < 40:
+        return 0.0
+    if re.search(r"[.!?]", text or ""):
+        return 0.0
+    # Scale gently with length so very long unpunctuated dumps score worse.
+    return min(1.0, (len(words) - 30) / 80.0)
 
 
 def unknown_word_rate(words: List[str], skip: Optional[Set[str]] = None) -> float:
@@ -215,7 +247,8 @@ def missing_finite_verb_rate(text: str) -> float:
 def compute_structural_grammar_score(text: str) -> Dict[str, Any]:
     """
     0–100 grammar proxy from syntactic breakdown (not parser success).
-    Syntax only: pronoun salad, verb density, and missing finite verbs.
+    Syntax only: pronoun salad, verb density, missing finite verbs, and
+    unpunctuated run-ons (fallback when spaCy cannot see sentence boundaries).
     """
     words = tokenize(text)
     n = len(words)
@@ -229,18 +262,27 @@ def compute_structural_grammar_score(text: str) -> Dict[str, Any]:
         }
 
     salad = pronoun_salad_rate(words, text)
-    vden = verb_density(words)
+    vden = verb_density(words, text)
     mfv = missing_finite_verb_rate(text)
+    runon = unpunctuated_runon_rate(text, words)
+    # Prefer spaCy's finite-verb signal; fall back to run-on rate when spaCy is
+    # blind (no model / no sentence splits on a punctuation-free dump).
+    structure_break = max(mfv, runon)
 
-    # Healthy speech usually has verb density ~0.12–0.25
-    if vden < 0.08:
-        verb_density_penalty = (0.08 - vden) * 250.0
-    elif vden < 0.12:
-        verb_density_penalty = (0.12 - vden) * 100.0
+    # Low verb density only penalizes when structure is already broken. Otherwise
+    # clean prose with fewer hand-listed verbs gets unfairly punished and can
+    # rank *below* broken speech that happens to hit the content-verb set.
+    if structure_break > 0 or salad > 0:
+        if vden < 0.08:
+            verb_density_penalty = (0.08 - vden) * 250.0
+        elif vden < 0.12:
+            verb_density_penalty = (0.12 - vden) * 100.0
+        else:
+            verb_density_penalty = 0.0
     else:
         verb_density_penalty = 0.0
 
-    score = 82.0 - salad * 55.0 - verb_density_penalty - mfv * 45.0
+    score = 82.0 - salad * 55.0 - verb_density_penalty - structure_break * 45.0
     score = max(5.0, min(95.0, score))
     return {
         "score": round(score, 2),
@@ -249,6 +291,7 @@ def compute_structural_grammar_score(text: str) -> Dict[str, Any]:
             "pronoun_salad_rate": round(salad, 4),
             "verb_density": round(vden, 4),
             "missing_finite_verb_rate": round(mfv, 4),
+            "unpunctuated_runon_rate": round(runon, 4),
         },
     }
 
